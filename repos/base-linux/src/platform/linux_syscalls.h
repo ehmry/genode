@@ -34,9 +34,9 @@
 
 /* Linux includes */
 #include <linux/futex.h>
+#include <linux/sched.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sched.h>
 #include <sys/syscall.h>
 
 /* Genode includes */
