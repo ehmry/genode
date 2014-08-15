@@ -17,8 +17,10 @@
 #define printf(...)
 #endif /* GENODE_RELEASE */
 
+/*
 int sprintf(char *str, const char *format, ...)
 	{ printf("%s: not implemented\n", __func__); return 0; }
+*/
 FILE *fopen(const char *path, const char *mode)
 	{ printf("%s: not implemented\n", __func__); return 0; }
 FILE *fdopen(int fildes, const char *mode)
@@ -67,8 +69,10 @@ void *memcpy(void *dest, const void *src, unsigned n);
 */
 char *strcpy(char *dest, const char *src)
 	{ return strncpy(dest, src, ~0); }
+/*
 char *strcat(char *dest, const char *src)
 	{ printf("%s: not implemented\n", __func__); return 0; }
+*/
 
 inline size_t min(size_t v1, size_t v2) { return v1 < v2 ? v1 : v2; }
 
