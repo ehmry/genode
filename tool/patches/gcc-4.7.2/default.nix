@@ -1,0 +1,13 @@
+[
+  ./tmake_file_extra_parts.patch
+  ./misc.patch
+  ./tmake_file_arm.patch
+  ./link_spec.patch
+  ./inhibit_libc.patch
+  ./cppflags_for_target.patch
+  ./cpp_for_target.patch
+  ./no_short_enums.patch
+  ./host_target_combination.patch
+  ./pic_cxxflags.patch
+  ./makeinfo5.patch
+]

@@ -1,0 +1,65 @@
+#
+# \brief  Overrides for the testing framework
+# \author Emery Hemingway
+# \date   2014-08-11
+#
+
+
+##
+# Variables from the Nix expression
+#
+set out          $env(out)
+set name         $env(name)
+set wait_regex   $env(waitRegex)
+set wait_timeout $env(waitTimeout)
+
+exec mkdir -p $out
+
+log_file log
+# this comes out with the execute bit set for some reason
+exec chmod -x log
+
+
+proc run_dir { } { global out; return $out }
+proc qemu    { } { global env; return $env(qemu) }
+
+
+##
+# Strip the store directory and hash prefix
+# from a derivation output.
+#
+proc strip_hash {store_name} {
+    set name ""
+    regexp "\[a-z0-9\]\{32\}-(.*)" $store_name ignore name
+    return $name
+}
+
+##
+# Recursively recreate a file tree
+#
+proc includeInput {{input} {out}} {
+    foreach x [glob $input/*] {
+        if {[file isdirectory $x]} {
+            set subdir $out/[file tail $x]
+            exec mkdir $subdir
+            includeInput $x $subdir
+        } else {
+            exec ln -s $x $out/
+        }
+    }
+}
+
+#
+# Read and execute files passed by the Nix builder
+#
+foreach arg $argv { source $arg }
+
+
+##
+## Execution of run scripts
+##
+
+# Execute Genode
+run_genode_until $wait_regex $wait_timeout
+
+#exec cp log $out

@@ -1,0 +1,26 @@
+#
+# \brief  Environment for executing Genode on Linux
+# \author Emery Hemingway
+# \date   2014-08-11
+#
+
+proc run_genode_until {{wait_for_re forever} {timeout_value 0} {running_spawn_id -1}} {
+	#
+	# If a running_spawn_id is specified, wait for the expected output
+	#
+	if {$running_spawn_id != -1} {
+		wait_for_output $wait_for_re $timeout_value $running_spawn_id
+		return
+	}
+
+	global out spawn_id
+
+	cd $out/image
+	spawn ./core
+	wait_for_output $wait_for_re $timeout_value $spawn_id
+}
+
+## link in the image
+exec mkdir -p $out
+exec ln -s $env(image_dir) $out/image
+exec ln -s $env(image_dir) ./image

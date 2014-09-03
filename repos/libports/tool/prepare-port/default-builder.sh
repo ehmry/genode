@@ -1,0 +1,2 @@
+source $preparePort/setup
+genericBuild
