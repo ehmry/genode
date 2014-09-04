@@ -328,7 +328,6 @@ genericBuild() {
         return
     fi
 
-
     for curPhase in $phases; do
         if [ -n "$tracePhases" ]; then
             echo

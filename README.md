@@ -7,8 +7,6 @@ all source to library and program building is managed by Nix.
 
 ## Todo
 - Append git revision info to version string.
-- Compile object files to a '.o' file in a store directory, rather than 
-  directly on the output path.
 - Strip compilation and link outputs so that source code and intermediate
   object files don't get interpreted as runtime dependencies.
 - Find a better way to handle include directories

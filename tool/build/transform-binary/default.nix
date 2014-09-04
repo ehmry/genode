@@ -4,14 +4,14 @@
  * \date   2014-08-14
  */
 
-{ spec, compiler, common, shell }:
+{ build, common, shell }:
 
 { binary }:
 derivation {
-  name = "${spec.system}-binary";
+  name = "binary";
   system = builtins.currentSystem;
   inherit common binary;
-  inherit (compiler) as asOpt;
+  inherit (build) as asOpt;
   builder = shell;
   args = [ "-e" ./transform-binary.sh ];
 

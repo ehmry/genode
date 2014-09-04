@@ -1,3 +1,0 @@
-source $program/setup
-
-programBuild

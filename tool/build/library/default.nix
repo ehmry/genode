@@ -1,39 +1,51 @@
-{ spec, common, compiler, compile, transformBinary, shell }:
+{ build, common, compileObject, transformBinary, shell }:
+
+with build;
 
 let
   result = derivation
-    { name = "genode-build-library";
+    { name = "build-library";
       system = builtins.currentSystem;
 
       inherit common;
-
       setup = ./setup.sh;
-
       builder = shell;
       args = [ "-e" ../common/sub-builder.sh ];
     };
 in
+
 { name
 , shared ? false
 , sources
 , binaries ? []
 , includeDirs
-, flags ? []
 , libs ? []
 , entryPoint ? "0x0"
 , ... } @ args:
+
+let
+  ccFlags = [
+    (args.ccOpt or build.ccOpt)
+    (args.ccOLevel or build.ccOLevel)
+    (args.ccOptDep or build.ccOptDep)
+    (args.ccWarn or build.ccWarn)
+  ];
+  cxxFlags = [
+    (args.ccCxxOpt or build.ccCxxOpt)
+  ];
+in
 derivation ( args // {
   library = result;
   system = result.system;
 
   objects = 
-    map ( source: compile { inherit source includeDirs flags; }) sources
+    map (source: compileObject { inherit source includeDirs ccFlags cxxFlags; }) sources
     ++
     map (binary: transformBinary { inherit binary; }) binaries;
 
   inherit libs entryPoint;
 
-  inherit (compiler) cc cxx ar ld ldOpt objcopy;
+  inherit cc cxx ar ld ldOpt objcopy;
   inherit (spec) ccMarch ldMarch;
 
   builder = shell;

@@ -48,18 +48,12 @@ let
     libports = import ./repos/libports { inherit tool base os; };
   };
 
-  base      = repos.base.merge     repos;
+in
+rec {
+  base     = repos.base.merge     repos;
   os       = repos.os.merge       repos;
   demo     = repos.demo.merge     repos;
   libports = repos.libports.merge repos;
-
-in
-(base // os // demo // libports // {
-
-  test = base.test // os.test // demo.test;
-  run  = base.run // os.run;
-
-
 
   #####################################################
   ##### this is quite a hack but atleast it works #####
@@ -154,4 +148,4 @@ in
       ];
     };
   } else { };
-})
+}

@@ -1,15 +1,15 @@
 /*
-* \brief  Expression for the base repo
-* \author Emery Hemingway
-* \date   2014-08-11
-*
-* Here the plaform implementation is imported in local scope
-* and combined with the final attribute set.
-*
-* Implentations should only be imported through here to keep
-* a clean interface.
-*
-*/
+ * \brief  Expression for the base repo
+ * \author Emery Hemingway
+ * \date   2014-08-11
+ *
+ * Here the plaform implementation is imported in local scope
+ * and combined with the final attribute set.
+ *
+ * Implentations should only be imported through here to keep
+ * a clean interface.
+ *
+ */
 
 { tool, os }:
 
@@ -21,7 +21,7 @@ let
     if build.spec.kernel == "nova"  then import ../base-nova  { inherit tool base; } else
     throw "no base support for ${build.spec}";
 
-  ## TODO: get the version, look at NixOS for a reference
+  ## TODO: append the git revision
   version = builtins.readFile ../../VERSION;
 
   buildLibFromBase =
@@ -55,7 +55,6 @@ let
             abort "unknown cpu for platform"
         )
         includeDir
-        "${build.toolchain}/lib/gcc/${build.spec.target}/${build.toolchain.version}/include"
         "${build.toolchain.glibc}/include"
       ];
 
@@ -80,7 +79,7 @@ let
 
     };
   
-    core = build.program
+    core = build.component
       ( impl.core
         //
         { name = "core";
@@ -89,7 +88,7 @@ let
             ++ [ (base.sourceDir + "/core/include") ]
             ++ map (d: base.sourceDir + "/base/${d}") [ "env" "thread" ]
             ++ base.includeDirs;
-          flags = (impl.core.flags or []) ++ [ "-DGENODE_VERSION='\"${version}\"'" ];
+          ccOpt = build.ccOpt ++ (impl.core.flags or []) ++ [ "-DGENODE_VERSION='\"${version}\"'" ];
         }
       );
 

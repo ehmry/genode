@@ -1,5 +1,12 @@
 source @common@/setup
 
+_objects=$objects
+objects=""
+
+for o in $_objects; do
+    objects="$objects $o/*.o"
+done
+
 findLibs() {
     local pkg=$1
     local var=$2
@@ -28,30 +35,33 @@ done
 
 
 linkPhase() {
+    runHook preLink
     MSG_LINK $name
 
+    extraFlags=""
     if [ -n "$ldTextAddr" ]; then
-        cxxLinkOpt="$cxxLinkOpt -Wl,-Ttext=$ldTextAddr"
+        extraFlags="-Wl,-Ttext=$ldTextAddr"
     fi
 
     if [ -n "$ldScriptStatic" ]; then
         for s in $ldScriptStatic; do
-            cxxLinkOpt="$cxxLinkOpt -Wl,-T -Wl,$s"
+            extraFlags="$extraFlags -Wl,-T -Wl,$s"
         done
     fi
 
     mkdir -p $out
 
-    VERBOSE $cxx \
-        $ccMarch $cxxLinkOpt \
+    VERBOSE $cxx $cxxLinkOpt $extraFlags $ccMarch \
 	-Wl,--whole-archive -Wl,--start-group \
         $objects $libs \
 	-Wl,--end-group -Wl,--no-whole-archive \
         $($cc $ccMarch -print-libgcc-file-name) \
         -o $out/$name
+
+    runHook postLink
 }
 
-programBuild() {
+componentBuild() {
     MSG_PRG $name
     genericBuild
 }

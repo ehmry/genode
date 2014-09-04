@@ -2,7 +2,7 @@
 
 build.library {
   name = "libpng_static";
-  flags = [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ];
+  ccOpt = [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ] ++ build.ccOpt;
   libs = with demo.lib; [ mini_c libz_static ];
   sources = map (fn: (./contrib + "/${fn}"))
     [ "png.c"      "pngerror.c" "pngget.c"   "pngmem.c"

@@ -50,10 +50,4 @@
       #"${build.nixpkgs.linuxHeaders}/include"
     ];
 
-  ldScriptStatic =
-    if builtins.hasAttr "alwaysHybrid" build.spec && build.spec.alwaysHybrid == true then
-      [ (if build.is32Bit then "ldscripts/elf_i386.xc" else "ldscripts/elf_x86_64.xc")
-        (repo.sourceDir + "/platform/context_area.stdlib.ld")
-      ]
-    else [ (base.sourceDir + "/platform/genode.ld") ];
 }

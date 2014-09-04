@@ -1,5 +1,6 @@
 { build, base, os, demo }:
-build.program {
+
+build.component {
   name = "launchpad";
   libs = [ demo.lib.launchpad demo.lib.scout_widgets os.lib.config ];
   sources = [ ./launchpad_window.cc ./launcher.cc ./main.cc ];

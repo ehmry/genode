@@ -1,5 +1,12 @@
 source @common@/setup
 
+_objects=$objects
+objects=""
+
+for o in $_objects; do
+    objects="$objects $o/*.o"
+done
+
 mergeStaticPhase() {
     MSG_MERGE $name
 

@@ -1,7 +1,7 @@
 { build, base, os, demo }:
 build.test {
   name = "test-libpng_static";
-  flags = [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ];
+  ccOpt = [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ] ++ build.ccOpt;
   libs =
     [ base.lib.base
       demo.lib.libpng_static

@@ -1,6 +1,6 @@
 { build, base, os }:
 
-build.program {
+build.component {
   name = "init";
 
    libs =

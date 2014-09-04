@@ -9,5 +9,5 @@
   ldTextAddr = "0x01000000";
   ldScriptStatic = [ ../repos/base/src/platform/genode.ld ];
 
-  #ccOpt = [ "-fPIC" ];
+  ccOpt = [];
 }

@@ -1,6 +1,6 @@
 { build, base, os, demo }:
 
-build.program {
+build.component {
   name = "scout";
   libs = with demo.lib; [
     launchpad scout_widgets
@@ -35,7 +35,7 @@ build.program {
         "x-ray_small.png"
       ];
 
-  flags = [ "-DPNG_USER_CONFIG" ];
+  ccOpt = [ "-DPNG_USER_CONFIG" ] ++ build.ccOpt;
 
   includeDirs =
    [ ../scout 

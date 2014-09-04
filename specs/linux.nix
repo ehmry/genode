@@ -9,5 +9,5 @@
   ldTextAddr = "0x01000000";
   ldScriptStatic = [ ../repos/base/src/platform/genode.ld ../repos/base-linux/src/platform/context_area.nostdlib.ld ];
 
-  #ccOpt = [ "-fPIC" ];
+  ccOpt = [ "-fPIC" ];
 }
