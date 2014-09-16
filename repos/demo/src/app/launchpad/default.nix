@@ -1,11 +1,9 @@
-{ build, base, os, demo }:
+{ build }:
+{ launchpad, scout_widgets, config }:
 
 build.component {
   name = "launchpad";
-  libs = [ demo.lib.launchpad demo.lib.scout_widgets os.lib.config ];
+  libs = [ launchpad scout_widgets config ];
   sources = [ ./launchpad_window.cc ./launcher.cc ./main.cc ];
-  includeDirs =
-    [ ../launchpad ../scout
-      demo.includeDir ] 
-    ++ os.includeDirs ++ base.includeDirs;
+  includeDirs = [ ../launchpad ../scout ];
 }

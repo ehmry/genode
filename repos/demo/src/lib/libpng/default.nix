@@ -1,9 +1,10 @@
-{ build, base, os, demo }:
+{ build }:
+{ mini_c, libz_static }:
 
 build.library {
   name = "libpng_static";
   ccOpt = [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ] ++ build.ccOpt;
-  libs = with demo.lib; [ mini_c libz_static ];
+  libs = [ mini_c libz_static ];
   sources = map (fn: (./contrib + "/${fn}"))
     [ "png.c"      "pngerror.c" "pngget.c"   "pngmem.c"
       "pngpread.c" "pngread.c"  "pngrio.c"   "pngrtran.c"
@@ -12,9 +13,9 @@ build.library {
     ];
 
   includeDirs =
-    [ (demo.includeDir + "/libpng_static")
-      (demo.includeDir + "/libz_static")
-      (demo.includeDir + "/mini_c")
-    ]
-    ++ base.includeDirs;
+    [ ../../../include/libpng_static
+      ../../../include/libz_static
+      ../../../include/mini_c
+    ];
+
 }

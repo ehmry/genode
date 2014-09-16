@@ -1,13 +1,12 @@
-{ build, base, os }:
+{ build }:
+{ base, config }:
+
 let
   pciDir = ../../pci;
 in
-if build.isNova then  build.driver {
+if build.isNova then  build.component {
   name = "pci_device_pd";
-  libs = [ base.lib.base os.lib.config ];
+  libs = [ base config ];
   sources = [ ./main.cc ];
-  includeDirs =
-    [ "${pciDir}/device_pd" ]
-     ++ os.includeDirs
-     ++ base.includeDirs;
+  includeDirs = [ ../../pci/device_pd ];
 } else null

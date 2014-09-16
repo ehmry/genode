@@ -7,4 +7,5 @@
   pkgs.gawk
   pkgs.bash
   pkgs.patch
+  pkgs.patchelf
 ]

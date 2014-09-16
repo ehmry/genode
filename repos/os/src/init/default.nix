@@ -1,17 +1,9 @@
-{ build, base, os }:
+{ build }:
+
+{ base, init_pd_args, config }:
 
 build.component {
   name = "init";
-
-   libs =
-     [ base.lib.base ]
-     ++
-     (with os.lib; [ init_pd_args config ]);
-
+   libs = [ base init_pd_args config ];
    sources = [ ./main.cc ];
-
-   includeDirs =
-     os.includeDirs
-     ++
-     base.includeDirs;
 }

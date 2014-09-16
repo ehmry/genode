@@ -3,14 +3,16 @@
  * \date   2014-08-11
  */
 
-{ tool, base, os }:
+{ run }:
+{ thread }:
 
-tool.run {
+run {
   name = "thread";
 
-  bootInputs = [
-    base.core os.init base.test.thread
-    (builtins.toFile "config" ''
+  contents = [
+    { target = "/"; source = thread; }
+    { target = "/config";
+      source = builtins.toFile "config" ''
 	<config>
 		<parent-provides>
 			<service name="LOG"/>
@@ -24,23 +26,9 @@ tool.run {
 			<resource name="RAM" quantum="10M"/>
 		</start>
 	</config>
-    '')
+      '';
+    }
   ];
-
-  /*
-  config = tool.initConfig {
-    parentProvides = [ "LOG" "RM" "CPU" ];
-    
-    defaultRoute = [ [ "any-service" "parent" "any-child" ] ];
-
-    children = {
-      "test-thread" =
-        { binary = base.test.thread.name;
-          resources = [ { name="RAM"; quantum="10M"; } ];
-        };
-    };
-  };
-  */
 
   qemuArgs = [ "-nographic" "-m 64" ];
 

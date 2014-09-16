@@ -1,8 +1,8 @@
-{ build, base }:
+{ build }:
+{ base }:
 
-build.test {
+build.component {
   name = "test-fpu";
-  libs = [ base.lib.base ];
+  libs = [ base ];
   sources = [ ./main.cc ];
-  inherit (base) includeDirs;
 }

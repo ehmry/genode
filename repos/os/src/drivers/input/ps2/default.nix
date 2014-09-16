@@ -1,12 +1,9 @@
-{ build, base, os }:
+{ build }:
+{ base }:
 
-if build.isx86 then build.driver {
+if build.isx86 then build.component {
   name = "ps2_drv";
-  libs = [ base.lib.base ];
+  libs = [ base ];
   sources = [ ./x86/main.cc ];
-  includeDirs =
-   [ ./x86 ../ps2 ]
-   ++ os.includeDirs
-   ++ base.includeDirs;
-} else 
-null
+  includeDirs = [ ./x86 ../ps2 ];
+} else null

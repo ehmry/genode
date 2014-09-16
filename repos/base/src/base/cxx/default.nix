@@ -1,19 +1,16 @@
-{ build, base }:
+{ build }:
+
+# no library dependencies
+{ }:
 
 build.library rec {
   name = "cxx";
   shared = false;
 
-  sources = map (fn: base.sourceDir + "/base/cxx/${fn}")
-    [ "exception.cc"
-      "guard.cc"
-      "malloc_free.cc"
-      "misc.cc"
-      "new_delete.cc"
-      "unwind.cc"
+  sources = 
+    [ ./exception.cc ./guard.cc ./malloc_free.cc
+      ./misc.cc ./new_delete.cc ./unwind.cc
     ];
-
-  includeDirs = base.includeDirs;
 
   phases = [ "mergePhase" ];
 
@@ -67,6 +64,7 @@ build.library rec {
   #-include $(CXX_OBJECTS:.o=.d)
   #endif
 
+  # TODO check if these must be passed like this
   inherit (build.spec) ccMarch ldMarch;
   mergePhase = ''
     outName=subc++.o

@@ -1,11 +1,10 @@
-{ build, base, os }:
+{ build }:
 
-if !build.isx86 then null else build.driver {
+{ base }:
+
+if build.isx86 then build.component {
   name = "acpi_drv";
-  libs = [ base.lib.base ];
+  libs = [ base ];
   sources = [ ./main.cc ./acpi.cc ];
-  includeDirs =
-    [ ../acpi ]
-     ++ os.includeDirs
-     ++ base.includeDirs;
-}
+  includeDirs = [ ../acpi ];
+} else null

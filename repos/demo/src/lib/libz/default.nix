@@ -1,4 +1,5 @@
-{ build, base, os, demo }:
+{ build }:
+{ }:
 
 build.library {
   name = "libz_static";
@@ -10,7 +11,7 @@ build.library {
 
   includeDirs =
     [ ./contrib
-      (demo.includeDir + "/libz_static")
-      (demo.includeDir + "/mini_c")
-    ] ++ base.includeDirs;
+      ../../../include/libz_static
+      ../../../include/mini_c
+    ];
 }

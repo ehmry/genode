@@ -1,13 +1,20 @@
 /*
+* \brief  Functions for Linux core expression.
 * \author Emery Hemingway
 * \date   2014-08-12
+*
 */
 
 { build, base, repo }:
 
-{
-  libs = with base.lib;
-    [ base-common cxx startup syscall ];
+{ name, ccOpt, includeDirs }:
+
+{ base-common, cxx, startup, syscall }:
+
+build.component {
+  inherit name ccOpt;
+
+  libs = [ base-common cxx startup syscall ];
 
   sources =
     map (fn: repo.sourceDir + "/core/${fn}")
@@ -48,6 +55,6 @@
       (repo.sourceDir + "/base/console")
       (base.sourceDir + "/base/thread")
       #"${build.nixpkgs.linuxHeaders}/include"
-    ];
+    ] ++ includeDirs;
 
 }

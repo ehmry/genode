@@ -1,8 +1,8 @@
-{ build, base }:
+{ build }:
+{ base }:
 
-build.test {
+build.component {
   name = "test-thread";
   sources = [ ./main.cc ];
-  libs = [ base.lib.base ];
-  includeDirs = base.includeDirs;
+  libs = [ base ];
 }

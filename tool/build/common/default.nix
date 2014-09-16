@@ -1,4 +1,4 @@
-{ spec, toolchain, nixpkgs }:
+{ nixpkgs, toolchain }:
 
 let
 
@@ -9,9 +9,8 @@ let
 in
 
 derivation {
+  name = "common-build-environment";
   system = builtins.currentSystem;
-
-  name = "${spec.system}-buildenv";
 
   builder = shell;
   args = ["-e" ./builder.sh];
@@ -21,11 +20,6 @@ derivation {
   inherit shell toolchain;
 
   initialPath = initialPath ++ [ toolchain ];
-  #  (if targetSystem == "arm-genode" then toolchain + "/arm-elf-eabi" else
-  #  if targetSystem == "x86_64-genode" then toolchain + "/x86_64-elf" else
-  #  throw "unknown target system \"${targetSystem}\"") ];     
-
-  #inherit (cross.toolchain) target;
 
   propagatedUserEnvPkgs = [ toolchain ] ++
     nixpkgs.lib.filter nixpkgs.lib.isDerivation initialPath;

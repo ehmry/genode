@@ -3,14 +3,22 @@
 # \author Alexander Boettcher
 #
 
-{ tool, base, os }:
+{ run }:
+{ affinity }:
 
-tool.run rec {
+let
+  wantCpusX = "4";
+  wantCpusY = "1";
+  wantCpusTotal = "4";
+  rounds = "03";
+in
+run {
   name = "affinity";
   
-  bootInputs = [
-    base.core os.init base.test.affinity
-    (builtins.toFile "config" ''
+  contents = [
+    { target = "/"; source = affinity; }
+    { target = "/config";
+      source = builtins.toFile "config" ''
 	<config>
 		<parent-provides>
 			<service name="LOG"/>
@@ -29,31 +37,9 @@ tool.run rec {
 			<resource name="RAM" quantum="10M"/>
 		</start>
 	</config>
-    '')
+      '';
+    }
   ];
-
-  /*
-  config = tool.initConfig {
-    parentProvides =
-      [ "LOG" "CPU" "RM" "CAP"
-       "SIGNAL" "RAM" "ROM" "IO_MEM"
-      ];
-
-      defaultRoute = [ [ "any-service" "parent" ] ];
-
-      children = {
-        "test-affinity" =
-	  { #binary = base.test.affinity;
-            resources = [ { name = "RAM"; quantum = "10M"; } ];
-          };
-      };
-  };
-  */
-
-  wantCpusX = "4";
-  wantCpusY = "1";
-  wantCpusTotal = "4";
-  rounds = "03";
 
   qemuArgs = "-smp ${wantCpusTotal},cores=${wantCpusTotal}";
 

@@ -4,13 +4,27 @@
  * \date   2014-08-11
  */
 
-{ spec, nixpkgs, tool }:
+{ nixpkgs, pkgs }:
 
-{ name, bootInputs
+let
+  bootImage = import ../boot-image { inherit nixpkgs; };
+in
+
+{ name, contents
 , waitRegex ? "", waitTimeout ? 0
-, ... } @ args:
+, ... }:
 
-derivation (args // {
+let
+  contents' = contents ++ [
+    { target = "/";
+      source = pkgs.core;
+    }
+    { target = "/";
+      source = pkgs.init;
+    }
+  ];
+in
+derivation {
   name = name+"-run";
   system = builtins.currentSystem;
   preferLocalBuild = true;
@@ -32,9 +46,5 @@ derivation (args // {
 
   inherit waitRegex waitTimeout;
 
-  image_dir = tool.bootImage {
-    inherit name;
-    inputs = bootInputs;
-  };
-
-})
+  image_dir = bootImage { inherit name; contents = contents'; };
+}

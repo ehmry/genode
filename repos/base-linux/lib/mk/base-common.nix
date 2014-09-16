@@ -1,7 +1,11 @@
-{ base, repo }:
+{ repo }:
+{ build, base, includeDirs }:
 
-{
-  libs = [ base.lib.syscall ];
+{ syscall }:
+
+build.library {
+  name = "base-common";
+  libs = [ syscall ];
 
   sources =
     map (fn: repo.sourceDir + "/base/${fn}")
@@ -30,6 +34,7 @@
       (repo.sourceDir + "/platform" )
     ]
     ++
-    map (d: repo.sourceDir + "/base/${d}") [ "ipc" "env" "lock" ];
-
+    map (d: repo.sourceDir + "/base/${d}") [ "ipc" "env" "lock" ]
+    ++
+    includeDirs;
 }

@@ -1,13 +1,9 @@
-{ build, base, os }:
+{ build }:
+{ base, blit, config, server }:
 
-build.server {
+build.component {
   name = "nitpicker";
-
-  libs =
-    [ base.lib.base
-      os.lib.blit os.lib.config os.lib.server
-    ];
-
+  libs = [ base blit config server ];
   sources = 
     [ ./main.cc
       ./view_stack.cc ./view.cc
@@ -15,8 +11,5 @@ build.server {
     ];
 
   binaries = [ ./default.tff ];
-
-  includeDirs = [ ../nitpicker ]
-    ++ os.includeDirs ++ base.includeDirs;
-
+  includeDirs = [ ../nitpicker ];
 }

@@ -1,13 +1,11 @@
-{ build, base, os, demo }:
+{ build }:
+
+{ base, blit, scout_gfx }:
 
 build.library {
   name = "scout_widgets";
-  libs = [ base.lib.base os.lib.blit demo.lib.scout_gfx ];
+  libs = [ base blit scout_gfx ];
   sources = [ ./elements.cc ./scrollbar.cc ./tick.cc ./widgets.cc ];
-  includeDirs = 
-    [ demo.includeDir  ../../app/scout os.includeDir ]
-    ++ base.includeDirs;
-
   binaries = map (fn: (./data + "/${fn}"))
     [ "vera16.tff" "verai16.tff"
       "vera18.tff" "vera20.tff"
@@ -20,4 +18,5 @@ build.library {
       "redbar.rgba" "whitebar.rgba"
       "kill_icon.rgba" "opened_icon.rgba" "closed_icon.rgba"
     ];
+  includeDirs = [ ../scout ];
 }

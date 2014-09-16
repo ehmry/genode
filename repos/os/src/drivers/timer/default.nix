@@ -1,9 +1,10 @@
-{ build, base, os }:
+{ build }:
+{ base, alarm, syscall }:
 
 let
 
   platformLibs =
-    if build.isLinux then [ base.lib.syscall ] else
+    if build.isLinux then [ syscall ] else
     if build.isNova then [ ] else
     throw "no timer driver for ${build.spec.system}";
 
@@ -16,11 +17,9 @@ let
     throw "no timer driver for ${build.spec.system}";
 
 in
-build.driver {
+build.component {
   name = "timer";
-  libs =
-    [ base.lib.base os.lib.alarm ]
-    ++ platformLibs;
+  libs = [ base alarm ] ++ platformLibs;
 
   sources =
     [ ./main.cc
@@ -28,7 +27,7 @@ build.driver {
 
   includeDirs =
     platformIncludes
-    ++ [ ./include ]
-    ++ os.includeDirs
-    ++ base.includeDirs;
+    ++
+    [ ../../../../base-linux/src/platform ./include ];
+
 }

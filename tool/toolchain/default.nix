@@ -28,6 +28,7 @@ let
   ];
 
 in rec {
+  /*
 
   binutils = import ./binutils {
     inherit cross;
@@ -64,9 +65,9 @@ in rec {
    inherit (nixpkgs) stdenv fetchurl zlib; 
    libcCross = libc;
   };
+  */
 
-  precompiled = import ./precompiled {
-    inherit (nixpkgs) stdenv fetchurl patchelf gcc zlib;
+  precompiled = nixpkgs.callPackage ./precompiled {
     glibc = nixpkgs.glibc_multi;
   };
 

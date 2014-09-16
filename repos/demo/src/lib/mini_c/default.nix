@@ -1,4 +1,5 @@
-{ build, base, os, demo }:
+{ build }:
+{ }:
 
 build.library {
   name = "mini_c";
@@ -11,5 +12,5 @@ build.library {
       ./strlen.cc      ./strtod.cc
       ./strtol.cc      ./vsnprintf.cc
     ];
-  includeDirs = [ (demo.includeDir + "/mini_c") ] ++  base.includeDirs;
+  includeDirs = [ ../../../include/mini_c ];
 }

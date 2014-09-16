@@ -1,9 +1,14 @@
 # Taken from base.mk and base.inc
 
-{ base, repo }:
+{ repo }:
+{ build, base, includeDirs }:
 
-{
-  libs = with base.lib; [ startup cxx base-common syscall ];
+{ startup, cxx, base-common, syscall }:
+
+build.library {
+  name = "base";
+
+  libs = [ startup cxx base-common syscall ];
 
   sources =
     map (fn: repo.sourceDir + "/base/${fn}")
@@ -22,6 +27,6 @@
     [ (repo.sourceDir + "/platform")
       (repo.sourceDir + "/base/env")
       (base.sourceDir + "/base/env")
-    ];
+    ] ++ includeDirs;
 
 }

@@ -1,5 +1,7 @@
 { build, base, impl }:
 
+{ syscall }:
+
 let
   sourceDir = base.sourceDir + "/platform";
   subdir =
@@ -12,7 +14,7 @@ build.library rec {
   name = "startup";
   shared = false;
 
-  libs = [ base.lib.syscall ];
+  libs = [ syscall ];
 
   sources =
     [ (subdir + "/crt0.s")
@@ -23,6 +25,6 @@ build.library rec {
       ];
 
   includeDirs =
-    [ "${impl.sourceDir}/platform" sourceDir ]
-    ++ impl.includeDirs ++ base.includeDirs;
+    [ "${impl.repo.sourceDir}/platform" sourceDir ]
+    ++ impl.repo.includeDirs ++ base.includeDirs;
 }

@@ -3,14 +3,16 @@
  * \date   2014-08-11
  */
 
-{ tool, base, os }:
+{ run }:
+{ fpu }:
 
-tool.run {
+run {
   name = "fpu";
 
-  bootInputs = [
-    base.core os.init base.test.fpu
-    (builtins.toFile "config" ''
+  contents = [
+    { target = "/"; source = fpu; }
+    { target = "/config";
+      source = builtins.toFile "config" ''
 	<config>
 		<parent-provides>
 			<service name="ROM"/>
@@ -30,21 +32,9 @@ tool.run {
 			<resource name="RAM" quantum="10M"/>
 		</start>
 	</config>
-    '')
+      '';
+    }
   ];
-
-  /*
-  config = tool.initConfig {
-    parentProvides = [ "ROM" "RAM" "CPU" "RM" "CAP" "PD" "LOG" "SIGNAL" ];
-    defaultRoute = [ [ "any-service" "parent" ] ];
-    children =
-      { test = 
-        { binary = base.test.fpu.name;
-          resources = [ { name="RAM"; quantum="10M"; } ];
-        };
-      };
-  };
-  */
 
   waitRegex  = "test done.*\n";
   waitTimeout = 20;

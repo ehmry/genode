@@ -1,9 +1,9 @@
-{ build, base, os, demo }:
+{ build }:
+{ base, blit }:
 
-build.server {
+build.component {
   name = "nitlog";
-  libs = [ base.lib.base os.lib.blit ];
+  libs = [ base blit ];
   sources  = [ ./main.cc ];
   binaries = [ ./mono.tff ];
-  includeDirs = os.includeDirs ++ base.includeDirs;
 }

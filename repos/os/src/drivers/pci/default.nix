@@ -1,11 +1,9 @@
-{ build, base, os }:
+{ build }:
+{ base, config }:
 
-if build.isx86 then build.driver {
+if build.isx86 then build.component {
   name = "pci_drv";
-  libs = [ base.lib.base os.lib.config ];
+  libs = [ base config ];
   sources = [ ./main.cc ];
-  includeDirs =
-    [ ../pci ]
-     ++ os.includeDirs
-     ++ base.includeDirs;
+  includeDirs = [ ../pci ];
 } else null

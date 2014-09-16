@@ -4,11 +4,11 @@
 * \date   2014-08-11
 */
 
-{ build, base }:
+{ build }:
+{ base }:
 
-build.test {
+build.component {
   name = "test-affinity";
   sources = [ ./main.cc ];
-  libs = [ base.lib.base ];
-  includeDirs = base.includeDirs;
+  libs = [ base ];
 }

@@ -2,19 +2,28 @@
  * \brief  Functions for building Genode components
  * \author Emery Hemingway
  * \date   2014-08-11
- *
- * Much of the what is imported here needs to be
- * de-duplicated.
- *
  */
 
-{ spec, nixpkgs, toolchain }:
+{ system, nixpkgs }:
 
 let
+  spec =
+    if system == "x86_32-linux" then import ../../specs/x86_32-linux.nix else
+    if system == "x86_64-linux" then import ../../specs/x86_64-linux.nix else
+    if system == "x86_32-nova"  then import ../../specs/x86_32-nova.nix  else
+    if system == "x86_64-nova"  then import ../../specs/x86_64-nova.nix  else
+    abort "unknown system type ${system}";
+
+  toolchain = nixpkgs.callPackage ../toolchain/precompiled {
+    glibc = nixpkgs.glibc_multi;
+  };
+
   devPrefix = "genode-${spec.platform}-";
   shell = nixpkgs.bash + "/bin/sh";
 
   build = rec {
+    system = system;
+
     inherit spec nixpkgs toolchain;
 
     version = builtins.readFile ../../VERSION;
@@ -54,7 +63,7 @@ let
     ccWarn   = "-Wall";
 
     ccOpt = [
-      # Always compile with '-ffunction-sections' to enable 
+      # Always compile with '-ffunction-sections' to enable
       # the use of the linker option '-gc-sections'
       "-ffunction-sections"
 
@@ -87,7 +96,7 @@ let
 
   };
 
-    common = import ./common { inherit spec nixpkgs toolchain; };
+    common = import ./common { inherit nixpkgs toolchain; };
 
     compileObject = import ./compile-object { inherit build common shell; };
     transformBinary = import ./transform-binary { inherit build common shell; };
@@ -98,7 +107,8 @@ in
   library = import ./library { inherit build common compileObject transformBinary shell; };
   component = import ./component { inherit build common compileObject transformBinary shell; };
 
-  # These might be overridden later
-  driver = component; server = component; test = component;
+  #final = { # final excludes nixpkgs from pkgs.build
+  #  inherit library component driver server test;
+  #};
 
 })

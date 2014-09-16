@@ -1,13 +1,13 @@
-{ build, base, os, demo }:
+{ build }:
 
-build.server {
+{ config, scout_widgets }:
+
+build.component {
   name = "liquid_fb";
-  libs = [ demo.lib.scout_widgets os.lib.config ];
+  libs = [ config scout_widgets ];
   sources = [ ./main.cc ./services.cc ];
   includeDirs =
     [ ../liquid_framebuffer
       ../../app/scout
-      demo.includeDir
-      os.includeDir
-    ] ++ base.includeDirs;
+    ];
 }

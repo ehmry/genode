@@ -1,11 +1,15 @@
-{ build, base, os, demo }:
+{ build }:
+{ launchpad, scout_widgets, libpng_static }:
 
+let
+  demoInclude = ../../../include;
+in
 build.component {
   name = "scout";
-  libs = with demo.lib; [
-    launchpad scout_widgets
-    libpng_static
-  ];
+  libs = 
+    [ launchpad scout_widgets
+      libpng_static
+    ];
 
   sources =
     [ ./main.cc
@@ -39,10 +43,8 @@ build.component {
 
   includeDirs =
    [ ../scout 
-     demo.includeDir
-     (demo.includeDir + "/libpng_static")
-     (demo.includeDir + "/libz_static")
-     os.includeDir
-   ]
-   ++ base.includeDirs;
+     (demoInclude + "/libpng_static")
+     (demoInclude + "/libz_static")
+   ];
+
 }

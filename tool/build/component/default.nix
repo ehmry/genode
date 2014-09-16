@@ -15,7 +15,7 @@ in
 { name
 , sources
 , binaries ? []
-, includeDirs
+, includeDirs ? []
 , libs
 , ... } @ args:
 
