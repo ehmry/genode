@@ -14,12 +14,12 @@ let
 
   build = import ./tool/build { inherit system nixpkgs; };
 
-  baseIncludes = import ./repos/base/include { inherit build; };
-  osIncludes   = import ./repos/os/include   { inherit build; };
-  demoIncludes = import ./repos/demo/include { inherit build; };
+  baseIncludes = import ./repos/base/include { inherit tool; };
+  osIncludes   = import ./repos/os/include   { inherit tool; };
+  demoIncludes = import ./repos/demo/include { inherit tool; };
 
   libs = import ./libs.nix {
-    inherit build baseIncludes osIncludes demoIncludes;
+    inherit system tool baseIncludes osIncludes demoIncludes;
   };
 
   test = import ./test.nix {

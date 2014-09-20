@@ -13,6 +13,7 @@ nix-repl> :b run.fpu
 nix-repl> :q
 
 $ nix-build -A run.thread
+$ nix-build libs.nix
 $ nix-build repos/libports/ports -A libc
 $ nix-build repos/ports/ports -A dosbox
 ```
@@ -25,12 +26,8 @@ functions for building libraries and components, when that is finished, then I
 get back to system building and booting.
 
 I started with everything in a single namespace broken up by repo, like base.core,
- os.init, demo.app.scout, but now everything is in libs, pkgs, test, and run.
+os.init, demo.app.scout, but now everything is in libs, pkgs, test, and run.
 Only pkgs and run are exported in the 'default.nix' entry expression.
-
-When I say entry expression I mean files that can be loaded directly by nix-build.
-Currently the only real entry expressions are the top-level default.nix and the port
-directories in the libports and ports repos.
 
 ## Todo
 - Append git revision info to version string.

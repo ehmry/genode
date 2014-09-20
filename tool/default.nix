@@ -1,4 +1,6 @@
-{ nixpkgs ? import <nixpkgs> { } }:
+{ system ? builtins.currentSystem
+,  nixpkgs ? import <nixpkgs> { }
+}:
 
 let
   shell = nixpkgs.bash + "/bin/sh";
@@ -19,5 +21,7 @@ in
     });
 
   preparePort = import ./prepare-port { inherit nixpkgs; };
+
+  build = import ./build { inherit system nixpkgs; };
 
 }

@@ -4,7 +4,7 @@
  * \date   2014-09-11
  */
 
-{ build, callLibrary, baseIncludes, osIncludes }:
+{ tool, callLibrary, baseIncludes, osIncludes }:
 
 let
 
@@ -14,9 +14,9 @@ let
   };
 
   # overide the build.library function
-  build' = build // {
+  build = tool.build // {
     library = { includeDirs ? [], ... } @ args:
-      build.library (args // {
+      tool.build.library (args // {
         includeDirs =  builtins.concatLists [
           includeDirs osIncludes baseIncludes
         ];
@@ -24,7 +24,7 @@ let
   };
 
   importLibrary = path:
-    callLibrary (import path { build = build'; });
+    callLibrary (import path { inherit build; });
 
 in {
   alarm        = importLibrary ./src/lib/alarm;

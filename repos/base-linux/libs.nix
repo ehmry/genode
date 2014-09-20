@@ -41,14 +41,17 @@ in rec {
       sources =
         [ ./src/platform/lx_hybrid.cc
           (baseRepo.sourceDir + "/base/cxx/new_delete.cc")
-        ] ++
         # from lib/mk/base.inc
-        [ (baseRepo.sourceDir + "/base/console/log_console.cc")
+          (baseRepo.sourceDir + "/base/console/log_console.cc")
           (baseRepo.sourceDir + "/base/env/env.cc")
           ./src/base/env/platform_env.cc
           (baseRepo.sourceDir + "/base/env/context_area.cc")
         ];
-      includeDirs = [ ./src/base/env (baseRepo.sourceDir + "/base/env") ] ++ baseRepo.includeDirs;
+      includeDirs =
+        [ ./src/base/env
+          ./src/platform
+          (baseRepo.sourceDir + "/base/env")
+        ];# ++ baseRepo.includeDirs;
     }
   );
 
