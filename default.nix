@@ -10,6 +10,8 @@ let
 
   nixpkgs = import <nixpkgs> {};
 
+  tool = import ./tool { inherit nixpkgs; };
+
   build = import ./tool/build { inherit system nixpkgs; };
 
   baseIncludes = import ./repos/base/include { inherit build; };
@@ -27,7 +29,7 @@ let
 in rec {
 
   pkgs = import ./pkgs.nix {
-    inherit build libs baseIncludes osIncludes demoIncludes;
+    inherit tool build libs baseIncludes osIncludes demoIncludes;
   };
 
   run = import ./run.nix {

@@ -1,5 +1,5 @@
 /*
- * \brief  Demo components.
+ * \brief  Demo components
  * \author Emery Hemingway
  * \date   2014-09-15
  */

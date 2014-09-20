@@ -79,17 +79,6 @@ closeNest() {
     done
 }
 
-# This function is useful for debugging broken Nix builds.  It dumps
-# all environment variables to a file `env-vars' in the build
-# directory.  If the build fails and the `-K' option is used, you can
-# then go to the build directory and source in `env-vars' to reproduce
-# the environment used for building.
-dumpVars() {
-    if [ "$noDumpEnvVars" != 1 ]; then
-        export > "$NIX_BUILD_TOP/env-vars"
-    fi
-}
-
 
 ######################################################################
 # Helper functions that might be useful in setup hooks.
@@ -135,6 +124,107 @@ if [ "$NIX_DEBUG" = 1 ]; then
 fi
 
 
+# Allow the caller to augment buildInputs (it's not always possible to
+# do this before the call to setup.sh, since the PATH is empty at that
+# point; here we have a basic Unix environment).
+runHook addInputsHook
+
+
+# Recursively find all build inputs.
+findInputs() {
+    local pkg=$1
+    local var=$2
+    local propagatedBuildInputsFile=$3
+
+    case ${!var} in
+        *\ $pkg\ *)
+            return 0
+            ;;
+    esac
+
+    eval $var="'${!var} $pkg '"
+
+    if [ -f $pkg/nix-support/setup-hook ]; then
+        source $pkg/nix-support/setup-hook
+    fi
+
+    if [ -f $pkg/nix-support/$propagatedBuildInputsFile ]; then
+        for i in $(cat $pkg/nix-support/$propagatedBuildInputsFile); do
+            findInputs $i $var $propagatedBuildInputsFile
+        done
+    fi
+}
+
+crossPkgs=""
+for i in $buildInputs $propagatedBuildInputs; do
+    findInputs $i crossPkgs propagated-build-inputs
+done
+
+nativePkgs=""
+for i in $nativeBuildInputs $propagatedNativeBuildInputs; do
+    findInputs $i nativePkgs propagated-native-build-inputs
+done
+
+PATH=$_PATH${_PATH:+:}$PATH
+if [ "$NIX_DEBUG" = 1 ]; then
+    echo "final path: $PATH"
+fi
+
+
+# Set the relevant environment variables to point to the build inputs
+# found above.
+addToNativeEnv() {
+    local pkg=$1
+
+    if [ -d $1/bin ]; then
+        addToSearchPath _PATH $1/bin
+    fi
+
+    # Run the package-specific hooks set by the setup-hook scripts.
+    for i in "${envHooks[@]}"; do
+        $i $pkg
+    done
+}
+
+for i in $nativePkgs; do
+    addToNativeEnv $i
+done
+
+addToCrossEnv() {
+    local pkg=$1
+
+    # Some programs put important build scripts (freetype-config and similar)
+    # into their crossDrv bin path. Intentionally these should go after
+    # the nativePkgs in PATH.
+    if [ -d $1/bin ]; then
+        addToSearchPath _PATH $1/bin
+    fi
+
+    # Run the package-specific hooks set by the setup-hook scripts.
+    for i in "${crossEnvHooks[@]}"; do
+        $i $pkg
+    done
+}
+
+for i in $crossPkgs; do
+    addToCrossEnv $i
+done
+
+
+# Set the prefix.  This is generally $out, but it can be overriden,
+# for instance if we just want to perform a test build/install to a
+# temporary location and write a build report to $out.
+if [ -z "$prefix" ]; then
+    prefix="$out";
+fi
+
+
+PATH=$_PATH${_PATH:+:}$PATH
+if [ "$NIX_DEBUG" = 1 ]; then
+    echo "final path: $PATH"
+fi
+
+
 # Utility function: return the base name of the given path, with the
 # prefix `HASH-' removed, if present.
 stripHash() {
@@ -154,12 +244,12 @@ unpackFile() {
     case "$curSrc" in
         *.tar.xz | *.tar.lzma)
             # Don't rely on tar knowing about .xz.
-            xz -d < $curSrc | tar xf - $tarOpt
+            xz -d < $curSrc | tar xf - $tarFlags
             ;;
         *.tar | *.tar.* | *.tgz | *.tbz2)
             # GNU tar can automatically select the decompression method
             # (info "(tar) gzip").
-            tar -xf $curSrc $tarOpt
+            tar -xf $curSrc $tarFlags
             ;;
         *.zip)
             unzip -qq $curSrc
@@ -183,16 +273,16 @@ unpackFile() {
 
 
 unpackPhase() {
-    mkdir -p $out/$name ; cd $out/$name
+    #mkdir -p $out/$name ; cd $out/$name
 
     runHook preUnpack
 
-    if [ -z "$archives" ]; then
-        if [ -z "$archive" ]; then
-            echo 'variable $archive or $archives should point to the source'
+    if [ -z "$srcs" ]; then
+        if [ -z "$src" ]; then
+            echo 'variable $src or $srcs should point to the source'
             exit 1
         fi
-        archives="$archive"
+        srcs="$src"
     fi
 
     # To determine the source directory created by unpacking the
@@ -207,9 +297,75 @@ unpackPhase() {
     done
 
     # Unpack all source archives.
-    for a in $archives; do
+    for a in $srcs; do
         unpackFile $a
     done
+
+    runHook postUnpack
+}
+
+unpackPhase() {
+    runHook preUnpack
+
+    if [ -z "$srcs" ]; then
+        if [ -z "$src" ]; then
+            echo 'variable $src or $srcs should point to the source'
+            exit 1
+        fi
+        srcs="$src"
+    fi
+
+    # To determine the source directory created by unpacking the
+    # source archives, we record the contents of the current
+    # directory, then look below which directory got added.  Yeah,
+    # it's rather hacky.
+    local dirsBefore=""
+    for i in *; do
+        if [ -d "$i" ]; then
+            dirsBefore="$dirsBefore $i "
+        fi
+    done
+
+    # Unpack all source archives.
+    for i in $srcs; do
+        unpackFile $i
+    done
+
+    # Find the source directory.
+    if [ -n "$setSourceRoot" ]; then
+        runHook setSourceRoot
+    elif [ -z "$sourceRoot" ]; then
+        sourceRoot=
+        for i in *; do
+            if [ -d "$i" ]; then
+                case $dirsBefore in
+                    *\ $i\ *)
+                        ;;
+                    *)
+                        if [ -n "$sourceRoot" ]; then
+                            sourceRoot=$NIX_BUILD_TOP
+                            break
+                        fi
+                        sourceRoot="$i"
+                        ;;
+                esac
+            fi
+        done
+    fi
+
+    if [ -z "$sourceRoot" ]; then
+        echo "unpacker appears to have produced no directories"
+        exit 1
+    fi
+
+    echo "source root is $sourceRoot"
+
+    # By default, add write permission to the sources.  This is often
+    # necessary when sources have been copied from other store
+    # locations.
+    if [ "$dontMakeSourcesWritable" != 1 ]; then
+        chmod -R u+w "$sourceRoot"
+    fi
 
     runHook postUnpack
 }
@@ -244,6 +400,16 @@ patchPhase() {
 }
 
 
+installPhase() {
+    runHook preInstall
+
+    mkdir -p "$prefix"
+    cp -r ./* "$prefix"
+
+    runHook postInstall
+}
+
+
 genericBuild() {
     header "preparing $out"
 
@@ -253,12 +419,10 @@ genericBuild() {
     fi
 
     if [ -z "$phases" ]; then
-        phases="unpackPhase patchPhase "
+        phases="unpackPhase patchPhase installPhase"
     fi
 
     for curPhase in $phases; do
-        dumpVars
-
         # Evaluate the variable named $curPhase if it exists, otherwise the
         # function named $curPhase.
         eval "${!curPhase:-$curPhase}"
@@ -272,5 +436,3 @@ genericBuild() {
 
     stopNest
 }
-
-dumpVars

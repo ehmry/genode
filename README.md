@@ -1,13 +1,9 @@
 # The Nix conversion
 
-This my Nix conversion of the Genode build system.
-
-It doesn't work as well as it used because I've been doing alot of re-arranging.
-
 If you would like to try it out, here is few places to start:
 
 ```
-$ nix-repl <GENODE_DIR>/default.nix
+$ nix-repl default.nix
 
 nix-repl> :?
 nix-repl> :b pkgs.init
@@ -16,17 +12,25 @@ nix-repl> run.fpu
 nix-repl> :b run.fpu
 nix-repl> :q
 
-$ nix-build <GENODE_DIR>/default.nix -A run.thread
+$ nix-build -A run.thread
+$ nix-build repos/libports/ports -A libc
+$ nix-build repos/ports/ports -A dosbox
 ```
 
 I've been rebasing and squashing and forcing pushes to the Github repo to
-get Hydra working just right, so I apologize if it makes it hard to follow.
+get Hydra working just right, so I apologize if that makes it hard to follow.
 
-I started with everything in a single namespace broken up by repo,
-like base.core, os.init, demo.app.scout, but now everything is in
-libs, pkgs, test, and run. Only pkgs and run are exported in the 'default.nix'
-entry expression, as libs and test are not usefull in and of themselves (thats
-not entirely true of test but I'll deal with that another way).
+Booting NOVA tests was working previously, but I'm in the process of reorganizing
+functions for building libraries and components, when that is finished, then I
+get back to system building and booting.
+
+I started with everything in a single namespace broken up by repo, like base.core,
+ os.init, demo.app.scout, but now everything is in libs, pkgs, test, and run.
+Only pkgs and run are exported in the 'default.nix' entry expression.
+
+When I say entry expression I mean files that can be loaded directly by nix-build.
+Currently the only real entry expressions are the top-level default.nix and the port
+directories in the libports and ports repos.
 
 ## Todo
 - Append git revision info to version string.

@@ -4,7 +4,7 @@
  * \date   2014-09-04
  */
 
-{ build, libs
+{ tool, build, libs
 , baseIncludes, osIncludes, demoIncludes }:
 
 let
@@ -24,6 +24,12 @@ let
     inherit build callPackage baseIncludes osIncludes demoIncludes;
   };
 
-in base // os // demo // {
+  ports = import ./repos/ports/pkgs.nix {
+    inherit tool build callPackage baseIncludes osIncludes;
+  };
+
+# TODO: make a function to combine these
+in base // os // demo // ports // {
+  app = (demo.app // ports.app);
   server = (os.server // demo.server);
 }
