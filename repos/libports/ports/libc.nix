@@ -94,7 +94,6 @@ preparePort {
   repos = map (x: x.name) subdirs;
   dirs  = map (x: x.dir ) subdirs;
 
-  patches = wildcard "${../src/lib/libc/patches}/*.patch";
+  patches = "${../src/lib/libc/patches}/*.patch";
   patchFlags = "-p0";
-
 }

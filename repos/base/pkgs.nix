@@ -28,11 +28,20 @@ let
       });
   };
 
+  importComponent = path:
+    callPackage (import path { build = build'; });
+
   ## TODO: append the git revision
   version = builtins.readFile ../../VERSION;
 
 in
 {
+  test = {
+    affinity = importComponent ./src/test/affinity;
+    fpu      = importComponent ./src/test/fpu;
+    thread   = importComponent ./src/test/thread;
+  } // (impl.test or {});
+
   core = callPackage (impl.core {
     name = "core";
     includeDirs =

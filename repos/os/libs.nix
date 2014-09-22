@@ -32,6 +32,7 @@ in {
   config       = importLibrary ./src/lib/config;
   config_args  = importLibrary ./src/lib/config_args;
   init_pd_args = importLibrary ./src/lib/init_pd_args;
+  ldso-startup = importLibrary ./src/lib/ldso/startup;
   server       = importLibrary ./src/lib/server;
   #trace        = importLibrary ./src/lib/trace;
 }

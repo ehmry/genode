@@ -43,6 +43,11 @@ in
     nitpicker = importComponent ./src/server/nitpicker;
   };
 
+  test = {
+    signal = importComponent ./src/test/signal;
+    timer  = importComponent ./src/test/timer;
+  };
+
   init = importComponent ./src/init;
 
 }

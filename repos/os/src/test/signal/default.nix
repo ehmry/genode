@@ -3,11 +3,11 @@
  * \date   2014-08-12
  */
 
-{ build, base, os }:
+{ build }:
+{ base }:
 
-build.test {
+build.component {
   name = "test-signal";
-  libs = [ base.lib.base ];
+  libs = [ base ];
   sources = [ ./main.cc ];
-  includeDirs = [ os.includeDir ] ++ base.includeDirs;
 }

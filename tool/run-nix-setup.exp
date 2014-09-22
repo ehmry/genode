@@ -8,17 +8,15 @@
 ##
 # Variables from the Nix expression
 #
-set out          $env(out)
-set name         $env(name)
-set wait_regex   $env(waitRegex)
-set wait_timeout $env(waitTimeout)
+set out  $env(out)
+set name $env(name)
+set test_script $env(testScript)
 
 exec mkdir -p $out
 
-log_file log
+log_file $out/log
 # this comes out with the execute bit set for some reason
-exec chmod -x log
-
+exec chmod -x $out/log
 
 proc run_dir { } { global out; return $out }
 proc qemu    { } { global env; return $env(qemu) }
@@ -59,7 +57,4 @@ foreach arg $argv { source $arg }
 ## Execution of run scripts
 ##
 
-# Execute Genode
-run_genode_until $wait_regex $wait_timeout
-
-#exec cp log $out
+eval $test_script

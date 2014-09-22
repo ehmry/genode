@@ -3,14 +3,18 @@
  * \date   2014-08-12
  */
 
-{ tool, base, os }:
+{ run, pkgs }:
 
-tool.run {
+with pkgs;
+
+run {
   name = "signal";
 
-  bootInputs = [
-    base.core os.init os.driver.timer os.test.signal
-    (builtins.toFile "config" ''
+  contents = [
+    { target = "/"; source = driver.timer; }
+    { target = "/"; source = test.signal; }
+    { target = "/config"; 
+      source = builtins.toFile "config" ''
     	<config>
 		<parent-provides>
 			<service name="ROM"/>
@@ -36,31 +40,15 @@ tool.run {
 			<resource name="RAM" quantum="10M"/>
 		</start>
 	</config>
-    '')
+      '';
+    }
   ];
 
-  /*
-  config = tool.initConfig {
-    parentProvides =
-      [ "ROM" "RAM" "CPU" "RM" "CAP" "PD" "IRQ" "IO_PORT" "IO_MEM" "SIGNAL" "LOG" ];
+  testScript = ''
+    append qemu_args "-nographic -m 64"
 
-    defaultRoute = [ [ "any-service" "parent" "any-child" ] ];
+    run_genode_until {child exited with exit value 0.*} 200
 
-    children = {
-      "timer" =
-        { binary = os.driver.timer.name;
-          resources = [ { name="RAM"; quantum="10M"; } ];
-          provides  = [ { name="Timer"; } ];
-        };
-
-      "test-signal" =
-        { binary = os.test.signal.name;
-          resources = [ { name="RAM"; quantum="10M"; } ];
-        };
-    };
-  };
-  */
-
-  waitRegex = "child exited with exit value 0.*";
-  waitTimeout = 200;
+    puts "Test succeeded"
+  '';
 }

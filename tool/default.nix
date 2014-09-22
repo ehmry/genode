@@ -9,15 +9,16 @@ in
   inherit nixpkgs;
 
   filterOut = filters: filteree:
-    builtins.filter (e: !(builtins.elem e filters)) filteree;
+    builtins.filter (e: !(builtins.elem (builtins.baseNameOf e) filters)) filteree;
 
   wildcard = glob:
     import (derivation {
       name = "files.nix";
       system = builtins.currentSystem;
       builder = shell;
+      PATH="${nixpkgs.coreutils}/bin";
       inherit glob;
-      args = [ "-c" "echo [ $glob ] > $out" ];
+      args = [ "-e" "-c" "echo [ > $out; ls -Q $glob >> $out; echo ] >> $out" ];
     });
 
   preparePort = import ./prepare-port { inherit nixpkgs; };

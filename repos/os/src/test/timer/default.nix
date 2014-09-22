@@ -3,11 +3,11 @@
 * \date   2014-08-12
 */
 
-{ build, base, os }:
+{ build }:
+{ base }:
 
-build.test {
+build.component {
   name = "test-timer";
   sources = [ ./main.cc ];
-  libs = [ base.lib.base ];
-  includeDirs = [ os.includeDir ] ++ base.includeDirs;
+  libs = [ base ];
 }

@@ -3,14 +3,15 @@
  * \date   2014-08-11
  */
 
-{ run }:
-{ fpu }:
+{ run, pkgs }:
+
+with pkgs;
 
 run {
   name = "fpu";
 
   contents = [
-    { target = "/"; source = fpu; }
+    { target = "/"; source = test.fpu; }
     { target = "/config";
       source = builtins.toFile "config" ''
 	<config>
@@ -36,6 +37,26 @@ run {
     }
   ];
 
-  waitRegex  = "test done.*\n";
-  waitTimeout = 20;
+  testScript = ''
+    append qemu_args "-nographic -m 64"
+
+    run_genode_until "test done.*\n" 60
+
+    grep_output {^\[init -\> test\]}
+
+    compare_output_to {
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] test done
+    }
+  '';
+
 }

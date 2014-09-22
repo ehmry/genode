@@ -22,8 +22,6 @@ let
   shell = nixpkgs.bash + "/bin/sh";
 
   build = rec {
-    system = system;
-
     inherit spec nixpkgs toolchain;
 
     version = builtins.readFile ../../VERSION;
@@ -96,19 +94,13 @@ let
 
   };
 
-    common = import ./common { inherit nixpkgs toolchain; };
+  common = import ./common { inherit nixpkgs toolchain; };
 
-    compileObject = import ./compile-object { inherit build common shell; };
-    transformBinary = import ./transform-binary { inherit build common shell; };
+  compileObject = import ./compile-object { inherit build common shell; };
+  transformBinary = import ./transform-binary { inherit build common shell; };
 
 in
 (build // rec {
-
   library = import ./library { inherit build common compileObject transformBinary shell; };
   component = import ./component { inherit build common compileObject transformBinary shell; };
-
-  #final = { # final excludes nixpkgs from pkgs.build
-  #  inherit library component driver server test;
-  #};
-
 })

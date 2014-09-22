@@ -6,9 +6,10 @@
 
 { system ? builtins.currentSystem
 , tool ? import ./tool { inherit system; }
-, baseIncludes ? import ./repos/base/include { inherit tool; }
-, osIncludes   ? import ./repos/os/include   { inherit tool; }
-, demoIncludes ? import ./repos/demo/include { inherit tool; }
+, baseIncludes     ? import ./repos/base/include     { inherit tool; }
+, osIncludes       ? import ./repos/os/include       { inherit tool; }
+, demoIncludes     ? import ./repos/demo/include     { inherit tool; }
+, libportsIncludes ? import ./repos/libports/include { inherit tool; }
 }:
 
 let
@@ -27,6 +28,10 @@ let
     inherit tool callLibrary baseIncludes osIncludes demoIncludes;
   };
 
-  libs = base // os // demo;
+  libports = import ./repos/libports/libs.nix {
+    inherit tool callLibrary baseIncludes osIncludes libportsIncludes;
+  };
+
+  libs = base // os // demo // libports;
 
 in libs

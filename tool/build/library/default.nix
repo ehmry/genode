@@ -33,6 +33,7 @@ let
   cxxFlags = [
     (args.ccCxxOpt or build.ccCxxOpt)
   ];
+  ldFlags = args.ldOpt or build.ldOpt;
 in
 derivation ( args // {
   library = result;
@@ -45,8 +46,10 @@ derivation ( args // {
 
   inherit libs entryPoint;
 
-  inherit cc cxx ar ld ldOpt objcopy;
-  inherit (spec) ccMarch ldMarch;
+  inherit cc cxx ar ld ldOpt objcopy ldFlags;
+  inherit (spec) ccMarch;
+
+  ldScriptSo = args.ldScriptSo or ../../../repos/os/src/platform/genode_rel.ld;
 
   builder = shell;
   args = [ "-e" (args.builder or ./default-builder.sh)];

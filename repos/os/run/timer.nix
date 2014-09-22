@@ -4,16 +4,20 @@
  * \date   2012-05-29
  */
 
-{ tool, base, os }:
+{ run, pkgs }:
 
-tool.run {
+with pkgs;
+
+run {
   name = "timer";
 
-  bootInputs = [
-    base.core os.init os.driver.timer os.test.timer
-    (builtins.toFile "config" ''
-      <config>
-	<parent-provides>
+  contents = [
+    { target = "/"; source = driver.timer; }
+    { target = "/"; source = test.timer;   }
+    { target = "/config";
+      source = builtins.toFile "config" ''
+        <config>
+	  <parent-provides>
 		<service name="ROM"/>
 		<service name="RAM"/>
 		<service name="IRQ"/>
@@ -25,43 +29,31 @@ tool.run {
 		<service name="CPU"/>
 		<service name="LOG"/>
 		<service name="SIGNAL"/>
-	</parent-provides>
-	<default-route>
+	  </parent-provides>
+	  <default-route>
 		<any-service><parent/><any-child/></any-service>
-	</default-route>
-	<start name="timer">
+	  </default-route>
+	  <start name="timer">
 		<resource name="RAM" quantum="10M"/>
 		<provides><service name="Timer"/></provides>
-	</start>
-	<start name="client">
+	  </start>
+	  <start name="client">
 		<binary name="test-timer"/>
 		<resource name="RAM" quantum="10M"/>
-	</start>
-      </config>
-    '')
+	  </start>
+        </config>
+      ''; 
+    }
   ];
 
-  /*
-  config = tool.initConfig {
-    parentProvides =
-      [ "ROM" "RAM" "CPU" "RM" "CAP" "PD" "LOG" "SIGNAL" ];
+  testScript = ''
+    # Configure Qemu
+    append qemu_args " -m 64 -nographic"
 
-    defaultRoute = [ [ "any-service" "parent" "any-child" ] ];
+    # Execute test in Qemu
+    run_genode_until "--- timer test finished ---" 60
 
-    children = {
-      "timer" =
-        { binary = os.driver.timer.name;
-          resources = [ { name="RAM"; quantum="10M"; } ];
-          provides  = [ { name="Timer"; } ];
-        };
-      "client" =
-        { binary = os.test.timer.name;
-          resources = [ { name="RAM"; quantum="10M"; } ];
-        };
-    };
-  };
-  */
+    puts "Test succeeded"
+  '';
 
-  waitRegex = "--- timer test finished ---";
-  waitTimeout = 60;
 }

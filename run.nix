@@ -4,13 +4,10 @@
  * \date   2014-09-16
  */
 
-{ system, nixpkgs, pkgs, test }:
+{ system, nixpkgs, pkgs }:
 
 let
-  importRun = path:
-    let f = import path { inherit run; };
-    in f (builtins.intersectAttrs (builtins.functionArgs f)
-      ( pkgs // test ));
+  importRun = p: import p { inherit run pkgs; };
 
   linuxRun = import ./repos/base-linux/tool/run { inherit nixpkgs pkgs; };
   novaRun  = import ./repos/base-nova/tool/run { inherit nixpkgs pkgs; };
@@ -23,8 +20,13 @@ let
       abort "no run environment for ${system}";
 in
 {
-  # BASE
-  affinity          = importRun ./repos/base/run/affinity.nix;
-  fpu               = importRun ./repos/base/run/fpu.nix;
-  thread            = importRun ./repos/base/run/thread.nix;
+  # Base
+  #affinity = importRun ./repos/base/run/affinity.nix;
+  #fpu      = importRun ./repos/base/run/fpu.nix;
+  thread   = importRun ./repos/base/run/thread.nix;
+
+  # OS
+  #ldso   = importRun ./repos/os/run/ldso.nix;
+  signal = importRun ./repos/os/run/signal.nix;
+  timer  = importRun ./repos/os/run/timer.nix;
 }

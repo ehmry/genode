@@ -22,10 +22,6 @@ let
     inherit system tool baseIncludes osIncludes demoIncludes;
   };
 
-  test = import ./test.nix {
-    inherit build libs baseIncludes osIncludes demoIncludes;
-  };
-
 in rec {
 
   pkgs = import ./pkgs.nix {
@@ -33,7 +29,7 @@ in rec {
   };
 
   run = import ./run.nix {
-    inherit system nixpkgs pkgs test;
+    inherit system nixpkgs pkgs;
   };
 
 }

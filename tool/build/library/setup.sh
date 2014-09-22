@@ -3,9 +3,10 @@ source @common@/setup
 _objects=$objects
 objects=""
 
-for o in $_objects; do
-    objects="$objects $o/*.o"
+for o in $_objects
+do objects="$objects $o/*.o"
 done
+
 
 mergeStaticPhase() {
     MSG_MERGE $name
@@ -15,18 +16,26 @@ mergeStaticPhase() {
     VERBOSE $ar -rc $out/$name.lib.a $objects
 }
 
+
 mergeSharedPhase() {
+    local _libs=$libs
+    local libs=""
+
+    for l in $_libs
+    do libs="$libs $l/*.a"
+    done
+
     MSG_MERGE $name
 
     mkdir -p $out
 
     VERBOSE $ld -o $out/$name.lib.so -shared --eh-frame-hdr \
-        $ldOpt \
+        $ldFlags \
 	-T $ldScriptSo \
         --entry=$entryPoint \
 	--whole-archive \
 	--start-group \
-	$usedSoFiles $staticLibsBrief $objects $libs\
+        $libs $objects \
 	--end-group \
 	--no-whole-archive \
         $($cc $ccMarch -print-libgcc-file-name)

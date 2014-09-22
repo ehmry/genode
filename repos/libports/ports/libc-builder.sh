@@ -12,8 +12,8 @@ postUnpack() {
     for ((i = 0; i < ${#repos_[@]}; i++)); do
         repo="${repos_[$i]}"
         dir="${dirs_[$i]}"
-        if [ $repo != $dir ] ; then
-            mkdir -p $(dirname $dir)
+        if [ "$repo" != "$dir" ] ; then
+            mkdir -p $(dirname "$dir")
             mv $repo $dir
         fi
     done

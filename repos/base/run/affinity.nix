@@ -3,20 +3,15 @@
 # \author Alexander Boettcher
 #
 
-{ run }:
-{ affinity }:
+{ run, pkgs }:
 
-let
-  wantCpusX = "4";
-  wantCpusY = "1";
-  wantCpusTotal = "4";
-  rounds = "03";
-in
+with pkgs;
+
 run {
   name = "affinity";
   
   contents = [
-    { target = "/"; source = affinity; }
+    { target = "/"; source = test.affinity; }
     { target = "/config";
       source = builtins.toFile "config" ''
 	<config>
@@ -41,8 +36,45 @@ run {
     }
   ];
 
-  qemuArgs = "-smp ${wantCpusTotal},cores=${wantCpusTotal}";
+  testScript = ''
+    if {[is_qemu_available]} {
+	set want_cpus_x 4
+	set want_cpus_y 1
+	set want_cpus_total [expr $want_cpus_x*$want_cpus_y]
+	set rounds "03"
+	append qemu_args "-nographic -m 64 -smp $want_cpus_total,cores=$want_cpus_total "
+} else {
+	set rounds "10"
+	if {[have_spec x86]} { set rounds "40" }
+}
 
-  waitRegex = "Round ${rounds}:.*\n";
-  waitTimeout = 120;
+run_genode_until "Round $rounds:.*\n" 90
+
+set cpus [regexp -inline {Detected [0-9x]+ CPU[ s]\.} $output]
+set cpus [regexp -all -inline {[0-9]+} $cpus]
+set cpus [expr [lindex $cpus 0] * [lindex $cpus 1]]
+
+if {[is_qemu_available]} {
+	if {$want_cpus_total != $cpus} {
+		puts "CPU count is not as expected: $want_cpus_total != $cpus"
+		exit 1;
+	}
+}
+
+set good_string {}
+for {set r 0} {$r <= $rounds} {incr r} {
+	append good_string {[init -> test-affinity] Round }
+	append good_string [format "%02d" $r]
+	append good_string ":"
+	for {set i 0} {$i < $cpus} {incr i} {
+		append good_string "  A"
+	}
+	append good_string "\n"
+}
+
+grep_output {\[init -\> test-affinity\] Round}
+
+compare_output_to $good_string
+  '';
+
 }

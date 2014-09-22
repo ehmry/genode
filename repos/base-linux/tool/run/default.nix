@@ -10,9 +10,7 @@ let
   bootImage = import ../boot-image { inherit nixpkgs; };
 in
 
-{ name, contents
-, waitRegex ? "", waitTimeout ? 0
-, ... }:
+{ name, contents, testScript }:
 
 let
   contents' = contents ++ [
@@ -37,14 +35,14 @@ derivation {
 
   builder = nixpkgs.expect + "/bin/expect";
   args =
-   [ "-nN"
-     ../../../../tool/run-nix-setup.exp
-     # setup.exp will source the files that follow
-     ../../../../tool/run
-     ./linux.exp
-   ];
+    [ "-nN"
+      ../../../../tool/run-nix-setup.exp
+      # setup.exp will source the files that follow
+      ../../../../tool/run
+      ./linux.exp
+    ];
 
-  inherit waitRegex waitTimeout;
+  inherit testScript;
 
   image_dir = bootImage { inherit name; contents = contents'; };
 }

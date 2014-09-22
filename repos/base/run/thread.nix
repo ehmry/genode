@@ -3,14 +3,15 @@
  * \date   2014-08-11
  */
 
-{ run }:
-{ thread }:
+{ run, pkgs }:
+
+with pkgs;
 
 run {
   name = "thread";
 
   contents = [
-    { target = "/"; source = thread; }
+    { target = "/"; source = test.thread; }
     { target = "/config";
       source = builtins.toFile "config" ''
 	<config>
@@ -30,8 +31,12 @@ run {
     }
   ];
 
-  qemuArgs = [ "-nographic" "-m 64" ];
+  testScript = ''
+    append qemu_args "-nographic -m 64"
 
-  waitRegex = "child exited with exit value 0.*\n";
-  waitTimeout = 20;
+    run_genode_until "child exited with exit value 0.*\n" 20
+
+    puts "Test succeeded"
+  '';
+
 }

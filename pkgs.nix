@@ -32,4 +32,5 @@ let
 in base // os // demo // ports // {
   app = (demo.app // ports.app);
   server = (os.server // demo.server);
+  test = (base.test // os.test);
 }
