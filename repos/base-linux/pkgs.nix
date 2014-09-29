@@ -4,7 +4,7 @@
  * \date   2014-09-04
  */
 
-{ build, base }:
+{ tool, base }:
 
 let
   repo = rec
@@ -18,6 +18,9 @@ let
 in
 repo // {
 
-  core = import ./src/core { inherit build base repo; };
+  core = import ./src/core {
+    inherit (tool) build;
+    inherit base repo;
+  };
 
 }

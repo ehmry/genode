@@ -4,14 +4,14 @@
  * \date   2014-09-18
  */
 
-{ tool, build, callPackage, baseIncludes, osIncludes }:
+{ tool, callPackage, baseIncludes, osIncludes }:
 
 let
 
   # overide the build.component function
-  build' = build // {
+  build' = tool.build // {
     component = { includeDirs ? [], ... } @ args:
-      build.component (args // {
+      tool.build.component (args // {
         includeDirs =  builtins.concatLists [
           includeDirs osIncludes baseIncludes
         ];
@@ -26,7 +26,9 @@ let
 in
 {
   app = {
-    dosbox = callPackage (import ./src/app/dosbox { inherit tool build; inherit (ports) dosbox; });
+    dosbox = callPackage (import ./src/app/dosbox {
+      inherit tool; build = build'; inherit (ports) dosbox;
+    });
   };
 
 }

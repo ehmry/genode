@@ -22,7 +22,7 @@ let
   shell = nixpkgs.bash + "/bin/sh";
 
   build = rec {
-    inherit spec nixpkgs toolchain;
+    inherit system spec nixpkgs toolchain;
 
     version = builtins.readFile ../../VERSION;
 

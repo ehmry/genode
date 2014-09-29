@@ -4,14 +4,14 @@
  * \date   2014-09-15
  */
 
- { build, callPackage, baseIncludes, osIncludes }:
+ { tool, callPackage, baseIncludes, osIncludes }:
 
 let
 
   # overide the build.component function
-  build' = build // {
+  build' = tool.build // {
     component = { includeDirs ? [], ... } @ args:
-      build.component (args // {
+      tool.build.component (args // {
         includeDirs =  builtins.concatLists [
           includeDirs osIncludes baseIncludes
         ];

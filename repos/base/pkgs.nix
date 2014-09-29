@@ -4,14 +4,14 @@
  * \date   2014-09-04
  */
 
-{ build, baseIncludes, callPackage }:
+{ tool, baseIncludes, callPackage }:
 
 let
 
   impl =
-    if build.isLinux then import ../base-linux/pkgs.nix { inherit build base; } else
-    if build.isNova  then import ../base-nova/pkgs.nix  { inherit build base; } else
-    throw "no base support for ${build.system}";
+    if tool.build.isLinux then import ../base-linux/pkgs.nix { inherit tool base; } else
+    if tool.build.isNova  then import ../base-nova/pkgs.nix  { inherit tool base; } else
+    throw "no base support for ${tool.build.system}";
 
   base = {
     sourceDir = ./src;
@@ -19,9 +19,9 @@ let
   };
 
   # overide the build.component function
-  build' = build // {
+  build' = tool.build // {
     component = { includeDirs ? [], ... } @ args:
-      build.component (args // {
+      tool.build.component (args // {
         includeDirs =  builtins.concatLists [
           includeDirs baseIncludes
         ];
@@ -48,7 +48,7 @@ in
       [ (base.sourceDir + "/core/include") ]
       ++ map (d: base.sourceDir + "/base/${d}") [ "env" "thread" ]
       ++ base.includeDirs;
-    ccOpt = build.ccOpt ++ (impl.core.flags or []) ++ [ "-DGENODE_VERSION='\"${version}\"'" ];
+    ccOpt = build'.ccOpt ++ (impl.core.flags or []) ++ [ "-DGENODE_VERSION='\"${version}\"'" ];
   });
 
 }
