@@ -22,14 +22,17 @@ let
   build' = tool.build // {
     component = { includeDirs ? [], ... } @ args:
       tool.build.component (args // {
-        includeDirs =  builtins.concatLists [
-          includeDirs baseIncludes
-        ];
+        includeDirs = includeDirs ++ baseIncludes;
       });
   };
 
   importComponent = path:
     callPackage (import path { build = build'; });
+
+  tool' = tool // { buildComponent = build'.component; };
+
+  importComponent2 = path:
+    callPackage (import path { tool = tool'; });
 
   ## TODO: append the git revision
   version = builtins.readFile ../../VERSION;
@@ -38,7 +41,7 @@ in
 {
   test = {
     affinity = importComponent ./src/test/affinity;
-    fpu      = importComponent ./src/test/fpu;
+    fpu      = importComponent2 ./src/test/fpu;
     thread   = importComponent ./src/test/thread;
   } // (impl.test or {});
 

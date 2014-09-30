@@ -21,10 +21,13 @@ in
 , includeDirs
 , libs ? []
 , entryPoint ? "0x0"
+, compileArgs ? { }
+, propagatedIncludes ? [ ]
 , ... } @ args:
 
 let
   ccFlags = [
+    (args.ccDef or null)
     (args.ccOpt or build.ccOpt)
     (args.ccOLevel or build.ccOLevel)
     (args.ccOptDep or build.ccOptDep)
@@ -34,13 +37,19 @@ let
     (args.ccCxxOpt or build.ccCxxOpt)
   ];
   ldFlags = args.ldOpt or build.ldOpt;
+
+  includeDirs = args.includeDirs ++
+    (builtins.concatLists
+      (map (lib: lib.propagatedIncludes ) libs));
 in
-derivation ( args // {
+derivation (args // {
   library = result;
   system = result.system;
 
   objects = 
-    map (source: compileObject { inherit source includeDirs ccFlags cxxFlags; }) sources
+    map (source: compileObject ({
+      inherit source includeDirs ccFlags cxxFlags;
+    } // compileArgs)) sources
     ++
     map (binary: transformBinary { inherit binary; }) binaries;
 
@@ -56,5 +65,11 @@ derivation ( args // {
 
   phases = args.phases or (if shared then [ "mergeSharedPhase" ] else [ "mergeStaticPhase" ]) ++ [ "fixupPhase" ];
 
+  compileArgs = null; # only link in this environment
   verbose = builtins.getEnv "VERBOSE";
+
+  # not used by the builder but by further dependencies
+  # so actually this should be in a set that wraps this
+  # derivation
+  inherit propagatedIncludes;
 })

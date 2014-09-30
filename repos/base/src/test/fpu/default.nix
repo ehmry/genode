@@ -1,7 +1,7 @@
-{ build }:
+{ tool }: with tool;
 { base }:
 
-build.component {
+buildComponent {
   name = "test-fpu";
   libs = [ base ];
   sources = [ ./main.cc ];

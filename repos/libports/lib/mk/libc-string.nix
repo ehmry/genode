@@ -6,14 +6,14 @@
  * library and the complete libc
  */
 
-{ build, tool, libc }:
+{ tool, libc }: with tool;
 
-build.library {
+buildLibrary {
   name = "libc-string";
 
   # These files would infect the freestanding
   # string library with the locale library
-  sources = 
-    tool.filterOut [ "strcoll.c" "strxfrm.c" "wcscoll.c" "wcsxfrm.c" ]
-      (tool.wildcard "${libc}/src/lib/libc/lib/libc/string/*.c");
+  sources = tool.filterOut
+    [ "strcoll.c" "strxfrm.c" "wcscoll.c" "wcsxfrm.c" ]
+    (tool.wildcard "${libc}/src/lib/libc/lib/libc/string/*.c");
 }

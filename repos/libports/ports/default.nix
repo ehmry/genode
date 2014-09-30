@@ -13,5 +13,7 @@ let
 in
 {
   libc   = callPort ./libc.nix;
+  libpng = callPort ./libpng.nix;
   x86emu = callPort ./x86emu.nix;
+  zlib   = callPort ./zlib.nix;
 }

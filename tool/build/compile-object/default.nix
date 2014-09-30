@@ -8,18 +8,16 @@
 
 with build;
 
-{ source, includeDirs, ccFlags, cxxFlags }:
-derivation {
+{ source, includeDirs, ccFlags, cxxFlags, ... } @ args:
+derivation ({
   name = "object";
   system = builtins.currentSystem;
 
   inherit (build) cc cxx;
-  inherit common source ccFlags cxxFlags;
-  includeDirs = includeDirs ++ [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include" ];
+  inherit common;
 
   builder = shell;
   args = [ "-e" ./compile-object.sh ];
 
   verbose = builtins.getEnv "VERBOSE";
-
-}
+} // args)

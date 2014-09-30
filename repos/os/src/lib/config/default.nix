@@ -3,12 +3,12 @@
  * \date   2014-08-12
  */
 
-{ build }:
+{ tool }: with tool;
 
 # no library dependencies
 { }:
 
-build.library {
+buildLibrary {
   name = "config";
   shared = false;
   sources = [ ./config.cc ];

@@ -1,8 +1,11 @@
 { preparePort, fetchurl }:
 
-let version = "1.12.0"; in
+let
+  version = "1.12.0"; 
+  # LICENSE := MIT
+in
 preparePort {
-  name = "x86emu";
+  name = "x86emu-${version}";
 
   src = fetchurl {
     url = "http://ftp.x.org/pub/individual/xserver/xorg-server-${version}.tar.bz2";

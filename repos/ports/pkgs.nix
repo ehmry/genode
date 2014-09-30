@@ -26,9 +26,9 @@ let
 in
 {
   app = {
-    dosbox = callPackage (import ./src/app/dosbox {
-      inherit tool; build = build'; inherit (ports) dosbox;
-    });
+    #dosbox = callPackage (import ./src/app/dosbox {
+    #  inherit tool; build = build'; inherit (ports) dosbox;
+    #});
   };
 
 }

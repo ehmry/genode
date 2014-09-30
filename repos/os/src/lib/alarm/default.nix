@@ -3,12 +3,12 @@
  * \date   2014-08-12
  */
 
-{ build }:
+{ tool }: with tool;
 
 # no library dependencies
 { }:
 
-build.library {
+buildLibrary {
   name = "alarm";
   shared = false;
   sources = [ ./alarm.cc ];

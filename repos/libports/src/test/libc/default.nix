@@ -1,9 +1,8 @@
-{ build }:
+{ tool }: with tool;
+{ libm, libc, ld }:
 
-{ libm libc }:
-
-build.component {
+buildComponent {
   name = "test-libc";
   sources = [ ./main.cc ];
-  libs = [ libm libc ];
+  libs = [ libm libc ld ];
 }

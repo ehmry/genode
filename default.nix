@@ -18,18 +18,18 @@ let
   osIncludes   = import ./repos/os/include   { inherit tool; };
   demoIncludes = import ./repos/demo/include { inherit tool; };
 
+in rec {
+
   libs = import ./libs.nix {
     inherit system tool baseIncludes osIncludes demoIncludes;
   };
 
-in rec {
-
   pkgs = import ./pkgs.nix {
-    inherit tool build libs baseIncludes osIncludes demoIncludes;
+    inherit tool libs baseIncludes osIncludes demoIncludes;
   };
 
   run = import ./run.nix {
-    inherit system nixpkgs pkgs;
+    inherit system nixpkgs pkgs libs;
   };
 
 }

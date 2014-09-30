@@ -1,5 +1,5 @@
 /*
- * \brief  OS libraries.
+ * \brief  OS libraries
  * \author Emery Hemingway
  * \date   2014-09-11
  */
@@ -13,18 +13,18 @@ let
     includeDirs = osIncludes;
   };
 
+  tool' = tool // { inherit buildLibrary; };
+
   # overide the build.library function
-  build = tool.build // {
-    library = { includeDirs ? [], ... } @ args:
-      tool.build.library (args // {
-        includeDirs =  builtins.concatLists [
-          includeDirs osIncludes baseIncludes
-        ];
-      });
-  };
+  buildLibrary = { includeDirs ? [], ... } @ args:
+    tool.build.library (args // {
+      includeDirs =  builtins.concatLists [
+        includeDirs osIncludes baseIncludes
+      ];
+    });
 
   importLibrary = path:
-    callLibrary (import path { inherit build; });
+    callLibrary (import path { tool = tool'; });
 
 in {
   alarm        = importLibrary ./src/lib/alarm;
@@ -32,7 +32,10 @@ in {
   config       = importLibrary ./src/lib/config;
   config_args  = importLibrary ./src/lib/config_args;
   init_pd_args = importLibrary ./src/lib/init_pd_args;
+  ld           = importLibrary ./src/lib/ldso;
   ldso-startup = importLibrary ./src/lib/ldso/startup;
+  ldso-arch    = importLibrary ./src/lib/ldso/arch;
   server       = importLibrary ./src/lib/server;
+  timed_semaphore = importLibrary ./src/lib/timed_semaphore;
   #trace        = importLibrary ./src/lib/trace;
 }

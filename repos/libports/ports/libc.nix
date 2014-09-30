@@ -3,10 +3,11 @@
  * \date   2014-09-19
  */
 
-{ preparePort, wildcard, fetchsvn, flex, bison, glibc, gcc }:
+{ preparePort, fetchsvn, flex, bison, glibc, gcc }:
 
-let 
-  baseUrl = "http://svn.freebsd.org/base/release/8.2.0";
+let
+  version = "8.2.0";
+  baseUrl = "http://svn.freebsd.org/base/release/${version}";
 
   subdirs =
     [ { name = "libc";
@@ -77,7 +78,7 @@ let
 
 in
 preparePort {
-  name = "libc";
+  name = "libc-freebsd-${version}";
 
   builder = ./libc-builder.sh;
 

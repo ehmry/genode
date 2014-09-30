@@ -4,11 +4,11 @@
  * \date   2014-08-10
  */
 
-{ build }:
+{ tool }: with tool;
 
 { config }:
 
-build.library {
+buildLibrary {
   name = "config_args";
   shared = false;
   sources = [ ./config_args.cc ];

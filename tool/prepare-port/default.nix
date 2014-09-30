@@ -27,6 +27,7 @@ let
 in
 { name, ... } @ attrs:
 derivation ( attrs // {
+  name = name+"-port";
   preparePort = result;
   system = builtins.currentSystem;
 

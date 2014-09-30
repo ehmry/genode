@@ -4,75 +4,77 @@
  * \date   2014-09-20
  */
 
-{ tool, callLibrary, baseIncludes, osIncludes, libportsIncludes }:
+{ tool, callLibrary
+, baseIncludes, osIncludes, libportsIncludes }:
 
 let
-
   ports = import ./ports { inherit tool; };
+  tool' = tool // { inherit buildLibrary; };
 
   callWithPorts = f:
     f (builtins.intersectAttrs (builtins.functionArgs f) ports);
+  importLibrary = path:
+    callLibrary (callWithPorts (
+      import path { tool = tool'; }
+    ));
 
   importLibcLibrary = path:
-    import path { inherit tool build; inherit (ports) libc; };
+    import path { tool = tool'; inherit (ports) libc; };
 
   # overide the build.library function
-  build = tool.build // {
-    library = { ccOpt ? [], includeDirs ? [], ... } @ args:
-      tool.build.library (args // {
+  buildLibrary = { ccOpt ? [], includeDirs ? [], ... } @ args:
+    tool.build.library (args // {
 
-        #
-        # Use default warning level rather than -Wall because we do not want to touch
-        # the imported source code to improve build aesthetics
-        #
-        ccWarn = null;
+      #
+      # Use default warning level rather than -Wall because we do not want to touch
+      # the imported source code to improve build aesthetics
+      #
+      ccWarn = null;
 
-        ccOpt = ccOpt ++
-          [ #
-            # Generate position independent code to allow linking of static libc code into
-            # shared libraries (define is evaluated by assembler files)
-            #
-            "-DPIC"
+      ccOpt = ccOpt ++
+        [ #
+          # Generate position independent code to allow linking of static libc code into
+          # shared libraries (define is evaluated by assembler files)
+          #
+          "-DPIC"
 
-            #
-            # Prevent gcc headers from defining __size_t. This definition is done in
-            # machine/_types.h.
-            #
-            "-D__FreeBSD__=8"
+          #
+          # Prevent gcc headers from defining __size_t. This definition is done in
+          # machine/_types.h.
+          #
+          "-D__FreeBSD__=8"
 
-            #
-            # Prevent gcc-4.4.5 from generating code for the family of 'sin' and 'cos'
-            # functions because the gcc-generated code would actually call 'sincos'
-            # or 'sincosf', which is a GNU extension, not provided by our libc.
-            #
-            "-fno-builtin-sin" "-fno-builtin-cos" "-fno-builtin-sinf" "-fno-builtin-cosf"
-          ] ++ tool.build.ccOpt;
+          #
+          # Prevent gcc-4.4.5 from generating code for the family of 'sin' and 'cos'
+          # functions because the gcc-generated code would actually call 'sincos'
+          # or 'sincosf', which is a GNU extension, not provided by our libc.
+          #
+          "-fno-builtin-sin" "-fno-builtin-cos" "-fno-builtin-sinf" "-fno-builtin-cosf"
+        ] ++ tool.build.ccOpt;
 
-        includeDirs =  builtins.concatLists [
-          includeDirs
-          ( map (d: "${ports.libc}/src/lib/libc/${d}")
-              [ "lib/libc/locale"
-                "lib/libc/include"
-                "lib/libc/stdio"
-                "lib/libc/net"
-                "contrib/gdtoa"
-              ] )
-          [ "${ports.libc}/include/libc"
-            #
-            # Genode-specific supplements to standard libc headers
-            #
-            include/libc-genode
+      includeDirs =  builtins.concatLists [
+        includeDirs
+        ( map (d: "${ports.libc}/src/lib/libc/${d}")
+            [ "lib/libc/locale"
+              "lib/libc/include"
+              "lib/libc/stdio"
+              "lib/libc/net"
+              "contrib/gdtoa"
+            ] )
+        [ "${ports.libc}/include/libc"
+          #
+          # Genode-specific supplements to standard libc headers
+          #
+          include/libc-genode
 
-            ( if tool.build.isx86_32 then "${ports.libc}/include/libc-i386" else
-              if tool.build.isx86_64 then "${ports.libc}/include/libc-amd64" else
-              if tool.build.isxArm   then "${ports.libc}/include/libc-arm" else
-              throw "libc port does not support ${build.system}" )
-          ]
-          libportsIncludes osIncludes baseIncludes
-        ];
-
-      });
-  };
+          ( if tool.build.isx86_32 then "${ports.libc}/include/libc-i386" else
+            if tool.build.isx86_64 then "${ports.libc}/include/libc-amd64" else
+            if tool.build.isxArm   then "${ports.libc}/include/libc-arm" else
+            throw "libc port does not support ${tool.build.system}" )
+        ]
+        libportsIncludes osIncludes baseIncludes
+      ];
+    });
 
   genPath =
     if tool.build.isx86_32 then ./lib/mk/x86_32/libc-gen.nix else
@@ -99,6 +101,9 @@ in
   libc-setjmp  = importLibcLibrary setjmpPath;
   libc-string  = importLibcLibrary ./lib/mk/libc-string.nix;
   libc-stdio   = importLibcLibrary ./lib/mk/libc-stdio.nix;
-
   libc = callLibrary (importLibcLibrary ./lib/mk/libc.nix);
+  libm = callLibrary (importLibcLibrary ./lib/mk/libm.nix);
+
+  libpng = importLibrary ./lib/mk/libpng.nix;
+  zlib   = importLibrary ./lib/mk/zlib.nix;
 }

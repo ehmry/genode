@@ -36,6 +36,8 @@ let
     in callLibrary (x {inherit build base includeDirs; });
 
 in (impl // {
+  repo = null; # hack
+
     base = mergeLib {
       name = "base";
       inherit (base) includeDirs;

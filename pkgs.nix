@@ -33,6 +33,10 @@ let
     inherit tool callPackage baseIncludes osIncludes demoIncludes;
   };
 
+  libports = import ./repos/libports/pkgs.nix {
+    inherit tool callPackage baseIncludes osIncludes libportsIncludes;
+  };
+
   ports = import ./repos/ports/pkgs.nix {
     inherit tool callPackage baseIncludes osIncludes;
   };
@@ -41,5 +45,5 @@ let
 in base // os // demo // ports // {
   app = (demo.app // ports.app);
   server = (os.server // demo.server);
-  test = (base.test // os.test);
+  test = (base.test // os.test // libports.test);
 }

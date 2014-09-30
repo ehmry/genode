@@ -1,24 +1,24 @@
 source $common/setup
 
-dumpVars
+# Link the file into this temporary directory
+# so that gcc doesn't compile the nix store
+# prefix into the object, which would register
+# source code as a runtime dependency.
+_source=$source
+source=$(stripHash $source)
+ln -s $_source ./$source
 
-object=$(basename "$source")
-
-if echo "$object" | grep -q '^[a-z0-9]\{32\}-'; then
-    object=$(echo "$object" | cut -c34-)
-fi
-
-object="${object/%.c/.o}"
-object="${object/%.cc/.o}"
-object="${object/%.S/.o}"
-object="${object/%.cpp/.o}"
-object="${object/%.s/.o}"
+base="${source%.*}"
+object="${base}.o"
+base="${base//./_}"
 
 stripHash $object
 
 MSG_COMP $object
 
 includes=""
+sourceDir=$(dirname $_source)
+[ "$sourceDir" != "$NIX_STORE" ] && includes="-I$sourceDir"
 for d in $includeDirs; do
     if [ -d "$d" ]; then
         includes="$includes -I$d"
@@ -29,7 +29,15 @@ for d in $includeDirs; do
     fi
 done
 
+#for lib in $libs; do
+#    d="$lib/include"
+#    [ -d "$d" ] && includes="$includes -I$d"
+#done
+
 mkdir -p $out
+
+file_opt_var=ccOpt_$base
+ccFlags="$ccFlags ${!file_opt_var}"
 
 case $source in
     *.c | *.s )
@@ -48,5 +56,3 @@ case $source in
         exit 1
         ;;
 esac
-
-dumpVars

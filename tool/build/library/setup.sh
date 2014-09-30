@@ -42,7 +42,7 @@ mergeSharedPhase() {
 }
 
 fixupPhase() {
-    if [ -n "libs" ]; then
+    if [ -z "$shared" ] && [ -n "$libs" ]; then
         mkdir -p "$out/nix-support"
         echo "$libs" > "$out/nix-support/propagated-libraries"
     fi

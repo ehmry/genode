@@ -3,10 +3,10 @@
  * \date   2014-09-21
  */
 
-{ build }:
+{ tool }: with tool;
 { }:
 
-build.library {
+buildLibrary {
   name = "ldso-startup";
   sources = [ ./startup.cc ];
 }

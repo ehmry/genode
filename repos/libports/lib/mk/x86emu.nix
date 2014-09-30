@@ -1,9 +1,9 @@
-{ build, base, os, libports }:
+{ tool }: with tool;
 
 let
   portDir = "${libports.port.x86emu}/x86emu";
 in
-build.library {
+buildLibrary {
   name = "x86emu";
   flags = [ "-fomit-frame-pointer" ];
   sources = map (fn: "${portDir}/${fn}")

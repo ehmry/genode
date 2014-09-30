@@ -4,10 +4,13 @@
  * \date   2014-09-16
  */
 
-{ system, nixpkgs, pkgs }:
+# I wasn't planning on using libs here,
+# but then I realized I need shared libs.
+{ system, nixpkgs, pkgs, libs }:
 
 let
   importRun = p: import p { inherit run pkgs; };
+  importRunTheSequel = p: import p { inherit run pkgs libs; };
 
   linuxRun = import ./repos/base-linux/tool/run { inherit nixpkgs pkgs; };
   novaRun  = import ./repos/base-nova/tool/run { inherit nixpkgs pkgs; };
@@ -29,4 +32,7 @@ in
   #ldso   = importRun ./repos/os/run/ldso.nix;
   signal = importRun ./repos/os/run/signal.nix;
   timer  = importRun ./repos/os/run/timer.nix;
+
+  # Libports
+  libc = importRunTheSequel ./repos/libports/run/libc.nix;
 }

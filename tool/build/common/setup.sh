@@ -320,6 +320,7 @@ stripHash() {
     if echo "$strippedName" | grep -q '^[a-z0-9]\{32\}-'; then
         strippedName=$(echo "$strippedName" | cut -c34-)
     fi
+    echo $strippedName
 }
 
 genericBuild() {
