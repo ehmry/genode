@@ -13,9 +13,8 @@ let
   # overide the build.component function
   buildComponent = { includeDirs ? [], ... } @ args:
     tool.build.component (args // {
-      includeDirs =  builtins.concatLists [
-        libportsIncludes osIncludes baseIncludes
-      ];
+      includeDirs = includeDirs ++
+        libportsIncludes ++ osIncludes ++ baseIncludes;
     });
 
   importComponent = path:
@@ -24,7 +23,7 @@ let
 in
 {
   test =
-    { #ldso = importComponent ./src/test/ldso;
+    { ldso = importComponent ./src/test/ldso;
       libc = importComponent ./src/test/libc;
     };
 }

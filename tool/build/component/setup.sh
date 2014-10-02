@@ -28,8 +28,9 @@ findLibs() {
     fi
 }
 
+_libs=$libs
 libs=""
-for i in $searchLibs; do
+for i in $_libs; do
     findLibs $i libs
 done
 
@@ -38,20 +39,9 @@ linkPhase() {
     runHook preLink
     MSG_LINK $name
 
-    extraFlags=""
-    if [ -n "$ldTextAddr" ]; then
-        extraFlags="-Wl,-Ttext=$ldTextAddr"
-    fi
-
-    if [ -n "$ldScriptStatic" ]; then
-        for s in $ldScriptStatic; do
-            extraFlags="$extraFlags -Wl,-T -Wl,$s"
-        done
-    fi
-
     mkdir -p $out
 
-    VERBOSE $cxx $cxxLinkOpt $extraFlags $ccMarch \
+    VERBOSE $cxx $cxxLinkOpt \
 	-Wl,--whole-archive -Wl,--start-group \
         $objects $libs \
 	-Wl,--end-group -Wl,--no-whole-archive \

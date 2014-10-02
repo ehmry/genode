@@ -22,7 +22,7 @@ mergeSharedPhase() {
     local libs=""
 
     for l in $_libs
-    do libs="$libs $l/*.a"
+    do libs="$libs $l/*.a $l/*.so"
     done
 
     MSG_MERGE $name

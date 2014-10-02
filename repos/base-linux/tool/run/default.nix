@@ -4,7 +4,7 @@
  * \date   2014-08-11
  */
 
-{ nixpkgs, pkgs }:
+{ nixpkgs, libs, pkgs }:
 
 let
   bootImage = import ../boot-image { inherit nixpkgs; };
@@ -19,6 +19,9 @@ let
     }
     { target = "/";
       source = pkgs.init;
+    }
+    { target = "/";
+      source = libs.ld;
     }
   ];
 in

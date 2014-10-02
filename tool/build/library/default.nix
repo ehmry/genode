@@ -43,6 +43,7 @@ let
       (map (lib: lib.propagatedIncludes ) libs));
 in
 derivation (args // {
+  inherit shared;
   library = result;
   system = result.system;
 

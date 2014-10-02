@@ -7,7 +7,7 @@
   # the program under Linux to prevent clashes with vdso.
   #
   ldTextAddr = "0x01000000";
-  ldScriptStatic = [ ../repos/base/src/platform/genode.ld ];
+  ldScriptsStatic = [ ../repos/base/src/platform/genode.ld ];
 
   ccOpt = [];
 }

@@ -13,7 +13,6 @@ run {
 
   contents = [
     { target = "/"; source = test.libc; }
-    { target = "/"; source = ld; }
     { target = "/"; source = libc; }
     { target = "/"; source = libm; }
     { target = "/config";

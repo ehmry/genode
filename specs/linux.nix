@@ -7,7 +7,7 @@
   # the program under Linux to prevent clashes with vdso.
   #
   ldTextAddr = "0x01000000";
-  ldScriptStatic = [ ../repos/base/src/platform/genode.ld ../repos/base-linux/src/platform/context_area.nostdlib.ld ];
+  ldScriptsStatic = [ ../repos/base/src/platform/genode.ld ../repos/base-linux/src/platform/context_area.nostdlib.ld ];
 
   ccOpt = [ "-fPIC" ];
 }

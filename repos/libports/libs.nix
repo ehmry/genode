@@ -9,7 +9,7 @@
 
 let
   ports = import ./ports { inherit tool; };
-  tool' = tool // { inherit buildLibrary; };
+  tool' = tool // { inherit buildLibrary buildLibraryPlain; };
 
   callWithPorts = f:
     f (builtins.intersectAttrs (builtins.functionArgs f) ports);
@@ -20,6 +20,14 @@ let
 
   importLibcLibrary = path:
     import path { tool = tool'; inherit (ports) libc; };
+
+  buildLibraryPlain = { includeDirs ? [], ... } @ args:
+    tool.build.library (args // {
+      includeDirs =  builtins.concatLists [
+        includeDirs osIncludes baseIncludes
+      ];
+    });
+
 
   # overide the build.library function
   buildLibrary = { ccOpt ? [], includeDirs ? [], ... } @ args:
@@ -106,4 +114,7 @@ in
 
   libpng = importLibrary ./lib/mk/libpng.nix;
   zlib   = importLibrary ./lib/mk/zlib.nix;
+
+  test-ldso_lib_1 = importLibrary ./lib/mk/test-ldso_lib_1.nix;
+  test-ldso_lib_2 = importLibrary ./lib/mk/test-ldso_lib_2.nix;
 }

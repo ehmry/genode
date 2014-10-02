@@ -9,6 +9,10 @@
 with build;
 
 { source, includeDirs, ccFlags, cxxFlags, ... } @ args:
+
+assert source != [];
+assert includeDirs != [];
+
 derivation ({
   name = "object";
   system = builtins.currentSystem;

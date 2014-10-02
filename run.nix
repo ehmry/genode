@@ -12,8 +12,8 @@ let
   importRun = p: import p { inherit run pkgs; };
   importRunTheSequel = p: import p { inherit run pkgs libs; };
 
-  linuxRun = import ./repos/base-linux/tool/run { inherit nixpkgs pkgs; };
-  novaRun  = import ./repos/base-nova/tool/run { inherit nixpkgs pkgs; };
+  linuxRun = import ./repos/base-linux/tool/run { inherit nixpkgs libs pkgs; };
+  novaRun  = import ./repos/base-nova/tool/run  { inherit nixpkgs libs pkgs; };
 
   run =
       if system == "x86_32-linux" then linuxRun else
@@ -29,7 +29,7 @@ in
   thread   = importRun ./repos/base/run/thread.nix;
 
   # OS
-  #ldso   = importRun ./repos/os/run/ldso.nix;
+  ldso   = importRunTheSequel ./repos/os/run/ldso.nix;
   signal = importRun ./repos/os/run/signal.nix;
   timer  = importRun ./repos/os/run/timer.nix;
 

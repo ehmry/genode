@@ -17,9 +17,16 @@ in
 , binaries ? []
 , includeDirs ? []
 , libs
+, dynamicLinker ? "ld"
 , ... } @ args:
 
 let
+
+  anyShared = libs:
+    if libs == [] then false else
+       if (builtins.getAttr "shared" (builtins.head libs))
+       then true else anyShared (builtins.tail libs);
+
   ccFlags = [
     (args.ccOpt or build.ccOpt)
     (args.ccOLevel or build.ccOLevel)
@@ -31,43 +38,60 @@ let
     (args.ccCxxOpt or build.ccCxxOpt)
   ];
 
-  cxxLinkOpt = 
-    (args.cxxLinkOpt or build.cxxLinkOpt)
-    ++
-    (map (x: "-Wl,${x}") (args.ldOpt or build.ldOpt))
-    ++
-   [ "-nostdlib -Wl,-nostdlib" ];
-
 in
-derivation ( args // {
+derivation ( args // rec {
   inherit name;
   component = result;
   system = result.system;
+  builder = shell;
+  args = [ "-e" (args.builder or ./default-builder.sh) ];
 
   objects =
     map (source: compileObject { inherit source includeDirs ccFlags cxxFlags; }) sources
     ++
     map (binary: transformBinary { inherit binary; }) binaries;
 
-  builder = shell;
-  args = [ "-e" (args.builder or ./default-builder.sh) ];
-
-  includes = map (d: "-I${d}") includeDirs;
-
   phases = ( args.phases or [ "linkPhase" ] );
 
-  inherit (build)
-    cc cxx 
+  inherit (build) cc cxx
     ldScriptDyn ldScriptSo;
 
   inherit (build.spec) ccMarch ldMarch;
 
-  inherit cxxLinkOpt;
-
+  # Assemble linker options for static and dynamic linkage
   ldTextAddr = args.ldTextAddr or build.spec.ldTextAddr or "";
-  ldScriptStatic = args.ldScriptStatic or build.spec.ldScriptStatic or [ ];
 
-  searchLibs = libs;
+  sharedLibs = anyShared libs;
+
+  ldScriptsStatic = args.ldScriptsStatic or build.spec.ldScriptsStatic or [ ../../../repos/base/src/platform/genode.ld ];
+  ldScriptsDynamic = args.ldScriptsDynamic or [ build.ldScriptDyn ];
+
+  ldScripts = if sharedLibs then ldScriptsDynamic else ldScriptsStatic;
+
+  ldOpt = 
+    (args.ldOpt or build.ldOpt)
+    ++
+    (if sharedLibs then
+    # Add a list of symbols that shall always be added to the dynsym section
+    [ "--dynamic-list=${../../../repos/os/src/platform/genode_dyn.dl}" ]
+    else [ ]);
+
+  cxxLinkOpt =
+    (args.cxxLinkOpt or build.cxxLinkOpt)
+    ++
+    (map (x: "-Wl,${x}") ldOpt)
+    ++
+    [ "-nostdlib -Wl,-nostdlib"
+      (if ldTextAddr != "" then "-Wl,-Ttext=${ldTextAddr}" else "")
+      ccMarch
+    ]
+    ++
+    (if sharedLibs then [
+       "-Wl,--dynamic-linker=${dynamicLinker}.lib.so"
+       "-Wl,--eh-frame-hdr"
+     ] else [])
+    ++
+    (map (script: "-Wl,-T -Wl,${script}") ldScripts);
 
   verbose = builtins.getEnv "VERBOSE";
 })
