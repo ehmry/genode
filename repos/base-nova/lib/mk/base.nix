@@ -1,13 +1,15 @@
-{ base, repo }:
+{ genodeEnv, baseDir, repoDir, base-common }:
 
-{
-  libs = with base.lib; [ base-common ];
+with genodeEnv.tool;
 
+genodeEnv.mkLibrary {
+  name = "base";
+  libs = [ base-common ];
   sources =
-    map (fn: repo.sourceDir + "/base/${fn}")
+    fromDir (repoDir + "/src/base")
       [ "thread/thread_nova.cc" ]
     ++
-    map (fn: base.sourceDir + "/base/${fn}")
+    fromDir (baseDir+"/src/base")
       [ "console/log_console.cc"
         "cpu/cache.cc"
         "env/context_area.cc"
@@ -15,6 +17,6 @@
         "env/reinitialize.cc"
       ];
 
-  includeDirs = [ (base.sourceDir + "/base/env") ];
+  systemIncludes = [ (baseDir + "/src/base/env") ];
 
 }

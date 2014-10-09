@@ -4,27 +4,18 @@
  * \date   2014-09-11
  */
 
-{ tool, callLibrary, baseIncludes, osIncludes }:
+{ tool, callLibrary }:
 
 let
 
-  os = rec {
-    sourceDir = ./src;
-    includeDirs = osIncludes;
-  };
+  # Prepare genodeEnv.
+  genodeEnv =  tool.genodeEnvAdapters.addSystemIncludes
+    tool.genodeEnv (
+      ( import ../base/include { inherit (tool) genodeEnv; }) ++
+      [ ./include ]);
 
-  tool' = tool // { inherit buildLibrary; };
-
-  # overide the build.library function
-  buildLibrary = { includeDirs ? [], ... } @ args:
-    tool.build.library (args // {
-      includeDirs =  builtins.concatLists [
-        includeDirs osIncludes baseIncludes
-      ];
-    });
-
-  importLibrary = path:
-    callLibrary (import path { tool = tool'; });
+  callLibrary' = callLibrary { inherit genodeEnv; };
+  importLibrary = path: callLibrary' (import path);
 
 in {
   alarm        = importLibrary ./src/lib/alarm;
@@ -33,9 +24,10 @@ in {
   config_args  = importLibrary ./src/lib/config_args;
   init_pd_args = importLibrary ./src/lib/init_pd_args;
   ld           = importLibrary ./src/lib/ldso;
-  ldso-startup = importLibrary ./src/lib/ldso/startup;
   ldso-arch    = importLibrary ./src/lib/ldso/arch;
+  ldso-startup = importLibrary ./src/lib/ldso/startup;
   server       = importLibrary ./src/lib/server;
   timed_semaphore = importLibrary ./src/lib/timed_semaphore;
+  timer           = importLibrary ./lib/mk/timer.nix;
   #trace        = importLibrary ./src/lib/trace;
 }

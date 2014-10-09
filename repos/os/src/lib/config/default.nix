@@ -3,13 +3,8 @@
  * \date   2014-08-12
  */
 
-{ tool }: with tool;
+{ genodeEnv }:
 
-# no library dependencies
-{ }:
-
-buildLibrary {
-  name = "config";
-  shared = false;
-  sources = [ ./config.cc ];
+genodeEnv.mkLibrary {
+  name = "config"; sources = genodeEnv.fromPath ./config.cc;
 }

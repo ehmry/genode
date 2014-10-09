@@ -11,5 +11,5 @@ sed -e "s^@initialPath@^$initialPath^g" \
     -e "s^@shell@^$shell^g" \
     < $setup > $out/setup
 
-mkdir $out/nix-support
-echo $propagatedUserEnvPkgs > $out/nix-support/propagated-user-env-packages
+#mkdir $out/nix-support
+#echo $propagatedUserEnvPkgs > $out/nix-support/propagated-user-env-packages

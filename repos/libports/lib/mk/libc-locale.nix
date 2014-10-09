@@ -1,11 +1,5 @@
-/*
- * \author Emery Hemingway
- * \date   2014-09-20
- */
+{ subLibcEnv }:
 
-{ tool, libc }: with tool;
-
-buildLibrary {
-  name = "libc-locale";
-  sources = wildcard "${libc}/src/lib/libc/lib/libc/locale/*.c";
+subLibcEnv.mkLibrary {
+  name = "libc-locale"; srcSh = [ "lib/libc/locale/*.c" ];
 }

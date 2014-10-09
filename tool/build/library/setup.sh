@@ -42,6 +42,15 @@ mergeSharedPhase() {
 }
 
 fixupPhase() {
+    mkdir $src
+
+    for s in $objectSources; do
+        cp -rL --no-preserve=mode $s/* $src
+    done
+
+    dumpVars
+    cp env-vars $src
+
     if [ -z "$shared" ] && [ -n "$libs" ]; then
         mkdir -p "$out/nix-support"
         echo "$libs" > "$out/nix-support/propagated-libraries"
@@ -52,5 +61,3 @@ libraryBuild() {
     MSG_LIB $name
     genericBuild
 }
-
-dumpVars

@@ -1,16 +1,21 @@
-{ build, base, repo }:
+{ genodeEnv, baseDir, repoDir, cxx, startup }:
+
+with genodeEnv.tool;
 
 let
   subdir =
-    if build.isx86_32 then "x86_32" else
-    if build.isx86_64 then "x86_64" else
-    abort "bad spec for ${build.spec.system}";
+    if genodeEnv.isx86_32 then "x86_32" else
+    if genodeEnv.isx86_64 then "x86_64" else
+    abort "bad spec for ${genodeEnv.system}";
 in
-{
-  libs = with base.lib; [ cxx startup ];
+genodeEnv.mkLibrary {
+  name = "base-common";
+  libs = [ cxx startup ];
+
+  # pager/x86_64/pager.cc
 
   sources =
-    map (fn: repo.sourceDir + "/base/${fn}")
+    fromDir (repoDir+"/src/base")
       [ "env/cap_map.cc"
         "ipc/ipc.cc"
         "ipc/pager.cc"
@@ -19,7 +24,7 @@ in
         "thread/thread_context.cc"
       ]
     ++
-    map (fn: base.sourceDir + "/base/${fn}")
+    fromDir (baseDir+"/src/base")
       [ "allocator/allocator_avl.cc"
         "allocator/slab.cc"
         "avl_tree/avl_tree.cc"
@@ -37,8 +42,8 @@ in
         "thread/trace.cc"
       ];
 
-  includeDirs =
-    [ (base.sourceDir + "/base/elf/")
-      (repo.sourceDir + "/base/lock")
+  systemIncludes =
+    [ (repoDir + "/src/base/lock")
+      (baseDir + "/src/base/thread/")
     ];
 }

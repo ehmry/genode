@@ -1,0 +1,3 @@
+source $repoLibrary/setup
+
+libraryBuild

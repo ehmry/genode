@@ -1,25 +1,18 @@
+sources_=($sources)
+targets_=($targets)
+
 ##
 # Recursively recreate a file tree
 #
-include() {
-    for x in $1/*; do
-        if [ -d "$x" ]; then
-            local subdir="$2/$(basename \"$x\")"
-            mkdir -p "$subdir"
-            includeInput "$x" "$subdir"
-        else
-            ln -s "$x" "$2/"
-        fi
-    done
-}
+for ((i = 0; i < ${#targets_[@]}; i++)); do
+    target="${targets_[$i]}"
+    source="${sources_[$i]}"
 
-mkdir $out
-
-for input in $inputs; do
-        if [ -d $input ]; then
-            include $input $out
-        else
-            name=
-            ln -s $input $out/$(basename $input | cut -c34-)
-        fi
+    if [ -d "$source" ]; then
+        mkdir -p $out/$target
+        ln -s ${source}/* "$out/${target}/"
+    else
+        mkdir -p $out/$(dirname $target)
+        ln -s "${source}" $out/"${target}"
+    fi
 done

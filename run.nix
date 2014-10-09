@@ -4,28 +4,26 @@
  * \date   2014-09-16
  */
 
-# I wasn't planning on using libs here,
-# but then I realized I need shared libs.
-{ system, nixpkgs, pkgs, libs }:
+{ system, tool, pkgs }:
 
 let
   importRun = p: import p { inherit run pkgs; };
-  importRunTheSequel = p: import p { inherit run pkgs libs; };
+  importRunTheSequel = p: import p { inherit run pkgs; };
 
-  linuxRun = import ./repos/base-linux/tool/run { inherit nixpkgs libs pkgs; };
-  novaRun  = import ./repos/base-nova/tool/run  { inherit nixpkgs libs pkgs; };
+  linuxRun = import ./repos/base-linux/tool/run { inherit tool pkgs; };
+  novaRun  = import ./repos/base-nova/tool/run  { inherit tool pkgs; };
 
   run =
       if system == "x86_32-linux" then linuxRun else
       if system == "x86_64-linux" then linuxRun else
-      #if system == "x86_32-nova" then novaRun else
-      #if system == "x86_64-nova" then novaRun else
+      if system == "x86_32-nova" then novaRun else
+      if system == "x86_64-nova" then novaRun else
       abort "no run environment for ${system}";
 in
 {
   # Base
   #affinity = importRun ./repos/base/run/affinity.nix;
-  #fpu      = importRun ./repos/base/run/fpu.nix;
+  fpu      = importRun ./repos/base/run/fpu.nix;
   thread   = importRun ./repos/base/run/thread.nix;
 
   # OS

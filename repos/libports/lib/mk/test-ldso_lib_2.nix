@@ -1,11 +1,9 @@
-{ tool }: with tool;
-{ }:
-{ ldso-startup }:
+{ genodeEnv, ldso-startup }:
 
-buildLibraryPlain {
+genodeEnv.mkLibrary {
   name = "test-ldso_lib_2";
   shared = true;
   libs = [ ldso-startup ];
-  sources = [ ../../src/test/ldso/lib_2.cc ];
-  includeDirs = [ ../../src/test/ldso/include ];
+  src = [ ../../src/test/ldso/lib_2.cc ];
+  incDir = [ ../../src/test/ldso/include ];
 }

@@ -1,13 +1,7 @@
-/*
- * \author Emery Hemingway
- * \date   2014-09-20
- */
-
-{ tool, libc }: with tool;
-
-buildLibrary {
+{ subLibcEnv }:
+subLibcEnv.mkLibrary {
   name = "libc-stdlib";
-  sources =
-    filterOut [ "exit.c" "atexit.c" "malloc.c" ]
-      (wildcard "${libc}/src/lib/libc/lib/libc/stdlib/*.c");
+  srcSh = [ "lib/libc/stdlib/*.c" ];
+  filter = map
+    (fn: "lib/libc/stdlib/${fn}") [ "exit.c" "atexit.c" "malloc.c" ];
 }

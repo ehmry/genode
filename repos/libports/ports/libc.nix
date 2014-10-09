@@ -96,5 +96,5 @@ preparePort {
   dirs  = map (x: x.dir ) subdirs;
 
   patches = "${../src/lib/libc/patches}/*.patch";
-  patchFlags = "-p0";
+  patchFlags = "-p0 --strip 3";
 }

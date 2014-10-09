@@ -85,20 +85,20 @@ proc build_boot_image {binaries} {
 # Execute scenario using Qemu
 #
 proc spawn_qemu { wait_for_re timeout_value } {
-	global env    
-	set qemu $env(qemu)
-	set qemu_args $env(qemuArgs)
-	append qemu_args " -cpu core2duo "
+	global env qemu_args
+	set qemu qemu-system-x86_64
+	#append qemu_args " -cpu core2duo "
+	set qemu_args "-nographic -cpu core2duo "
 
 	global spawn_id
 	global run_target
 
 	# Redirect serial output to stdio in graphics mode.
-	if {$env(graphical) == 1} {
+	#$if {$env(graphical) == 1} {
 		append qemu_args " -serial mon:stdio "
-	} else {
-		append qemu_args " -nographic "
-	}
+	#} else {
+	#	append qemu_args " -nographic "
+	#}
 
 	# disk booting for now, PXE later
 	global disk_image

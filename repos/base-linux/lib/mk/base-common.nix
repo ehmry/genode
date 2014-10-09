@@ -1,40 +1,46 @@
-{ repo }:
-{ build, base, includeDirs }:
+{ genodeEnv, baseDir, repoDir, syscall }:
 
-{ syscall }:
-
-build.library {
+genodeEnv.mkLibrary {
   name = "base-common";
   libs = [ syscall ];
-
   sources =
-    map (fn: repo.sourceDir + "/base/${fn}")
-      [ "env/rm_session_mmap.cc" "env/debug.cc"
-        "ipc/ipc.cc"
+    genodeEnv.fromDir (repoDir+"/src/base")
+      [ "ipc/ipc.cc"
         "process/process.cc"
+        "env/rm_session_mmap.cc"
+        "env/debug.cc"
         "thread/thread_env.cc"
       ]
     ++
-    map (fn: base.sourceDir + "/base/${fn}")
-      [ "allocator/allocator_avl.cc" "allocator/slab.cc"
-        "avl_tree/avl_tree.cc"
-        "child/child.cc"
+    genodeEnv.fromDir (baseDir+"/src/base")
+      [ "avl_tree/avl_tree.cc"
+        "allocator/slab.cc"
+        "allocator/allocator_avl.cc"
+        "heap/heap.cc"
+        "heap/sliced_heap.cc"
         "console/console.cc"
+        "child/child.cc"
         "elf/elf_binary.cc"
-        "heap/heap.cc" "heap/sliced_heap.cc"
         "lock/lock.cc"
-        "signal/signal.cc"
-        "server/common.cc" "server/server.cc"
-        "signal/common.cc"
-        "thread/context_allocator.cc" "thread/trace.cc"
+        "signal/signal.cc" "signal/common.cc"
+        "server/server.cc" "server/common.cc"
+        "thread/trace.cc"
+        "thread/context_allocator.cc"
       ];
 
-  includeDirs =
-    [ (base.sourceDir + "/base/elf")
-      (repo.sourceDir + "/platform" )
-    ]
-    ++
-    map (d: repo.sourceDir + "/base/${d}") [ "ipc" "env" "lock" ]
-    ++
-    includeDirs;
+  localIncludes =
+    [ # lock/lock.cc - spin_lock.h,lock_helper.h
+      (repoDir+"/src/base/lock") (baseDir+"/src/base/lock")
+    ];
+
+  systemIncludes =
+    [ # platform_env.h - platform_env_common.h
+      (baseDir+"/src/base/env")
+      
+      # thread/trace.cc - trace/control.h
+      (baseDir+"/src/base/thread")
+
+      # ipc.cc - <sys/un.h> <sys/socket.h>
+      (genodeEnv.toolchain.glibc+"/include")
+    ];
 }

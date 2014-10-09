@@ -1,0 +1,2 @@
+source $genodeEnv/setup
+genericBuild

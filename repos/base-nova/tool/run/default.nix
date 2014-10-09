@@ -4,16 +4,16 @@
  * \date   2014-08-16
  */
 
- { spec, nixpkgs, tool }:
+ { tool, pkgs }:
 
-let iso = import ../iso { inherit nixpkgs tool; }; in
+with tool;
 
-{ name, bootInputs
-, waitRegex ? "",  waitTimeout ? 0
-, graphical ? false, qemuArgs ? "", ... } @ args:
+let iso = import ../iso { inherit tool; }; in
+
+{ name, contents, testScript }:
 
 let
-  hypervisor = nixpkgs.stdenv.mkDerivation rec {
+  hypervisor = tool.nixpkgs.stdenv.mkDerivation rec {
     rev = "f304d54b176ef7b1de9bd6fff6884e1444a0c116";
     shortRev = builtins.substring 0 7 rev;
     name = "nova-${shortRev}";
@@ -24,8 +24,8 @@ let
     };
     sourceRoot = "git-export/build";
     makeFlags =
-      if spec.bits == 32 then [ "ARCH=x86_32" ] else
-      if spec.bits == 64 then [ "ARCH=x86_64" ] else
+      if pkgs.system == "x86_32-nova" then [ "ARCH=x86_32" ] else
+      if pkgs.system == "x86_64-nova" then [ "ARCH=x86_64" ] else
       throw "will not build a ${toString spec.bits} copy of NOVA";
     preBuild = ''
       substituteInPlace Makefile --replace '$(call gitrv)' ${shortRev}
@@ -38,15 +38,35 @@ let
     sha256 = "02dlr26xajbdvg2zhs5g9k57kd68d31vqqfpgc56k4ci3kwhbrkw";
   };
 
+  contents' =
+    ( map ({ target, source }:
+        { target = "/genode/${target}"; inherit source; })
+        contents
+    ) ++ [
+      { target = "/genode";
+        source = pkgs.core;
+      }
+      { target = "/genode";
+        source = pkgs.init;
+      }
+      #{ target = "/genode";
+      #  source = pkgs.libs.ld;
+      #}
+      { target = "/boot";
+        source = hypervisor;
+      }
+    ];
+
 in
-derivation (args // {
+derivation {
   name = name+"-run";
   system = builtins.currentSystem;
   preferLocalBuild = true;
 
   PATH =
     "${nixpkgs.coreutils}/bin:" +
-    "${nixpkgs.findutils}/bin";
+    "${nixpkgs.findutils}/bin:" +
+    "${nixpkgs.qemu}/bin";
 
   builder = nixpkgs.expect + "/bin/expect";
   args = 
@@ -57,19 +77,7 @@ derivation (args // {
       ./nova.exp
     ];
 
-  inherit waitRegex waitTimeout graphical qemuArgs;
+  inherit testScript;
 
-  # Only the x86_64 variant of Qemu provides the emulation of hardware
-  # virtualization features used by NOVA. So let's always stick to this
-  # variant of Qemu when working with NOVA even when operating in 32bit.
-  qemu = nixpkgs.qemu + "/bin/qemu-system-x86_64";
-
-  diskImage = iso {
-    inherit name hypervisor;
-    genodeImage = tool.bootImage {
-      inherit name;
-      inputs = bootInputs;
-    };
-  };
-
-})
+  diskImage = iso { inherit name; contents = contents'; };
+}

@@ -4,52 +4,31 @@
  * \date   2014-09-11
  */
 
-{ tool, callLibrary, baseIncludes }:
+{ tool, callLibrary }:
 
 let
 
-  impl = 
-    if build.isLinux then import ../base-linux/libs.nix { inherit build callLibrary base; } else
-    if build.isNova  then import ../base-nova/libs.nix  { inherit build callLibrary base; } else
-    throw "no base support for ${build.system}";
+  # Prepare genodeEnv.
+  genodeEnv = tool.genodeEnvAdapters.addSystemIncludes
+    tool.genodeEnv (import ./include { inherit (tool) genodeEnv; });
 
-  base = {
-    sourceDir = ./src;
-    includeDirs = baseIncludes;
-  };
+  callLibrary' = callLibrary { inherit genodeEnv; };
+  importLibrary = path: callLibrary' (import path);
 
-  # overide the build.library function
-  build = tool.build // {
-    library = { includeDirs ? [], ... } @ args:
-      tool.build.library (args // {
-        includeDirs =  builtins.concatLists [
-          includeDirs baseIncludes
-        ];
-      });
-  };
+  callBaseLibrary = callLibrary {inherit genodeEnv baseDir repoDir;};
+  importBaseLibrary = path: callBaseLibrary (import path);
 
-  importLibrary = path:
-    callLibrary (import path { inherit build; });
+  baseDir = ../base;
+  repoDir =
+    if tool.genodeEnv.isLinux then ../base-linux else
+    if tool.genodeEnv.isNova  then ../base-nova  else
+    throw "no base libraries for ${genodeEnv.system}";
 
-  mergeLib = { name, includeDirs ? [] }:
-    let x = builtins.getAttr name impl;
-    in callLibrary (x {inherit build base includeDirs; });
+  impl =
+    import (repoDir+"/libs.nix") { inherit tool importBaseLibrary; };
 
-in (impl // {
-  repo = null; # hack
-
-    base = mergeLib {
-      name = "base";
-      inherit (base) includeDirs;
-    };
-
-    base-common = mergeLib {
-      name = "base-common";
-      includeDirs = (
-        map (d: base.sourceDir + "/base/${d}") [ "env" "lock" "thread" ]
-        ++ base.includeDirs);
-    };
-
-    cxx = importLibrary ./src/base/cxx;
-    startup = callLibrary (import ./lib/mk/startup.nix { inherit build base impl;});
-})
+in 
+impl // {
+  cxx     = importBaseLibrary ./src/base/cxx;
+  startup = importBaseLibrary ./lib/mk/startup.nix;
+}

@@ -1,7 +1,7 @@
-{ build }:
+{ tool }:
 { base }:
 
-build.library {
+tool.buildLibrary {
   name = "launchpad";
   libs = [ base ];
   sources = [ ./launchpad.cc ];

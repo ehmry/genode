@@ -8,4 +8,5 @@
   pkgs.bash
   pkgs.patch
   pkgs.patchelf
+  pkgs.perl
 ]

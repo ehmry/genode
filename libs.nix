@@ -6,32 +6,38 @@
 
 { system ? builtins.currentSystem
 , tool ? import ./tool { inherit system; }
-, baseIncludes     ? import ./repos/base/include     { inherit tool; }
-, osIncludes       ? import ./repos/os/include       { inherit tool; }
-, demoIncludes     ? import ./repos/demo/include     { inherit tool; }
-, libportsIncludes ? import ./repos/libports/include { inherit tool; }
 }:
 
 let
-  callLibrary = f:
-    f (builtins.intersectAttrs (builtins.functionArgs f) libs);
+  callLibrary = extraAttrs: f:
+    f (
+      builtins.intersectAttrs
+        (builtins.functionArgs f)
+        (libs // extraAttrs )
+    );
 
-  base = import ./repos/base/libs.nix {
-    inherit tool callLibrary baseIncludes;
+  importLibs = p: import p { inherit tool callLibrary; };
+
+  base     = importLibs ./repos/base/libs.nix;
+  os       = importLibs ./repos/os/libs.nix;
+  libports = importLibs ./repos/libports/libs.nix;
+
+  #demo = import ./repos/demo/libs.nix {
+  #  inherit tool callLibrary;
+  #  includes = baseIncludes ++ osIncludes;
+  #};
+
+  #
+  #  inherit tool callLibrary;
+  #  includes = baseIncludes ++ osIncludes ++ libportsIncludes;
+  #};
+
+  libs' = tool.mergeSets [ base os libports ]; #demo
+  libs  = libs' // {
+    baseLibs = with libs;
+      [ base-common base.base startup cxx
+        timed_semaphore alarm config syscall
+      ];
   };
-
-  os = import ./repos/os/libs.nix {
-    inherit tool callLibrary baseIncludes osIncludes;
-  };
-
-  demo = import ./repos/demo/libs.nix {
-    inherit tool callLibrary baseIncludes osIncludes demoIncludes;
-  };
-
-  libports = import ./repos/libports/libs.nix {
-    inherit tool callLibrary baseIncludes osIncludes libportsIncludes;
-  };
-
-  libs = base // os // demo // libports;
 
 in libs

@@ -1,12 +1,13 @@
-{ build }:
-
+{ tool }:
 { base, blit, scout_gfx }:
 
-build.library {
+with tool;
+
+buildLibrary {
   name = "scout_widgets";
   libs = [ base blit scout_gfx ];
   sources = [ ./elements.cc ./scrollbar.cc ./tick.cc ./widgets.cc ];
-  binaries = map (fn: (./data + "/${fn}"))
+  binaries = fromDir ./data
     [ "vera16.tff" "verai16.tff"
       "vera18.tff" "vera20.tff"
       "vera24.tff" "verabi10.tff"

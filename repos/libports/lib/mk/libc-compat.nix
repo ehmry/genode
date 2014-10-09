@@ -1,11 +1,5 @@
-/*
- * \brief  
- * \author Emery Hemingway
- * \date   2014-09-20
- */
-{ tool, libc }: with tool;
+{ subLibcEnv, libcSrc }:
 
-buildLibrary {
-  name = "libc-compat";
-  sources = wildcard "${libc}/src/lib/libc/lib/libc/compat-43/*.c";
+subLibcEnv.mkLibrary {
+  name = "libc-compat"; srcSh = [ "lib/libc/compat-43/*.c" ];
 }

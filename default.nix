@@ -10,26 +10,22 @@ let
 
   nixpkgs = import <nixpkgs> {};
 
-  tool = import ./tool { inherit nixpkgs; };
+  tool = import ./tool { inherit system nixpkgs; };
 
   build = import ./tool/build { inherit system nixpkgs; };
 
-  baseIncludes = import ./repos/base/include { inherit tool; };
-  osIncludes   = import ./repos/os/include   { inherit tool; };
-  demoIncludes = import ./repos/demo/include { inherit tool; };
+  libs = import ./libs.nix {
+    inherit system tool;
+  };
 
 in rec {
 
-  libs = import ./libs.nix {
-    inherit system tool baseIncludes osIncludes demoIncludes;
-  };
-
   pkgs = import ./pkgs.nix {
-    inherit tool libs baseIncludes osIncludes demoIncludes;
+    inherit system tool libs;
   };
 
   run = import ./run.nix {
-    inherit system nixpkgs pkgs libs;
+    inherit system tool pkgs;
   };
 
 }

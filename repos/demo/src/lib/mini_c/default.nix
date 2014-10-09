@@ -1,7 +1,7 @@
-{ build }:
+{ tool }:
 { }:
 
-build.library {
+tool.buildLibrary {
   name = "mini_c";
   stdinc = true;
   sources =

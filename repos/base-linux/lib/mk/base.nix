@@ -1,32 +1,30 @@
-# Taken from base.mk and base.inc
+#
+# \brief  Base lib parts that are not used by hybrid applications
+# \author Sebastian Sumpf
+# \date   2014-02-21
+#
 
-{ repo }:
-{ build, base, includeDirs }:
+{ genodeEnv, baseDir, repoDir, startup, cxx, base-common, syscall }:
 
-{ startup, cxx, base-common, syscall }:
+genodeEnv.mkLibrary (genodeEnv.tool.mergeSets [
+( import ./base.inc.nix {
+   inherit genodeEnv baseDir repoDir base-common syscall cxx; 
+})
 
-build.library {
+{
   name = "base";
+  libs = [ startup cxx ];
 
-  libs = [ startup cxx base-common syscall ];
+  sources = genodeEnv.fromPaths
+    [ (baseDir+"/src/base/thread/thread.cc")
+      (repoDir+"/src/base/thread/thread_linux.cc")
+    ];
 
-  sources =
-    map (fn: repo.sourceDir + "/base/${fn}")
-      [ "thread/thread_linux.cc"
-        "env/platform_env.cc"
-      ]
-    ++
-    map (fn: base.sourceDir + "/base/${fn}")
-      [ "console/log_console.cc"
-        "env/context_area.cc"
-        "env/env.cc"
-        "thread/thread.cc"
-      ];
-
-  includeDirs =
-    [ (repo.sourceDir + "/platform")
-      (repo.sourceDir + "/base/env")
-      (base.sourceDir + "/base/env")
-    ] ++ includeDirs;
-
+  systemIncludes =
+    [ # thread_linux.cc - linux_syscalls.h
+      (repoDir+"/src/platform") 
+      (genodeEnv.toolchain.glibc+"/include")
+    ];
 }
+
+])

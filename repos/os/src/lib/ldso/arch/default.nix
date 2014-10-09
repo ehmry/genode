@@ -1,18 +1,7 @@
-/*
- * \author Emery Hemingway
- * \date   2014-09-22
- */
+{ genodeEnv }:
 
-{ tool }: with tool;
-{ }:
-
-let
-  srcdir = if tool.build.isLinux then ./linux else ../arch;
-in
-buildLibrary {
+genodeEnv.mkLibrary {
   name = "ldso-arch";
-  sources = map (fn: "${srcdir}/${fn}")
-    [ "parent_cap.cc"
-      "binary_name.cc"
-    ];
+  src = [ "parent_cap.cc" "binary_name.cc" ];
+  vpath = { "*" = if genodeEnv.isLinux then ./linux else ../arch; };
 }

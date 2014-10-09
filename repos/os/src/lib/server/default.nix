@@ -3,12 +3,7 @@
  * \date   2014-09-15
  */
 
-{ tool }: with tool;
+{ builder, ... }:
+{ }: # no library dependencies
 
-# no library dependencies
-{ }:
-
-buildLibrary {
-  name = "server";
-  sources = [ ./server.cc ];
-}
+builder { name = "server"; sources = [ ./server.cc ]; }

@@ -4,4 +4,7 @@
  * \date   2014-09-16
  */
 
-{ build, base }:
+{ importBaseComponent }:
+{
+  core = importBaseComponent ./src/core;
+}

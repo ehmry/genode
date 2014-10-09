@@ -6,11 +6,8 @@ my $out = $ENV{"out"};
 open OUT, ">$out" or die "$!";
 print OUT "[\n";
 
-open IN, "<$root" or die "$!";
+open IN, "<$root" or die "$!, $root";
 while (<IN>) {
-    if (/^\#include\s+\"([^\"]*)\"/) {
-        print OUT "\"$1\"\n";
-    }
     if (/^\#include\s+\<([^\>]*)\>/) {
         print OUT "\"$1\"\n";
     }

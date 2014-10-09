@@ -1,8 +1,5 @@
-{ tool }: with tool;
-{ base }:
+{ genodeEnv, base }:
 
-buildComponent {
-  name = "test-fpu";
-  libs = [ base ];
-  sources = [ ./main.cc ];
+genodeEnv.mkComponent {
+  name = "test-fpu"; libs = [ base ]; src = [ ./main.cc ];
 }

@@ -1,13 +1,13 @@
-{ build, common, compileObject, transformBinary, shell }:
+{ build }:
 
 let
   result = derivation {
     name = "build-component";
     system = builtins.currentSystem;
 
-    inherit common;
+    inherit (build) common;
     setup = ./setup.sh;
-    builder = shell;
+    builder = build.shell;
     args = [ "-e" ../common/sub-builder.sh ];
   };
 in
@@ -22,11 +22,6 @@ in
 
 let
 
-  anyShared = libs:
-    if libs == [] then false else
-       if (builtins.getAttr "shared" (builtins.head libs))
-       then true else anyShared (builtins.tail libs);
-
   ccFlags = [
     (args.ccOpt or build.ccOpt)
     (args.ccOLevel or build.ccOLevel)
@@ -39,19 +34,25 @@ let
   ];
 
 in
+abort "build.component is deprecated"
 derivation ( args // rec {
   inherit name;
   component = result;
   system = result.system;
-  builder = shell;
+  outputs = [ "out" "src" ];
+  builder = build.shell;
   args = [ "-e" (args.builder or ./default-builder.sh) ];
 
   objects =
-    map (source: compileObject { inherit source includeDirs ccFlags cxxFlags; }) sources
+    map (main: build.compileObject {
+        inherit main ccFlags cxxFlags;
+        localIncludePath = includeDirs;
+      }) sources
     ++
-    map (binary: transformBinary { inherit binary; }) binaries;
+    map (binary: build.transformBinary { inherit binary; }) binaries;
+  objectSources = map (o: o.src) objects;
 
-  phases = ( args.phases or [ "linkPhase" ] );
+  phases = ( args.phases or [ "linkPhase" ] ) ++ [ "fixupPhase" ];
 
   inherit (build) cc cxx
     ldScriptDyn ldScriptSo;
@@ -61,7 +62,7 @@ derivation ( args // rec {
   # Assemble linker options for static and dynamic linkage
   ldTextAddr = args.ldTextAddr or build.spec.ldTextAddr or "";
 
-  sharedLibs = anyShared libs;
+  sharedLibs = build.anyShared libs;
 
   ldScriptsStatic = args.ldScriptsStatic or build.spec.ldScriptsStatic or [ ../../../repos/base/src/platform/genode.ld ];
   ldScriptsDynamic = args.ldScriptsDynamic or [ build.ldScriptDyn ];

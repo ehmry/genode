@@ -3,9 +3,8 @@
  * \date   2014-09-30
  */
 
-{ run, pkgs, libs }:
+{ run, pkgs }:
 
-with libs;
 with pkgs;
 
 run {
@@ -13,8 +12,8 @@ run {
 
   contents = [
     { target = "/"; source = test.libc; }
-    { target = "/"; source = libc; }
-    { target = "/"; source = libm; }
+    { target = "/"; source = libs.libc; }
+    { target = "/"; source = libs.libm; }
     { target = "/config";
       source = builtins.toFile "config" ''
         <config>

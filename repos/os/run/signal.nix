@@ -47,7 +47,7 @@ run {
   testScript = ''
     append qemu_args "-nographic -m 64"
 
-    run_genode_until {child exited with exit value 0.*} 200
+    run_genode_until {child "test-signal" exited with exit value 0.*} 200
 
     puts "Test succeeded"
   '';

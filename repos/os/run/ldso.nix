@@ -1,6 +1,5 @@
-{ run, libs, pkgs }:
+{ run, pkgs }:
 
-with libs;
 with pkgs;
 
 #if {[have_spec always_hybrid]} {
@@ -11,6 +10,7 @@ run {
 
   contents = [
     { target = "/"; source = test.ldso; }
+    { target = "/"; source = libs.ld; }
     { target = "/config";
       source = builtins.toFile "config" ''
 	<config>

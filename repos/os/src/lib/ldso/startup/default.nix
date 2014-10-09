@@ -1,12 +1,5 @@
-/*
- * \author Emery Hemingway
- * \date   2014-09-21
- */
+{ genodeEnv }:
 
-{ tool }: with tool;
-{ }:
-
-buildLibrary {
-  name = "ldso-startup";
-  sources = [ ./startup.cc ];
+genodeEnv.mkLibrary {
+  name = "ldso-startup"; src = [ ./startup.cc ];
 }

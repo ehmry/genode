@@ -1,9 +1,7 @@
-{ build }:
+{ genodeEnv, base, init_pd_args, config }:
 
-{ base, init_pd_args, config }:
-
-build.component {
+genodeEnv.mkComponent {
   name = "init";
-   libs = [ base init_pd_args config ];
-   sources = [ ./main.cc ];
+  libs = [ base init_pd_args config ];
+  sources = genodeEnv.fromPath ./main.cc;
 }

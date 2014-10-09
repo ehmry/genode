@@ -51,9 +51,20 @@ linkPhase() {
     runHook postLink
 }
 
+
+fixupPhase() {
+    mkdir $src
+
+    for s in $objectSources; do
+        cp -rLf --no-preserve=mode $s/* $src
+    done
+
+    dumpVars
+    cp env-vars $src
+}
+
 componentBuild() {
     MSG_PRG $name
     genericBuild
 }
 
-dumpVars

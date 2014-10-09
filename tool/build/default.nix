@@ -1,106 +1,127 @@
 /*
- * \brief  Functions for building Genode components
+ * \brief  Build environment
  * \author Emery Hemingway
- * \date   2014-08-11
+ * \date   2014-08-23
  */
 
-{ system, nixpkgs }:
+{ system, tool }:
+
+with tool;
 
 let
-  spec =
-    if system == "x86_32-linux" then import ../../specs/x86_32-linux.nix else
-    if system == "x86_64-linux" then import ../../specs/x86_64-linux.nix else
-    if system == "x86_32-nova"  then import ../../specs/x86_32-nova.nix  else
-    if system == "x86_64-nova"  then import ../../specs/x86_64-nova.nix  else
-    abort "unknown system type ${system}";
 
-  toolchain = nixpkgs.callPackage ../toolchain/precompiled {
-    glibc = nixpkgs.glibc_multi;
+  # Linker script for dynamically linked programs
+  ldScriptDyn = ../../repos/os/src/platform/genode_dyn.ld;
+
+  # Linker script for shared libraries
+  ldScriptSo  = ../../repos/os/src/platform/genode_rel.ld;
+
+  staticLibraryLinkPhase = ''
+    echo -e "    MERGE    $name"
+    mkdir -p $out
+    VERBOSE $ar -rc $out/$name.lib.a $objects
+
+    if [ -n "$libs" ]; then
+        mkdir -p "$out/nix-support"
+        echo "$libs" > "$out/nix-support/propagated-libraries"
+    fi
+  '';
+
+  sharedLibraryLinkPhase = ''
+    echo -e "    MERGE    $@"
+
+    local _libs=$libs
+    local libs=""
+
+    for l in $_libs
+    do libs="$libs $l/*.a $l/*.so"
+    done
+
+    mkdir -p $out
+
+    VERBOSE $ld -o $out/$name.lib.so -shared --eh-frame-hdr \
+        $ldOpt $ldFlags \
+	-T $ldScriptSo \
+        --entry=$entryPoint \
+	--whole-archive \
+	--start-group \
+        $libs $objects \
+	--end-group \
+	--no-whole-archive \
+        $($cc $ccMarch -print-libgcc-file-name)
+  '';
+
+  libraryFixupPhase = ''
+    if [ -n "$libs" ]; then
+        mkdir -p "$out/nix-support"
+        echo "$libs" > "$out/nix-support/propagated-libraries"
+    fi
+  '';
+
+  componentLinkPhase = ''
+    echo -e "    LINK     $name"
+
+    local _libs=$libs
+    local libs=""
+
+    for l in $_libs
+    do findLibs $l libs
+    done
+
+    mkdir -p $out
+    
+    [[ "$ldTextAddr" ]] && \
+        cxxLinkOpt="$cxxLinkOpt -Wl,-Ttext=$ldTextAddr"
+
+    for s in $ldScripts
+    do cxxLinkOpt="$cxxLinkOpt -Wl,-T -Wl,$s"
+    done
+
+    VERBOSE $cxx $cxxLinkOpt \
+	-Wl,--whole-archive -Wl,--start-group \
+        $objects $libs \
+	-Wl,--end-group -Wl,--no-whole-archive \
+        $($cc $ccMarch -print-libgcc-file-name) \
+        -o $out/$name
+  '';
+
+  componentFixupPhase = " ";
+
+  genodeEnv'   = import ./genode-env.nix { inherit system tool; };
+  genodePortEnv' = genodeEnv // {
+    mk =
+    { portSrc, ... } @ attrs:
+    genodeEnv'.mk { gatherPhase = "cd \"$portSrc\""; };
   };
 
-  devPrefix = "genode-${spec.platform}-";
-  shell = nixpkgs.bash + "/bin/sh";
+  addSubMks = env: env // {
 
-  build = rec {
-    inherit system spec nixpkgs toolchain;
+    mkLibrary = attrs: env.mk (
+      { fixupPhase = libraryFixupPhase;
+      } // 
+      (if attrs.shared or false then
+         { mergePhase = sharedLibraryLinkPhase;
+           entryPoint = attrs.entryPoint or "0x0";
+           inherit ldScriptSo;
+         }
+       else
+         { mergePhase = staticLibraryLinkPhase; }
+      )
+      // attrs
+    );
 
-    version = builtins.readFile ../../VERSION;
-
-    is32Bit  = spec.bits == 32;
-    is64Bit  = spec.bits == 64;
-    isArm = spec.platform == "arm";
-    isx86 = spec.platform == "x86";
-    isx86_32 = isx86 && is32Bit;
-    isx86_64 = isx86 && is64Bit;
-
-    isLinux = spec.kernel == "linux";
-    isNova  = spec.kernel == "nova";
-
-    cc      = "${devPrefix}gcc";
-    cxx     = "${devPrefix}g++";
-    ld      = "${devPrefix}ld";
-    as      = "${devPrefix}as";
-    ar      = "${devPrefix}ar";
-    nm      = "${devPrefix}nm";
-    objcopy = "${devPrefix}objcopy";
-    ranlib  = "${devPrefix}ranlib";
-    strip   = "${devPrefix}strip";
-
-    # Options for automatically generating dependency files
-    #
-    # We specify the target for the generated dependency file explicitly via
-    # the -MT option. Unfortunately, this option is handled differently by
-    # different gcc versions. Older versions used to always append the object
-    # file to the target. However, gcc-4.3.2 takes the -MT argument literally.
-    # So we have to specify both the .o file and the .d file. On older gcc
-    # versions, this results in the .o file to appear twice in the target
-    # but that is no problem.
-    ccOptDep = [ "-MMD" ];
-
-    ccOLevel = "-O2";
-    ccWarn   = "-Wall";
-
-    ccOpt = [
-      # Always compile with '-ffunction-sections' to enable
-      # the use of the linker option '-gc-sections'
-      "-ffunction-sections"
-
-      # Prevent the compiler from optimizations related to strict aliasing
-      "-fno-strict-aliasing"
-
-      # Do not compile with standard includes per default.
-      "-nostdinc"
-
-      "-g"
-    ]
-    ++ spec.ccOpt
-    ++ spec.ccMarch;
-
-    ccCxxOpt = [ "-std=gnu++11" ];
-    ccCOpt = ccOpt;
-
-    ldOpt = spec.ldMarch ++ [ "-gc-sections" ];
-    cxxLinkOpt = [ ];
-
-    # Linker script for dynamically linked programs
-    ldScriptDyn = ../../repos/os/src/platform/genode_dyn.ld;
-
-    # Linker script for shared libraries
-    ldScriptSo  = ../../repos/os/src/platform/genode_rel.ld;
-
-    asOpt = spec.asMarch;
-
-    ##########################################################
+    mkComponent = attrs: env.mk (
+      { mergePhase  = componentLinkPhase;
+        fixupPhase = componentFixupPhase;
+        ldTextAddr = attrs.ldTextAddr or env.spec.ldTextAddr or "";
+      } // attrs
+    );
 
   };
-
-  common = import ./common { inherit nixpkgs toolchain; };
-
-  compileObject = import ./compile-object { inherit build common shell; };
-  transformBinary = import ./transform-binary { inherit build common shell; };
 
 in
-(build // rec {
-  library = import ./library { inherit build common compileObject transformBinary shell; };
-  component = import ./component { inherit build common compileObject transformBinary shell; };
-})
+rec {
+  genodeEnv     = addSubMks genodeEnv';
+  genodePortEnv = addSubMks genodeEnv;
+  genodeEnvAdapters = import ./adapters.nix;
+}

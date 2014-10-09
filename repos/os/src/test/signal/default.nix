@@ -1,13 +1,7 @@
-/*
- * \author Emery Hemingway
- * \date   2014-08-12
- */
+{ genodeEnv, base }:
 
-{ build }:
-{ base }:
-
-build.component {
+genodeEnv.mkComponent {
   name = "test-signal";
   libs = [ base ];
-  sources = [ ./main.cc ];
+  src = genodeEnv.fromPath ./main.cc;
 }

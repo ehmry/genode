@@ -4,21 +4,27 @@
  * \date   2014-09-21
  */
 
-{ tool, callPackage, baseIncludes, osIncludes, libportsIncludes }:
+{ tool, callComponent }:
 
 let
 
-  tool' = tool // { inherit buildComponent; };
+  ports = import ./ports { inherit tool; };
 
-  # overide the build.component function
-  buildComponent = { includeDirs ? [], ... } @ args:
-    tool.build.component (args // {
-      includeDirs = includeDirs ++
-        libportsIncludes ++ osIncludes ++ baseIncludes;
-    });
+  includes =
+    [ #(ports.libc + "/include/libc")
+      #(ports.libc + "/include/libc-amd64")
+      ./include/libc-genode
+    ];
 
-  importComponent = path:
-    callPackage (import path { tool = tool'; });
+  # Prepare genodeEnv.
+  genodeEnv' =  tool.genodeEnvAdapters.addIncludePath
+    tool.genodeEnv (
+      ( import ../base/include { inherit (tool) genodeEnv; }) ++
+      includes
+    );
+
+  callComponent' = callComponent { genodeEnv = genodeEnv'; };
+  importComponent = path: callComponent' (import path);
 
 in
 {

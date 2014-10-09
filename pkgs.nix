@@ -6,44 +6,31 @@
 
 { system ? builtins.currentSystem
 , tool ? import ./tool { inherit system; }
-, libs ? import ./libs.nix {
-    inherit system tool;
-    inherit baseIncludes osIncludes demoIncludes libportsIncludes;
-  }
-, baseIncludes     ? import ./repos/base/include     { inherit tool; }
-, osIncludes       ? import ./repos/os/include       { inherit tool; }
-, demoIncludes     ? import ./repos/demo/include     { inherit tool; }
-, libportsIncludes ? import ./repos/libports/include { inherit tool; }
+, libs ? import ./libs.nix { inherit system tool; }
 }:
 
 let
+  callComponent = extraAttrs: f:
+    f (
+      builtins.intersectAttrs 
+        (builtins.functionArgs f)
+        (libs // extraAttrs)
+    );
 
-  callPackage = f:
-    f (builtins.intersectAttrs (builtins.functionArgs f) libs);
+  importPkgs = p: import p { inherit tool callComponent; };
 
-  base = import ./repos/base/pkgs.nix {
-    inherit tool callPackage baseIncludes;
-  };
+  base     = importPkgs ./repos/base/pkgs.nix;
+  os       = importPkgs ./repos/os/pkgs.nix;
+  libports = importPkgs ./repos/libports/pkgs.nix;
 
-  os = import ./repos/os/pkgs.nix {
-    inherit tool callPackage baseIncludes osIncludes;
-  };
+  #demo = import ./repos/demo/pkgs.nix {
+  #  inherit tool callComponent baseIncludes osIncludes demoIncludes;
+  #};
 
-  demo = import ./repos/demo/pkgs.nix {
-    inherit tool callPackage baseIncludes osIncludes demoIncludes;
-  };
 
-  libports = import ./repos/libports/pkgs.nix {
-    inherit tool callPackage baseIncludes osIncludes libportsIncludes;
-  };
 
-  ports = import ./repos/ports/pkgs.nix {
-    inherit tool callPackage baseIncludes osIncludes;
-  };
+  #ports = import ./repos/ports/pkgs.nix {
+  #  inherit tool callComponent baseIncludes osIncludes;
+  #};
 
-# TODO: make a function to combine these
-in base // os // demo // ports // {
-  app = (demo.app // ports.app);
-  server = (os.server // demo.server);
-  test = (base.test // os.test // libports.test);
-}
+in tool.mergeSets [ base os libports { inherit libs system; } ]

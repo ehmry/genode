@@ -5,13 +5,15 @@
  */
 
 { nixpkgs }:
-{ name, inputs }:
+{ name, contents }:
 
 derivation {
   name = name+"-boot-image";
   system = builtins.currentSystem;
   builder = nixpkgs.bash+"/bin/sh";
   args = [ "-e" ./boot-image.sh ];
-  inherit inputs;
   PATH = nixpkgs.coreutils+"/bin";
+
+  sources = map (x: x.source) contents;
+  targets = map (x: x.target) contents;
 }

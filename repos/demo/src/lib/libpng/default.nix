@@ -1,11 +1,13 @@
-{ build }:
+{ tool }:
 { mini_c, libz_static }:
 
-build.library {
+with tool;
+
+buildLibrary {
   name = "libpng_static";
   ccOpt = [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ] ++ build.ccOpt;
   libs = [ mini_c libz_static ];
-  sources = map (fn: (./contrib + "/${fn}"))
+  sources = fromDir ./contrib
     [ "png.c"      "pngerror.c" "pngget.c"   "pngmem.c"
       "pngpread.c" "pngread.c"  "pngrio.c"   "pngrtran.c"
       "pngrutil.c" "pngset.c"   "pngtrans.c" "pngwio.c"

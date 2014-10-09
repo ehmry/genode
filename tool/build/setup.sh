@@ -4,6 +4,11 @@
 # environment variables) and from shell scripts (as functions).
 runHook() {
     local hookName="$1"
+    if [ "${!hookName}" ]; then
+        eval "${!hookName}"
+        return 
+    fi
+
     case "$(type -t $hookName)" in
         (function|alias|builtin) $hookName;;
         (file) source $hookName;;
@@ -323,10 +328,192 @@ stripHash() {
     echo $strippedName
 }
 
+compile() {
+    main=$1
+
+    echo -e "    COMPILE  $@"
+
+    base="${main%.*}"
+    object="${base}.o"
+    base="${base//./_}"
+
+    file_opt_var=ccOpt_$base
+    ccFlags="$ccFlags ${!file_opt_var}"
+
+    test "$prefix" && cd $prefix
+
+    case $main in
+        *.c | *.s )
+            VERBOSE $cc $ccFlags $includeOpts \
+                -c $main -o $object
+            ;;
+
+        *.cc | *.cpp )
+            VERBOSE $cxx $ccFlags $cxxFlags \
+                $includeOpts -c $main -o $object
+            ;;
+
+        *.S )
+            VERBOSE $cc $ccFlags -D__ASSEMBLY__ \
+                $includeOpts -c $main -o $object
+            ;;
+        * )
+            echo Unhandled source file $main
+            exit 1
+            ;;
+    esac
+    objects="$objects $object"
+}
+
+findLibs() {
+    local pkg=$1
+    local var=$2
+
+    lib=$(echo $pkg/*.a; echo $pkg/*.so)
+    case ${!var} in
+        *\ $lib\ *)
+            return 0
+            ;;
+    esac
+
+    eval $var="'${!var} $lib '"
+
+    if [ -f $pkg/nix-support/propagated-libraries ]; then
+        for i in $(cat $pkg/nix-support/propagated-libraries); do
+            findLibs $i $var
+        done
+    fi
+}
+
+gatherSource() {
+    srcSrc=$1
+    srcDst=$2
+    
+    bn=$(basename $srcDst)
+    var="local_includes_${bn/./_}"
+    localIncludes=(${!var})
+
+    #localIncludes=($localIncludes)
+
+    # Determine how many `..' levels appear in the header file
+    # references. E.g., if there is some reference 
+    # `../../foo.h', then we have to insert two extra levels
+    # in the directory structure, so that `a.c' is stored at
+    # `dotdot/dotdot/a.c', and a reference from it to
+    # `../../foo.h' resolves to
+    # `dotdot/dotdot/../../foo.h' == `foo.h'.
+    local n=0
+    maxDepth=0
+    for ((n = 0; n < ${#localIncludes[*]}; n += 2)); do
+        target=${localIncludes[$((n + 1))]}
+
+        # Split the target name into path components using some
+        # IFS magic.
+        savedIFS="$IFS"
+        IFS=/
+        components=($target)
+        depth=0
+        for ((m = 0; m < ${#components[*]}; m++)); do
+            c=${components[m]}
+            if test "$c" = ".."; then
+                depth=$((depth + 1))
+            fi
+        done
+        IFS="$savedIFS"
+
+        if test $depth -gt $maxDepth; then
+            maxDepth=$depth;
+        fi
+    done
+
+    # Create the extra levels in the directory hierarchy.
+    local prefix=
+    for ((n = 0; n < maxDepth; n++)); do
+        prefix="dotdot/$prefix"
+    done
+
+    local dir="$(dirname $srcDst)/"
+
+    # Create symlinks to the header files.
+    for ((n = 0; n < ${#localIncludes[*]}; n += 2)); do
+        incSrc=${localIncludes[n]}
+        incDst=${localIncludes[$((n + 1))]}
+        
+        # Create missing directories.  We use IFS magic to split the path
+        # into path components.
+        savedIFS="$IFS"
+        IFS=/
+        components=($prefix$dir$incDst)
+        fullPath=(.)
+        for ((m = 0; m < ${#components[*]} - 1; m++)); do
+            fullPath=("${fullPath[@]}" ${components[m]})
+            if ! test -d "${fullPath[*]}"; then
+                mkdir "${fullPath[*]}"
+            fi
+        done
+        IFS="$savedIFS"
+    
+        ln -sf $incSrc $prefix$dir$incDst
+    done
+
+    # Create a symlink to the source file.
+    # Create missing directories.  We use IFS magic to split the path
+    # into path components.
+    savedIFS="$IFS"
+    IFS=/
+    components=($prefix$srcDst)
+    fullPath=(.)
+    for ((m = 0; m < ${#components[*]} - 1; m++)); do
+        fullPath=("${fullPath[@]}" ${components[m]})
+        if ! test -d "${fullPath[*]}"; then
+            mkdir "${fullPath[*]}"
+        fi
+    done
+    IFS="$savedIFS"
+    
+    if ! test "$(readlink $prefix$srcDst)" = $srcSrc; then
+        ln -s $srcSrc $prefix$srcDst
+    fi
+}
+
+# turn into an array
+sources=($sources)
+
+gatherPhase() {
+    runHook preGather
+
+    local n
+    for ((n = 0; n < ${#sources[*]}; n += 2)); do
+        gatherSource "${sources[n]}" "${sources[$((n + 1))]}"
+    done
+
+    runHook postGather
+}
+
+ccFlags="$ccDef $ccOpt $ccOLevel $ccWarn"
+cxxFlags="$ccCxxOpt"
+
+compilePhase() {
+    includeOpts=
+    for i in $systemIncludes $nativeIncludePaths
+    do includeOpts="$includeOpts -I$i"
+    done
+
+    [ -z "$sources" ] && exit 1
+
+    for ((n = 1; n < ${#sources[*]}; n += 2)); do
+        compile ${sources[$n]}
+    done
+}
+
 genericBuild() {
     if [ -n "$buildCommand" ]; then
         eval "$buildCommand"
         return
+    fi
+
+    if [ -z "$phases" ]; then
+        phases="gatherPhase compilePhase mergePhase fixupPhase"
     fi
 
     for curPhase in $phases; do
@@ -351,7 +538,6 @@ genericBuild() {
 
     stopNest
 }
-
 
 BRIGHT_COL="\033[01;33m"
 DARK_COL="\033[00;33m"

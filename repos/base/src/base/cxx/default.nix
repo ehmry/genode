@@ -1,18 +1,14 @@
-{ build }:
+{ genodeEnv, baseDir, repoDir }:
 
-# no library dependencies
-{ }:
-
-build.library rec {
+genodeEnv.mkLibrary rec {
   name = "cxx";
   shared = false;
+  libs = [ ];
 
-  sources = 
+  sources = genodeEnv.fromPaths
     [ ./exception.cc ./guard.cc ./malloc_free.cc
       ./misc.cc ./new_delete.cc ./unwind.cc
     ];
-
-  phases = [ "mergePhase" ];
 
   #
   # Here we define all symbols we want to hide in libsupc++ and libgcc_eh
@@ -65,9 +61,9 @@ build.library rec {
   #endif
 
   # TODO check if these must be passed like this
-  inherit (build.spec) ccMarch ldMarch;
+  #inherit (build.spec) ccMarch ldMarch;
   mergePhase = ''
-    outName=subc++.o
+    outName=supc++.o
   
     libcc_gcc="$($cxx $ccMarch -print-file-name=libsupc++.a) $($cxx $ccMarch -print-file-name=libgcc_eh.a)"
 
@@ -77,7 +73,10 @@ build.library rec {
     mkdir -p $out
 
     MSG_CONVERT $outName
-    VERBOSE $objcopy $localSymbols $redefSymbols $outName.tmp $out/cxx.lib.a
+    VERBOSE $objcopy $localSymbols $redefSymbols $outName.tmp supc++.o
+
+    MSG_MERGE cxx.lib.a
+    VERBOSE $ar -rc $out/cxx.lib.a $outName
   '';
 
 }

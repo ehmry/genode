@@ -1,31 +1,21 @@
 /*
- * \brief  OS components.
+ * \brief  OS components
  * \author Emery Hemingway
  * \date   2014-09-15
  */
 
- { tool, callPackage, baseIncludes, osIncludes }:
+ { tool, callComponent }:
 
 let
 
-  # overide the build.component function
-  build' = tool.build // {
-    component = { includeDirs ? [], ... } @ args:
-      tool.build.component (args // {
-        includeDirs =  builtins.concatLists [
-          includeDirs osIncludes baseIncludes
-        ];
-      });
-  };
-  
-  os = rec {
-    sourceDir = ./src;
-    includeDir = ./include;
-    includeDirs = osIncludes;
-  };
+  # Prepare genodeEnv.
+  genodeEnv =  tool.genodeEnvAdapters.addSystemIncludes
+    tool.genodeEnv (
+      ( import ../base/include { inherit (tool) genodeEnv; }) ++
+      [ ./include ]);
 
-  importComponent = path:
-    callPackage (import path { build = build'; });
+  callComponent' = callComponent { inherit genodeEnv; };
+  importComponent = path: callComponent' (import path);
 
 in
 {

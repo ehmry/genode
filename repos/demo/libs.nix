@@ -4,22 +4,21 @@
  * \date   2014-09-15
  */
 
-{ tool, callLibrary, baseIncludes, osIncludes, demoIncludes }:
+{ tool, callLibrary, includes }:
 
 let
 
   # overide the build.library function
-  build = tool.build // {
-    library = { includeDirs ? [], ... } @ args:
-      tool.build.library (args // {
-        includeDirs =  builtins.concatLists [
-          includeDirs demoIncludes osIncludes baseIncludes
-        ];
-      });
-  };
+  buildLibrary =
+  { includeDirs ? [], ... } @ args:
+  tool.build.library (args // {
+    includeDirs = includeDirs ++ includes;
+  });
+
+  tool' = tool // { inherit buildLibrary; };
 
   importLibrary = path:
-    callLibrary (import path { inherit build; });
+    callLibrary (import path { tool = tool'; });
 
 in {
   launchpad          = importLibrary ./src/lib/launchpad;

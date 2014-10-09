@@ -1,13 +1,7 @@
-/*
- * \author Emery Hemingway
- * \date   2014-09-22
- */
+{ genodeEnv, alarm }:
 
-{ tool }: with tool;
-{ alarm }:
-
-buildLibrary {
+genodeEnv.mkLibrary {
   name = "timed_semaphore";
   libs = [ alarm ];
-  sources = [ ./timed_semaphore.cc ];
+  sources = genodeEnv.fromPath ./timed_semaphore.cc;
 }

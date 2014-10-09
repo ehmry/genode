@@ -1,8 +1,7 @@
-{ build }:
-{ base }:
+{ genodeEnv, base }:
 
-build.component {
+genodeEnv.mkComponent {
   name = "test-thread";
-  sources = [ ./main.cc ];
+  sources = genodeEnv.fromPath ./main.cc;
   libs = [ base ];
 }

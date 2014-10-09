@@ -1,16 +1,12 @@
-/*
- * \author Emery Hemingway
- * \date   2014-09-20
- */
-
-{ tool, libc }: with tool;
-
-buildLibrary {
+{ subLibcEnv }:
+subLibcEnv.mkLibrary {
   name = "libc-gdtoa";
-  sources = 
-    filterOut [ "arithchk.c" "strtodnrp.c" "qnan.c" "machdep_ldisQ.c" "machdep_ldisx.c" ]
-      ( (wildcard "${libc}/src/lib/libc/contrib/gdtoa/*.c")
-        ++
-        (wildcard "${libc}/src/lib/libc/lib/libc/gdtoa/*.c")
-      );
+  srcSh = [ "contrib/gdtoa/*.c" "lib/libc/gdtoa/*.c" ];
+  filter = (
+    map (fn: "contrib/gdtoa/${fn}")
+      [ "arithchk.c" "strtodnrp.c" "qnan.c" ]
+    ++
+    map (fn: "lib/libc/gdtoa/${fn}")
+      [ "machdep_ldisQ.c" "machdep_ldisx.c" ]
+  );
 }

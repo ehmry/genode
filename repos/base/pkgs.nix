@@ -1,57 +1,41 @@
 /*
- * \brief  Base packages.
+ * \brief  Base packages
  * \author Emery Hemingway
  * \date   2014-09-04
  */
 
-{ tool, baseIncludes, callPackage }:
+{ tool, callComponent }:
+
+with tool;
 
 let
 
-  impl =
-    if tool.build.isLinux then import ../base-linux/pkgs.nix { inherit tool base; } else
-    if tool.build.isNova  then import ../base-nova/pkgs.nix  { inherit tool base; } else
-    throw "no base support for ${tool.build.system}";
+  # Prepare genodeEnv.
+  genodeEnv = tool.genodeEnvAdapters.addSystemIncludes
+    tool.genodeEnv (import ./include { inherit (tool) genodeEnv; });
 
-  base = {
-    sourceDir = ./src;
-    includeDirs = baseIncludes;
+  callComponent' = callComponent { inherit genodeEnv; };
+  importComponent = path: callComponent' (import path);
+  
+  callBasePackage = callComponent {
+    inherit genodeEnv baseDir repoDir;
   };
+  importBaseComponent = path: callBasePackage (import path);
 
-  # overide the build.component function
-  build' = tool.build // {
-    component = { includeDirs ? [], ... } @ args:
-      tool.build.component (args // {
-        includeDirs = includeDirs ++ baseIncludes;
-      });
-  };
+  baseDir = ../base;
+  repoDir = 
+    if genodeEnv.isLinux then ../base-linux else
+    if genodeEnv.isNova  then ../base-nova  else
+    throw "no base components for ${genodeEnv.system}";
 
-  importComponent = path:
-    callPackage (import path { build = build'; });
-
-  tool' = tool // { buildComponent = build'.component; };
-
-  importComponent2 = path:
-    callPackage (import path { tool = tool'; });
-
-  ## TODO: append the git revision
-  version = builtins.readFile ../../VERSION;
+  impl = 
+    import (repoDir+"/pkgs.nix") { inherit importBaseComponent; };
 
 in
-{
+tool.mergeSet impl {
   test = {
     affinity = importComponent ./src/test/affinity;
-    fpu      = importComponent2 ./src/test/fpu;
+    fpu      = importComponent ./src/test/fpu;
     thread   = importComponent ./src/test/thread;
-  } // (impl.test or {});
-
-  core = callPackage (impl.core {
-    name = "core";
-    includeDirs =
-      [ (base.sourceDir + "/core/include") ]
-      ++ map (d: base.sourceDir + "/base/${d}") [ "env" "thread" ]
-      ++ base.includeDirs;
-    ccOpt = build'.ccOpt ++ (impl.core.flags or []) ++ [ "-DGENODE_VERSION='\"${version}\"'" ];
-  });
-
+  };
 }

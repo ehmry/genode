@@ -1,30 +1,20 @@
-{ build, base, impl }:
+{ genodeEnv, baseDir, repoDir, syscall }:
 
-{ syscall }:
-
-let
-  sourceDir = base.sourceDir + "/platform";
-  subdir =
-    if build.isArm then sourceDir + "/arm" else
-    if build.isx86_32 then sourceDir + "/x86_32" else
-    if build.isx86_64 then sourceDir + "/x86_64" else
-    abort "no startup library for ${build.spec.system}";
-in
-build.library rec {
+let sourceDir = baseDir+"/src/platform"; in
+genodeEnv.mkLibrary {
   name = "startup";
   shared = false;
 
-  libs = [ syscall ];
+  libs = if syscall == null then [] else [ syscall ];
 
   sources =
-    [ (subdir + "/crt0.s")
-    ] ++
-    map (fn: base.sourceDir + "/platform/${fn}")
-      [ "_main.cc"
-        "init_main_thread.cc"
+    genodeEnv.fromDir sourceDir [ "_main.cc" "init_main_thread.cc" ]
+    ++
+    genodeEnv.fromPaths
+      [ (( if genodeEnv.isArm    then sourceDir+"/arm" else
+           if genodeEnv.isx86_32 then sourceDir+"/x86_32" else
+           if genodeEnv.isx86_64 then sourceDir+"/x86_64" else
+           abort "no startup library for ${genodeEnv.system}"
+         ) + "/crt0.s")
       ];
-
-  includeDirs =
-    [ "${impl.repo.sourceDir}/platform" sourceDir ]
-    ++ impl.repo.includeDirs ++ base.includeDirs;
 }
