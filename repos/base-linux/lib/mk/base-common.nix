@@ -28,14 +28,12 @@ genodeEnv.mkLibrary {
         "thread/context_allocator.cc"
       ];
 
-  localIncludes =
+  systemIncludes =
     [ # lock/lock.cc - spin_lock.h,lock_helper.h
       (repoDir+"/src/base/lock") (baseDir+"/src/base/lock")
-    ];
 
-  systemIncludes =
-    [ # platform_env.h - platform_env_common.h
-      (baseDir+"/src/base/env")
+      # platform_env.h - platform_env_common.h
+      (repoDir+"/src/base/env") (baseDir+"/src/base/env")
       
       # thread/trace.cc - trace/control.h
       (baseDir+"/src/base/thread")

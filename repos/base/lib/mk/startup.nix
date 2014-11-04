@@ -17,4 +17,7 @@ genodeEnv.mkLibrary {
            abort "no startup library for ${genodeEnv.system}"
          ) + "/crt0.s")
       ];
+
+   # TODO #include /<...>/"..."/
+   systemIncludes = [ sourceDir ];
 }

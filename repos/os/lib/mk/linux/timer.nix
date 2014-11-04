@@ -4,4 +4,7 @@
   sources = genodeEnv.fromPath
      ../../../src/drivers/timer/linux/platform_timer.cc;
   localIncludes = [ ../../../src/drivers/timer/include_periodic ];
+
+  # platform_timer.cc - linux_syscalls.h - ...
+  systemIncludes = [ (genodeEnv.toolchain.glibc+"/include") ];
 }
