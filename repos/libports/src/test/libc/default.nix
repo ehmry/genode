@@ -1,8 +1,7 @@
-{ tool }: with tool;
-{ libm, libc, ld }:
+{ genodeEnv, libc, libm, ld }:
 
-buildComponent {
+genodeEnv.mkComponent {
   name = "test-libc";
-  sources = [ ./main.cc ];
+  sources = genodeEnv.fromPath ./main.cc;
   libs = [ libm libc ld ];
 }

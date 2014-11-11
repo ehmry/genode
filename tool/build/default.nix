@@ -51,10 +51,21 @@ let
         $($cc $ccMarch -print-libgcc-file-name)
   '';
 
+
+  ## propagatedIncludes could be powerful...
+  
   libraryFixupPhase = ''
     if [ -n "$libs" ]; then
         mkdir -p "$out/nix-support"
         echo "$libs" > "$out/nix-support/propagated-libraries"
+    fi
+    
+    if [ -n "$propagatedIncludes" ]; then
+        mkdir -p $include
+
+        for i in $propagatedIncludes
+        do ln -s $i/* $include/
+        done
     fi
   '';
 
@@ -98,6 +109,10 @@ let
 
     mkLibrary = attrs: env.mk (
       { fixupPhase = libraryFixupPhase;
+        outputs =
+          if builtins.hasAttr "propagatedIncludes" attrs then
+            [ "out" "include" ]
+          else [ "out" ];
       } // 
       (if attrs.shared or false then
          { mergePhase = sharedLibraryLinkPhase;

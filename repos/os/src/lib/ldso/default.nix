@@ -27,6 +27,8 @@ let
 
   dir = ../ldso;
 
+  incomplete = "ld library expression incomplete for ${genodeEnv.system}";
+  
   archAttrs =
     if genodeEnv.isArm then
       { sources = genodeEnv.fromPath ./arm/platform.c; }
@@ -39,11 +41,15 @@ let
         #  ];
         sources = genodeEnv.fromPath ./platform.c;
       } 
-    else throw "no ld library expression for ${genodeEnv.system}";
+    else throw incomplete;
 
-    contribArchDir =
-      if genodeEnv.isx86_64 then ./contrib/amd64 else
-      throw "no ld library expression for ${genodeEnv.system}";
+  archIncDir =
+    if genodeEnv.isx86_64
+    then ./include/libc/libc-amd64
+    else throw incomplete;
+  
+  archContribDir =
+    if genodeEnv.isx86_64 then ./contrib/amd64 else throw incomplete;
 
 in
 genodeEnv.mkLibrary (genodeEnv.tool.mergeSets [ archAttrs {
@@ -52,7 +58,7 @@ genodeEnv.mkLibrary (genodeEnv.tool.mergeSets [ archAttrs {
   libs = baseLibs ++ [ ldso-arch ];
 
   sources =
-    genodeEnv.fromDir contribArchDir [ "rtld_start.S" "reloc.c" ]
+    genodeEnv.fromDir archContribDir [ "rtld_start.S" "reloc.c" ]
     ++
     genodeEnv.fromDir ./contrib
       [ "rtld.c" "map_object.c" "xmalloc.c" "debug.c" ]
@@ -64,12 +70,14 @@ genodeEnv.mkLibrary (genodeEnv.tool.mergeSets [ archAttrs {
         "test.cc" "environ.cc" "call_program_main.cc"
       ];
 
-  #incDir =
-  #  [ dir
-  #    (dir+"/contrib")
-  #    (dir+"/include/libc")
-  #    (dir+"/include/libc_emu")
-  #  ];
+  localIncludes = [ ../ldso ];
+
+  systemIncludes =
+    [ archIncDir
+      archContribDir
+      ./include/libc
+      ./include/libc_emu
+    ];
 
   entryPoint = "_start";
 

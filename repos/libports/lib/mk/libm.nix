@@ -30,29 +30,31 @@ libcEnv.mkLibrary {
   # 'is static but used in inline function which is not static'
   # messages
 
-  srcSh =
+  sourceSh =
     [ "src/*.c"
       "ld80/*.c"
       "bsdsrc/*.c"
     ];
 
   # remove on update to version 9
-  src = [ ../../src/lib/libc/log2.c ];
+  sources = libcEnv.fromPath ../../src/lib/libc/log2.c;
 
   filter =
     [ "s_exp2l.c"
+      "s_lrint.c"
+      "s_lround.c"
 
-    # Files that are included by other sources (e.g., 's_sin.c'). 
-    # Hence, we need to remove them from the build. Otherwise, 
-    # we would end up with doubly defined symbols (and compiler 
-    # warnings since those files are apparently not meant to be 
-    # compiled individually).
-    "e_rem_pio2.c" "e_rem_pio2f.c"
+      # Files that are included by other sources (e.g., 's_sin.c'). 
+      # Hence, we need to remove them from the build. Otherwise, 
+      # we would end up with doubly defined symbols (and compiler 
+      # warnings since those files are apparently not meant to be 
+      # compiled individually).
+      "e_rem_pio2.c" "e_rem_pio2f.c"
 
-    "log2.c" # remove on update to version 9
-  ];
+      "log2.c" # remove on update to version 9
+    ];
 
-  incDirSh = [
+  localIncludesSh = [
     # finding 'math_private.h'
     "${libmDir}/src"
 

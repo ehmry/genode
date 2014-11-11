@@ -17,7 +17,7 @@ let
     ];
 
   # Prepare genodeEnv.
-  genodeEnv' =  tool.genodeEnvAdapters.addIncludePath
+  genodeEnv' =  tool.genodeEnvAdapters.addSystemIncludes
     tool.genodeEnv (
       ( import ../base/include { inherit (tool) genodeEnv; }) ++
       includes

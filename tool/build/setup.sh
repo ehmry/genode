@@ -329,16 +329,16 @@ stripHash() {
 }
 
 compile() {
-    main=$1
+    local main=$1
 
     echo -e "    COMPILE  $@"
 
-    base="${main%.*}"
-    object="${base}.o"
+    local base="${main%.*}"
+    local object="${base}.o"
     base="${base//./_}"
 
-    file_opt_var=ccOpt_$base
-    ccFlags="$ccFlags ${!file_opt_var}"
+    local file_opt_var="ccOpt_$(basename $base)"
+    local ccFlags="$ccFlags ${!file_opt_var}"
 
     test "$prefix" && cd $prefix
 
@@ -494,16 +494,18 @@ ccFlags="$ccDef $ccOpt $ccOLevel $ccWarn"
 cxxFlags="$ccCxxOpt"
 
 compilePhase() {
-    includeOpts=
+    runHook preCompile
+    
+    includeOpts="-I."
     for i in $systemIncludes $nativeIncludePaths
     do includeOpts="$includeOpts -I$i"
     done
 
-    [ -z "$sources" ] && exit 1
-
-    for ((n = 1; n < ${#sources[*]}; n += 2)); do
-        compile ${sources[$n]}
+    for ((n = 1; n < ${#sources[*]}; n += 2))
+    do compile ${sources[$n]}
     done
+
+    runHook postCompile
 }
 
 genericBuild() {

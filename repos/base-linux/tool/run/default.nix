@@ -18,9 +18,9 @@ let
     { target = "/";
       source = pkgs.init;
     }
-    #{ target = "/";
-    #  source = pkgs.libs.ld;
-    #}
+    { target = "/";
+      source = pkgs.libs.ld;
+    }
   ];
 in
 derivation {

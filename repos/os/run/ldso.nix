@@ -10,7 +10,6 @@ run {
 
   contents = [
     { target = "/"; source = test.ldso; }
-    { target = "/"; source = libs.ld; }
     { target = "/config";
       source = builtins.toFile "config" ''
 	<config>

@@ -9,7 +9,7 @@
 let
 
   # Prepare genodeEnv.
-  genodeEnv =  tool.genodeEnvAdapters.addIncludePath
+  genodeEnv =  tool.genodeEnvAdapters.addSystemIncludes
     tool.genodeEnv (
       ( import ../base/include { inherit (tool) genodeEnv; }) ++
       [ ./include ]);
@@ -52,11 +52,15 @@ let
       ccCxxOpt =
         args.ccCxxOpt or [] ++ [ "-Wall" ] ++ genodeEnv.ccCxxOpt;
 
-      incDir = args.incDir or [] ++ [ ./include/libc-genode ];
-
-      incDirSh = args.incDirSh or [] ++
+      localIncludes = args.localIncludes or [] ++
+        map (p: "${ports.libc}/${p}")
+          [ "lib/libc/include"
+          ];
+      
+      systemIncludes = args.systemIncludes or [] ++
         map (p: "${ports.libc}/${p}")
           [ "include/libc"
+            "lib/libc/include"
             # Add platform-specific libc headers
             # to standard include search paths
             ( if genodeEnv.isx86_32 then "include/libc-i386"  else
@@ -64,9 +68,11 @@ let
               if genodeEnv.isxarm then  "include/libc-arm"    else
               throw "no libc for ${genodeEnv.system}"
             )
-          ];
 
-      postGather = builtins.readFile ./libc-gather-phase.sh;
+          ]
+        ++ [ ./include/libc-genode ];
+
+      postCompile = builtins.readFile ./libc-compile-phase.sh;
 
     }); };
 
@@ -84,7 +90,7 @@ let
   subLibcEnv = genodeEnv // 
     { mkLibrary = args: libcEnv.mkLibrary (args // {
 
-        incDir = args.incDir or [] ++
+        localIncludes = args.localIncludes or [] ++
           [ "lib/libc/locale"
             "lib/libc/include"
             "lib/libc/stdio"

@@ -7,7 +7,7 @@ let
 
   archArgs =
     if subLibcEnv.isx86_64 then {
-      srcSh =
+      sourceSh =
         [ "lib/libc/amd64/gen/*.S"
           "lib/libc/amd64/gen/flt_rounds.c"
         ];
@@ -22,26 +22,24 @@ let
 in
 subLibcEnv.mkLibrary (subLibcEnv.tool.mergeSet archArgs {
   name = "libc-gen";
-  srcSh = [ "${genDir}/*.c" ];
+  sourceSh = [ "${genDir}/*.c" ];
 
   filter = map (fn: "${genDir}/${fn}")
     # this file produces a warning about a missing header file,
     # lets drop it
     [ "getosreldate.c" "sem.c" "valloc.c" "getpwent.c" ];
 
-# getpwent.c is not being filtered out
+    localIncludesSh =
+      [ ( if subLibcEnv.isx86_32 then "include/libc-i386"  else
+          if subLibcEnv.isx86_64 then "include/libc-amd64" else
+          if subLibcEnv.isxarm then  "include/libc-arm"    else
+          throw "no libc for ${subLibcEnv.system}"
+        )
+      ];
 
-  # Create fake headers
-  preGather = ''
-    mkdir -p machine mach
-    touch machine/pctr.h mach/port.h hesiod.h
-  '';
+    systemIncludes =
+      [ # libc_pdbg.h
+        ../../src/lib/libc
+      ];
 
-  incDir =
-    [ genDir
-      "lib/libc/stdtime"
-
-      # libc_pdbg.h
-      ../../src/lib/libc
-    ];
 })

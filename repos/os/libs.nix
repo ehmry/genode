@@ -12,7 +12,8 @@ let
   genodeEnv =  tool.genodeEnvAdapters.addSystemIncludes
     tool.genodeEnv (
       ( import ../base/include { inherit (tool) genodeEnv; }) ++
-      [ ./include ]);
+      ( import ./include { inherit (tool) genodeEnv; })
+    );
 
   callLibrary' = callLibrary { inherit genodeEnv; };
   importLibrary = path: callLibrary' (import path);

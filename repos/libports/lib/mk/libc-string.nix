@@ -7,9 +7,9 @@
 let dir = "lib/libc/string"; in
 subLibcEnv.mkLibrary {
   name = "libc-string";
-  srcSh = [ "${dir}/*.c" ];
+  sourceSh = [ "${dir}/*.c" ];
   filter = map 
     (fn: "${dir}/${fn}")
     [ "strcoll.c" "strxfrm.c" "wcscoll.c" "wcsxfrm.c" ];
-  incDir = [ "${dir}" "include" ];
+  systemIncludesSh = [ "${dir}" "include" ];
 }

@@ -1,5 +1,5 @@
 { subLibcEnv }:
 
 subLibcEnv.mkLibrary {
-  name = "libc-locale"; srcSh = [ "lib/libc/locale/*.c" ];
+  name = "libc-locale"; sourceSh = [ "lib/libc/locale/*.c" ];
 }

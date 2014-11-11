@@ -17,7 +17,7 @@
 #include <base/env.h>
 
 /* local includes */
-#include <test-ldso.h>
+#include "test-ldso.h"
 
 using namespace Genode;
 

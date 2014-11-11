@@ -1,4 +1,4 @@
 { subLibcEnv }:
 subLibcEnv.mkLibrary {
-  name = "libc-stdio"; srcSh = [ "lib/libc/stdio/*.c" ];
+  name = "libc-stdio"; sourceSh = [ "lib/libc/stdio/*.c" ];
 }

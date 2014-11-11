@@ -193,13 +193,6 @@ let
         $($cc $ccMarch -print-libgcc-file-name)
   '';
 
-  libraryFixupPhase = ''
-    if [ -n "$libs" ]; then
-        mkdir -p "$out/nix-support"
-        echo "$libs" > "$out/nix-support/propagated-libraries"
-    fi
-  '';
-
   componentLinkPhase = ''
     echo -e "    LINK     $name"
 
@@ -256,17 +249,15 @@ let
       # Function to produce derivations.
       mk =
       attrs:
-      assert builtins.hasAttr "sources" attrs;
+      #assert builtins.hasAttr "sources" attrs;
       assert !builtins.hasAttr "srcS" attrs;
       assert !builtins.hasAttr "srcC" attrs;
       assert !builtins.hasAttr "srcCC" attrs;
       assert !builtins.hasAttr "srcSh" attrs;
-      assert 
-        builtins.hasAttr "sourceSh" attrs ->
-        builtins.hasAttr "sourceRoot";
+      #assert (builtins.hasAttr "sourceSh" attrs) -> (builtins.hasAttr "sourceRoot");
       let
         fixName = s: replaceInString "." "_" s;
-        
+
         localIncludesFun =
         path: absRel:
         let
@@ -304,6 +295,11 @@ let
         genodeEnv = result;
         args = [ "-e" ./default-builder.sh ];
 
+        ## If a library has an "include" output, add it
+        ## to the list of system include paths.
+        systemIncludes = (attrs.systemIncludes or [])
+          ++ map (l: l.include or "") (attrs.libs or []);
+        
         ldScripts =
           if anyShared (attrs.libs or [])
             then ldScriptsDynamic

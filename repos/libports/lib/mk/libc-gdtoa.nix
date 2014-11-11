@@ -1,7 +1,7 @@
 { subLibcEnv }:
 subLibcEnv.mkLibrary {
   name = "libc-gdtoa";
-  srcSh = [ "contrib/gdtoa/*.c" "lib/libc/gdtoa/*.c" ];
+  sourceSh = [ "contrib/gdtoa/*.c" "lib/libc/gdtoa/*.c" ];
   filter = (
     map (fn: "contrib/gdtoa/${fn}")
       [ "arithchk.c" "strtodnrp.c" "qnan.c" ]

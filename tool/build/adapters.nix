@@ -14,6 +14,7 @@
       { mkLibrary = args: genodeEnv.mkLibrary (args // {
           systemIncludes = (args.systemIncludes or []) ++ includes;
         });
+        
         mkComponent = args: genodeEnv.mkComponent (args // {
           systemIncludes = (args.systemIncludes or []) ++ includes;
         });

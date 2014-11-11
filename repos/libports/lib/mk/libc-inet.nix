@@ -1,4 +1,4 @@
 { subLibcEnv }:
 subLibcEnv.mkLibrary {
-  name = "libc-inet"; srcSh = [ "lib/libc/inet/*.c" ];
+  name = "libc-inet"; sourceSh = [ "lib/libc/inet/*.c" ];
 }
