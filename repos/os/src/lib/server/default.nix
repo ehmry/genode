@@ -1,9 +1,5 @@
-/*
- * \author Emery Hemingway
- * \date   2014-09-15
- */
+{ genodeEnv }:
 
-{ builder, ... }:
-{ }: # no library dependencies
-
-builder { name = "server"; sources = [ ./server.cc ]; }
+genodeEnv.mkLibrary { 
+  name = "server"; sources = genodeEnv.fromPath ./server.cc;
+}

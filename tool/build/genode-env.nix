@@ -47,18 +47,17 @@ let
   transformBinary =
   { binary }:
   derivation {
-    name = "binary";
+    name =
+      if builtins.typeOf binary == "path"
+      then "${baseNameOf (toString binary)}-binary"
+      else "binary";
     system = builtins.currentSystem;
-    inherit common binary as asOpt verbose;
+    genodeEnv = result;
+    inherit binary;
+    inherit (stdAttrs) as asOpt;
     builder = shell;
     args = [ "-e" ./transform-binary.sh ];
   };
-
-  anyShared = libs:
-    let h = builtins.head libs; in
-    if libs == [] then false else
-      if h.shared or false
-      then true else anyShared (builtins.tail libs);
 
   findSrc = fn: pathSet:
     let
@@ -134,93 +133,15 @@ let
 
       asOpt = spec.asMarch;
 
-      cxxLinkOpt =
-        map (x: "-Wl,${x}") ldOpt
-         ++ [ "-nostdlib -Wl,-nostdlib"] ++ spec.ccMarch;
-          #( if ldTextAddr != "" 
-          #    then "-Wl,-Ttext=${ldTextAddr}" else ""
-          #)
-        #]);
-        #++
-        #( if sharedLibs then [
-        #    "-Wl,--dynamic-linker=${dynamicLinker}.lib.so"
-        #    "-Wl,--eh-frame-hdr"
-        # ] else [])
-        #++
-        #(map (script: "-Wl,-T -Wl,${script}") ldScripts);
+      cxxLinkOpt = [ "-nostdlib -Wl,-nostdlib"] ++ spec.ccMarch;
 
       nativeIncludePaths =
         [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include"
-
         ];
     };
 
   # This is pretty much the same thing as genodeEnv/setup, deprecated.
   common = import ./common { inherit nixpkgs toolchain; };
-
-  staticLibraryLinkPhase = ''
-    echo -e "    MERGE    $name"
-    mkdir -p $out
-    VERBOSE $ar -rc $out/$name.lib.a $objects
-
-    if [ -n "$libs" ]; then
-        mkdir -p "$out/nix-support"
-        echo "$libs" > "$out/nix-support/propagated-libraries"
-    fi
-  '';
-
-  sharedLibraryLinkPhase = ''
-    echo -e "    MERGE    $@"
-
-    local _libs=$libs
-    local libs=""
-
-    for l in $_libs
-    do libs="$libs $l/*.a $l/*.so"
-    done
-
-    mkdir -p $out
-    
-    VERBOSE $ld -o $out/$name.lib.so -shared --eh-frame-hdr \
-        $ldOpt $ldFlags \
-  -T $ldScriptSo \
-        --entry=$entryPoint \
-  --whole-archive \
-  --start-group \
-        $libs $objects \
-  --end-group \
-  --no-whole-archive \
-        $($cc $ccMarch -print-libgcc-file-name)
-  '';
-
-  componentLinkPhase = ''
-    echo -e "    LINK     $name"
-
-    local _libs=$libs
-    local libs=""
-
-    for l in $_libs
-    do findLibs $l libs
-    done
-
-    mkdir -p $out
-    
-    [[ "$ldTextAddr" ]] && \
-        cxxLinkOpt="$cxxLinkOpt -Wl,-Ttext=$ldTextAddr"
-
-    for s in $ldScripts
-    do cxxLinkOpt="$cxxLinkOpt -Wl,-T -Wl,$s"
-    done
-
-    VERBOSE $cxx $cxxLinkOpt \
-  -Wl,--whole-archive -Wl,--start-group \
-        $objects $libs \
-  -Wl,--end-group -Wl,--no-whole-archive \
-        $($cc $ccMarch -print-libgcc-file-name) \
-        -o $out/$name
-  '';
-
-  componentFixupPhase = " ";
 
   # The genodeEnv that we are producing.
   result =
@@ -299,7 +220,15 @@ let
         ## to the list of system include paths.
         systemIncludes = (attrs.systemIncludes or [])
           ++ map (l: l.include or "") (attrs.libs or []);
-        
+
+        # Transfrom binaries as individual derivations,
+        # I may do the same thing with sources some day.
+        # It is unclear if the time saved in partial recompilation is
+        # worth the time evaluating rarely changed inputs.
+        extraObjects = map
+          (binary: transformBinary { inherit binary; })
+          attrs.binaries or [];
+                  
         ldScripts =
           if anyShared (attrs.libs or [])
             then ldScriptsDynamic

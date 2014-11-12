@@ -11,6 +11,16 @@
 let tool = rec {
   inherit nixpkgs;
 
+  ##
+  # Determine if any of the following libs are shared.
+  anyShared = libs:
+    let h = builtins.head libs; in
+    if libs == [] then false else
+      if h.shared or false
+      then true else anyShared (builtins.tail libs);
+
+  ##
+  # Replace substring a with substring b in string s.
   replaceInString =
   a: b: s:
   let
@@ -87,6 +97,8 @@ let tool = rec {
     inherit dir glob;
   });
 
+  ##
+  # Merge an attr between two sets.
   mergeAttr =
   name: s1: s2:
   let
@@ -101,12 +113,16 @@ let tool = rec {
   #if type == "int" then builtins.add a1 a2 else
   abort "cannot merge ${type}s";
 
+  ##
+  # Merge two sets together.
   mergeSet = s1: s2:
     s1 // s2 // (builtins.listToAttrs (map 
       (name: { inherit name; value = mergeAttr name s1 s2; })
       (builtins.attrNames (builtins.intersectAttrs s1 s2))
     ));
 
+  ##
+  # Merge a list of sets.
   mergeSets =
   sets:
   if sets == [] then {} else
@@ -115,6 +131,8 @@ let tool = rec {
   ####
   # from Eelco Dolstra's nix-make
 
+  ##
+  # Find a filename in a search path.
   findFile = fn: searchPath:
     if searchPath == [] then []
     else

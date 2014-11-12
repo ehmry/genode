@@ -1,12 +1,10 @@
-{ build }:
-{ base, config }:
+{ genodeEnv, base, config }:
 
 let
   pciDir = ../../pci;
 in
-if build.isNova then  build.component {
+if genodeEnv.isNova then  genodeEnv.mkComponent {
   name = "pci_device_pd";
   libs = [ base config ];
-  sources = [ ./main.cc ];
-  includeDirs = [ ../../pci/device_pd ];
+  sources = genodeEnv.fromPath ./main.cc;
 } else null

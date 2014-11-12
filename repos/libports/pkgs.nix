@@ -8,6 +8,8 @@
 
 let
 
+  ld = callComponent {} ({ld}: ld);
+
   ports = import ./ports { inherit tool; };
 
   includes =
@@ -17,13 +19,16 @@ let
     ];
 
   # Prepare genodeEnv.
-  genodeEnv' =  tool.genodeEnvAdapters.addSystemIncludes
+  genodeEnv' = tool.genodeEnvAdapters.addSystemIncludes
     tool.genodeEnv (
       ( import ../base/include { inherit (tool) genodeEnv; }) ++
       includes
     );
 
-  callComponent' = callComponent { genodeEnv = genodeEnv'; };
+  genodeEnv'' = tool.genodeEnvAdapters.addDynamicLinker
+    genodeEnv' "${ld}/ld.lib.so";
+
+  callComponent' = callComponent { genodeEnv = genodeEnv''; };
   importComponent = path: callComponent' (import path);
 
 in

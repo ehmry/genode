@@ -1,14 +1,7 @@
-/*
- * \brief  
- * \author Emery Hemingway
- * \date   2014-08-10
- */
+{ genodeEnv, config }:
 
-{ builder, ... }:
-{ config }:
-
-builder {
+genodeEnv.mkLibrary { 
   name = "config_args";
-  src = [ ./config_args.cc ];
   libs = [ config ];
+  sources = genodeEnv.fromPath ./config_args.cc;
 }

@@ -1,4 +1,4 @@
-source $common/setup
+source $genodeEnv/setup
 
 
 symbol_name=$(echo $(basename $binary) | cut -c34-)

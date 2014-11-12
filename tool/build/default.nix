@@ -17,11 +17,14 @@ let
   ldScriptSo  = ../../repos/os/src/platform/genode_rel.ld;
 
   staticLibraryLinkPhase = ''
+    objects=$(sortWords $objects)
+
     echo -e "    MERGE    $name"
     mkdir -p $out
     VERBOSE $ar -rc $out/$name.lib.a $objects
 
     if [ -n "$libs" ]; then
+        libs=$(sortDerivations $libs)
         mkdir -p "$out/nix-support"
         echo "$libs" > "$out/nix-support/propagated-libraries"
     fi
@@ -30,7 +33,8 @@ let
   sharedLibraryLinkPhase = ''
     echo -e "    MERGE    $@"
 
-    local _libs=$libs
+    objects=$(sortWords $objects)
+    local _libs=$(sortDerivations $libs)
     local libs=""
 
     for l in $_libs
@@ -52,7 +56,7 @@ let
   '';
 
 
-  ## propagatedIncludes could be powerful...
+  ## could propagatedIncludes replace systemIncludes?
   
   libraryFixupPhase = ''
     if [ -n "$libs" ]; then
@@ -64,7 +68,7 @@ let
         mkdir -p $include
 
         for i in $propagatedIncludes
-        do ln -s $i/* $include/
+        do ln -s $i/* $include/ #*/
         done
     fi
   '';
@@ -86,6 +90,10 @@ let
 
     for s in $ldScripts
     do cxxLinkOpt="$cxxLinkOpt -Wl,-T -Wl,$s"
+    done
+
+    for o in $ldOpt
+    do cxxLinkOpt="$cxxLinkOpt -Wl,$o"
     done
 
     VERBOSE $cxx $cxxLinkOpt \
@@ -126,9 +134,21 @@ let
     );
 
     mkComponent = attrs: env.mk (
+      let anyShared' = anyShared (attrs.libs or []); in
       { mergePhase  = componentLinkPhase;
         fixupPhase = componentFixupPhase;
         ldTextAddr = attrs.ldTextAddr or env.spec.ldTextAddr or "";
+        ldOpt = attrs.ldOpt or env.ldOpt ++ (
+          if anyShared' then
+            # Add a list of symbols that shall
+            # always be added to the dynsym section
+            [ "--dynamic-list=${../../repos/os/src/platform/genode_dyn.dl}"
+              # Assume that 'dynamicLinker' has been added to attrs.
+              "--dynamic-linker=${attrs.dynamicLinker}"
+              "--eh-frame-hdr"
+            ]
+          else []
+        );
       } // attrs
     );
 

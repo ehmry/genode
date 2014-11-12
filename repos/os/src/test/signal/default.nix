@@ -3,5 +3,5 @@
 genodeEnv.mkComponent {
   name = "test-signal";
   libs = [ base ];
-  src = genodeEnv.fromPath ./main.cc;
+  sources = genodeEnv.fromPath ./main.cc;
 }

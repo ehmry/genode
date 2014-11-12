@@ -1,9 +1,8 @@
-{ build }:
-{ base }:
+{ genodeEnv, base }:
 
-if build.isx86 then build.component {
+if genodeEnv.isx86 then genodeEnv.mkComponent {
   name = "ps2_drv";
   libs = [ base ];
-  sources = [ ./x86/main.cc ];
-  includeDirs = [ ./x86 ../ps2 ];
+  sources = genodeEnv.fromPath ./x86/main.cc;
+  localIncludes = [ ../ps2 ];
 } else null

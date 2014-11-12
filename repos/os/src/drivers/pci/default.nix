@@ -1,9 +1,8 @@
-{ build }:
-{ base, config }:
+{ genodeEnv, base, config }:
 
-if build.isx86 then build.component {
+if genodeEnv.isx86 then genodeEnv.mkComponent {
   name = "pci_drv";
   libs = [ base config ];
-  sources = [ ./main.cc ];
-  includeDirs = [ ../pci ];
+  sources = genodeEnv.fromPath ./main.cc;
+  #includeDirs = [ ../pci ];
 } else null

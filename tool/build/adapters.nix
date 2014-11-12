@@ -20,4 +20,14 @@
         });
       };
 
+  ##
+  # Set the dynamic linker library.
+  # TODO: find a better way.
+  addDynamicLinker = genodeEnv: dynamicLinker:
+    genodeEnv //
+      { mkComponent = args: genodeEnv.mkComponent (
+          { inherit dynamicLinker; } // args
+        );
+      };
+
 }

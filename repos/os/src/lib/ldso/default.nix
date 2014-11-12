@@ -19,7 +19,6 @@ let
 
   dOpts = map (o: "-D${o}") (
     [ "IN_RTLD" "__BSD_VISIBLE=1" "LINK_ADDRESS=${linkAddress}"
-      "GNU_SOURCE"
     ]
     ++ (if genodeEnv.isx86_64 then [ "__ELF_WORD_SIZE=64" ] else [])
     ++ (if debug then [ "DEBUG" ] else [])
@@ -90,7 +89,7 @@ genodeEnv.mkLibrary (genodeEnv.tool.mergeSets [ archAttrs {
   cxxDef = dOpts;
   asOpt  = dOpts;
 
-  ldOpt =
+  ldOpt = genodeEnv.ldOpt ++
     [ "-Bsymbolic-functions"  
       "-T${dir}/ldso.ld --version-script=${dir}/symbol.map"
       

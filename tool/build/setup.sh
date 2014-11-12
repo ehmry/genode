@@ -385,6 +385,15 @@ findLibs() {
     fi
 }
 
+sortWords() {
+    echo $* | tr " " "\n" | sort | tr "\n" " "
+}
+
+sortDerivations() {
+    # hard coded to /nix/store/...-...
+    echo $* | tr " " "\n" | sort -k 1.44 | tr "\n" " "
+}
+
 gatherSource() {
     srcSrc=$1
     srcDst=$2
@@ -495,7 +504,7 @@ cxxFlags="$ccCxxOpt"
 
 compilePhase() {
     runHook preCompile
-    
+
     includeOpts="-I."
     for i in $systemIncludes $nativeIncludePaths
     do includeOpts="$includeOpts -I$i"
@@ -505,6 +514,11 @@ compilePhase() {
     do compile ${sources[$n]}
     done
 
+    # Add the extra objects (transformed binaries).
+    for o in $extraObjects
+    do objects="$objects $o/*.o"
+    done
+    
     runHook postCompile
 }
 
