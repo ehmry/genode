@@ -7,4 +7,8 @@
 { importBaseComponent }:
 {
   core = importBaseComponent ./src/core;
+
+  test =
+    { rm_session_mmap = importBaseComponent ./src/test/rm_session_mmap;
+    };
 }

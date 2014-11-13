@@ -1,8 +1,3 @@
-/*
- * \author Emery Hemingway
- * \date   2014-08-11
- */
-
 { run, pkgs }:
 
 with pkgs;
