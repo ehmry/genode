@@ -6,15 +6,23 @@
 
 { tool, callComponent }:
 
-with tool;
-
 let
 
   # Prepare genodeEnv.
   genodeEnv = tool.genodeEnvAdapters.addSystemIncludes
     tool.genodeEnv (import ./include { inherit (tool) genodeEnv; });
 
-  callComponent' = callComponent { inherit genodeEnv; };
+  compileCC =
+  attrs:
+  tool.compileCC (attrs // {
+    systemIncludes =
+     (attrs.systemIncludes or [])
+      ++
+      (import ./include { inherit (tool) genodeEnv; });
+  });
+
+  callComponent' = callComponent { inherit genodeEnv compileCC; };
+
   importComponent = path: callComponent' (import path);
   
   callBasePackage = callComponent {

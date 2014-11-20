@@ -1,23 +1,24 @@
-{ genodeEnv, baseDir, repoDir, syscall }:
+{ genodeEnv, compileCC, compileS, baseDir, repoDir, syscall }:
 
-let sourceDir = baseDir+"/src/platform"; in
+let
+  sourceDir = baseDir+"/src/platform";
+  archDir =
+    if genodeEnv.isArm    then sourceDir+"/arm" else
+    if genodeEnv.isx86_32 then sourceDir+"/x86_32" else
+    if genodeEnv.isx86_64 then sourceDir+"/x86_64" else
+    abort "no startup library for ${genodeEnv.system}";
+
+  systemIncludes = map (d: d+"/src/platform") [ repoDir baseDir ];
+
+in
 genodeEnv.mkLibrary {
   name = "startup";
-  shared = false;
 
-  libs = if syscall == null then [] else [ syscall ];
+  libs = [ syscall ];
 
-  sources =
-    genodeEnv.fromDir sourceDir [ "_main.cc" "init_main_thread.cc" ]
-    ++
-    genodeEnv.fromPaths
-      [ (( if genodeEnv.isArm    then sourceDir+"/arm" else
-           if genodeEnv.isx86_32 then sourceDir+"/x86_32" else
-           if genodeEnv.isx86_64 then sourceDir+"/x86_64" else
-           abort "no startup library for ${genodeEnv.system}"
-         ) + "/crt0.s")
-      ];
-
-   # TODO #include /<...>/"..."/
-   systemIncludes = [ sourceDir ];
+  objects =
+    (map (src: compileCC { inherit src systemIncludes; })
+      [ (sourceDir+"/_main.cc") (sourceDir+"/init_main_thread.cc") ]
+    ) ++
+    [ (compileS { src = (archDir+"/crt0.s"); }) ];
 }

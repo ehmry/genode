@@ -1,6 +1,7 @@
-{ genodeEnv, base }:
+{ genodeEnv, compileCC, base }:
 
 genodeEnv.mkComponent {
-  name = "test-fpu"; libs = [ base ];
-  sources = genodeEnv.fromPath ./main.cc;
+  name = "test-fpu";
+  libs = [ base ];
+  objects = compileCC { src = ./main.cc; };
 }

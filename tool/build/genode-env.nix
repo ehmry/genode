@@ -89,9 +89,7 @@ let
 
   devPrefix = "genode-${spec.platform}-";
 
-  # attributes that should always be present
-  # and accessible through genodeEnv."..."
-  # TODO split into compile, component, library?
+  # Attributes that should be present by default in compile functions.
   stdAttrs = rec
     { verbose = 1;
 
@@ -104,6 +102,10 @@ let
       objcopy = "${devPrefix}objcopy";
       ranlib  = "${devPrefix}ranlib";
       strip   = "${devPrefix}strip";
+
+      ccMarch = spec.ccMarch or [];
+      ldMarch = spec.ldMarch or [];
+      asMarch = spec.ldMarch or [];
 
       ccOLevel = "-O2";
       ccWarn   = "-Wall";
@@ -123,17 +125,15 @@ let
 
           "-g"
           ]
-          ++ spec.ccMarch ++ spec.ccOpt;
+          ++ spec.ccMarch ++ (spec.ccOpt or []);
 
       ccCOpt = ccOpt;
-
-      ldMarch = spec.ldMarch or [];
 
       ldOpt = ldMarch ++ [ "-gc-sections" ];
 
       asOpt = spec.asMarch;
 
-      cxxLinkOpt = [ "-nostdlib -Wl,-nostdlib"] ++ spec.ccMarch;
+      cxxLinkOpt = spec.ccMarch ++ [ "-nostdlib -Wl,-nostdlib"];
 
       nativeIncludePaths =
         [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include"
@@ -202,7 +202,7 @@ let
         ldScriptsStatic =
           attrs.ldScriptsStatic or
           spec.ldScriptsStatic or
-          [ ../../../repos/base/src/platform/genode.ld ];
+          [ ../../repos/base/src/platform/genode.ld ];
 
         ldScriptsDynamic =
           attrs.ldScriptsDynamic or
@@ -228,7 +228,7 @@ let
         extraObjects = map
           (binary: transformBinary { inherit binary; })
           attrs.binaries or [];
-                  
+
         ldScripts =
           if anyShared (attrs.libs or [])
             then ldScriptsDynamic

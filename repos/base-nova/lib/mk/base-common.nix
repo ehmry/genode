@@ -12,8 +12,6 @@ genodeEnv.mkLibrary {
   name = "base-common";
   libs = [ cxx startup ];
 
-  # pager/x86_64/pager.cc
-
   sources =
     fromDir (repoDir+"/src/base")
       [ "env/cap_map.cc"
@@ -44,6 +42,7 @@ genodeEnv.mkLibrary {
 
   systemIncludes =
     [ (repoDir + "/src/base/lock")
-      (baseDir + "/src/base/thread/")
+      #(baseDir + "/src/base/lock")
+      (baseDir + "/src/base/thread")
     ];
 }

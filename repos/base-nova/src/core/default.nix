@@ -1,9 +1,3 @@
-/*
- * \brief  NOVA core
- * \author Emery Hemingway
- * \date   2014-10-21
- */
-
 { genodeEnv, baseDir, repoDir, base-common }:
 
 let
@@ -13,7 +7,7 @@ genodeEnv.mkComponent  (genodeEnv.tool.mergeSets [ {
   name = "core";
   libs = [ base-common ];
 
-  ldScriptStatic = repoDir + "/src/platform/roottask.ld";
+  ldScriptsStatic = [ (repoDir + "/src/platform/roottask.ld") ];
   ldTextAddr = "0x100000";
 
   sources =
@@ -47,8 +41,8 @@ genodeEnv.mkComponent  (genodeEnv.tool.mergeSets [ {
         "cpu_session_extension.cc"
         "cpu_session_support.cc"
         "echo.cc"
+        "io_mem_session_support.cc"
         "irq_session_component.cc"
-        "io_mem_session_support.cc"        
         "pd_session_extension.cc"
         "platform.cc"
         "platform_pd.cc"
@@ -61,10 +55,8 @@ genodeEnv.mkComponent  (genodeEnv.tool.mergeSets [ {
 
   systemIncludes =
     [ (repoDir + "/src/core/include")
-      #(repoDir + "/src/base/env") (baseDir + "/src/base/env")
-      (baseDir + "/src/base/thread")
       (repoDir + "/src/base/console")
-      #(repoDir + "/src/base/ipc")
+      (baseDir + "/src/base/thread")
       (genCoreDir + "/include")
     ];
 

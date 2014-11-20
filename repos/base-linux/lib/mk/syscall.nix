@@ -16,4 +16,11 @@ genodeEnv.mkLibrary {
         [ "lx_clone.S" "lx_restore_rt.S" "lx_syscall.S" ])
     else
     throw "syscall library unavailable for ${genodeEnv.system}";
+
+  propagatedIncludes =
+    [ # linux_syscalls.h
+      ../../src/platform
+      (genodeEnv.tool.nixpkgs.linuxHeaders+"/include")
+      (genodeEnv.toolchain.glibc+"/include")
+    ];
 }

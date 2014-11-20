@@ -15,7 +15,21 @@ let
       ( import ./include { inherit (tool) genodeEnv; })
     );
 
-  callLibrary' = callLibrary { inherit genodeEnv; };
+  addIncludes =
+  f: attrs:
+  f (attrs // {
+    systemIncludes =
+     (attrs.systemIncludes or []) ++
+     (import ../base/include { inherit (tool) genodeEnv; }) ++
+     (import ./include { inherit (tool) genodeEnv; });
+  });
+
+  callLibrary' = callLibrary {
+    inherit genodeEnv;
+    compileS  = addIncludes tool.compileS;
+    compileC  = addIncludes tool.compileC;
+    compileCC = addIncludes tool.compileCC;
+  };
   importLibrary = path: callLibrary' (import path);
 
 in {

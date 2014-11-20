@@ -12,10 +12,25 @@ let
   genodeEnv = tool.genodeEnvAdapters.addSystemIncludes
     tool.genodeEnv (import ./include { inherit (tool) genodeEnv; });
 
-  callLibrary' = callLibrary { inherit genodeEnv; };
+  compileCC =
+  attrs:
+  tool.compileCC (attrs // {
+    systemIncludes =
+     (attrs.systemIncludes or [])
+      ++
+      (import ./include { inherit (tool) genodeEnv; });
+  });
+
+  callLibrary' = callLibrary {
+    inherit genodeEnv compileCC;
+    inherit (tool) compileS;
+  };
   importLibrary = path: callLibrary' (import path);
 
-  callBaseLibrary = callLibrary {inherit genodeEnv baseDir repoDir;};
+  callBaseLibrary = callLibrary {
+    inherit genodeEnv compileCC baseDir repoDir;
+    inherit (tool) compileS;
+  };
   importBaseLibrary = path: callBaseLibrary (import path);
 
   baseDir = ../base;

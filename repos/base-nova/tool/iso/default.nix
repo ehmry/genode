@@ -18,27 +18,27 @@ derivation {
 
   builder = shell;
   args = [ "-e" ./iso.sh ];
-  PATH = 
-    "${nixpkgs.coreutils}/bin/:" +
-    "${nixpkgs.gnused}/bin:" +
-    "${nixpkgs.xorriso}/bin:" +
-    "${nixpkgs.grub2}/bin";
+  #PATH = 
+  #  "${nixpkgs.coreutils}/bin/:" +
+  #  "${nixpkgs.cdrkit}/bin:" +
+  #  "${nixpkgs.syslinux}/bin";
+
 
   bender = ../../../../tool/boot/bender;
 
   # add the rest of the components in the script
-  grubCfg = ''
-    serial
-    terminal_output serial
-    set timeout=0
+  syslinuxCfg =
+    ''
+      SERIAL 0
+      DEFAULT NOVA
 
-    menuentry "Genode on NOVA - ${name}" {
-      multiboot /boot/bender
-      module /boot/hypervisor iommu serial
-      module /genode/core
-      module /genode/config
-      module /genode/init
-  '';
+      LABEL NOVA
+        KERNEL mboot.c32
+        APPEND /hypervisor iommu serial --- /genode/core'';
+
+  inherit (nixpkgs) cdrkit syslinux;
+  inherit (tool) genodeEnv;
+  inherit (tool.genodeEnv) objcopy;
 
   image_dir = bootImage { inherit name contents; };
 }

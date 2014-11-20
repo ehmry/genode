@@ -33,27 +33,23 @@ let
     '';
   };
 
-  pulsarBz2 = nixpkgs.fetchurl {
-    url = http://hypervisor.org/pulsar/pulsar-0.5.bz2;
-    sha256 = "02dlr26xajbdvg2zhs5g9k57kd68d31vqqfpgc56k4ci3kwhbrkw";
-  };
-
   contents' =
     ( map ({ target, source }:
         { target = "/genode/${target}"; inherit source; })
         contents
-    ) ++ [
+    ) ++
+    [
       { target = "/genode";
         source = pkgs.core;
       }
       { target = "/genode";
         source = pkgs.init;
       }
-      #{ target = "/genode";
-      #  source = pkgs.libs.ld;
-      #}
-      { target = "/boot";
-        source = hypervisor;
+      { target = "/genode";
+        source = pkgs.libs.ld;
+      }
+      { target = "/";
+        source = pkgs.hypervisor;
       }
     ];
 

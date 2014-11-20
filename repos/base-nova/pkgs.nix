@@ -5,6 +5,9 @@
  */
 
 { importBaseComponent }:
-{
+rec {
   core = importBaseComponent ./src/core;
+
+  hypervisor = importBaseComponent ./src/kernel;
+  kernel = hypervisor;
 }

@@ -1,4 +1,5 @@
-{ genodeEnv, baseLibs, ldso-arch, debug ? true }:
+{ genodeEnv, compileS, compileC, compileCC
+, baseLibs, ldso-arch, debug ? false }:
 
 let
 
@@ -14,95 +15,87 @@ let
   #
   # In this case, backtraces show no symbol names or source lines.
   #
-  linkAddress =
-    if genodeEnv.isLinux then "0x50000000" else "0x30000";
+  linkAddress = if genodeEnv.isLinux then "0x50000000" else "0x30000";
 
-  dOpts = map (o: "-D${o}") (
-    [ "IN_RTLD" "__BSD_VISIBLE=1" "LINK_ADDRESS=${linkAddress}"
-    ]
-    ++ (if genodeEnv.isx86_64 then [ "__ELF_WORD_SIZE=64" ] else [])
-    ++ (if debug then [ "DEBUG" ] else [])
+  dFlags = map (o: "-D${o}") (
+    (if genodeEnv.isx86_64 then [ "__ELF_WORD_SIZE=64" ] else []) ++ 
+    [ "IN_RTLD" "__BSD_VISIBLE=1" "LINK_ADDRESS=${linkAddress}" ] ++
+    (if debug then [ "DEBUG" ] else [])
   );
 
-  dir = ../ldso;
+  archContrib =
+    if genodeEnv.isArm    then ./contrib/arm   else
+    if genodeEnv.isx86_32 then ./contrib/i386  else
+    if genodeEnv.isx86_64 then ./contrib/amd64 else
+    throw "ld library expression incomplete for ${genodeEnv.system}";
 
-  incomplete = "ld library expression incomplete for ${genodeEnv.system}";
-  
-  archAttrs =
-    if genodeEnv.isArm then
-      { sources = genodeEnv.fromPath ./arm/platform.c; }
-    else
-    if genodeEnv.isx86_64 then
-      { #incDir =
-        #  [ (dir+"/contrib/amd64")
-        #    (dir+"/include/libc/libc-amd64")
-        #   #(dir+"/include/x86_64")
-        #  ];
-        sources = genodeEnv.fromPath ./platform.c;
-      } 
-    else throw incomplete;
+  archInclude =
+    if genodeEnv.isArm    then ./include/libc/libc-arm   else
+    if genodeEnv.isx86_32 then ./include/libc/libc-i386  else
+    if genodeEnv.isx86_64 then ./include/libc/libc-amd64 else
+    throw "ld library expression incomplete for ${genodeEnv.system}";
 
-  archIncDir =
-    if genodeEnv.isx86_64
-    then ./include/libc/libc-amd64
-    else throw incomplete;
-  
-  archContribDir =
-    if genodeEnv.isx86_64 then ./contrib/amd64 else throw incomplete;
+  addFlags = f: flags: attrs:
+    f (attrs // {
+      extraFlags = flags;
+      localIncludes = [ (archContrib) ./contrib ../ldso ];
+      systemIncludes =
+        [ archContrib
+          archInclude
+          ./contrib
+          ./include/libc
+          ./include/libc_emu
+          archInclude
+        ];
+    });
+
+  extraFlags =
+    dFlags ++
+    [ "-Iinclude -include ${./include/libc_emu/ldso_types.h}"
+      "-Wno-unused-but-set-variable"
+    ];
+
+  cFlags = extraFlags ++ [ "-fno-builtin" ];
+
+  compileS'  = addFlags compileS  cFlags;
+  compileC'  = addFlags compileC  cFlags;
+  compileCC' = addFlags compileCC extraFlags;
 
 in
-genodeEnv.mkLibrary (genodeEnv.tool.mergeSets [ archAttrs {
+genodeEnv.mkLibrary {
   name = "ld";
   shared = true;
   libs = baseLibs ++ [ ldso-arch ];
 
-  sources =
-    genodeEnv.fromDir archContribDir [ "rtld_start.S" "reloc.c" ]
-    ++
-    genodeEnv.fromDir ./contrib
-      [ "rtld.c" "map_object.c" "xmalloc.c" "debug.c" ]
-    ++
-    genodeEnv.fromDir ../ldso
-      [ "main.c"
-        "ldso_types.c" "rtld_dummies.c"
-        "stdio.cc" "stdlib.cc" "file.cc" "err.cc" "string.cc" "lock.cc"
-        "test.cc" "environ.cc" "call_program_main.cc"
-      ];
-
-  localIncludes = [ ../ldso ];
-
-  systemIncludes =
-    [ archIncDir
-      archContribDir
-      ./include/libc
-      ./include/libc_emu
-    ];
-
   entryPoint = "_start";
-
-  ccDef = 
-    dOpts ++ 
-    [ "-fno-builtin" 
-      "-Iinclude -include ${dir}/include/libc_emu/ldso_types.h"
-    ];
-
-  cxxDef = dOpts;
-  asOpt  = dOpts;
-
+  asOpt = genodeEnv.asOpt ++ dFlags;
   ldOpt = genodeEnv.ldOpt ++
-    [ "-Bsymbolic-functions"  
-      "-T${dir}/ldso.ld --version-script=${dir}/symbol.map"
-      
-      #
-      # Add context area script to Linux version of linker
-      #
-      ( if genodeEnv.isLinux then
-          "-T${../../../../base-linux/src/platform/context_area.nostdlib.ld}"
-        else ""
-      )
-    ];
+    [ "-Bsymbolic-functions"
+      "-T${./ldso.ld} --version-script=${./symbol.map}"
+    ] ++
+    #
+    # Add context area script to Linux version of linker
+    #
+    (if genodeEnv.isLinux then [
+      "-T${../../../../base-linux/src/platform/context_area.nostdlib.ld}"
+    ] else []);
 
-  ccOpt =
-    [ "-Wno-unused-but-set-variable" ] ++ genodeEnv.ccOpt;
-
-}])
+  objects =
+    [ (compileS' { src = archContrib+"/rtld_start.S"; })
+      (compileC' { src = archContrib+"/reloc.c"; })
+    ] ++
+    map (src: compileC' { inherit src; })
+      [ ./contrib/rtld.c ./contrib/map_object.c
+        ./contrib/xmalloc.c ./contrib/debug.c
+      ]
+    ++
+    map (src: compileC' { inherit src; })
+      [ ./main.c ./ldso_types.c ./rtld_dummies.c
+        (if genodeEnv.isArm then ./arm/platform.c else ./platform.c)
+      ]
+    ++
+    map (src: compileCC' { inherit src; })
+      [ ./stdio.cc ./stdlib.cc ./file.cc ./err.cc ./string.cc ./lock.cc
+        ./test.cc ./environ.cc ./call_program_main.cc
+      ];
+}

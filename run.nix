@@ -27,7 +27,7 @@ in
   thread   = importRun ./repos/base/run/thread.nix;
 
   # Base Linux
-  rm_session_mmap = importRun ./repos/base-linux/run/rm_session_mmap.nix;
+  #rm_session_mmap = importRun ./repos/base-linux/run/rm_session_mmap.nix;
   
   # OS
   ldso   = importRunTheSequel ./repos/os/run/ldso.nix;

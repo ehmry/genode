@@ -67,15 +67,17 @@ let
     if [ -n "$propagatedIncludes" ]; then
         mkdir -p $include
 
-        for i in $propagatedIncludes
-        do ln -s $i/* $include/ #*/
+        for i in $propagatedIncludes; do
+            cp -ru --no-preserve=mode $i/* $include
         done
     fi
   '';
+  #*/
 
   componentLinkPhase = ''
     echo -e "    LINK     $name"
 
+    objects=$(sortWords $objects)
     local _libs=$libs
     local libs=""
 
@@ -83,6 +85,8 @@ let
     do findLibs $l libs
     done
 
+    libs=$(sortDerivations $libs)
+    
     mkdir -p $out
     
     [[ "$ldTextAddr" ]] && \
@@ -154,9 +158,123 @@ let
 
   };
 
+  spec =
+    if system == "x86_32-linux" then import ../../specs/x86_32-linux.nix else
+    if system == "x86_64-linux" then import ../../specs/x86_64-linux.nix else
+    if system == "x86_32-nova"  then import ../../specs/x86_32-nova.nix  else
+    if system == "x86_64-nova"  then import ../../specs/x86_64-nova.nix  else
+    abort "unknown system type ${system}";
+
+  toolchain = nixpkgs.callPackage ../toolchain/precompiled {
+    glibc = nixpkgs.glibc_multi;
+  };
+
+  devPrefix = "genode-${spec.platform}-";
+
+  # attributes that should always be present
+  # and accessible through genodeEnv."..."
+  # TODO split into compile, component, library?
+  stdAttrs = rec
+    { verbose = 1;
+
+      cc      = "${devPrefix}gcc";
+      cxx     = "${devPrefix}g++";
+      ld      = "${devPrefix}ld";
+      as      = "${devPrefix}as";
+      ar      = "${devPrefix}ar";
+      nm      = "${devPrefix}nm";
+      objcopy = "${devPrefix}objcopy";
+      ranlib  = "${devPrefix}ranlib";
+      strip   = "${devPrefix}strip";
+
+      ccMarch = spec.ccMarch or [];
+      ldMarch = spec.ldMarch or [];
+      asMarch = spec.ldMarch or [];
+
+      ccOLevel = "-O2";
+      ccWarn   = "-Wall";
+      ccCxxOpt = [ "-std=gnu++11" ];
+
+      ccOpt =
+        [ # Always compile with '-ffunction-sections' to enable
+          # the use of the linker option '-gc-sections'
+          "-ffunction-sections"
+
+          # Prevent the compiler from optimizations
+          # related to strict aliasing
+          "-fno-strict-aliasing"
+
+          # Do not compile with standard includes per default.
+          "-nostdinc"
+
+          "-g"
+          ]
+          ++ spec.ccMarch ++ (spec.ccOpt or []);
+
+      ccCOpt = ccOpt;
+
+      ldOpt = ldMarch ++ [ "-gc-sections" ];
+
+      asOpt = spec.asMarch;
+
+      cxxLinkOpt = spec.ccMarch ++ [ "-nostdlib -Wl,-nostdlib"];
+
+      nativeIncludePaths =
+        [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include"
+        ];
+    };
 in
 rec {
   genodeEnv     = addSubMks genodeEnv';
   genodePortEnv = addSubMks genodeEnv;
   genodeEnvAdapters = import ./adapters.nix;
+
+  compileS =
+  { src
+  , localIncludes ? []
+  , ... } @ args:
+  derivation (stdAttrs // args // {
+    name = "${baseNameOf (toString src)}-object";
+    system = builtins.currentSystem;
+    builder = shell;
+    args = [ "-e" ./compile-s.sh ];
+    main = src;
+
+    inherit genodeEnv;
+
+    localIncludes = findLocalIncludes src localIncludes;
+  });
+
+  compileC =
+  { src
+  , localIncludes ? []
+  , ... } @ args:
+  derivation (stdAttrs // args // {
+    name = "${baseNameOf (toString src)}-object";
+    system = builtins.currentSystem;
+    builder = shell;
+    args = [ "-e" ./compile-c.sh ];
+    main = src;
+
+    inherit genodeEnv;
+
+    localIncludes = findLocalIncludes src localIncludes;
+  });
+
+  compileCC =
+  { src
+  , localIncludes ? []
+  , ... } @ args:
+  derivation (stdAttrs // args // {
+    name = "${baseNameOf (toString src)}-object";
+    system = builtins.currentSystem;
+    builder = shell;
+    args = [ "-e" ./compile-cc.sh ];
+    main = src;
+
+    inherit genodeEnv;
+
+    localIncludes = findLocalIncludes src localIncludes;
+  });
+
 }

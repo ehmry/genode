@@ -1,19 +1,30 @@
-cd $image_dir
+source $genodeEnv/setup
 
-for c in genode/*; do
-    if [ ! "$c" == "genode/core" ]; then
-        grubCfg="$grubCfg  module /$c\n"
-    fi
+cp -rL --no-preserve mode $image_dir/* ./
+
+rm -fr genode/nix-support
+
+for c in genode/*
+do [ ! "$c" == "genode/core" ] && syslinuxCfg="$syslinuxCfg --- /$c"
 done
 
-hypervisor=$(basename $image_dir/boot/hypervisor?*)
+mkdir -p isolinux
 
-cd -
-echo -e "$grubCfg}" > grub.cfg
+echo -e "$syslinuxCfg" > isolinux/isolinux.cfg
 
-grub-mkrescue -o $out -- \
-    -follow link \
-    -map $image_dir / \
-    -map $bender /boot/bender \
-    -map grub.cfg /boot/grub/grub.cfg \
-    -lns $hypervisor /boot/hypervisor
+cp --no-preserve mode \
+   $syslinux/share/syslinux/isolinux.bin \
+   $syslinux/share/syslinux/ldlinux.c32 \
+   $syslinux/share/syslinux/mboot.c32 \
+   $syslinux/share/syslinux/libcom32.c32 \
+   isolinux
+
+chmod a+rX -R ./
+
+$objcopy -O elf32-i386 hypervisor hypervisor
+
+$cdrkit/bin/genisoimage -o $out \
+    -f -l -R -hide-rr-moved -jcharset utf-8 \
+    -b isolinux/isolinux.bin -c isolinux/boot.cat \
+    -no-emul-boot -boot-load-size 4 -boot-info-table \
+    ./
