@@ -1,7 +1,7 @@
-{ genodeEnv, config }:
+{ genodeEnv, compileCC, config }:
 
-genodeEnv.mkLibrary { 
+genodeEnv.mkLibrary {
   name = "config_args";
   libs = [ config ];
-  sources = genodeEnv.fromPath ./config_args.cc;
+  objects = compileCC { src = ./config_args.cc; };
 }

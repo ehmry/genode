@@ -1,8 +1,15 @@
-{ genodeEnv, baseDir, repoDir, cxx, startup }:
-
-with genodeEnv.tool;
+{ genodeEnv, compileCC, baseDir, repoDir, cxx, startup }:
 
 let
+  compileCC' = src: compileCC {
+    inherit src;
+    systemIncludes =
+      [ (repoDir + "/src/base/lock")
+        #(baseDir + "/src/base/lock")
+        (baseDir + "/src/base/thread")
+      ];
+  };
+
   subdir =
     if genodeEnv.isx86_32 then "x86_32" else
     if genodeEnv.isx86_64 then "x86_64" else
@@ -12,8 +19,8 @@ genodeEnv.mkLibrary {
   name = "base-common";
   libs = [ cxx startup ];
 
-  sources =
-    fromDir (repoDir+"/src/base")
+  objects = map compileCC' (
+    (map (fn: (repoDir+"/src/base/${fn}"))
       [ "env/cap_map.cc"
         "ipc/ipc.cc"
         "ipc/pager.cc"
@@ -21,8 +28,8 @@ genodeEnv.mkLibrary {
         "server/server.cc"
         "thread/thread_context.cc"
       ]
-    ++
-    fromDir (baseDir+"/src/base")
+    ) ++
+    ( map (fn: (baseDir+"/src/base/${fn}"))
       [ "allocator/allocator_avl.cc"
         "allocator/slab.cc"
         "avl_tree/avl_tree.cc"
@@ -38,11 +45,7 @@ genodeEnv.mkLibrary {
         "thread/context_allocator.cc"
         "thread/thread.cc"
         "thread/trace.cc"
-      ];
-
-  systemIncludes =
-    [ (repoDir + "/src/base/lock")
-      #(baseDir + "/src/base/lock")
-      (baseDir + "/src/base/thread")
-    ];
+      ]
+    )
+  );
 }

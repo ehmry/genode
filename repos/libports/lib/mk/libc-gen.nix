@@ -1,4 +1,4 @@
-{ subLibcEnv }:
+{ genodeEnv, compileSubLibc }:
 
 let
   repoSrcDir = ../../src/lib/libc;
@@ -6,8 +6,8 @@ let
   genDir = "lib/libc/gen";
 
   archArgs =
-    if subLibcEnv.isx86_32 then
-      { sourceSh =
+    if genodeEnv.isx86_32 then
+      { sources =
           [ "lib/libc/i386/gen/*.S"
             "lib/libc/i386/gen/flt_rounds.c"
             "lib/libc/i386/gen/makecontext.c"
@@ -20,8 +20,8 @@ let
           ];
       }
     else
-    if subLibcEnv.isx86_64 then
-      { sourceSh =
+    if genodeEnv.isx86_64 then
+      { sources =
           [ "lib/libc/amd64/gen/*.S"
             "lib/libc/amd64/gen/flt_rounds.c"
           ];
@@ -32,29 +32,33 @@ let
             "fabs.S" "modf.S" "frexp.c"
           ];
       }
-    else throw "incomplete libc-gen expression for ${subLibcEnv.system}";
+    else throw "incomplete libc-gen expression for ${genodeEnv.system}";
 
 in
-subLibcEnv.mkLibrary (subLibcEnv.tool.mergeSet archArgs {
+genodeEnv.mkLibrary rec {
   name = "libc-gen";
-  sourceSh = [ "${genDir}/*.c" ];
 
-  filter = map (fn: "${genDir}/${fn}")
-    # this file produces a warning about a missing header file,
-    # lets drop it
-    [ "getosreldate.c" "sem.c" "valloc.c" "getpwent.c" ];
+  externalObjects = compileSubLibc (genodeEnv.tool.mergeSet archArgs {
+    inherit name;
+    sources = [ "${genDir}/*.c" ];
 
-    localIncludesSh =
-      [ ( if subLibcEnv.isx86_32 then "include/libc-i386"  else
-          if subLibcEnv.isx86_64 then "include/libc-amd64" else
-          if subLibcEnv.isxarm then  "include/libc-arm"    else
-          throw "no libc for ${subLibcEnv.system}"
-        )
-      ];
+    filter = map (fn: "${genDir}/${fn}")
+      # this file produces a warning about a missing header file,
+      # lets drop it
+      [ "getosreldate.c" "sem.c" "valloc.c" "getpwent.c" ];
 
-    systemIncludes =
-      [ # libc_pdbg.h
-        ../../src/lib/libc
-      ];
+      localIncludes =
+        [ ( if genodeEnv.isx86_32 then "include/libc-i386"  else
+            if genodeEnv.isx86_64 then "include/libc-amd64" else
+            if genodeEnv.isArm    then "include/libc-arm"    else
+            throw "no libc for ${genodeEnv.system}"
+          )
+        ];
 
-})
+      systemIncludes =
+        [ # libc_pdbg.h
+          ../../src/lib/libc
+        ];
+    });
+
+}

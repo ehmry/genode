@@ -1,7 +1,7 @@
-{ genodeEnv, libc, libm, ld }:
+{ genodeEnv, compileCC, libc, libm, ld }:
 
 genodeEnv.mkComponent {
   name = "test-libc";
-  sources = genodeEnv.fromPath ./main.cc;
+  objects = compileCC { src = ./main.cc; };
   libs = [ libm libc ld ];
 }

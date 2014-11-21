@@ -1,7 +1,7 @@
-{ genodeEnv, base }:
+{ genodeEnv, compileCC, base }:
 
 genodeEnv.mkComponent {
   name = "test-timer";
   libs = [ base ];
-  sources = genodeEnv.fromPath ./main.cc;
+  objects = compileCC { src = ./main.cc; };
 }

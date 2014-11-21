@@ -1,8 +1,8 @@
-{ build, base, os }:
+{ genodeEnv, compileCC, base }:
 
-if build.isx86 then build.test {
+if !genodeEnv.isx86 then null else
+genodeEnv.mkComponent {
   name = "test-pci";
-  libs = [ base.lib.base ];
-  sources = [ ./test.cc ];
-  includeDirs = os.includeDirs ++ base.includeDirs;
-} else null
+  libs = [ base ];
+  objects = compileCC { src = ./test.cc; };
+}

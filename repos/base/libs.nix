@@ -7,11 +7,6 @@
 { tool, callLibrary }:
 
 let
-
-  # Prepare genodeEnv.
-  genodeEnv = tool.genodeEnvAdapters.addSystemIncludes
-    tool.genodeEnv (import ./include { inherit (tool) genodeEnv; });
-
   compileCC =
   attrs:
   tool.compileCC (attrs // {
@@ -21,15 +16,9 @@ let
       (import ./include { inherit (tool) genodeEnv; });
   });
 
-  callLibrary' = callLibrary {
-    inherit genodeEnv compileCC;
-    inherit (tool) compileS;
-  };
-  importLibrary = path: callLibrary' (import path);
-
   callBaseLibrary = callLibrary {
-    inherit genodeEnv compileCC baseDir repoDir;
-    inherit (tool) compileS;
+    inherit (tool) genodeEnv compileS;
+    inherit compileCC baseDir repoDir;
   };
   importBaseLibrary = path: callBaseLibrary (import path);
 
@@ -37,12 +26,12 @@ let
   repoDir =
     if tool.genodeEnv.isLinux then ../base-linux else
     if tool.genodeEnv.isNova  then ../base-nova  else
-    throw "no base libraries for ${genodeEnv.system}";
+    throw "no base libraries for ${tool.genodeEnv.system}";
 
   impl =
     import (repoDir+"/libs.nix") { inherit tool importBaseLibrary; };
 
-in 
+in
 impl // {
   cxx     = importBaseLibrary ./src/base/cxx;
   startup = importBaseLibrary ./lib/mk/startup.nix;

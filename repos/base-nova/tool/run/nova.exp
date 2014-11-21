@@ -11,6 +11,8 @@ set disk_image $env(diskImage)
 exec ln -s $disk_image ./[strip_hash $disk_image]
 exec ln -s $disk_image $out/[strip_hash $disk_image]
 
+set is_qemu_available 1
+
 ##################################
 ## Test framework API functions ##
 ##################################
@@ -85,20 +87,11 @@ proc build_boot_image {binaries} {
 # Execute scenario using Qemu
 #
 proc spawn_qemu { wait_for_re timeout_value } {
-	global env qemu_args
+	global qemu_args
 	set qemu qemu-system-x86_64
-	#append qemu_args " -cpu core2duo "
-	set qemu_args "-nographic -cpu core2duo "
+	append qemu_args " -cpu core2duo -serial mon:stdio "
 
 	global spawn_id
-	global run_target
-
-	# Redirect serial output to stdio in graphics mode.
-	#$if {$env(graphical) == 1} {
-		append qemu_args " -serial mon:stdio "
-	#} else {
-	#	append qemu_args " -nographic "
-	#}
 
 	# disk booting for now, PXE later
 	global disk_image

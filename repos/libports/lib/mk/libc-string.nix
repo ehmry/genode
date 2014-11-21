@@ -3,13 +3,16 @@
  * library and the complete libc
  */
 
-{ subLibcEnv }:
+{ genodeEnv, compileSubLibc }:
 let dir = "lib/libc/string"; in
-subLibcEnv.mkLibrary {
+genodeEnv.mkLibrary {
   name = "libc-string";
-  sourceSh = [ "${dir}/*.c" ];
-  filter = map 
-    (fn: "${dir}/${fn}")
-    [ "strcoll.c" "strxfrm.c" "wcscoll.c" "wcsxfrm.c" ];
-  systemIncludesSh = [ "${dir}" "include" ];
+
+  externalObjects = compileSubLibc {
+    sources = [ "${dir}/*.c" ];
+    filter = map
+      (fn: "${dir}/${fn}")
+      [ "strcoll.c" "strxfrm.c" "wcscoll.c" "wcsxfrm.c" ];
+    systemIncludes = [ "${dir}" "include" ];
+  };
 }

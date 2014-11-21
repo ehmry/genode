@@ -1,42 +1,51 @@
-{ genodeEnv, baseDir, repoDir, base-common }:
+{ genodeEnv, compileCC
+, baseDir, repoDir, versionObject
+, base-common }:
 
 let
   genCoreDir = baseDir+"/src/core";
+
+  systemIncludes =
+    [ (repoDir + "/src/core/include")
+      (repoDir + "/src/base/console")
+      (baseDir + "/src/base/thread")
+      (genCoreDir + "/include")
+    ];
 in
-genodeEnv.mkComponent  (genodeEnv.tool.mergeSets [ {
+genodeEnv.mkComponent {
   name = "core";
   libs = [ base-common ];
 
   ldScriptsStatic = [ (repoDir + "/src/platform/roottask.ld") ];
   ldTextAddr = "0x100000";
 
-  sources =
-    genodeEnv.fromDir genCoreDir
+  objects = map (src: compileCC { inherit src systemIncludes; }) (
+    map (fn: genCoreDir+"/${fn}")
       [ "main.cc"
         "context_area.cc"
         "core_mem_alloc.cc"
-        "cpu_session_component.cc"        
+        "cpu_session_component.cc"
         "dataspace_component.cc"
         "dump_alloc.cc"
         "io_mem_session_component.cc"
         "ram_session_component.cc"
-        "rom_session_component.cc"      
+        "rom_session_component.cc"
         "pd_session_component.cc"
         "rm_session_component.cc"
         "signal_session_component.cc"
-        "trace_session_component.cc" 
+        "trace_session_component.cc"
       ]
     ++
-    genodeEnv.fromDir (genCoreDir+"/x86")
+    map (fn: genCoreDir+"/x86/${fn}")
       [ "io_port_session_component.cc"
         "platform_services.cc"
       ]
     ++
-    genodeEnv.fromPath (baseDir+"/src/base/console/core_printf.cc")
+    [ (baseDir+"/src/base/console/core_printf.cc")
+      (repoDir+"/src/base/pager/pager.cc")
+    ]
     ++
-    genodeEnv.fromPath (repoDir+"/src/base/pager/pager.cc")
-    ++
-    genodeEnv.fromDir (repoDir+"/src/core")
+    map (fn: repoDir+"/src/core/${fn}")
       [ "core_rm_session.cc"
         "cpu_session_extension.cc"
         "cpu_session_support.cc"
@@ -51,13 +60,7 @@ genodeEnv.mkComponent  (genodeEnv.tool.mergeSets [ {
         "rm_session_support.cc"
         "signal_source_component.cc"
         "thread_start.cc"
-      ];
+      ]
+  ) ++ [ versionObject ];
 
-  systemIncludes =
-    [ (repoDir + "/src/core/include")
-      (repoDir + "/src/base/console")
-      (baseDir + "/src/base/thread")
-      (genCoreDir + "/include")
-    ];
-
-} (import (genCoreDir+"/version.nix")) ])
+}

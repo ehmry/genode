@@ -4,24 +4,27 @@
  * \date   2013-02-14
  */
 
-{ genodeEnv, baseDir, repoDir, base-common }:
+{ genodeEnv, compileCC, baseDir, repoDir, base-common }:
 
-with genodeEnv.tool;
-
+let
+  compileCC' = src: compileCC {
+    inherit src;
+    systemIncludes = [ (baseDir + "/src/base/env") ];
+  };
+in
 genodeEnv.mkLibrary {
   name = "base";
   libs = [ base-common ];
-  sources =
-    fromDir (repoDir + "/src/base") [ "thread/thread_nova.cc" ]
+  objects = map compileCC' (
+    [ (repoDir + "/src/base/thread/thread_nova.cc") ]
     ++
-    fromDir (baseDir+"/src/base")
-      [ "console/log_console.cc"
-        "cpu/cache.cc"
-        "env/context_area.cc"
-        "env/env.cc"
-        "env/reinitialize.cc"
-      ];
-
-  systemIncludes = [ (baseDir + "/src/base/env") ];
-
+    ( map (fn: baseDir+"/src/base/${fn}")
+        [ "console/log_console.cc"
+          "cpu/cache.cc"
+          "env/context_area.cc"
+          "env/env.cc"
+          "env/reinitialize.cc"
+        ]
+    )
+  );
 }

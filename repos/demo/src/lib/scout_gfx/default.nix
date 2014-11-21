@@ -1,7 +1,6 @@
-{ tool }:
-{}:
+{ genodeEnv, compileCC }:
 
-tool.buildLibrary {
+genodeEnv.mkLibrary {
   name = "scout_gfx";
-  sources = [ ./sky_texture_painter.cc ];
+  object = compileCC { src = ./sky_texture_painter.cc; };
 }

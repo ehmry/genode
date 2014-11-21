@@ -1,11 +1,11 @@
-{ genodeEnv, baseDir, repoDir }:
+{ genodeEnv, compileCC }:
 
 genodeEnv.mkLibrary rec {
   name = "cxx";
   shared = false;
   libs = [ ];
 
-  sources = genodeEnv.fromPaths
+  objects = map (src: compileCC { inherit src; })
     [ ./exception.cc ./guard.cc ./malloc_free.cc
       ./misc.cc ./new_delete.cc ./unwind.cc
     ];
@@ -23,7 +23,7 @@ genodeEnv.mkLibrary rec {
 
   ehSymbols = [
     # Symbols we wrap (see unwind.cc)
-    "_Unwind_Resume" "_Unwind_Complete" "_Unwind_DeleteException" 
+    "_Unwind_Resume" "_Unwind_Complete" "_Unwind_DeleteException"
   ] ++ [ # Additional symbols for ARM
     "__aeabi_unwind_cpp_pr0" "__aeabi_unwind_cpp_pr1"
   ];
@@ -64,7 +64,7 @@ genodeEnv.mkLibrary rec {
   #inherit (build.spec) ccMarch ldMarch;
   mergePhase = ''
     outName=supc++.o
-  
+
     libcc_gcc="$($cxx $ccMarch -print-file-name=libsupc++.a) $($cxx $ccMarch -print-file-name=libgcc_eh.a)"
 
     MSG_MERGE $outName

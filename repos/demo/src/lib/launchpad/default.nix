@@ -1,8 +1,7 @@
-{ tool }:
-{ base }:
+{ genodeEnv, compileCC, base }:
 
-tool.buildLibrary {
+genodeEnv.mkLibrary {
   name = "launchpad";
   libs = [ base ];
-  sources = [ ./launchpad.cc ];
+  objects = compileCC { src = ./launchpad.cc; };
 }

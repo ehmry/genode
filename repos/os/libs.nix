@@ -8,13 +8,6 @@
 
 let
 
-  # Prepare genodeEnv.
-  genodeEnv =  tool.genodeEnvAdapters.addSystemIncludes
-    tool.genodeEnv (
-      ( import ../base/include { inherit (tool) genodeEnv; }) ++
-      ( import ./include { inherit (tool) genodeEnv; })
-    );
-
   addIncludes =
   f: attrs:
   f (attrs // {
@@ -25,7 +18,7 @@ let
   });
 
   callLibrary' = callLibrary {
-    inherit genodeEnv;
+    inherit (tool) genodeEnv;
     compileS  = addIncludes tool.compileS;
     compileC  = addIncludes tool.compileC;
     compileCC = addIncludes tool.compileCC;
@@ -43,6 +36,6 @@ in {
   ldso-startup = importLibrary ./src/lib/ldso/startup;
   server       = importLibrary ./src/lib/server;
   timed_semaphore = importLibrary ./src/lib/timed_semaphore;
-  timer           = importLibrary ./lib/mk/timer.nix;
+  timer           = importLibrary ./src/drivers/timer/lib.nix;
   #trace        = importLibrary ./src/lib/trace;
 }

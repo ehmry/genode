@@ -1,4 +1,7 @@
-{ subLibcEnv }:
-subLibcEnv.mkLibrary {
-  name = "libc-inet"; sourceSh = [ "lib/libc/inet/*.c" ];
+{ genodeEnv, compileSubLibc }:
+genodeEnv.mkLibrary {
+  name = "libc-inet";
+  externalObjects = compileSubLibc {
+    sources = [ "lib/libc/inet/*.c" ];
+  };
 }

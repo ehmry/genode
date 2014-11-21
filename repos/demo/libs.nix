@@ -4,21 +4,25 @@
  * \date   2014-09-15
  */
 
-{ tool, callLibrary, includes }:
+{ tool, callLibrary }:
 
 let
 
-  # overide the build.library function
-  buildLibrary =
-  { includeDirs ? [], ... } @ args:
-  tool.build.library (args // {
-    includeDirs = includeDirs ++ includes;
+  compileCC =
+  attrs:
+  tool.compileCC (attrs // {
+    systemIncludes =
+     (attrs.systemIncludes or []) ++
+      (import ../base/include { inherit (tool) genodeEnv; }) ++
+      (import ./include { inherit (tool) genodeEnv; });
   });
 
-  tool' = tool // { inherit buildLibrary; };
+  callLibrary' = callLibrary {
+    inherit (tool) genodeEnv compileC transformBinary;
+    inherit compileCC;
+  };
 
-  importLibrary = path:
-    callLibrary (import path { tool = tool'; });
+  importLibrary = path: callLibrary' (import path);
 
 in {
   launchpad          = importLibrary ./src/lib/launchpad;

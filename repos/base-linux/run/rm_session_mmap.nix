@@ -1,6 +1,8 @@
-{ run, pkgs }:
+{ spec, run, pkgs }:
 
 with pkgs;
+
+if spec.kernel != "linux" then null else
 
 run {
   name = "rm_session_mmap";

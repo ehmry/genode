@@ -7,8 +7,15 @@
 { system, tool, pkgs }:
 
 let
-  importRun = p: import p { inherit run pkgs; };
-  importRunTheSequel = p: import p { inherit run pkgs; };
+
+  spec =
+    if system == "x86_32-linux" || system == "x86_64-linux"
+    then import specs/x86_32-linux.nix
+    else
+    if system == "x86_32-nova" || system == "x86_64-nova"
+    then import specs/x86_64-nova.nix
+    else
+    abort "unknown system type ${system}";
 
   linuxRun = import ./repos/base-linux/tool/run { inherit tool pkgs; };
   novaRun  = import ./repos/base-nova/tool/run  { inherit tool pkgs; };
@@ -19,21 +26,39 @@ let
       if system == "x86_32-nova" then novaRun else
       if system == "x86_64-nova" then novaRun else
       abort "no run environment for ${system}";
+
+  callRun = f:
+    f (builtins.intersectAttrs
+        (builtins.functionArgs f)
+        { inherit spec run pkgs; }
+      );
+
+  importRun = p: callRun (import p);
+
+  hasSuffixNix = tool.hasSuffix ".nix";
 in
-{
-  # Base
-  #affinity = importRun ./repos/base/run/affinity.nix;
-  fpu      = importRun ./repos/base/run/fpu.nix;
-  thread   = importRun ./repos/base/run/thread.nix;
+builtins.listToAttrs (builtins.concatLists (map
+  (dir:
+    let
+      dir' = dir + "/run";
+      set = builtins.readDir dir';
+    in
+    builtins.filter (x: x != null) (map
+      (fn:
+        if hasSuffixNix fn then
+          { name = tool.replaceInString ".nix" "" fn;
+            value = importRun (dir'+"/${fn}");
+          }
+        else null
+      )
+      (builtins.attrNames set)
+    )
+  )
 
-  # Base Linux
-  #rm_session_mmap = importRun ./repos/base-linux/run/rm_session_mmap.nix;
-  
-  # OS
-  ldso   = importRunTheSequel ./repos/os/run/ldso.nix;
-  signal = importRun ./repos/os/run/signal.nix;
-  timer  = importRun ./repos/os/run/timer.nix;
-
-  # Libports
-  libc = importRunTheSequel ./repos/libports/run/libc.nix;
-}
+  [ ./repos/base
+    ./repos/base-linux
+    ./repos/base-nova
+    ./repos/os
+    ./repos/libports
+  ]
+))

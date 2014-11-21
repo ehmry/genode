@@ -1,5 +1,5 @@
 { genodeEnv, compileS, compileC, compileCC
-, baseLibs, ldso-arch, debug ? false }:
+, baseLibs, ldso-arch, debug ? true }:
 
 let
 
@@ -55,10 +55,10 @@ let
       "-Wno-unused-but-set-variable"
     ];
 
-  cFlags = extraFlags ++ [ "-fno-builtin" ];
+  ccFlags = extraFlags ++ [ "-fno-builtin" ];
 
-  compileS'  = addFlags compileS  cFlags;
-  compileC'  = addFlags compileC  cFlags;
+  compileS'  = addFlags compileS  ccFlags;
+  compileC'  = addFlags compileC  ccFlags;
   compileCC' = addFlags compileCC extraFlags;
 
 in

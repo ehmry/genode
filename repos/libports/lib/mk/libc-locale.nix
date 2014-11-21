@@ -1,5 +1,8 @@
-{ subLibcEnv }:
+{ genodeEnv, compileSubLibc }:
 
-subLibcEnv.mkLibrary {
-  name = "libc-locale"; sourceSh = [ "lib/libc/locale/*.c" ];
+genodeEnv.mkLibrary {
+  name = "libc-locale";
+  externalObjects = compileSubLibc {
+    sources = [ "lib/libc/locale/*.c" ];
+  };
 }

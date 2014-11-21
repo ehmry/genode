@@ -16,26 +16,17 @@ let
         (libs // extraAttrs )
     );
 
-  importLibs = p: import p { inherit tool callLibrary; };
+  libs' = tool.mergeSets (
+    map
+      (repo: import (./repos + "/${repo}/libs.nix") {
+        inherit tool callLibrary;
+      })
+      [ "base" "os" "demo" "libports" ]
+  );
 
-  base     = importLibs ./repos/base/libs.nix;
-  os       = importLibs ./repos/os/libs.nix;
-  libports = importLibs ./repos/libports/libs.nix;
-
-  #demo = import ./repos/demo/libs.nix {
-  #  inherit tool callLibrary;
-  #  includes = baseIncludes ++ osIncludes;
-  #};
-
-  #
-  #  inherit tool callLibrary;
-  #  includes = baseIncludes ++ osIncludes ++ libportsIncludes;
-  #};
-
-  libs' = tool.mergeSets [ base os libports ]; #demo
-  libs  = libs' // {
-    baseLibs = with libs;
-      [ base-common base.base startup cxx
+  libs = libs' // {
+    baseLibs = with libs';
+      [ base-common base startup cxx
         timed_semaphore alarm config syscall
       ];
   };

@@ -3,15 +3,24 @@
 # \author Alexander Boettcher
 #
 
-{ run, pkgs }:
+{ spec, run, pkgs }:
 
-with pkgs;
+
+#if {
+#	![have_spec hw_arndale] &&
+#	([have_spec platform_pbxa9] || (![have_spec nova] && ![have_spec foc]))
+#} {
+#	puts "Platform is unsupported."
+#	exit 0
+#}
+
+if spec.kernel != "nova" then null else
 
 run {
   name = "affinity";
-  
+
   contents = [
-    { target = "/"; source = test.affinity; }
+    { target = "/"; source = pkgs.test.affinity; }
     { target = "/config";
       source = builtins.toFile "config" ''
 	<config>
@@ -37,7 +46,7 @@ run {
   ];
 
   testScript = ''
-    if {[is_qemu_available]} {
+if {[is_qemu_available]} {
 	set want_cpus_x 4
 	set want_cpus_y 1
 	set want_cpus_total [expr $want_cpus_x*$want_cpus_y]
@@ -75,6 +84,6 @@ for {set r 0} {$r <= $rounds} {incr r} {
 grep_output {\[init -\> test-affinity\] Round}
 
 compare_output_to $good_string
-  '';
+'';
 
 }

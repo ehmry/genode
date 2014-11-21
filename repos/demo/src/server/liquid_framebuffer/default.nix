@@ -1,13 +1,12 @@
-{ build }:
+{ genodeEnv, compileCC, config, scout_widgets }:
 
-{ config, scout_widgets }:
-
-build.component {
+let
+  compileCC' = src: compileCC {
+    inherit src; systemIncludes = [ ../../app/scout ];
+  };
+in
+genodeEnv.mkComponent {
   name = "liquid_fb";
   libs = [ config scout_widgets ];
-  sources = [ ./main.cc ./services.cc ];
-  includeDirs =
-    [ ../liquid_framebuffer
-      ../../app/scout
-    ];
+  objects = map compileCC' [ ./main.cc ./services.cc ];
 }

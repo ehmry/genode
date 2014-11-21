@@ -65,7 +65,7 @@ derivation {
     "${nixpkgs.qemu}/bin";
 
   builder = nixpkgs.expect + "/bin/expect";
-  args = 
+  args =
     [ "-nN"
       ../../../../tool/run-nix-setup.exp
       # setup.exp will source the files that follow

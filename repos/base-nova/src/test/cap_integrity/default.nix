@@ -1,8 +1,7 @@
-{ build, base }:
+{ genodeEnv, compileCC, base }:
 
-build.test {
+genodeEnv.mkComponent {
   name = "test-cap_integrity";
-  libs = [ base.lib.base ];
-  sources = [ ./main.cc ];
-  inherit (base) includeDirs;
+  libs = [ base ];
+  objects = compileCC { src = ./main.cc; };
 }

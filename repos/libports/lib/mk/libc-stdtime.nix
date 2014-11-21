@@ -1,9 +1,10 @@
-{ subLibcEnv }:
-subLibcEnv.mkLibrary {
-  name = "libc-stdtime";
-  ccOpt = [ "-DTZ_MAX_TIMES=1" ];
-  sourceSh = [ "lib/libc/stdtime/*.c" ];
-  incDir = [ "lib/libc/stdtime" ];
+{ genodeEnv, compileSubLibc }:
 
-  preGather = "touch libintl.h";
+genodeEnv.mkLibrary {
+  name = "libc-stdtime";
+  externalObjects = compileSubLibc {
+    sources = [ "lib/libc/stdtime/*.c" ];
+    extraFlags = [ "-DTZ_MAX_TIMES=1" ];
+    localIncludes = [ "lib/libc/stdtime" "include" ];
+  };
 }

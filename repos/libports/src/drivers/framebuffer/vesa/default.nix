@@ -1,15 +1,14 @@
-{ build, base, os, libports }:
+{ build, compileCC, base, x86emu, blit, config }:
 
+let
+  compileCC = src: compileCC {
+    inherit src;
+    includeDirs = [ ./include ../../../include/x86emu ]
+  };
+in
 build.driver {
   name = "fb_drv";
-  libs =
-    [ libports.lib.x86emu os.lib.blit 
-      base.lib.base os.lib.config
-    ];
-  sources = 
+  libs = [ x86emu blit base config ];
+  objects = map compileCC'
     [ ./main.cc ./framebuffer.cc ./ifx86emu.cc ./hw_emul.cc ];
-  includeDirs =
-    [ ./include "${libports.port.x86emu}" ]
-    ++ os.includeDirs
-    ++ base.includeDirs;
 }

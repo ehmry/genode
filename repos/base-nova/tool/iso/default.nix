@@ -12,6 +12,8 @@
 
 with tool;
 
+assert (builtins.compareVersions nixpkgs.syslinux.name "syslinux-6") != -1;
+
 derivation {
   name = "${name}.iso";
   system = builtins.currentSystem;
@@ -35,6 +37,7 @@ derivation {
       LABEL NOVA
         KERNEL mboot.c32
         APPEND /hypervisor iommu serial --- /genode/core'';
+    # No trailing endline, add more entries in the builder.
 
   inherit (nixpkgs) cdrkit syslinux;
   inherit (tool) genodeEnv;

@@ -1,20 +1,30 @@
-/*
- * \brief  Linux core
- * \author Emery Hemingway
- * \date   2014-10-21
- */
-
-{ genodeEnv, baseDir, repoDir, base-common, cxx, startup, syscall }:
+{ genodeEnv, compileCC
+, baseDir, repoDir, versionObject
+, base-common, cxx, startup, syscall }:
 
 let
   genCoreDir = baseDir+"/src/core";
+
+  systemIncludes =
+    [ (repoDir + "/src/core/include") (genCoreDir + "/include")
+      (repoDir + "/src/base/env") (baseDir + "/src/base/env")
+      (baseDir + "/src/base/thread")
+      (repoDir + "/src/base/console")
+      (repoDir + "/src/base/ipc")
+
+      (repoDir + "/src/platform")
+
+      # main.cc - core_env.h - platform_env.h - unistd.h ..
+      (genodeEnv.toolchain.glibc+"/include")
+    ];
+
 in
-genodeEnv.mkComponent  (genodeEnv.tool.mergeSets [ {
+genodeEnv.mkComponent {
   name = "core";
   libs = [ base-common cxx startup syscall ];
 
-  sources =
-    genodeEnv.fromDir genCoreDir
+  objects = map (src: compileCC { inherit src systemIncludes; }) (
+    map (fn: genCoreDir+"/${fn}")
       [ "main.cc"
         "cpu_session_component.cc"
         "ram_session_component.cc"
@@ -24,11 +34,11 @@ genodeEnv.mkComponent  (genodeEnv.tool.mergeSets [ {
         "trace_session_component.cc"
       ]
     ++
-    genodeEnv.fromPath (baseDir+"/src/base/console/core_printf.cc")
+    [ (baseDir+"/src/base/console/core_printf.cc")
+      (baseDir+"/src/base/thread/thread.cc")
+    ]
     ++
-    genodeEnv.fromPath (baseDir+"/src/base/thread/thread.cc")
-    ++
-    genodeEnv.fromDir ../core
+    map (fn: repoDir+"/src/core/${fn}")
       [ "platform.cc"
         "platform_thread.cc"
         "ram_session_support.cc"
@@ -39,24 +49,14 @@ genodeEnv.mkComponent  (genodeEnv.tool.mergeSets [ {
         "io_mem_session_component.cc"
         "thread_linux.cc"
         "context_area.cc"
-      ];
-
-  systemIncludes =
-    [ (repoDir + "/src/core/include") (genCoreDir + "/include")
-      (repoDir + "/src/base/env") (baseDir + "/src/base/env")
-      (baseDir + "/src/base/thread")
-      (repoDir + "/src/base/console")
-      (repoDir + "/src/base/ipc")
-
-      # main.cc - core_env.h - platform_env.h - unistd.h ..
-      (genodeEnv.toolchain.glibc+"/include")      
-    ];
+      ]
+  ) ++ [ versionObject ];
 
   # HOST_INC_DIR += /usr/include
 
   #
-  # core does not use POSIX threads when built for the 
-  # 'lx_hybrid_x86' platform, so we need to reserve the 
+  # core does not use POSIX threads when built for the
+  # 'lx_hybrid_x86' platform, so we need to reserve the
   # thread-context area via a segment in the program to
   # prevent clashes with vdso and shared libraries.
   #
@@ -66,5 +66,4 @@ genodeEnv.mkComponent  (genodeEnv.tool.mergeSets [ {
       [ (repoDir+"src/platform/context_area.stdlib.ld") ]
     else
       genodeEnv.spec.ldScriptsStatic;
-
-} (import (genCoreDir+"/version.nix")) ])
+}

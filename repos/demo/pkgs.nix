@@ -4,33 +4,43 @@
  * \date   2014-09-15
  */
 
-{ tool, callPackage, baseIncludes, osIncludes, demoIncludes }:
+{ tool, callComponent }:
 
 let
 
-  # overide the build.component function
-  build' = tool.build // {
-    component = { includeDirs ? [], ... } @ args:
-      tool.build.component (args // {
-        includeDirs =  builtins.concatLists [
-          includeDirs demoIncludes osIncludes baseIncludes
-        ];
-      });
+  importInclude = p: import p { inherit (tool) genodeEnv; };
+
+  compileCC =
+  attrs:
+  tool.compileCC (attrs // {
+    systemIncludes =
+     (attrs.systemIncludes or []) ++
+     (importInclude ../base/include) ++
+     (import ./include { inherit (tool) genodeEnv; });
+  });
+
+  callComponent' = callComponent {
+    inherit (tool) genodeEnv transformBinary;
+    inherit compileCC;
   };
 
-  importComponent = path:
-    callPackage (import path { build = build'; });
+  importComponent = path: callComponent' (import path);
 
 in
 {
-  server = {
-    liquid_framebuffer = importComponent ./src/server/liquid_framebuffer;
-    nitlog             = importComponent ./src/server/nitlog;
-  };
+  server =
+    { liquid_framebuffer =
+        importComponent ./src/server/liquid_framebuffer;
+      nitlog = importComponent ./src/server/nitlog;
+    };
 
-  app = {
-    launchpad = importComponent ./src/app/launchpad;
-    scout     = importComponent ./src/app/scout;
-  };
+  app =
+    { launchpad = importComponent ./src/app/launchpad;
+      scout     = importComponent ./src/app/scout;
+    };
+
+  test =
+    { libpng = importComponent ./src/lib/libpng/test.nix;
+    };
 
 }

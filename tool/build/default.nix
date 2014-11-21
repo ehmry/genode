@@ -9,6 +9,67 @@
 with tool;
 
 let
+  devPrefix = "genode-${spec.platform}-";
+
+  # TODO deduplicate with ../build/genode-env.nix
+  # attributes that should always be present
+  stdAttrs = rec
+    { verbose = 1;
+
+      cc      = "${devPrefix}gcc";
+      cxx     = "${devPrefix}g++";
+      ld      = "${devPrefix}ld";
+      as      = "${devPrefix}as";
+      ar      = "${devPrefix}ar";
+      nm      = "${devPrefix}nm";
+      objcopy = "${devPrefix}objcopy";
+      ranlib  = "${devPrefix}ranlib";
+      strip   = "${devPrefix}strip";
+
+      ccMarch = spec.ccMarch or [];
+      ldMarch = spec.ldMarch or [];
+      asMarch = spec.ldMarch or [];
+
+      ccOLevel = "-O2";
+      ccWarn   = "-Wall";
+
+      ccFlags =
+        (spec.ccFlags or []) ++ spec.ccMarch ++
+        [ ccOLevel ccWarn
+
+          # Always compile with '-ffunction-sections' to enable
+          # the use of the linker option '-gc-sections'
+          "-ffunction-sections"
+
+          # Prevent the compiler from optimizations
+          # related to strict aliasing
+          "-fno-strict-aliasing"
+
+          # Do not compile with standard includes per default.
+          "-nostdinc"
+
+          # It shouldn't be too difficult to make a function to
+          # turn this back on for specific components.
+          #"-g"
+        ];
+
+      cxxFlags = [ "-std=gnu++11" ];
+
+      ccCOpt = ccFlags;
+
+      ldOpt = ldMarch ++ [ "-gc-sections" ];
+
+      asOpt = spec.asMarch;
+
+      cxxLinkOpt =
+        (map (o: "-Wl,"+o) ldOpt) ++
+        spec.ccMarch ++ [ "-nostdlib -Wl,-nostdlib"];
+
+      nativeIncludePaths =
+        [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include"
+        ];
+    };
+
 
   # Linker script for dynamically linked programs
   ldScriptDyn = ../../repos/os/src/platform/genode_dyn.ld;
@@ -17,9 +78,12 @@ let
   ldScriptSo  = ../../repos/os/src/platform/genode_rel.ld;
 
   staticLibraryLinkPhase = ''
-    objects=$(sortWords $objects)
-
     echo -e "    MERGE    $name"
+
+    for o in $externalObjects
+    do objects="$objects $o/*.o"
+    done
+
     mkdir -p $out
     VERBOSE $ar -rc $out/$name.lib.a $objects
 
@@ -31,9 +95,12 @@ let
   '';
 
   sharedLibraryLinkPhase = ''
-    echo -e "    MERGE    $@"
+    echo -e "    MERGE    $name"
 
-    objects=$(sortWords $objects)
+    for o in $externalObjects
+    do objects="$objects $o/*.o"
+    done
+
     local _libs=$(sortDerivations $libs)
     local libs=""
 
@@ -57,13 +124,13 @@ let
 
 
   ## could propagatedIncludes replace systemIncludes?
-  
+
   libraryFixupPhase = ''
     if [ -n "$libs" ]; then
         mkdir -p "$out/nix-support"
         echo "$libs" > "$out/nix-support/propagated-libraries"
     fi
-    
+
     if [ -n "$propagatedIncludes" ]; then
         mkdir -p $include
 
@@ -77,7 +144,12 @@ let
   componentLinkPhase = ''
     echo -e "    LINK     $name"
 
+    for o in $externalObjects
+    do objects="$objects $o/*.o"
+    done
+
     objects=$(sortWords $objects)
+
     local _libs=$libs
     local libs=""
 
@@ -86,18 +158,14 @@ let
     done
 
     libs=$(sortDerivations $libs)
-    
+
     mkdir -p $out
-    
+
     [[ "$ldTextAddr" ]] && \
         cxxLinkOpt="$cxxLinkOpt -Wl,-Ttext=$ldTextAddr"
 
     for s in $ldScripts
     do cxxLinkOpt="$cxxLinkOpt -Wl,-T -Wl,$s"
-    done
-
-    for o in $ldOpt
-    do cxxLinkOpt="$cxxLinkOpt -Wl,$o"
     done
 
     VERBOSE $cxx $cxxLinkOpt \
@@ -110,12 +178,10 @@ let
 
   componentFixupPhase = " ";
 
-  genodeEnv'   = import ./genode-env.nix { inherit system tool; };
-  genodePortEnv' = genodeEnv // {
-    mk =
-    { portSrc, ... } @ attrs:
-    genodeEnv'.mk { gatherPhase = "cd \"$portSrc\""; };
-  };
+
+  genodeEnv' = import ./genode-env.nix {
+     inherit system tool spec stdAttrs;
+  }; # wtf is this?
 
   addSubMks = env: env // {
 
@@ -125,7 +191,7 @@ let
           if builtins.hasAttr "propagatedIncludes" attrs then
             [ "out" "include" ]
           else [ "out" ];
-      } // 
+      } //
       (if attrs.shared or false then
          { mergePhase = sharedLibraryLinkPhase;
            entryPoint = attrs.entryPoint or "0x0";
@@ -169,60 +235,6 @@ let
     glibc = nixpkgs.glibc_multi;
   };
 
-  devPrefix = "genode-${spec.platform}-";
-
-  # attributes that should always be present
-  # and accessible through genodeEnv."..."
-  # TODO split into compile, component, library?
-  stdAttrs = rec
-    { verbose = 1;
-
-      cc      = "${devPrefix}gcc";
-      cxx     = "${devPrefix}g++";
-      ld      = "${devPrefix}ld";
-      as      = "${devPrefix}as";
-      ar      = "${devPrefix}ar";
-      nm      = "${devPrefix}nm";
-      objcopy = "${devPrefix}objcopy";
-      ranlib  = "${devPrefix}ranlib";
-      strip   = "${devPrefix}strip";
-
-      ccMarch = spec.ccMarch or [];
-      ldMarch = spec.ldMarch or [];
-      asMarch = spec.ldMarch or [];
-
-      ccOLevel = "-O2";
-      ccWarn   = "-Wall";
-      ccCxxOpt = [ "-std=gnu++11" ];
-
-      ccOpt =
-        [ # Always compile with '-ffunction-sections' to enable
-          # the use of the linker option '-gc-sections'
-          "-ffunction-sections"
-
-          # Prevent the compiler from optimizations
-          # related to strict aliasing
-          "-fno-strict-aliasing"
-
-          # Do not compile with standard includes per default.
-          "-nostdinc"
-
-          "-g"
-          ]
-          ++ spec.ccMarch ++ (spec.ccOpt or []);
-
-      ccCOpt = ccOpt;
-
-      ldOpt = ldMarch ++ [ "-gc-sections" ];
-
-      asOpt = spec.asMarch;
-
-      cxxLinkOpt = spec.ccMarch ++ [ "-nostdlib -Wl,-nostdlib"];
-
-      nativeIncludePaths =
-        [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include"
-        ];
-    };
 in
 rec {
   genodeEnv     = addSubMks genodeEnv';
@@ -233,48 +245,84 @@ rec {
   { src
   , localIncludes ? []
   , ... } @ args:
-  derivation (stdAttrs // args // {
-    name = "${baseNameOf (toString src)}-object";
-    system = builtins.currentSystem;
-    builder = shell;
-    args = [ "-e" ./compile-s.sh ];
-    main = src;
+  derivation (
+    { inherit (stdAttrs) cc ccFlags nativeIncludePaths;
+      inherit genodeEnv;
+    } //
+    args //
+    {
+      name = "${baseNameOf (toString src)}-object";
+      system = builtins.currentSystem;
+      builder = shell;
+      args = [ "-e" ./compile-s.sh ];
 
-    inherit genodeEnv;
-
-    localIncludes = findLocalIncludes src localIncludes;
-  });
+      localIncludes = findLocalIncludes src localIncludes;
+    }
+  );
 
   compileC =
   { src
   , localIncludes ? []
   , ... } @ args:
-  derivation (stdAttrs // args // {
-    name = "${baseNameOf (toString src)}-object";
-    system = builtins.currentSystem;
-    builder = shell;
-    args = [ "-e" ./compile-c.sh ];
-    main = src;
+  derivation (
+    { inherit (stdAttrs) cc ccFlags nativeIncludePaths;
+      inherit genodeEnv;
+    } //
+    args //
+    {
+      name = dropSuffix ".c" (baseNameOf (toString src)) + ".o";
+      system = builtins.currentSystem;
+      builder = shell;
+      args = [ "-e" ./compile-c.sh ];
 
-    inherit genodeEnv;
-
-    localIncludes = findLocalIncludes src localIncludes;
-  });
+      localIncludes = findLocalIncludes src localIncludes;
+    }
+  );
 
   compileCC =
   { src
   , localIncludes ? []
   , ... } @ args:
-  derivation (stdAttrs // args // {
-    name = "${baseNameOf (toString src)}-object";
+  derivation (
+    { inherit (stdAttrs) cxx ccFlags cxxFlags nativeIncludePaths;
+      inherit genodeEnv;
+    } //
+    args //
+    {
+      name = dropSuffix ".cc" (baseNameOf (toString src)) + ".o";
+      system = builtins.currentSystem;
+      builder = shell;
+      args = [ "-e" ./compile-cc.sh ];
+
+      localIncludes = findLocalIncludes src localIncludes;
+    }
+  );
+
+  transformBinary =
+  binary:
+  let
+    s = baseNameOf (toString binary);
+    fixName = s:
+      let
+        l = builtins.stringLength s;
+        c = builtins.substring 0 1 s;
+      in
+      if l == 0 then "" else
+        (if c == "." || c == "-" then "_" else c) +
+        fixName (builtins.substring 1 l s);
+    symbolName = fixName s;
+  in
+  derivation {
+    name =
+      if builtins.typeOf binary == "path"
+      then symbolName + ".o"
+      else "binary";
     system = builtins.currentSystem;
-    builder = shell;
-    args = [ "-e" ./compile-cc.sh ];
-    main = src;
+    builder = tool.shell;
+    args = [ "-e" ./transform-binary.sh ];
 
-    inherit genodeEnv;
-
-    localIncludes = findLocalIncludes src localIncludes;
-  });
+    inherit genodeEnv binary symbolName;
+    inherit (stdAttrs) as asOpt;
+  };
 
 }

@@ -1,4 +1,8 @@
-{ subLibcEnv }:
-subLibcEnv.mkLibrary {
-  name = "libc-stdio"; sourceSh = [ "lib/libc/stdio/*.c" ];
+{ genodeEnv, compileSubLibc }:
+
+genodeEnv.mkLibrary {
+  name = "libc-stdio";
+  externalObjects = compileSubLibc {
+     sources = [ "lib/libc/stdio/*.c" ];
+  };
 }

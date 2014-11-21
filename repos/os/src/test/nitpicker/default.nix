@@ -1,8 +1,7 @@
-{ build, base, os }:
+{ genodeEnv, compileCC, base }:
 
-build.test {
+genodeEnv.mkComponent {
   name = "testnit";
-  libs = [ base.lib.base ];
-  sources = [ ./test.cc ];
-  includeDirs = os.includeDirs ++ base.includeDirs;
+  libs = [ base ];
+  objects = compileCC { src = ./test.cc; };
 }

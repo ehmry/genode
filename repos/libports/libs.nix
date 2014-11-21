@@ -8,12 +8,7 @@
 
 let
 
-  # Prepare genodeEnv.
-  genodeEnv =  tool.genodeEnvAdapters.addSystemIncludes
-    tool.genodeEnv (
-      ( import ../base/include { inherit (tool) genodeEnv; }) ++
-      [ ./include ]);
-
+  # The port source expressions.
   ports = import ./ports { inherit tool; };
   # Append 'Src' to each attribute in ports.
   ports' = builtins.listToAttrs (
@@ -21,60 +16,6 @@ let
       (n: { name = n+"Src"; value = builtins.getAttr n ports; })
       (builtins.attrNames ports)
   );
-
-  libcEnv = genodeEnv //
-    { mkLibrary = args: genodeEnv.mkLibrary (args // {
-      sourceRoot = args.sourceRoot or ports.libc;
-
-      ccOpt = args.ccOpt or [] ++ [
-        # Generate position independent code to allow linking of
-        # static libc code into shared libraries 
-        # (define is evaluated by assembler files)
-        "-DPIC"
-
-        # Prevent gcc headers from defining __size_t. 
-        # This definition is done in machine/_types.h.
-        "-D__FreeBSD__=8"
-
-        # Prevent gcc-4.4.5 from generating code for the family of
-        # 'sin' and 'cos' functions because the gcc-generated code
-        # would actually call 'sincos' or 'sincosf', which is a GNU
-        # extension, not provided by our libc.
-        "-fno-builtin-sin" "-fno-builtin-cos"
-        "-fno-builtin-sinf" "-fno-builtin-cosf"
-      ]
-      ++ genodeEnv.ccOpt;
-
-      # Use default warning level rather than -Wall because we do
-      # not want to touch
-      # the imported source code to improve build aesthetics
-      ccWarn = null;
-      ccCxxOpt =
-        args.ccCxxOpt or [] ++ [ "-Wall" ] ++ genodeEnv.ccCxxOpt;
-
-      localIncludes = args.localIncludes or [] ++
-        map (p: "${ports.libc}/${p}")
-          [ "lib/libc/include"
-          ];
-      
-      systemIncludes = args.systemIncludes or [] ++
-        map (p: "${ports.libc}/${p}")
-          [ "include/libc"
-            "lib/libc/include"
-            # Add platform-specific libc headers
-            # to standard include search paths
-            ( if genodeEnv.isx86_32 then "include/libc-i386"  else
-              if genodeEnv.isx86_64 then "include/libc-amd64" else
-              if genodeEnv.isxarm then  "include/libc-arm"    else
-              throw "no libc for ${genodeEnv.system}"
-            )
-
-          ]
-        ++ [ ./include/libc-genode ];
-
-      postCompile = builtins.readFile ./libc-compile-phase.sh;
-
-    }); };
 
   ##
   ## Automatically add the base library for targets that use the libc
@@ -87,23 +28,89 @@ let
   #LIBS += base
   #endif
 
-  subLibcEnv = genodeEnv // 
-    { mkLibrary = args: libcEnv.mkLibrary (args // {
+  libcArchInclude =
+    if tool.genodeEnv.isArm    then "include/libc-arm"    else
+    if tool.genodeEnv.isx86_32 then "include/libc-i386"  else
+    if tool.genodeEnv.isx86_64 then "include/libc-amd64" else
+    throw "no libc for ${tool.genodeEnv.system}";
 
-        localIncludes = args.localIncludes or [] ++
-          [ "lib/libc/locale"
-            "lib/libc/include"
-            "lib/libc/stdio"
-            "lib/libc/net"
-            "contrib/gdtoa"
-            "sys"
-          ];
+  compileLibc =
+  args:
+  derivation (tool.genodeEnv.stdAttrs // args // {
+    name = (args.name or "libc")+"-objects";
+    system = builtins.currentSystem;
+    builder = tool.shell;
+    args = [ "-e" ./compile-libc.sh ];
+    inherit (tool) genodeEnv;
 
+    sourceRoot = args.sourceRoot or ports.libc;
+
+    # Use default warning level rather than -Wall because we do
+    # not want to touch
+    # the imported source code to improve build aesthetics
+    # ccWarn = null;
+    # ^ has no effect
+
+    ccFlags = args.ccFlags or [] ++ [
+      # Generate position independent code to allow linking of
+      # static libc code into shared libraries
+      # (define is evaluated by assembler files)
+      "-DPIC"
+
+      # Prevent gcc headers from defining __size_t.
+      # This definition is done in machine/_types.h.
+      "-D__FreeBSD__=8"
+
+      # Prevent gcc-4.4.5 from generating code for the family of
+      # 'sin' and 'cos' functions because the gcc-generated code
+      # would actually call 'sincos' or 'sincosf', which is a GNU
+      # extension, not provided by our libc.
+      "-fno-builtin-sin" "-fno-builtin-cos"
+      "-fno-builtin-sinf" "-fno-builtin-cosf"
+    ]
+    ++ tool.genodeEnv.ccFlags;
+
+    localIncludes = (args.localIncludes or []) ++
+      [ "lib/libc/include" ];
+
+    systemIncludes = (args.systemIncludes or []) ++
+      #map (p: "${ports.libc}/${p}")
+        [ "include/libc"
+          "lib/libc/include"
+          # Add platform-specific libc headers
+          # to standard include search paths
+          libcArchInclude
+        ]
+      ++ [ ./include/libc-genode ];
+  });
+
+  # Function to compile the sub-libraries of our libc.
+  compileSubLibc = args:
+    compileLibc (args // {
+      localIncludes = args.localIncludes or [] ++
+        [ "lib/libc/locale"
+          "lib/libc/include"
+          "lib/libc/stdio"
+          "lib/libc/net"
+          "contrib/gdtoa"
+          "sys"
+          libcArchInclude
+        ];
       });
-    };
+
+ compileCC =
+  attrs:
+  tool.compileCC (attrs // {
+    systemIncludes =
+     (attrs.systemIncludes or []) ++
+      ( import ../base/include { inherit (tool) genodeEnv; }) ++
+      [ ./include ];
+  });
 
   callLibrary' = callLibrary (
-    { inherit genodeEnv libcEnv subLibcEnv; } // ports'
+    { inherit (tool) genodeEnv;
+      inherit compileLibc compileSubLibc compileCC;
+    } // ports'
   );
   importLibrary = path: callLibrary' (import path);
 

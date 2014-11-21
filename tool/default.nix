@@ -8,44 +8,64 @@
 , nixpkgs ? import <nixpkgs> { }
 }:
 
+with builtins;
+
 let tool = rec {
   inherit nixpkgs;
 
   ##
   # Determine if any of the following libs are shared.
   anyShared = libs:
-    let h = builtins.head libs; in
+    let h = head libs; in
     if libs == [] then false else
-      if h.shared or false
-      then true else anyShared (builtins.tail libs);
+    if h.shared or false then true else anyShared (tail libs);
+
+  dropSuffix = suf: str:
+    let
+      strL = stringLength str;
+      sufL = stringLength suf;
+    in
+    if lessThan strL sufL || substring (sub strL sufL) strL str != suf
+    then abort "${str} does not have suffix ${suf}"
+    else substring 0 (sub strL sufL) str;
+
+  ##
+  # Determine if a string has the given suffix.
+  hasSuffix = suf: str:
+    let
+      strL = stringLength str;
+      sufL = stringLength suf;
+    in
+    if lessThan strL sufL then false else
+      substring (sub strL sufL) strL str == suf;
 
   ##
   # Replace substring a with substring b in string s.
   replaceInString =
   a: b: s:
   let
-    al = builtins.stringLength a;
-    bl = builtins.stringLength b;
-    sl = builtins.stringLength s;
+    al = stringLength a;
+    bl = stringLength b;
+    sl = stringLength s;
   in
   if al == 0 then s else
   if sl == 0 then "" else
-  if ((builtins.substring 0 al s) == a) then
-    b+(replaceInString a b (builtins.substring al sl s))
+  if ((substring 0 al s) == a) then
+    b+(replaceInString a b (substring al sl s))
   else
-    (builtins.substring 0 1 s) + (replaceInString a b (builtins.substring 1 sl s));
+    (substring 0 1 s) + (replaceInString a b (substring 1 sl s));
 
   bootImage = import ./boot-image { inherit nixpkgs; };
 
   filterOut = filters: filteree:
-    builtins.filter (e: !(builtins.elem (builtins.baseNameOf e) filters)) filteree;
+    filter (e: !(elem (baseNameOf e) filters)) filteree;
 
   # if anti-quotation was used rather than concatenation,
   # the result would be a string containing a store path,
   # not the original absolute path
   fromDir =
   dir: names:
-  assert builtins.typeOf dir == "path";
+  assert typeOf dir == "path";
   map (name: [ (dir+"/${name}") name ]) names;
 
   fromPath = path: [ [ path (baseNameOf (toString path)) ] ];
@@ -55,7 +75,7 @@ let tool = rec {
   name: contents:
   derivation {
     inherit name contents;
-    system = builtins.currentSystem;
+    system = currentSystem;
     builder = shell;
     PATH="${nixpkgs.coreutils}/bin";
     args = [ "-e" "-c" ''
@@ -66,14 +86,20 @@ let tool = rec {
 
   preparePort = import ./prepare-port { inherit nixpkgs; };
 
+  propagatedIncludes = pkgs:
+    let pkg = head pkgs; in
+    if pkgs == [] then [] else
+    if hasAttr "include" pkg then [ pkg.include ] else []
+    ++ propagatedIncludes (tail pkgs);
+
   shell = nixpkgs.bash + "/bin/sh";
 
-  wildcard = 
+  wildcard =
   path: glob:
   let
     relativePaths = import (derivation {
       name = "files.nix";
-      system = builtins.currentSystem;
+      system = currentSystem;
       builder = shell;
       PATH="${nixpkgs.coreutils}/bin";
       inherit path glob;
@@ -86,39 +112,51 @@ let tool = rec {
   fromGlob =
   dir: glob:
   let
-    dirName = dir.name or "files";
+    dirName = dir.name or baseNameOf (toString dir);
   in
   import (derivation {
-    name = dirName+"-from-glob.nix";
-    system = builtins.currentSystem;
+    name = "${dirName}-glob.nix";
+    system = currentSystem;
     builder = shell;
     args = [ "-e" ./from-glob.sh ];
     #PATH="${nixpkgs.coreutils}/bin";
     inherit dir glob;
   });
 
+  # Generate a list of paths from a path and a shell glob.
+  pathsFromGlob = dir: glob:
+    let path = toString dir; in
+    trace "FIXME: pathsFromGlob causes excessive hashing"
+    import (derivation {
+      name = "${baseNameOf path}-glob.nix";
+      system = currentSystem;
+      builder = shell;
+      args = [ "-e" "-O" "nullglob" ./path-from-glob.sh ];
+      inherit dir glob path;
+    });
+
   ##
   # Merge an attr between two sets.
   mergeAttr =
   name: s1: s2:
   let
-    a1 = builtins.getAttr name s1;
-    a2 = builtins.getAttr name s2;
-    type = builtins.typeOf a1;
+    a1 = getAttr name s1;
+    a2 = getAttr name s2;
+    type = typeOf a1;
   in
-  assert type == (builtins.typeOf a2);
+  assert type == (typeOf a2);
   if type == "set" then mergeSet a1 a2 else
   if type == "list" then a1 ++ a2 else
   if type == "string" then "${a1} ${a2}" else
-  #if type == "int" then builtins.add a1 a2 else
-  abort "cannot merge ${type}s";
+  #if type == "int" then add a1 a2 else
+  abort "cannot merge ${type} ${name} ${toString a1} ${toString a2}";
 
   ##
   # Merge two sets together.
   mergeSet = s1: s2:
-    s1 // s2 // (builtins.listToAttrs (map 
+    s1 // s2 // (listToAttrs (map
       (name: { inherit name; value = mergeAttr name s1 s2; })
-      (builtins.attrNames (builtins.intersectAttrs s1 s2))
+      (attrNames (intersectAttrs s1 s2))
     ));
 
   ##
@@ -126,8 +164,8 @@ let tool = rec {
   mergeSets =
   sets:
   if sets == [] then {} else
-    mergeSet (builtins.head sets) (mergeSets (builtins.tail sets));
-  
+    mergeSet (head sets) (mergeSets (tail sets));
+
   ####
   # from Eelco Dolstra's nix-make
 
@@ -137,19 +175,19 @@ let tool = rec {
     if searchPath == [] then []
     else
       let
-        sp = builtins.head searchPath;
+        sp = head searchPath;
         fn' = sp + "/${fn}";
       in
-      if builtins.pathExists fn' then
+      if pathExists fn' then
         [ { key = fn'; relative = fn; } ]
-      else findFile fn (builtins.tail searchPath);
+      else findFile fn (tail searchPath);
 
   includesOf = main: derivation {
     name =
-      if builtins.typeOf main == "path"
+      if typeOf main == "path"
       then "${baseNameOf (toString main)}-includes"
       else "includes";
-    system = builtins.currentSystem;
+    system = currentSystem;
     builder = "${nixpkgs.perl}/bin/perl";
     args = [ ./find-includes.pl ];
     inherit main;
@@ -157,17 +195,17 @@ let tool = rec {
 
   localIncludesOf = main: derivation {
     name =
-      if builtins.typeOf main == "path"
+      if typeOf main == "path"
       then "${baseNameOf (toString main)}-local-includes"
       else "local-includes";
-    system = builtins.currentSystem;
+    system = currentSystem;
     builder = "${nixpkgs.perl}/bin/perl";
     args = [ ./find-local-includes.pl ];
     inherit main;
   };
 
   findIncludes = main: path:
-    map (x: [ x.key x.relative ]) (builtins.genericClosure {
+    map (x: [ x.key x.relative ]) (genericClosure {
       startSet = [ { key = main; relative = baseNameOf (toString main); } ];
       operator =
         { key, ... }:
@@ -175,14 +213,14 @@ let tool = rec {
           includes = import (includesOf key);
           includesFound =
             nixpkgs.lib.concatMap
-              (fn: findFile fn ([ (builtins.dirOf main) ] ++ path))
+              (fn: findFile fn ([ (dirOf main) ] ++ path))
               includes;
         in includesFound;
     });
 
   findLocalIncludes = main: path:
-    let path' = [ (builtins.dirOf main) ] ++ path; in
-    map (x: [ x.key x.relative ]) (builtins.genericClosure {
+    let path' = [ (dirOf main) ] ++ path; in
+    map (x: [ x.key x.relative ]) (genericClosure {
       startSet = [ { key = main; relative = baseNameOf (toString main); } ];
       operator =
         { key, ... }:
@@ -197,11 +235,11 @@ let tool = rec {
 
     includesSet =
     sources: path:
-    builtins.listToAttrs (
+    listToAttrs (
      map
       ( main:
         { name = "includes_" + (baseNameOf (toString main));
-          value = builtins.tail (findLocalIncludes main path);
+          value = tail (findLocalIncludes main path);
         }
       )
       sources

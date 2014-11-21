@@ -1,10 +1,7 @@
-{ genodeEnv, base, config }:
+{ genodeEnv, compileCC, base, config }:
 
-let
-  pciDir = ../../pci;
-in
-if genodeEnv.isNova then  genodeEnv.mkComponent {
+if genodeEnv.isNova then genodeEnv.mkComponent {
   name = "pci_device_pd";
   libs = [ base config ];
-  sources = genodeEnv.fromPath ./main.cc;
+  objects = compileCC { src = ./main.cc; };
 } else null

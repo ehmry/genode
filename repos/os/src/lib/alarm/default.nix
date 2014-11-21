@@ -1,4 +1,4 @@
-{ genodeEnv, timer }:
-genodeEnv.mkLibrary { 
-  name = "alarm"; sources = genodeEnv.fromPath ./alarm.cc;
+{ genodeEnv, compileCC }:
+genodeEnv.mkLibrary {
+  name = "alarm"; objects = compileCC { src = ./alarm.cc; };
 }

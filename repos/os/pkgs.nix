@@ -10,22 +10,19 @@ let
 
   importInclude = p: import p { inherit (tool) genodeEnv; };
 
-  # Prepare genodeEnv.
-  genodeEnv =  tool.genodeEnvAdapters.addSystemIncludes
-    tool.genodeEnv (
-      (importInclude ../base/include) ++ (importInclude ./include)
-    );
-
   compileCC =
   attrs:
   tool.compileCC (attrs // {
     systemIncludes =
      (attrs.systemIncludes or []) ++
-      (importInclude ../base/include) ++
-      (import ./include { inherit (tool) genodeEnv; });
+     (importInclude ../base/include) ++
+     (import ./include { inherit (tool) genodeEnv; });
   });
 
-  callComponent' = callComponent { inherit genodeEnv compileCC; };
+  callComponent' = callComponent {
+    inherit (tool) genodeEnv transformBinary;
+    inherit compileCC;
+  };
   importComponent = path: callComponent' (import path);
 
 in
@@ -42,8 +39,13 @@ in
   server = { nitpicker = importComponent ./src/server/nitpicker; };
 
   test =
-    { signal = importComponent ./src/test/signal;
-      timer  = importComponent ./src/test/timer;
+    { alarm   = importComponent ./src/test/alarm;
+      bomb    = importComponent ./src/test/bomb;
+      input   = importComponent ./src/test/input;
+      pci     = importComponent ./src/test/pci;
+      signal  = importComponent ./src/test/signal;
+      testnit = importComponent ./src/test/nitpicker;
+      timer   = importComponent ./src/test/timer;
     };
 
   init = importComponent ./src/init;

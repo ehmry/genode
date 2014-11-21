@@ -1,19 +1,18 @@
-{ tool }:
-{ }:
+{ genodeEnv, compileC }:
 
-with tool;
-
-buildLibrary {
+let
+  compileC' = src: compileC {
+    inherit src;
+    localIncludes = [ ./contrib ../../../include/libz_static ];
+     systemIncludes = [ ./contrib ../../../include/mini_c ];
+  };
+in
+genodeEnv.mkLibrary {
   name = "libz_static";
-  sources = fromDir ./contrib
+  objects = map (fn: compileC' (./contrib + "/${fn}"))
     [ "adler32.c"  "compress.c" "crc32.c"   "deflate.c"
       "gzio.c"     "infback.c"  "inffast.c" "inflate.c"
       "inftrees.c" "trees.c"    "uncompr.c" "zutil.c"
     ];
-
-  includeDirs =
-    [ ./contrib
-      ../../../include/libz_static
-      ../../../include/mini_c
-    ];
+  #propagatedIncludes = [ ../../../include/libz_static ];
 }

@@ -1,12 +1,16 @@
-{ subLibcEnv }:
-subLibcEnv.mkLibrary {
+{ genodeEnv, compileSubLibc }:
+
+genodeEnv.mkLibrary {
   name = "libc-gdtoa";
-  sourceSh = [ "contrib/gdtoa/*.c" "lib/libc/gdtoa/*.c" ];
-  filter = (
-    map (fn: "contrib/gdtoa/${fn}")
-      [ "arithchk.c" "strtodnrp.c" "qnan.c" ]
-    ++
-    map (fn: "lib/libc/gdtoa/${fn}")
-      [ "machdep_ldisQ.c" "machdep_ldisx.c" ]
-  );
+  externalObjects = compileSubLibc {
+    sources = [ "contrib/gdtoa/*.c" "lib/libc/gdtoa/*.c" ];
+    filter =
+      (map (fn: "contrib/gdtoa/${fn}")
+        [ "arithchk.c" "strtodnrp.c" "qnan.c" ]
+      ) ++
+      (map (fn: "lib/libc/gdtoa/${fn}")
+        [ "machdep_ldisQ.c" "machdep_ldisx.c" ]
+      );
+    localIncludes = [ "include/libc" ];
+  };
 }

@@ -1,13 +1,7 @@
-/*
- * \author Emery Hemingway
- * \date   2014-08-12
- */
+{ genodeEnv, compileCC, base, alarm }:
 
-{ build, base, os }:
-
-build.test {
+genodeEnv.mkComponent {
   name = "test-alarm";
-  sources = [ ./main.cc ];
-  libs = [ base.lib.base os.lib.alarm ];
-  includeDirs = [ os.includeDir ] ++ base.includeDirs;
+  objects = compileCC { src = ./main.cc; };
+  libs = [ base alarm ];
 }

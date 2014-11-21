@@ -1,16 +1,26 @@
-{ tool }:
-{ }:
+{ genodeEnv, compileC, compileCC }:
 
-tool.buildLibrary {
+let
+  compileCC' = src: compileCC {
+    inherit src;
+    systemIncludes = [ ../../../include/mini_c ];
+  };
+in
+genodeEnv.mkLibrary {
   name = "mini_c";
-  stdinc = true;
-  sources =
-    [ ./abort.cc       ./atol.cc
-      ./malloc_free.cc ./memcmp.cc
-      ./memset.cc      ./mini_c.c
-      ./printf.cc      ./snprintf.cc
-      ./strlen.cc      ./strtod.cc
-      ./strtol.cc      ./vsnprintf.cc
+  objects =
+    (map compileCC'
+      [ ./abort.cc       ./atol.cc
+        ./malloc_free.cc ./memcmp.cc
+        ./memset.cc
+        ./printf.cc      ./snprintf.cc
+        ./strlen.cc      ./strtod.cc
+        ./strtol.cc      ./vsnprintf.cc
+      ]
+    ) ++
+    [ (compileC {
+        src = ./mini_c.c;
+        systemIncludes = [ ../../../include/mini_c ];
+      })
     ];
-  includeDirs = [ ../../../include/mini_c ];
 }

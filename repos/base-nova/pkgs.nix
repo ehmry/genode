@@ -10,4 +10,6 @@ rec {
 
   hypervisor = importBaseComponent ./src/kernel;
   kernel = hypervisor;
+
+  test.cap_integrity = importBaseComponent ./src/test/cap_integrity;
 }

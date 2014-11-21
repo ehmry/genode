@@ -37,21 +37,20 @@ run {
 
     run_genode_until "test done.*\n" 60
 
-    grep_output {^\[init -\> test\]}
+    grep_output {^\[init -\> test\] FPU}
 
-    #compare_output_to {
-    # 	[init -> test] FPU user started
-    #	[init -> test] FPU user started
-    #	[init -> test] FPU user started
-    #	[init -> test] FPU user started
-    #	[init -> test] FPU user started
-    #	[init -> test] FPU user started
-    #	[init -> test] FPU user started
-    #	[init -> test] FPU user started
-    #	[init -> test] FPU user started
-    #	[init -> test] FPU user started
-    #	[init -> test] test done
-    #}
+    compare_output_to {
+     	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    	[init -> test] FPU user started
+    }
   '';
 
 }

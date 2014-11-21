@@ -1,9 +1,7 @@
 # based on Eelco Dostra's nix-make
 source $genodeEnv/setup
 
-mainName=$(stripHash $main)
-
-MSG_COMP $mainName
+MSG_COMP $name
 
 # Turn $includes into an array.
 localIncludes=($localIncludes)
@@ -64,20 +62,16 @@ for ((n = 0; n < ${#localIncludes[*]}; n += 2)); do
         fi
     done
     IFS="$savedIFS"
-    
+
     ln -sf $source $prefix$target
 done
 
-# Create a symlink to the main file.
-if ! test "$(readlink $prefix$mainName)" = $main; then
-    ln -s $main $prefix$mainName
+srcName=$(stripHash $src)
+
+# Create a symlink to the source file.
+if ! test "$(readlink $prefix$srcName)" = $src; then
+    ln -s $src $prefix$srcName
 fi
-
-base="${mainName%.*}"
-base="${base//./_}"
-
-file_opt_var=ccOpt_$base
-ccFlags="$ccFlags ${!file_opt_var}"
 
 includeOpts="-I."
 for i in $systemIncludes $nativeIncludePaths
@@ -86,4 +80,4 @@ done
 
 test "$prefix" && cd $prefix
 
-VERBOSE $cc $extraFlags $ccFlags $ccOpt $includeOpts -c $src -o $out
+VERBOSE $cc $extraFlags $ccFlags $includeOpts -c $src -o $out

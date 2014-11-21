@@ -1,8 +1,7 @@
-{ build, base }:
+{ genodeEnv, compileCC, lx_hybrid }:
 
 build.test {
   name = "test-lx_hybrid_errno";
-  libs = [ base.lib.lx_hybrid ];
-  sources = [ ./main.cc ];
-  includeDirs = base.includeDirs;
+  libs = [ lx_hybrid ];
+  objects = compileCC { src = ./main.cc; };
 }

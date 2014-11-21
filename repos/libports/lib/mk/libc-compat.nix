@@ -1,5 +1,8 @@
-{ subLibcEnv, libcSrc }:
+{ genodeEnv, compileSubLibc }:
 
-subLibcEnv.mkLibrary {
-  name = "libc-compat"; sourceSh = [ "lib/libc/compat-43/*.c" ];
+genodeEnv.mkLibrary {
+  name = "libc-compat";
+  externalObjets = compileSubLibc {
+    sources = [ "lib/libc/compat-43/*.c" ];
+  };
 }

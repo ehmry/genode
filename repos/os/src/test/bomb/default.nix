@@ -1,13 +1,7 @@
-/*
- * \author Emery Hemingway
- * \date   2014-08-12
- */
+{ genodeEnv, compileCC, base, config }:
 
-{ build, base, os }:
-
-build.test {
+genodeEnv.mkComponent {
   name = "bomb";
-  libs = [ base.lib.base os.lib.config ];
-  sources = [ ./main.cc ];
-  includeDirs = [ os.includeDir ] ++ base.includeDirs;
+  libs = [ base config ];
+  objects = compileCC { src = ./main.cc; };
 }
