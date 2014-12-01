@@ -331,40 +331,11 @@ unpackPhase() {
         unpackFile $i
     done
 
-    # Find the source directory.
-    if [ -n "$setSourceRoot" ]; then
-        runHook setSourceRoot
-    elif [ -z "$sourceRoot" ]; then
-        sourceRoot=
-        for i in *; do
-            if [ -d "$i" ]; then
-                case $dirsBefore in
-                    *\ $i\ *)
-                        ;;
-                    *)
-                        if [ -n "$sourceRoot" ]; then
-                            sourceRoot=$NIX_BUILD_TOP
-                            break
-                        fi
-                        sourceRoot="$i"
-                        ;;
-                esac
-            fi
-        done
-    fi
-
-    if [ -z "$sourceRoot" ]; then
-        echo "unpacker appears to have produced no directories"
-        exit 1
-    fi
-
-    echo "source root is $sourceRoot"
-
     # By default, add write permission to the sources.  This is often
     # necessary when sources have been copied from other store
     # locations.
     if [ "$dontMakeSourcesWritable" != 1 ]; then
-        chmod -R u+w "$sourceRoot"
+        chmod -R u+w ./
     fi
 
     runHook postUnpack

@@ -1,8 +1,7 @@
 { preparePort, fetchurl }:
 
 let
-  version = "1.12.0"; 
-  # LICENSE := MIT
+  version = "1.12.0";
 in
 preparePort {
   name = "x86emu-${version}";
@@ -15,6 +14,11 @@ preparePort {
   tarFlags = [ "--strip-components=4" "xorg-server-${version}/hw/xfree86/x86emu" ];
 
   patchPhase = ''
-    sed -i 's/private;/private_ptr;/g' regs.h
+    sed -i 's/private;/private_ptr;/g' x86emu/regs.h
+    mkdir -p include/x86emu/x86emu
+    mv x86emu.h include/x86emu/
+    mv x86emu/regs.h x86emu/types.h include/x86emu/x86emu
   '';
+
+  #meta.license = "MIT";
 }

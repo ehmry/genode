@@ -1,9 +1,10 @@
-{ build }:
-{ base, blit }:
+{ genodeEnv, compileCC, transformBinary, base, blit }:
 
-build.component {
+genodeEnv.mkComponent {
   name = "nitlog";
   libs = [ base blit ];
-  sources  = [ ./main.cc ];
-  binaries = [ ./mono.tff ];
+  objects =
+    [ (compileCC { src = ./main.cc;})
+      (transformBinary ./mono.tff)
+    ];
 }

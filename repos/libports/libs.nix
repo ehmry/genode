@@ -107,9 +107,18 @@ let
       [ ./include ];
   });
 
+ compileCPort =
+  attrs:
+  tool.compileCPort (attrs // {
+    systemIncludes =
+     (attrs.systemIncludes or []) ++
+      ( import ../base/include { inherit (tool) genodeEnv; }) ++
+      [ ./include ];
+  });
+
   callLibrary' = callLibrary (
     { inherit (tool) genodeEnv;
-      inherit compileLibc compileSubLibc compileCC;
+      inherit compileLibc compileSubLibc compileCC compileCPort;
     } // ports'
   );
   importLibrary = path: callLibrary' (import path);
@@ -136,4 +145,6 @@ in
 
   test-ldso_lib_1 = importLibrary ./lib/mk/test-ldso_lib_1.nix;
   test-ldso_lib_2 = importLibrary ./lib/mk/test-ldso_lib_2.nix;
+
+  x86emu = importLibrary ./lib/mk/x86emu.nix;
 }

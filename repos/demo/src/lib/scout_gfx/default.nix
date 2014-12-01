@@ -2,5 +2,5 @@
 
 genodeEnv.mkLibrary {
   name = "scout_gfx";
-  object = compileCC { src = ./sky_texture_painter.cc; };
+  objects = compileCC { src = ./sky_texture_painter.cc; };
 }

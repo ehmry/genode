@@ -1,5 +1,6 @@
-{ genodeEnv }:
+{ genodeEnv, compileCC }:
 
-genodeEnv.mkLibrary { 
-  name = "server"; sources = genodeEnv.fromPath ./server.cc;
+genodeEnv.mkLibrary {
+  name = "server";
+  objects = compileCC { src = ./server.cc; };
 }

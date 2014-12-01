@@ -27,6 +27,11 @@ let
 
 in
 {
+  app =
+    { pointer    = importComponent ./src/app/pointer;
+      status_bar = importComponent ./src/app/status_bar;
+    };
+
   driver =
     { acpi          = importComponent ./src/drivers/acpi;
       input =
@@ -36,18 +41,22 @@ in
       timer         = importComponent ./src/drivers/timer;
     };
 
-  server = { nitpicker = importComponent ./src/server/nitpicker; };
+  server =
+    { report_rom = importComponent ./src/server/report_rom;
+      nitpicker  = importComponent ./src/server/nitpicker;
+    };
 
   test =
-    { alarm   = importComponent ./src/test/alarm;
-      bomb    = importComponent ./src/test/bomb;
-      input   = importComponent ./src/test/input;
-      pci     = importComponent ./src/test/pci;
-      signal  = importComponent ./src/test/signal;
-      testnit = importComponent ./src/test/nitpicker;
-      timer   = importComponent ./src/test/timer;
+    { alarm       = importComponent ./src/test/alarm;
+      bomb        = importComponent ./src/test/bomb;
+      framebuffer = importComponent ./src/test/framebuffer;
+      input       = importComponent ./src/test/input;
+      nitpicker   = importComponent ./src/test/nitpicker;
+      pci         = importComponent ./src/test/pci;
+      signal      = importComponent ./src/test/signal;
+      testnit     = importComponent ./src/test/nitpicker;
+      timer       = importComponent ./src/test/timer;
     };
 
   init = importComponent ./src/init;
-
 }

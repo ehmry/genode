@@ -310,7 +310,7 @@ rec {
       if l == 0 then "" else
         (if c == "." || c == "-" then "_" else c) +
         fixName (builtins.substring 1 l s);
-    symbolName = fixName s;
+    symbolName = "_binary_" + fixName s;
   in
   derivation {
     name =
@@ -324,5 +324,18 @@ rec {
     inherit genodeEnv binary symbolName;
     inherit (stdAttrs) as asOpt;
   };
+
+  # Compile objects from a port derivation.
+  compileCPort =
+  { name ? "objects", ... } @ args:
+  derivation (
+    { inherit name genodeEnv;
+      inherit (stdAttrs) cc ccFlags nativeIncludePaths;
+    } // args // {
+      system = builtins.currentSystem;
+      builder = tool.shell;
+      args = [ "-e" ./compile-c-port.sh ];
+    }
+  );
 
 }

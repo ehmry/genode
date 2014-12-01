@@ -45,6 +45,8 @@ let
 
 in
 {
+  driver.framebuffer = importComponent ./src/drivers/framebuffer/vesa;
+
   test =
     { ldso = importComponent ./src/test/ldso;
       libc = importComponent ./src/test/libc;

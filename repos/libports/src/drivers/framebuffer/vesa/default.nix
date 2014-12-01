@@ -1,12 +1,13 @@
-{ build, compileCC, base, x86emu, blit, config }:
+{ genodeEnv, compileCC, base, x86emu, blit, config }:
 
 let
-  compileCC = src: compileCC {
+  compileCC' = src: compileCC {
     inherit src;
-    includeDirs = [ ./include ../../../include/x86emu ]
+    systemIncludes =
+      [ ./include x86emu.include ];
   };
 in
-build.driver {
+genodeEnv.mkComponent {
   name = "fb_drv";
   libs = [ x86emu blit base config ];
   objects = map compileCC'
