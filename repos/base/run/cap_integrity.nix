@@ -32,14 +32,15 @@ run {
   ];
 
   testScript = ''
-append qemu_args "-nographic -m 64"
+    append qemu_args "-nographic -m 64"
 
-# increase expect buffer size, since there might be many log messages
-match_max -d 100000
+    # increase expect buffer size, since there might be many log messages
+    match_max -d 100000
 
-run_genode_until {child exited with exit value 0.*} 60
+    run_genode_until {child "test-cap_integrity" exited with exit value 0.*\n} 20
 
-grep_output {\[init\] test message}
-compare_output_to { }
-'';
+
+    grep_output {\[init\] test message}
+    compare_output_to { }
+  '';
 }

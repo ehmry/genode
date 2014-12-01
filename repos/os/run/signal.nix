@@ -13,7 +13,7 @@ run {
   contents = [
     { target = "/"; source = driver.timer; }
     { target = "/"; source = test.signal; }
-    { target = "/config"; 
+    { target = "/config";
       source = builtins.toFile "config" ''
     	<config>
 		<parent-provides>
@@ -46,9 +46,7 @@ run {
 
   testScript = ''
     append qemu_args "-nographic -m 64"
-
-    run_genode_until {child exited with exit value 0.*} 200
-
+    run_genode_until {child "test-signal" exited with exit value 0.*} 200
     puts "Test succeeded"
   '';
 }

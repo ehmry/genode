@@ -5,7 +5,7 @@ genodeEnv.mkLibrary {
   shared = true;
   libs = [ test-ldso_lib_2 ldso-startup ];
   objects = compileCC {
-    src = ../../src/test/ldso/lib_1.cc;
-    localIncludes = [ ../../src/test/ldso/include ];
+    src = ./lib_1.cc;
+    localIncludes = [ ./include ];
   };
 }

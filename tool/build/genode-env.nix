@@ -54,7 +54,7 @@ let
         ldScriptsDynamic =
           attrs.ldScriptsDynamic or
           spec.ldScriptsDynamic or
-          [ ../../repos/os/src/platform/genode_dyn.ld ];
+          [ ../../repos/base/src/platform/genode_dyn.ld ];
 
       in
       derivation (stdAttrs // attrs // {

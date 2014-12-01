@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC }:
+{ genodeEnv, compileCC, compileS, syscall }:
 
 genodeEnv.mkLibrary {
   name = "ldso-startup";

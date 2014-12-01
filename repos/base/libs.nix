@@ -33,6 +33,8 @@ let
 
 in
 impl // {
-  cxx     = importBaseLibrary ./src/base/cxx;
-  startup = importBaseLibrary ./lib/mk/startup.nix;
+  cxx          = importBaseLibrary ./src/base/cxx;
+  ld           = importBaseLibrary ./src/lib/ldso;
+  ldso-startup = importBaseLibrary ./src/lib/ldso/startup;
+  startup      = importBaseLibrary ./lib/mk/startup.nix;
 }

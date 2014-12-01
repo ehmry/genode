@@ -40,7 +40,7 @@ run {
     ''
        append qemu_args "-nographic -m 64"
 
-       run_genode_until {child exited with exit value 0.*} 10
+       run_genode_until {child "test-rm_fault" exited with exit value 0.*} 10
 
        puts "Test succeeded"
     '';

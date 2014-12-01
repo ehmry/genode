@@ -26,7 +26,7 @@ run {
   testScript = ''
 append qemu_args "-nographic -m 64"
 
-run_genode_until {child exited with exit value 0} 15
+run_genode_until {child "test-new_delete" exited with exit value 0.*\n} 15
 
 grep_output  {^\[init -> test-new_delete\]}
 
@@ -80,7 +80,5 @@ compare_output_to {
 	[init -> test-new_delete]   ~A
 	[init -> test-new_delete] exception caught
 }
-
-puts "Test succeeded"
   '';
 }

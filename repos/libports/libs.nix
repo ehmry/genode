@@ -143,8 +143,9 @@ in
   #libpng = importLibrary ./lib/mk/libpng.nix;
   #zlib   = importLibrary ./lib/mk/zlib.nix;
 
-  test-ldso_lib_1 = importLibrary ./lib/mk/test-ldso_lib_1.nix;
-  test-ldso_lib_2 = importLibrary ./lib/mk/test-ldso_lib_2.nix;
+  test-ldso_lib_1  = importLibrary ./src/test/ldso/lib_1.nix;
+  test-ldso_lib_2  = importLibrary ./src/test/ldso/lib_2.nix;
+  test-ldso_lib_dl = importLibrary ./src/test/ldso/lib_dl.nix;
 
   x86emu = importLibrary ./lib/mk/x86emu.nix;
 }

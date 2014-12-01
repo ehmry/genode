@@ -72,10 +72,10 @@ let
 
 
   # Linker script for dynamically linked programs
-  ldScriptDyn = ../../repos/os/src/platform/genode_dyn.ld;
+  ldScriptDyn = ../../repos/base/src/platform/genode_dyn.ld;
 
   # Linker script for shared libraries
-  ldScriptSo  = ../../repos/os/src/platform/genode_rel.ld;
+  ldScriptSo  = ../../repos/base/src/platform/genode_rel.ld;
 
   staticLibraryLinkPhase = ''
     echo -e "    MERGE    $name"
@@ -111,7 +111,7 @@ let
     mkdir -p $out
 
     VERBOSE $ld -o $out/$name.lib.so -shared --eh-frame-hdr \
-        $ldOpt $ldFlags \
+        $extraLdFlags $ldOpt $ldFlags \
 	-T $ldScriptSo \
         --entry=$entryPoint \
 	--whole-archive \
@@ -212,7 +212,7 @@ let
           if anyShared' then
             # Add a list of symbols that shall
             # always be added to the dynsym section
-            [ "--dynamic-list=${../../repos/os/src/platform/genode_dyn.dl}"
+            [ "--dynamic-list=${../../repos/base/src/platform/genode_dyn.dl}"
               # Assume that 'dynamicLinker' has been added to attrs.
               "--dynamic-linker=${attrs.dynamicLinker}"
               "--eh-frame-hdr"
