@@ -1,21 +1,19 @@
 { stdenv, fetchurl, patchelf, glibc, zlib, gcc }:
 
-let genodeVersion = "12.11"; in
+let genodeVersion = "14.11"; in
 stdenv.mkDerivation rec {
   name = "genode-toolchain-${genodeVersion}";
-  version = "4.7.2";
-
-  #outputs = [ "out" "arm" "x86" ];
+  version = "4.7.4";
 
   src = if stdenv.isi686 then
     fetchurl {
       url = "mirror://sourceforge/genode/genode-toolchain/${genodeVersion}/${name}-x86_32.tar.bz2";
-      sha256 = "06z1nwismcn866wb0vbg9k1r1fina66lvbfdggj00b4qdz08df2q";
+      sha256 = "04rvsbmm7jlk7gkja0sag7m0pb996pzb02fxmx9dkksxn7cg2v0q";
     } else
     if stdenv.isx86_64 then
     fetchurl {
       url = "mirror://sourceforge/genode/genode-toolchain/${genodeVersion}/${name}-x86_64.tar.bz2";
-      sha256 = "03l91qfiz7a1wnx577acgfkacrzr162a175kdh3i1jjllqyvnixj";
+      sha256 = "0xjwrvnlmcq3p8v4mdj20gwba1qd1bk4khs1q1cbrzl24vqa1l85";
     }
     else abort "no toolchain for ${stdenv.system}";
 
@@ -55,7 +53,7 @@ stdenv.mkDerivation rec {
        echo new interpreter $interp does not exist,
        echo cannot patch binaries
        exit 1
-    fi 
+    fi
 
     for f in $(find $out); do
         if [ -f "$f" ] && patchelf "$f" 2> /dev/null; then
