@@ -249,6 +249,11 @@ typedef uint8_t       u_int8_t;
 typedef uint16_t      u_int16_t;
 typedef uint32_t      u_int32_t;
 
+/*
+ * Needed by 'dwc_otg/dwc_otg/dwc_otg_fiq_fsm.h'
+ */
+typedef unsigned short ushort;
+
 
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 #define BITS_TO_LONGS(nr)       DIV_ROUND_UP(nr, 8 * sizeof(long))
@@ -289,6 +294,22 @@ typedef uint32_t      u_int32_t;
 #undef __unused
 
 #define __printf(a, b) __attribute__((format(printf, a, b)))
+
+
+/*********************
+ ** linux/jiffies.h **
+ *********************/
+
+/* we directly map 'jiffies' to 'dde_kit_timer_ticks' */
+#define jiffies dde_kit_timer_ticks
+
+extern volatile unsigned long jiffies;
+unsigned long msecs_to_jiffies(const unsigned int m);
+unsigned int jiffies_to_msecs(const unsigned long j);
+long time_after(long a, long b);
+long time_after_eq(long a, long b);
+long time_before(long a, long b);
+
 
 /***********************
  ** linux/irqreturn.h **
@@ -689,6 +710,7 @@ void print_hex_dump(const char *level, const char *prefix_str,
 #define pr_warn pr_warning
 
 bool printk_ratelimit();
+bool printk_ratelimited();
 bool printk_timed_ratelimit(unsigned long *, unsigned int);
 
 struct va_format
@@ -971,21 +993,6 @@ void down_write(struct rw_semaphore *sem);
 void up_write(struct rw_semaphore *sem);
 
 #define __RWSEM_INITIALIZER(name) { 0 }
-
-
-/*********************
- ** linux/jiffies.h **
- *********************/
-
-/*
- * XXX check how the jiffies variable is used
- */
-extern volatile unsigned long jiffies;
-unsigned long msecs_to_jiffies(const unsigned int m);
-unsigned int jiffies_to_msecs(const unsigned long j);
-long time_after(long a, long b);
-long time_after_eq(long a, long b);
-long time_before(long a, long b);
 
 
 /******************
@@ -3859,6 +3866,7 @@ struct pt_regs { unsigned long dummy; };
 #define ARM_r8 dummy
 #define ARM_r9 dummy
 #define ARM_sp dummy
+#define ARM_fp dummy
 
 
 /************************

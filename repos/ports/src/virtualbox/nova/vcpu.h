@@ -45,6 +45,10 @@
 /* LibC includes */
 #include <setjmp.h>
 
+#include <VBox/vmm/rem.h>
+
+static bool debug_map_memory = false;
+
 /*
  * VirtualBox stores segment attributes in Intel format using a 32-bit
  * value. NOVA represents the attributes in packet format using a 16-bit
@@ -66,14 +70,16 @@ static inline Genode::uint32_t sel_ar_conv_from_nova(Genode::uint16_t v)
  * Used to map mmio memory to VM
  */
 extern "C" int MMIO2_MAPPED_SYNC(PVM pVM, RTGCPHYS GCPhys, size_t cbWrite,
-                                 void **ppv);
+                                 void **ppv, Genode::Flexpage_iterator &fli,
+                                 bool &writeable);
 
 
 class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 {
 	private:
 
-		X86FXSTATE _fpu_state __attribute__((aligned(0x10)));
+		X86FXSTATE _guest_fpu_state __attribute__((aligned(0x10)));
+		X86FXSTATE _emt_fpu_state __attribute__((aligned(0x10)));
 
 		Genode::Cap_connection _cap_connection;
 		Vmm::Vcpu_other_pd     _vcpu;
@@ -107,6 +113,16 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 			INTERRUPT_STATE_NONE  = 0U,
 		};
 
+		/*
+		 * 'longjmp()' restores some FPU registers saved by 'setjmp()',
+		 * so we need to save the guest FPU state before calling 'longjmp()'
+		 */
+		__attribute__((noreturn)) void _fpu_save_and_longjmp()
+		{
+			fpu_save(reinterpret_cast<char *>(&_guest_fpu_state));
+			longjmp(_env, 1);
+		}
+
 	protected:
 
 		struct {
@@ -120,7 +136,10 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 		void *   _stack_reply;
 		jmp_buf  _env;
 
-		void switch_to_hw(PCPUMCTX pCtx) {
+		bool     _last_exit_was_recall;
+
+		void switch_to_hw()
+		{
 			unsigned long value;
 
 			if (!setjmp(_env)) {
@@ -128,7 +147,6 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 				Nova::reply(_stack_reply);
 			}
 		}
-
 
 		__attribute__((noreturn)) void _default_handler()
 		{
@@ -138,7 +156,7 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 			Assert(!(utcb->inj_info & IRQ_INJ_VALID_MASK));
 
 			/* go back to re-compiler */
-			longjmp(_env, 1);
+			_fpu_save_and_longjmp();
 		}
 
 		__attribute__((noreturn)) void _recall_handler()
@@ -146,26 +164,31 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 			Nova::Utcb * utcb = reinterpret_cast<Nova::Utcb *>(Thread_base::utcb());
 
 			Assert(utcb->actv_state == ACTIVITY_STATE_ACTIVE);
+			if (utcb->intr_state != INTERRUPT_STATE_NONE)
+				Vmm::printf("intr state %x %x\n", utcb->intr_state, utcb->intr_state & 0xF);
+
 			Assert(utcb->intr_state == INTERRUPT_STATE_NONE);
 
 			if (utcb->inj_info & IRQ_INJ_VALID_MASK) {
 				Assert(utcb->flags & X86_EFL_IF);
-
+/*
 				if (!continue_hw_accelerated(utcb))
 					Vmm::printf("WARNING - recall ignored during IRQ delivery\n");
-
+*/
 				/* got recall during irq injection and X86_EFL_IF set for
 				 * delivery of IRQ - just continue */
 				Nova::reply(_stack_reply);
 			}
 
 			/* are we forced to go back to emulation mode ? */
-			if (!continue_hw_accelerated(utcb))
+			if (!continue_hw_accelerated(utcb)) {
+				_last_exit_was_recall = true;
 				/* go back to emulation mode */
-				longjmp(_env, 1);
+				_fpu_save_and_longjmp();
+			}
 
 			/* check whether we have to request irq injection window */
-			utcb->mtd = 0;
+			utcb->mtd = Nova::Mtd::FPU;
 			if (check_to_request_irq_window(utcb, _current_vcpu)) {
 				_irq_win = true;
 				Nova::reply(_stack_reply);
@@ -189,6 +212,9 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 			Assert(utcb->actv_state == ACTIVITY_STATE_ACTIVE);
 			Assert(utcb->intr_state == INTERRUPT_STATE_NONE);
 
+			if (utcb->inj_info & IRQ_INJ_VALID_MASK)
+				Vmm::printf("inj_info %x\n", utcb->inj_info);
+
 			Assert(!(utcb->inj_info & IRQ_INJ_VALID_MASK));
 
 			if (unmap) {
@@ -198,6 +224,7 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 
 			enum { MAP_SIZE = 0x1000UL };
 
+			bool writeable = true;
 			Flexpage_iterator fli;
 			void *pv = guest_memory()->lookup_ram(reason, MAP_SIZE, fli);
 
@@ -206,28 +233,26 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 				 * Check whether this is some mmio memory provided by VMM
 				 * we can map, e.g. VMMDev memory or framebuffer currently.
 				 */
-				int res = MMIO2_MAPPED_SYNC(_current_vm, reason, MAP_SIZE, &pv);
-				if (pv && (res == VINF_SUCCESS))
-					fli = Genode::Flexpage_iterator((addr_t)pv, MAP_SIZE,
-					                                reason, MAP_SIZE, reason);
-				else
+				int res = MMIO2_MAPPED_SYNC(_current_vm, reason, MAP_SIZE, &pv,
+				                            fli, writeable);
+				if (res != VINF_SUCCESS)
 					pv = 0;
 			}
 
 			/* emulator has to take over if fault region is not ram */	
 			if (!pv)
-				longjmp(_env, 1);
+				_fpu_save_and_longjmp();
 
-			/* fault region is ram - so map it */
-			enum {
-				USER_PD = false, GUEST_PGT = true,
-				READABLE = true, WRITEABLE = true, EXECUTABLE = true
-			};
-			Rights const permission(READABLE, WRITEABLE, EXECUTABLE);
-
-			/* prepare utcb */
+			/* fault region can be mapped - prepare utcb */
 			utcb->set_msg_word(0);
-			utcb->mtd = 0;
+			utcb->mtd = Mtd::FPU;
+			enum {
+				USER_PD   = false, GUEST_PGT = true,
+				READABLE  = true, EXECUTABLE = true
+			};
+
+			Rights permission(READABLE, writeable, EXECUTABLE);
+
 
 			/* add map items until no space is left on utcb anymore */
 			bool res;
@@ -246,6 +271,11 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 				Crd crd  = Mem_crd(flexpage.addr >> 12, flexpage.log2_order - 12,
 				                   permission);
 				res = utcb->append_item(crd, flexpage.hotspot, USER_PD, GUEST_PGT);
+
+				if (debug_map_memory)
+					Vmm::printf("map guest mem %p+%x -> %lx - reason %lx\n",
+					            flexpage.addr, 1UL << flexpage.log2_order,
+					            flexpage.hotspot, reason);
 			} while (res);
 
 			Nova::reply(_stack_reply);
@@ -320,7 +350,7 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 				utcb->gdtr.limit  = pCtx->gdtr.cbGdt;
 				utcb->gdtr.base   = pCtx->gdtr.pGdt;
 
-			Assert(!(VMCPU_FF_ISSET(pVCpu, VMCPU_FF_INHIBIT_INTERRUPTS)));
+			Assert(!(VMCPU_FF_IS_SET(pVCpu, VMCPU_FF_INHIBIT_INTERRUPTS)));
 
 			return true;
 		}
@@ -394,8 +424,8 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 		inline bool check_to_request_irq_window(Nova::Utcb * utcb, PVMCPU pVCpu)
 		{
 			if (!TRPMHasTrap(pVCpu) &&
-				!VMCPU_FF_ISPENDING(pVCpu, (VMCPU_FF_INTERRUPT_APIC |
-				                            VMCPU_FF_INTERRUPT_PIC)))
+				!VMCPU_FF_IS_PENDING(pVCpu, (VMCPU_FF_INTERRUPT_APIC |
+				                             VMCPU_FF_INTERRUPT_PIC)))
 				return false;
 
 			unsigned vector = 0;
@@ -414,7 +444,7 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 
 			Assert(utcb->intr_state == INTERRUPT_STATE_NONE);
 			Assert(utcb->flags & X86_EFL_IF);
-			Assert(!VMCPU_FF_ISSET(pVCpu, VMCPU_FF_INHIBIT_INTERRUPTS));
+			Assert(!VMCPU_FF_IS_SET(pVCpu, VMCPU_FF_INHIBIT_INTERRUPTS));
 			Assert(!(utcb->inj_info & IRQ_INJ_VALID_MASK));
 
 			Assert(_irq_win);
@@ -422,10 +452,10 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 
 			if (!TRPMHasTrap(pVCpu)) {
 
-				bool res = VMCPU_FF_TESTANDCLEAR(pVCpu, VMCPU_FF_INTERRUPT_NMI);
+				bool res = VMCPU_FF_TEST_AND_CLEAR(pVCpu, VMCPU_FF_INTERRUPT_NMI);
 				Assert(!res);
 
-				if (VMCPU_FF_ISPENDING(pVCpu, (VMCPU_FF_INTERRUPT_APIC |
+				if (VMCPU_FF_IS_PENDING(pVCpu, (VMCPU_FF_INTERRUPT_APIC |
 				                               VMCPU_FF_INTERRUPT_PIC))) {
 
 					uint8_t irq;
@@ -443,26 +473,21 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 			 */
 			Assert(TRPMHasTrap(pVCpu));
 
-			#ifdef VBOX_STRICT
-			if (TRPMHasTrap(pVCpu)) {
-				uint8_t     u8Vector;
-				int const rc = TRPMQueryTrapAll(pVCpu, &u8Vector, 0, 0, 0);
-				AssertRC(rc);
-			}
-			#endif
-
 		   	/* interrupt can be dispatched */
 			uint8_t     u8Vector;
 			TRPMEVENT   enmType;
-			SVM_EVENT   Event;
+			SVMEVENT    Event;
 			RTGCUINT    u32ErrorCode;
+			RTGCUINTPTR GCPtrFaultAddress;
+			uint8_t     cbInstr;
 
-			Event.au64[0] = 0;
+			Event.u = 0;
 
 			/* If a new event is pending, then dispatch it now. */
-			int rc = TRPMQueryTrapAll(pVCpu, &u8Vector, &enmType, &u32ErrorCode, 0);
+			int rc = TRPMQueryTrapAll(pVCpu, &u8Vector, &enmType, &u32ErrorCode, 0, 0);
 			AssertRC(rc);
 			Assert(enmType == TRPM_HARDWARE_INT);
+			Assert(u8Vector != X86_XCPT_NMI);
 
 			/* Clear the pending trap. */
 			rc = TRPMResetTrap(pVCpu);
@@ -474,35 +499,35 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 
 			Event.n.u3Type = SVM_EVENT_EXTERNAL_IRQ;
 
-			utcb->inj_info  = Event.au64[0]; 
+			utcb->inj_info  = Event.u; 
 			utcb->inj_error = Event.n.u32ErrorCode;
 
 /*
 			Vmm::printf("type:info:vector %x:%x:%x intr:actv - %x:%x mtd %x\n",
 			     Event.n.u3Type, utcb->inj_info, u8Vector, utcb->intr_state, utcb->actv_state, utcb->mtd);
 */
-			utcb->mtd = Nova::Mtd::INJ; 
+			utcb->mtd = Nova::Mtd::INJ | Nova::Mtd::FPU;
 			Nova::reply(_stack_reply);
 		}
 
 
 		inline bool continue_hw_accelerated(Nova::Utcb * utcb)
 		{
-			Assert(!(VMCPU_FF_ISSET(_current_vcpu, VMCPU_FF_INHIBIT_INTERRUPTS)));
+			Assert(!(VMCPU_FF_IS_SET(_current_vcpu, VMCPU_FF_INHIBIT_INTERRUPTS)));
 
-			uint32_t check_vm = VM_FF_HWACCM_TO_R3_MASK | VM_FF_REQUEST
+			uint32_t check_vm = VM_FF_HM_TO_R3_MASK | VM_FF_REQUEST
 			                    | VM_FF_PGM_POOL_FLUSH_PENDING
 			                    | VM_FF_PDM_DMA;
-			uint32_t check_vcpu = VMCPU_FF_HWACCM_TO_R3_MASK
+			uint32_t check_vcpu = VMCPU_FF_HM_TO_R3_MASK
 			                      | VMCPU_FF_PGM_SYNC_CR3
 			                      | VMCPU_FF_PGM_SYNC_CR3_NON_GLOBAL
 			                      | VMCPU_FF_REQUEST;
 
-			if (!VM_FF_ISPENDING(_current_vm, check_vm) &&
-			    !VMCPU_FF_ISPENDING(_current_vcpu, check_vcpu))
+			if (!VM_FF_IS_PENDING(_current_vm, check_vm) &&
+			    !VMCPU_FF_IS_PENDING(_current_vcpu, check_vcpu))
 				return true;
 
-			Assert(!(VM_FF_ISPENDING(_current_vm, VM_FF_PGM_NO_MEMORY)));
+			Assert(!(VM_FF_IS_PENDING(_current_vm, VM_FF_PGM_NO_MEMORY)));
 
 			return false;
 		}
@@ -675,7 +700,7 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 			VMCPU_SET_STATE(pVCpu, VMCPUSTATE_STARTED_EXEC);
 
 			/* save current FPU state */
-			fpu_save(reinterpret_cast<char *>(&_fpu_state));
+			fpu_save(reinterpret_cast<char *>(&_emt_fpu_state));
 			/* write FPU state from pCtx to FPU registers */
 			fpu_load(reinterpret_cast<char *>(&pCtx->fpu));
 			/* tell kernel to transfer current fpu registers to vCPU */
@@ -684,8 +709,10 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 			_current_vm   = pVM;
 			_current_vcpu = pVCpu;
 
+			_last_exit_was_recall = false;
+
 			/* switch to hardware accelerated mode */
-			switch_to_hw(pCtx);
+			switch_to_hw();
 
 			Assert(utcb->actv_state == ACTIVITY_STATE_ACTIVE);
 
@@ -693,11 +720,12 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 			_current_vcpu = 0;
 
 			/* write FPU state of vCPU (in current FPU registers) to pCtx */
-			fpu_save(reinterpret_cast<char *>(&pCtx->fpu));
-			/* load saved FPU state of EMT thread */
-			fpu_load(reinterpret_cast<char *>(&_fpu_state));
+			Genode::memcpy(&pCtx->fpu, &_guest_fpu_state, sizeof(X86FXSTATE));
 
-//			CPUMSetChangedFlags(pVCpu, CPUM_CHANGED_GLOBAL_TLB_FLUSH);
+			/* load saved FPU state of EMT thread */
+			fpu_load(reinterpret_cast<char *>(&_emt_fpu_state));
+
+			CPUMSetChangedFlags(pVCpu, CPUM_CHANGED_GLOBAL_TLB_FLUSH);
 
 			VMCPU_SET_STATE(pVCpu, VMCPUSTATE_STARTED);
 
@@ -723,7 +751,12 @@ class Vcpu_handler : public Vmm::Vcpu_dispatcher<pthread>
 				next_utcb.mtd        |= Mtd::STA;
 			}
 
-			return VINF_EM_RAW_EMULATE_INSTR;
+#ifdef VBOX_WITH_REM
+			/* XXX see VMM/VMMR0/HMVMXR0.cpp - not necessary every time ! XXX */
+			REMFlushTBs(pVM);
+#endif
+
+			return _last_exit_was_recall ? VINF_SUCCESS : VINF_EM_RAW_EMULATE_INSTR;
 		}
 };
 

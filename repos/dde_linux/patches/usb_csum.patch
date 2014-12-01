@@ -1,0 +1,23 @@
+commit e3804842c60157bab0d5bf2daa42f99ec3f8499d
+Author: Sebastian Sumpf <sebastian.sumpf@genode-labs.com>
+Date:   Mon Jun 2 13:24:37 2014 +0200
+
+    csum.patch
+
+--- a/drivers/net/usb/smsc95xx.c
++++ b/drivers/net/usb/smsc95xx.c
+@@ -1716,7 +1716,13 @@ static int smsc95xx_resume(struct usb_interface *intf)
+ 
+ static void smsc95xx_rx_csum_offload(struct sk_buff *skb)
+ {
+-	skb->csum = *(u16 *)(skb_tail_pointer(skb) - 2);
++	/*
++	 * Use bytewise access to avoid alignment issues on packets that have none
++	 * aligned sizes
++	 */
++	char *tail = skb_tail_pointer(skb);
++	skb->csum = (*(tail - 2) << 8) | *(tail - 1);
++
+ 	skb->ip_summed = CHECKSUM_COMPLETE;
+ 	skb_trim(skb, skb->len - 2);
+ }

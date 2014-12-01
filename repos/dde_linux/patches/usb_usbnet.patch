@@ -1,0 +1,41 @@
+commit e500c61c5fce23cf3a44bdd45fded0a3f34cf4f0
+Author: Sebastian Sumpf <sebastian.sumpf@genode-labs.com>
+Date:   Mon Jun 2 13:35:56 2014 +0200
+
+    usbnet.patch
+
+--- a/drivers/net/usb/usbnet.c
++++ b/drivers/net/usb/usbnet.c
+@@ -63,8 +63,30 @@
+  * the equation.
+  */
+ #define	MAX_QUEUE_MEMORY	(60 * 1518)
+-#define	RX_QLEN(dev)		((dev)->rx_qlen)
+-#define	TX_QLEN(dev)		((dev)->tx_qlen)
++
++inline unsigned RX_QLEN(struct usbnet *dev)
++{
++	switch(dev->udev->speed) {
++		case USB_SPEED_HIGH:
++			return MAX_QUEUE_MEMORY/dev->rx_urb_size;
++		case USB_SPEED_SUPER:
++			return 16;
++		default:
++			return 4;
++		}
++}
++
++inline unsigned TX_QLEN(struct usbnet *dev)
++{
++	switch(dev->udev->speed) {
++		case USB_SPEED_HIGH:
++			return MAX_QUEUE_MEMORY/dev->hard_mtu;
++		case USB_SPEED_SUPER:
++			return 16;
++		default:
++			return 4;
++	}
++}
+ 
+ // reawaken network queue this soon after stopping; else watchdog barks
+ #define TX_TIMEOUT_JIFFIES	(5*HZ)

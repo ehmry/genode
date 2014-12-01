@@ -133,39 +133,32 @@ void Thread::_pause()
 void Thread::_schedule()
 {
 	if (_state == SCHEDULED) { return; }
-	Processor_client::_schedule();
+	Cpu_job::_schedule();
 	_state = SCHEDULED;
 }
 
 
 void Thread::_unschedule(State const s)
 {
-	if (_state == SCHEDULED) { Processor_client::_unschedule(); }
+	if (_state == SCHEDULED) { Cpu_job::_unschedule(); }
 	_state = s;
 }
 
 
-Thread::Thread(unsigned const priority, char const * const label)
+Thread::Thread(unsigned const priority, unsigned const quota,
+               char const * const label)
 :
-	Processor_client(0, priority),
-	Thread_base(this),
-	_state(AWAITS_START),
-	_pd(0),
-	_utcb_phys(0),
-	_signal_receiver(0),
-	_label(label)
-{
-	cpu_exception = RESET;
-}
+	Cpu_job(priority, quota), Thread_base(this), _state(AWAITS_START), _pd(0),
+	_utcb_phys(0), _signal_receiver(0), _label(label)
+{ cpu_exception = RESET; }
 
 
-void Thread::init(Processor * const processor, Pd * const pd,
-             Native_utcb * const utcb_phys, bool const start)
+void Thread::init(Cpu * const cpu, Pd * const pd,
+                  Native_utcb * const utcb_phys, bool const start)
 {
 	assert(_state == AWAITS_START)
 
-	/* store thread parameters */
-	Processor_client::_processor = processor;
+	Cpu_job::affinity(cpu);
 	_utcb_phys = utcb_phys;
 
 	/* join protection domain */
@@ -176,10 +169,8 @@ void Thread::init(Processor * const processor, Pd * const pd,
 	if (START_VERBOSE) {
 		Genode::printf("start thread %u '%s' in program %u '%s' ",
 		               id(), label(), pd_id(), pd_label());
-		if (PROCESSORS) {
-			Genode::printf("on processor %u/%u ",
-			               processor->id(), PROCESSORS);
-		}
+		if (NR_OF_CPUS) {
+			Genode::printf("on CPU %u/%u ", cpu->id(), NR_OF_CPUS); }
 		Genode::printf("\n");
 	}
 	/* start execution */
@@ -190,7 +181,7 @@ void Thread::init(Processor * const processor, Pd * const pd,
 void Thread::_stop() { _unschedule(STOPPED); }
 
 
-void Thread::exception(unsigned const processor_id)
+void Thread::exception(unsigned const cpu)
 {
 	switch (cpu_exception) {
 	case SUPERVISOR_CALL:
@@ -203,13 +194,13 @@ void Thread::exception(unsigned const processor_id)
 		_mmu_exception();
 		return;
 	case INTERRUPT_REQUEST:
-		_interrupt(processor_id);
+		_interrupt(cpu);
 		return;
 	case FAST_INTERRUPT_REQUEST:
-		_interrupt(processor_id);
+		_interrupt(cpu);
 		return;
 	case UNDEFINED_INSTRUCTION:
-		if (_processor->retry_undefined_instr(&_lazy_state)) { return; }
+		if (_cpu->retry_undefined_instr(&_lazy_state)) { return; }
 		PWRN("undefined instruction");
 		_stop();
 		return;
@@ -230,10 +221,7 @@ void Thread::_receive_yielded_cpu()
 }
 
 
-void Thread::proceed(unsigned const processor_id)
-{
-	mtc()->continue_user(this, processor_id);
-}
+void Thread::proceed(unsigned const cpu) { mtc()->continue_user(this, cpu); }
 
 
 char const * Kernel::Thread::pd_label() const
@@ -271,7 +259,7 @@ void Thread::_call_bin_pd()
 	pd->~Pd();
 
 	/* clean up buffers of memory management */
-	Processor::flush_tlb_by_pid(pd->id());
+	Cpu::flush_tlb_by_pid(pd->id());
 	user_arg_0(0);
 }
 
@@ -281,8 +269,9 @@ void Thread::_call_new_thread()
 	/* create new thread */
 	void * const p = (void *)user_arg_1();
 	unsigned const priority = user_arg_2();
-	char const * const label = (char *)user_arg_3();
-	Thread * const t = new (p) Thread(priority, label);
+	unsigned const quota = cpu_pool()->timer()->ms_to_tics(user_arg_3());
+	char const * const label = (char *)user_arg_4();
+	Thread * const t = new (p) Thread(priority, quota, label);
 	user_arg_0(t->id());
 }
 
@@ -303,32 +292,28 @@ void Thread::_call_bin_thread()
 void Thread::_call_start_thread()
 {
 	/* lookup thread */
-	unsigned const thread_id = user_arg_1();
-	Thread * const thread = Thread::pool()->object(thread_id);
+	Thread * const thread = Thread::pool()->object(user_arg_1());
 	if (!thread) {
 		PWRN("failed to lookup  thread");
 		user_arg_0(0);
 		return;
 	}
-	/* lookup processor */
-	unsigned const processor_id = user_arg_2();
-	Processor * const processor = processor_pool()->processor(processor_id);
-	if (!processor) {
-		PWRN("failed to lookup  processor");
+	/* lookup CPU */
+	Cpu * const cpu = cpu_pool()->cpu(user_arg_2());
+	if (!cpu) {
+		PWRN("failed to lookup CPU");
 		user_arg_0(0);
 		return;
 	}
 	/* lookup domain */
-	unsigned const pd_id = user_arg_3();
-	Pd * const pd = Pd::pool()->object(pd_id);
+	Pd * const pd = Pd::pool()->object(user_arg_3());
 	if (!pd) {
 		PWRN("failed to lookup domain");
 		user_arg_0(0);
 		return;
 	}
 	/* start thread */
-	Native_utcb * const utcb = (Native_utcb *)user_arg_4();
-	thread->init(processor, pd, utcb, 1);
+	thread->init(cpu, pd, (Native_utcb *)user_arg_4(), 1);
 	user_arg_0((Call_ret)thread->_pd->translation_table());
 }
 
@@ -379,7 +364,7 @@ void Thread::_call_resume_local_thread()
 
 void Thread_event::_signal_acknowledged()
 {
-	Processor::tlb_insertions();
+	Cpu::tlb_insertions();
 	_thread->_resume();
 }
 
@@ -401,7 +386,7 @@ void Thread::_call_yield_thread()
 {
 	Thread * const t = Thread::pool()->object(user_arg_1());
 	if (t) { t->_receive_yielded_cpu(); }
-	Processor_client::_yield();
+	Cpu_job::_yield();
 }
 
 
@@ -538,10 +523,8 @@ void Thread::_call_access_thread_regs()
 }
 
 
-void Thread::_call_update_pd()
-{
-	if (Processor_domain_update::_perform(user_arg_1())) { _pause(); }
-}
+void Thread::_call_update_pd() {
+	if (Cpu_domain_update::_do_global(user_arg_1())) { _pause(); } }
 
 
 void Thread::_call_update_data_region()
@@ -556,12 +539,12 @@ void Thread::_call_update_data_region()
 	 *        until then we apply operations to caches as a whole instead.
 	 */
 	if (!_core()) {
-		Processor::flush_data_caches();
+		Cpu::flush_data_caches();
 		return;
 	}
 	auto base = (addr_t)user_arg_1();
 	auto const size = (size_t)user_arg_2();
-	Processor::flush_data_caches_by_virt_region(base, size);
+	Cpu::flush_data_caches_by_virt_region(base, size);
 }
 
 
@@ -577,14 +560,14 @@ void Thread::_call_update_instr_region()
 	 *        until then we apply operations to caches as a whole instead.
 	 */
 	if (!_core()) {
-		Processor::flush_data_caches();
-		Processor::invalidate_instr_caches();
+		Cpu::flush_data_caches();
+		Cpu::invalidate_instr_caches();
 		return;
 	}
 	auto base = (addr_t)user_arg_1();
 	auto const size = (size_t)user_arg_2();
-	Processor::flush_data_caches_by_virt_region(base, size);
-	Processor::invalidate_instr_caches_by_virt_region(base, size);
+	Cpu::flush_data_caches_by_virt_region(base, size);
+	Cpu::invalidate_instr_caches_by_virt_region(base, size);
 }
 
 

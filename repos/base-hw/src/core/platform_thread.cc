@@ -101,7 +101,8 @@ Platform_thread::Platform_thread(const char * const label,
 	_utcb_core_addr->core_start_info()->init(Cpu::primary_id());
 
 	/* create kernel object */
-	_id = Kernel::new_thread(_kernel_thread, Kernel::Priority::MAX, _label);
+	constexpr unsigned prio = Kernel::Cpu_priority::max;
+	_id = Kernel::new_thread(_kernel_thread, prio, 0, _label);
 	if (!_id) {
 		PERR("failed to create kernel object");
 		throw Cpu_session::Thread_creation_failed();
@@ -109,7 +110,7 @@ Platform_thread::Platform_thread(const char * const label,
 }
 
 
-Platform_thread::Platform_thread(const char * const label,
+Platform_thread::Platform_thread(size_t quota, const char * const label,
                                  unsigned const virt_prio,
                                  addr_t const utcb)
 :
@@ -136,9 +137,10 @@ Platform_thread::Platform_thread(const char * const label,
 	_utcb_core_addr = (Native_utcb *)core_env()->rm_session()->attach(_utcb);
 
 	/* create kernel object */
-	enum { MAX_PRIO = Kernel::Priority::MAX };
-	auto const phys_prio = Cpu_session::scale_priority(MAX_PRIO, virt_prio);
-	_id = Kernel::new_thread(_kernel_thread, phys_prio, _label);
+	constexpr unsigned max_prio = Kernel::Cpu_priority::max;
+	auto const phys_prio = Cpu_session::scale_priority(max_prio, virt_prio);
+	quota = _generic_to_platform_quota(quota);
+	_id = Kernel::new_thread(_kernel_thread, phys_prio, quota, _label);
 	if (!_id) {
 		PERR("failed to create kernel object");
 		throw Cpu_session::Thread_creation_failed();
@@ -199,14 +201,12 @@ int Platform_thread::start(void * const ip, void * const sp)
 		PERR("failed to initialize thread registers");
 		return -1;
 	}
-	/* determine kernel name of targeted processor */
-	unsigned processor_id;
-	if (_location.valid()) { processor_id = _location.xpos(); }
-	else { processor_id = Cpu::primary_id(); }
 
 	/* start executing new thread */
+	unsigned const cpu =
+		_location.valid() ? _location.xpos() : Cpu::primary_id();
 	_utcb_core_addr->start_info()->init(_id, _utcb);
-	if (!Kernel::start_thread(_id, processor_id, _pd->id(), _utcb_core_addr)) {
+	if (!Kernel::start_thread(_id, cpu, _pd->id(), _utcb_core_addr)) {
 		PERR("failed to start thread");
 		return -1;
 	}

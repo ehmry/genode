@@ -921,6 +921,21 @@ class Nitpicker::Session_component : public Genode::Rpc_object<Session>,
 			report_focus(_focus_reporter, session);
 		}
 
+		void session_control(Label suffix, Session_control control) override
+		{
+			char selector[Label::size()];
+
+			Genode::snprintf(selector, sizeof(selector), "%s%s%s",
+			                 label().string(),
+			                 suffix.length() ? " -> " : "", suffix.string());
+
+			switch (control) {
+			case SESSION_CONTROL_HIDE:     _view_stack.visible(selector, false); break;
+			case SESSION_CONTROL_SHOW:     _view_stack.visible(selector, true);  break;
+			case SESSION_CONTROL_TO_FRONT: _view_stack.to_front(selector);       break;
+			}
+		}
+
 
 		/*******************************
 		 ** Buffer_provider interface **
@@ -1138,6 +1153,7 @@ struct Nitpicker::Main
 
 	Genode::Reporter pointer_reporter = { "pointer" };
 	Genode::Reporter focus_reporter   = { "focus" };
+	Genode::Reporter xray_reporter    = { "xray" };
 
 	Root<PT> np_root = { session_list, *domain_registry, global_keys,
 	                     ep.rpc_ep(), user_state, user_state, pointer_origin,
@@ -1212,6 +1228,7 @@ void Nitpicker::Main::handle_input(unsigned)
 		Point       const old_pointer_pos     = user_state.pointer_pos();
 		::Session * const old_focused_session = user_state.Mode::focused_session();
 		bool        const old_kill_mode       = user_state.kill();
+		bool        const old_xray_mode       = user_state.xray();
 
 		/* handle batch of pending events */
 		if (input.is_pending())
@@ -1220,6 +1237,7 @@ void Nitpicker::Main::handle_input(unsigned)
 		Point       const new_pointer_pos     = user_state.pointer_pos();
 		::Session * const new_focused_session = user_state.Mode::focused_session();
 		bool        const new_kill_mode       = user_state.kill();
+		bool        const new_xray_mode       = user_state.xray();
 
 		/* report mouse-position updates */
 		if (pointer_reporter.is_enabled() && old_pointer_pos != new_pointer_pos) {
@@ -1228,6 +1246,14 @@ void Nitpicker::Main::handle_input(unsigned)
 			{
 				xml.attribute("xpos", new_pointer_pos.x());
 				xml.attribute("ypos", new_pointer_pos.y());
+			});
+		}
+
+		if (xray_reporter.is_enabled() && old_xray_mode != new_xray_mode) {
+
+			Genode::Reporter::Xml_generator xml(xray_reporter, [&] ()
+			{
+				xml.attribute("enabled", new_xray_mode ? "yes" : "no");
 			});
 		}
 
@@ -1284,6 +1310,22 @@ void Nitpicker::Main::handle_input(unsigned)
 }
 
 
+/**
+ * Helper function for 'handle_config'
+ */
+static void configure_reporter(Genode::Reporter &reporter)
+{
+	try {
+		Genode::Xml_node config_xml = Genode::config()->xml_node();
+		reporter.enabled(config_xml.sub_node("report")
+		                           .attribute(reporter.name().string())
+		                           .has_value("yes"));
+	} catch (...) {
+		reporter.enabled(false);
+	}
+}
+
+
 void Nitpicker::Main::handle_config(unsigned)
 {
 	config()->reload();
@@ -1297,18 +1339,9 @@ void Nitpicker::Main::handle_config(unsigned)
 		.attribute("color").value(&background.color);
 	} catch (...) { }
 
-	/* enable or disable reporting */
-	try {
-		pointer_reporter.enabled(config()->xml_node().sub_node("report")
-		                                             .attribute("pointer")
-		                                             .has_value("yes"));
-	} catch (...) { }
-
-	try {
-		focus_reporter.enabled(config()->xml_node().sub_node("report")
-		                                           .attribute("focus")
-		                                           .has_value("yes"));
-	} catch (...) { }
+	configure_reporter(pointer_reporter);
+	configure_reporter(focus_reporter);
+	configure_reporter(xray_reporter);
 
 	/* update domain registry and session policies */
 	for (::Session *s = session_list.first(); s; s = s->next())

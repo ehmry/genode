@@ -3,9 +3,10 @@ SHARED_LIB = yes
 LIB_DIR     = $(REP_DIR)/src/lib/lxip
 LIB_INC_DIR = $(LIB_DIR)/include
 
-LIBS += base cxx dde_kit
+# FIXME should we *really* effecticely add dde_kit to this shared library?
+LIBS += dde_kit
 
-LX_CONTRIB_DIR := $(call select_from_ports,dde_linux)/src/lib/dde_linux
+LX_CONTRIB_DIR := $(call select_from_ports,dde_linux)/src/lib/lxip
 NET_DIR        := $(LX_CONTRIB_DIR)/net
 
 #
@@ -14,7 +15,6 @@ NET_DIR        := $(LX_CONTRIB_DIR)/net
 #
 INC_DIR += $(LIB_INC_DIR)
 INC_DIR += $(LX_CONTRIB_DIR)/include $(LX_CONTRIB_DIR)/include/uapi \
-           $(LX_CONTRIB_DIR)/lxip/include $(LX_CONTRIB_DIR)/lxip/include/uapi \
            $(LX_CONTRIB_DIR)
 
 CC_OLEVEL = -O2
@@ -47,6 +47,7 @@ SRC_C += net/ethernet/eth.c
 SRC_C += net/netlink/af_netlink.c
 SRC_C += net/sched/sch_generic.c
 SRC_C += lib/checksum.c
+SRC_C += drivers/net/loopback.c
 
 # DHCP support
 SRC_C += net/ipv4/ipconfig.c

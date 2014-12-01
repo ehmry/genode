@@ -1,0 +1,41 @@
+commit 3785e30c9833a908775a69c2961a3c1d6fe50d09
+Author: Sebastian Sumpf <sebastian.sumpf@genode-labs.com>
+Date:   Mon Jun 2 13:25:30 2014 +0200
+
+    ip_config.patch
+
+--- a/net/ipv4/ipconfig.c
++++ b/net/ipv4/ipconfig.c
+@@ -1516,24 +1516,24 @@ static int __init ip_auto_config(void)
+ 	 */
+ 	pr_info("IP-Config: Complete:\n");
+ 
+-	pr_info("     device=%s, hwaddr=%*phC, ipaddr=%pI4, mask=%pI4, gw=%pI4\n",
+-		ic_dev->name, ic_dev->addr_len, ic_dev->dev_addr,
+-		&ic_myaddr, &ic_netmask, &ic_gateway);
++	pr_info("     device=%s, len=%u hwaddr=" MAC_FMT ", ipaddr=" IP_FMT ", mask=" IP_FMT " , gw=" IP_FMT "\n",
++		ic_dev->name, ic_dev->addr_len, MAC_ARG(ic_dev->dev_addr),
++		IP_ARG(ic_myaddr), IP_ARG(ic_netmask), IP_ARG(ic_gateway));
+ 	pr_info("     host=%s, domain=%s, nis-domain=%s\n",
+ 		utsname()->nodename, ic_domain, utsname()->domainname);
+-	pr_info("     bootserver=%pI4, rootserver=%pI4, rootpath=%s",
+-		&ic_servaddr, &root_server_addr, root_server_path);
++	pr_info("     bootserver=" IP_FMT ", rootserver=" IP_FMT ", rootpath=%s\n",
++		IP_ARG(ic_servaddr), IP_ARG(root_server_addr), root_server_path);
+ 	if (ic_dev_mtu)
+ 		pr_cont(", mtu=%d", ic_dev_mtu);
+ 	for (i = 0; i < CONF_NAMESERVERS_MAX; i++)
+ 		if (ic_nameservers[i] != NONE) {
+-			pr_info("     nameserver%u=%pI4",
+-				i, &ic_nameservers[i]);
++			pr_info("     nameserver%u=" IP_FMT,
++				i, IP_ARG(ic_nameservers[i]));
+ 			break;
+ 		}
+ 	for (i++; i < CONF_NAMESERVERS_MAX; i++)
+ 		if (ic_nameservers[i] != NONE)
+-			pr_cont(", nameserver%u=%pI4", i, &ic_nameservers[i]);
++			pr_cont(", nameserver%u=" IP_FMT, i, IP_ARG(ic_nameservers[i]));
+ 	pr_cont("\n");
+ #endif /* !SILENT */
+ 

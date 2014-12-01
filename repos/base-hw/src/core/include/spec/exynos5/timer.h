@@ -188,13 +188,11 @@ class Genode::Timer : public Mmio
 
 
 		/**
-		 * Return kernel name of timer interrupt of a specific processor
-		 *
-		 * \param processor_id  kernel name of targeted processor
+		 * Return kernel name of the interrupt of the timer of CPU 'cpu'
 		 */
-		static unsigned interrupt_id(unsigned const processor_id)
+		static unsigned interrupt_id(unsigned const cpu)
 		{
-			switch (processor_id) {
+			switch (cpu) {
 			case 0:  return Board::MCT_IRQ_L0;
 			case 1:  return Board::MCT_IRQ_L1;
 			default: return 0;
@@ -218,21 +216,19 @@ class Genode::Timer : public Mmio
 		}
 
 		/**
-		 * Start single timeout run
-		 *
-		 * \param tics          delay of timer interrupt
-		 * \param processor_id  kernel name of processor of targeted timer
+		 * Raise interrupt of CPU 'cpu' once after timeout 'tics'
 		 */
-		inline void start_one_shot(unsigned const tics,
-		                           unsigned const processor_id)
+		inline void start_one_shot(unsigned const tics, unsigned const cpu)
 		{
-			switch (processor_id) {
+			switch (cpu) {
 			case 0:
+				write<L0_int_cstat::Frcnt>(1);
 				_run_0(0);
 				_acked_write<L0_frcntb, L0_wstat::Frcntb>(tics);
 				_run_0(1);
 				return;
 			case 1:
+				write<L1_int_cstat::Frcnt>(1);
 				_run_1(0);
 				_acked_write<L1_frcntb, L1_wstat::Frcntb>(tics);
 				_run_1(1);
@@ -246,36 +242,11 @@ class Genode::Timer : public Mmio
 		 */
 		unsigned ms_to_tics(unsigned const ms) { return ms * _tics_per_ms; }
 
-		/**
-		 * Clear interrupt output line
-		 */
-		void clear_interrupt(unsigned const processor_id)
+		unsigned value(unsigned const cpu)
 		{
-			switch (processor_id) {
-			case 0:
-				write<L0_int_cstat::Frcnt>(1);
-				return;
-			case 1:
-				write<L1_int_cstat::Frcnt>(1);
-				return;
-			default: return;
-			}
-		}
-
-		unsigned value(unsigned const processor_id)
-		{
-			switch (processor_id) {
-			case 0:  return read<L0_frcnto>();
-			case 1:  return read<L1_frcnto>();
-			default: return 0;
-			}
-		}
-
-		unsigned irq_state(unsigned const processor_id)
-		{
-			switch (processor_id) {
-			case 0:  return read<L0_int_cstat::Frcnt>();
-			case 1:  return read<L1_int_cstat::Frcnt>();
+			switch (cpu) {
+			case 0: return read<L0_int_cstat::Frcnt>() ? 0 : read<L0_frcnto>();
+			case 1: return read<L1_int_cstat::Frcnt>() ? 0 : read<L1_frcnto>();
 			default: return 0;
 			}
 		}

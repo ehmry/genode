@@ -26,7 +26,110 @@ namespace Genode
 	 * Programmable interrupt controller for core
 	 */
 	class Pic;
+
+	class Usb_dwc_otg;
 }
+
+
+class Genode::Usb_dwc_otg : Mmio
+{
+	private:
+
+		struct Core_irq_status : Register<0x14, 32>
+		{
+			struct Sof : Bitfield<3, 1> { };
+		};
+
+		struct Guid : Register<0x3c, 32>
+		{
+			struct Num : Bitfield<0, 14> { };
+
+			/*
+			 * The USB driver set 'Num' to a defined value
+			 */
+			struct Num_valid : Bitfield<31, 1> { };
+
+			/*
+			 * Filter is not used, overridden by the USB driver
+			 */
+			struct Kick : Bitfield<30, 1> { };
+		};
+
+		struct Host_frame_number : Register<0x408, 32>
+		{
+			struct Num : Bitfield<0, 14> { };
+		};
+
+		bool _is_sof() const
+		{
+			return read<Core_irq_status::Sof>();
+		}
+
+		static bool _need_trigger_sof(uint32_t host_frame,
+		                              uint32_t scheduled_frame)
+		{
+			uint32_t const max_frame = 0x3fff;
+
+			if (host_frame < scheduled_frame) {
+				if (scheduled_frame - host_frame < max_frame / 2)
+					return false;  /* scheduled frame not reached yet */
+				else
+					return true;   /* scheduled frame passed, host frame wrapped */
+			} else {
+				if (host_frame - scheduled_frame < max_frame / 2)
+					return true;   /* scheduled frame passed */
+				else
+					return false;  /* scheduled frame wrapped, not reached */
+			}
+		}
+
+	public:
+
+		Usb_dwc_otg() : Mmio(Board::USB_DWC_OTG_BASE)
+		{
+			write<Guid::Num>(0);
+			write<Guid::Num_valid>(false);
+			write<Guid::Kick>(false);
+		}
+
+		bool handle_sof()
+		{
+			if (!_is_sof())
+				return false;
+
+			static int cnt, stat_cnt, filter_cnt, trigger_cnt, kick_cnt;
+
+			stat_cnt++;
+			if (stat_cnt == 8000) {
+				PLOG("kicked: %d filtered: %d  triggered: %d", kick_cnt, filter_cnt, trigger_cnt);
+				stat_cnt = 0;
+			}
+
+			cnt++;
+			if (cnt == 8*20) {
+				cnt = 0;
+				return false;
+			}
+
+			if (read<Guid::Kick>())
+				kick_cnt++;
+
+			if (!read<Guid::Num_valid>() || read<Guid::Kick>())
+				return false;
+
+			if (_need_trigger_sof(read<Host_frame_number::Num>(), read<Guid::Num>())) {
+				trigger_cnt++;
+				return false;
+			}
+
+			filter_cnt++;
+
+			write<Core_irq_status::Sof>(1);
+
+			return true;
+		}
+};
+
 
 class Genode::Pic : Mmio
 {
@@ -51,6 +154,8 @@ class Genode::Pic : Mmio
 		struct Irq_disable_gpu_2  : Register<0x20, 32> { };
 		struct Irq_disable_basic  : Register<0x24, 32> { };
 
+		Usb_dwc_otg _usb;
+
 		/**
 		 * Return true if specified interrupt is pending
 		 */
@@ -66,7 +171,7 @@ class Genode::Pic : Mmio
 		 */
 		Pic() : Mmio(Board::IRQ_CONTROLLER_BASE) { mask(); }
 
-		void init_processor_local() { }
+		void init_cpu_local() { }
 
 		bool take_request(unsigned &irq)
 		{
@@ -89,6 +194,12 @@ class Genode::Pic : Mmio
 					continue;
 
 				irq = Board_base::GPU_IRQ_BASE + i;
+
+				/* handle SOF interrupts locally, filter from the user land */
+				if (irq == Board_base::DWC_IRQ)
+					if (_usb.handle_sof())
+						return false;
+
 				return true;
 			}
 
@@ -124,24 +235,12 @@ class Genode::Pic : Mmio
 				write<Irq_disable_gpu_2>(1 << (i - 8 - 32));
 		}
 
-		/**
-		 * Wether an interrupt is inter-processor interrupt of a processor
-		 *
-		 * \param interrupt_id  kernel name of the interrupt
-		 * \param processor_id  kernel name of the processor
+		/*
+		 * Dummies
 		 */
-		bool is_ip_interrupt(unsigned const interrupt_id,
-		                     unsigned const processor_id)
-		{
-			return false;
-		}
 
-		/**
-		 * Trigger the inter-processor interrupt of a processor
-		 *
-		 * \param processor_id  kernel name of the processor
-		 */
-		void trigger_ip_interrupt(unsigned const processor_id) { }
+		bool is_ip_interrupt(unsigned, unsigned) { return false; }
+		void trigger_ip_interrupt(unsigned) { }
 };
 
 namespace Kernel { class Pic : public Genode::Pic { }; }

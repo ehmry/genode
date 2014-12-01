@@ -1,12 +1,13 @@
 LIB_DIR     = $(REP_DIR)/src/lib/usb
 LIB_INC_DIR = $(LIB_DIR)/include
 
-LIBS     += base cxx dde_kit libc-setjmp config
+# FIXME should we *really* dde_kit to this shared library?
+LIBS     += dde_kit libc-setjmp config
 SRC_CC   += main.cc lx_emul.cc irq.cc timer.cc event.cc storage.cc \
             input_component.cc nic.cc
 SRC_C    += dummies.c scsi.c evdev.c
 
-LX_CONTRIB_DIR := $(call select_from_ports,dde_linux)/src/lib/dde_linux
+LX_CONTRIB_DIR := $(call select_from_ports,dde_linux)/src/lib/usb
 DRIVERS_DIR    := $(LX_CONTRIB_DIR)/drivers
 USB_DIR        := $(DRIVERS_DIR)/usb
 
@@ -25,7 +26,7 @@ CC_OPT += -DCONFIG_USB_DEVICEFS -DCONFIG_HOTPLUG -DDEBUG -DCONFIG_USB_PHY=1
 CC_WARN = -Wall -Wno-unused-variable -Wno-uninitialized \
           -Wno-unused-function -Wno-overflow
 
-CC_C_OPT += -Wno-unused-but-set-variable -Wno-pointer-sign
+CC_C_OPT += -Wno-unused-but-set-variable -Wno-pointer-sign -Wno-unused-label
 
 CXX_OPT = -fpermissive
 CC_CXX_OPT = -fpermissive
@@ -96,7 +97,6 @@ $(GEN_INCLUDES):
 	$(VERBOSE)ln -s $(LIB_INC_DIR)/lx_emul.h $@
 
 vpath %.c  $(DRIVERS_DIR)
-vpath %.c  $(USB_DIR)/host
 vpath %.c  $(LIB_DIR)
 vpath %.cc $(LIB_DIR)
 vpath %.cc $(LIB_DIR)/signal

@@ -20,7 +20,6 @@
 /* core includes */
 #include <kernel/kernel.h>
 #include <kernel/pd.h>
-#include <kernel/processor_pool.h>
 #include <kernel/signal_receiver.h>
 
 namespace Kernel
@@ -38,7 +37,7 @@ namespace Kernel
 }
 
 class Kernel::Vm : public Object<Vm, MAX_VMS, Vm_ids, vm_ids, vm_pool>,
-                   public Processor_client
+                   public Cpu_job
 {
 	private:
 
@@ -58,48 +57,41 @@ class Kernel::Vm : public Object<Vm, MAX_VMS, Vm_ids, vm_ids, vm_pool>,
 		 * \param state    initial CPU state
 		 * \param context  signal for VM exceptions other than interrupts
 		 */
-		Vm(void           * const state,
-		   Signal_context * const context)
+		Vm(void * const state, Signal_context * const context)
 		:
-			Processor_client(processor_pool()->primary_processor(),
-			                 Priority::MIN),
-			_state((Vm_state * const)state),
+			Cpu_job(Cpu_priority::min, 0), _state((Vm_state * const)state),
 			_context(context)
-		{ }
+		{ affinity(cpu_pool()->primary_cpu()); }
 
 
 		/****************
 		 ** Vm_session **
 		 ****************/
 
-		void run()   { Processor_client::_schedule(); }
+		void run()   { Cpu_job::_schedule(); }
+		void pause() { Cpu_job::_unschedule(); }
 
-		void pause() { Processor_client::_unschedule(); }
 
+		/*************
+		 ** Cpu_job **
+		 *************/
 
-		/**********************
-		 ** Processor_client **
-		 **********************/
-
-		void exception(unsigned const processor_id)
+		void exception(unsigned const cpu)
 		{
 			switch(_state->cpu_exception) {
 			case Genode::Cpu_state::INTERRUPT_REQUEST:
 			case Genode::Cpu_state::FAST_INTERRUPT_REQUEST:
-				_interrupt(processor_id);
+				_interrupt(cpu);
 				return;
 			case Genode::Cpu_state::DATA_ABORT:
-				_state->dfar = Processor::Dfar::read();
+				_state->dfar = Cpu::Dfar::read();
 			default:
-				Processor_client::_unschedule();
+				Cpu_job::_unschedule();
 				_context->submit(1);
 			}
 		}
 
-		void proceed(unsigned const processor_id)
-		{
-			mtc()->continue_vm(_state, processor_id);
-		}
+		void proceed(unsigned const cpu) { mtc()->continue_vm(_state, cpu); }
 };
 
 #endif /* _KERNEL__VM_H_ */

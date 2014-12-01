@@ -69,7 +69,10 @@ extern "C" {
 			switch(curr.type())
 			{
 			case Input::Event::MOTION:
-				SDL_PrivateMouseMotion(0, 1, curr.rx(), curr.ry());
+				if (curr.is_absolute_motion())
+					SDL_PrivateMouseMotion(0, 0, curr.ax(), curr.ay());
+				else
+					SDL_PrivateMouseMotion(0, 1, curr.rx(), curr.ry());
 				break;
 			case Input::Event::PRESS:
 				if(curr.code() >= Input::BTN_MISC &&
@@ -219,7 +222,7 @@ extern "C" {
 			case KEY_P: keymap[i]=SDLK_p; break;
 			case KEY_LEFTBRACE: keymap[i]=SDLK_UNKNOWN; break;
 			case KEY_RIGHTBRACE: keymap[i]=SDLK_UNKNOWN; break;
-			case KEY_ENTER: keymap[i]=SDLK_KP_ENTER; break;
+			case KEY_ENTER: keymap[i]=SDLK_RETURN; break;
 			case KEY_LEFTCTRL: keymap[i]=SDLK_LCTRL; break;
 			case KEY_A: keymap[i]=SDLK_a; break;
 			case KEY_S: keymap[i]=SDLK_s; break;
