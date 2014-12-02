@@ -1,0 +1,178 @@
+
+
+                   ===========================
+                   The Genode Nix build system
+                   ===========================
+
+
+                         Emery Hemingway
+
+Abstract
+########
+
+In addition to Genode's Make based build system, an experimental Nix based
+system is developing in parallel. Nix is most often described as a package
+manager, but just as Make can be used for more than building source code,
+so can Nix be applied to more than package management. NixOS is the successful
+application of Nix to a level above simple package management. It constructs and
+arranges system components and configurations using declarative specifications.
+In theory the same practices can be applied to the construction of complete
+Genode based systems, but here they are applied to component construction.
+Genode's experimental Nix build system operates at and below the level of package
+management, expressing the relationship between source files and libraries
+directly when building components rather than relying on intermediate build
+instructions such as makefiles and configure scripts. In this system components
+are constructed using fuctional expressions. This article serves to introduce
+the patterns in expressing Genode components using this system.
+
+
+Comparison with Make
+####################
+
+The common behaviors between Make and Nix are enforcing dependency build order
+and selective rebuilding in reponse to changes.
+
+With Make dependencies are collected by listed them in target recipes.
+A target will only be built after all  dependencies have been constructed.
+With Nix dependencies are bound to variables to be lazily evaulated. Not all
+variables pointing to dependencies that are the scope of an output are evaluated
+and instantiated, only those referred to explicitly in the build environment.
+
+Make finds modifications to files using filesystem timestamps; this is most often
+effective in practice, but is incorrect when file content changes without
+increasing timestamps. Nix detects changes by recursively hashing dependencies.
+This behavior is correct when the build environment is properly isolated. An
+example of this isolation is the zeroing of the system clock (nearly the inverse
+of Make).
+
+With this hashing scheme one can intuit that Nix depencency evaluation is slower
+than Make, but the trade-off is the correct and consistent evaulation of
+dependencies. The current Genode build system no doubt has has good performance
+and correctness when building on-demand on a single machine. What is sought in a
+Nix build system is correctness across multiple machines, something that Make is
+not well equiped for. When behavior is correct and consistent across multiple
+machines, a hybrid source and binary package manager may be realized.
+
+
+Build system entry points
+#########################
+
+Any meaningful output produced by Nix is the result of a function. When the
+inputs to a desired output may vary, we encounter functions that take arguments.
+As any good function should require minimal set of arguments, entry into the
+build system is made at a few points that require only a short string specifying
+the target machine architecture and kernel. A common signature for an
+entry function follows:
+
+! { system ? builtins.currentSystem }:
+
+As a convience the *?* keyword is used to default the value of *system* to
+*builtins.currentSystem*. On a typical GNU/Linux build host
+*builtins.currentSystem* has the value of _x86_64-linux_ or _x86_32-linux_.
+These are both valid Genode targets, so the results of this function should
+execute directly in the host environment.
+
+As entry functions are evaluated, many more functions with varying arguments
+are evaluated in turn, but only the target system need be made explicit at the
+point of entry.
+
+Two entry files that have stablised are _libs.nix_ and _pkgs.nix_. These files
+evalute to sets of libraries and packages. The following command will build
+components selected from those sets.
+
+! cd <genode-dir>
+! nix-build libs.nix -A cxx
+! nix-build libs.nix -A timed_semaphore
+! nix-build pkgs.nix -A init
+! nix-build pkgs.nix -A app.scout
+
+To build for a NOVA target the nix-build invocation is as follows:
+! cd <genode-dir>
+! nix-build --argstr system x86_64-nova libs.nix -A cxx
+! nix-build --argstr system x86_64-nova pkgs.nix -A server.nitpicker
+
+
+Component expressions
+#####################
+
+
+Library expressions
+===================
+
+We shall start with a simple example, the timed_semaphone library.
+
+! { genodeEnv, compileCC, alarm }:
+!
+! genodeEnv.mkLibrary {
+!   name = "timed_semaphore";
+!   libs = [ alarm ];
+!   objects = [ (compileCC { src = ./timed_semaphore.cc; }) ];
+! }
+
+
+Function signature
+~~~~~~~~~~~~~~~~~~
+
+The first line declares that a function with three arguments follows,
+the arguments are:
+
+:genodeEnv:
+  Set of attributes that comprise the standard genodeEnv. We will
+  be using _mkLibrary_, a function that links a library together.
+
+:compileCC:
+  Function that compiles a c++ source file into an object file.
+
+:alarm: The _alarm_ Library. Defined elsewhere, just as this libary.
+
+By stating build inputs as arguments to a function, we make it easy to overide
+inputs in a calling environment.
+
+
+mkLibrary
+~~~~~~~~~
+
+Next we see that this function is really a wrapper to the function
+_genodeEnv.mkLibrary_. Note that this is a functional language, and
+_mkLibrary_ is merely an attribute in the _genodeEnv_ set, not a method.
+
+The arguments to _mkLibrary_ are passed as a set of named attributes.
+They are:
+
+:name: Name of the library.
+:libs: List of libraries to link into the output.
+:objects: List of object files to link into the output.
+
+The result of this function is a directory containing the file _${name}.lib.a.
+
+
+compileCC
+~~~~~~~~~
+
+CompileCC compiles the C++ source at _src_ and returns the object file. The value
+bound to _src_ is not of the string type, it is of the _path_ type, a file that
+will be isolated by Nix prior to building. CompileCC takes other arguments,
+most notably _extraFlags_ for extra compiler option flags, and _localIncudes_
+and _systemIncludes_ for resolving files imported with _#include "..."_ and
+_#include <...>_ respectively. In this example we assume that the includes are
+generic and the function _compileCC_ is wrapped to include them by the caller,
+
+When the object expressed by the compileCC call is evaulated, timed_semaphore.cc
+is scanned for #include preproccessor directives and a list is made of include
+files. This list is used to propagate changes from header files to compiliation
+objects.
+
+
+Evaluating the experession
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The entry file _libs.nix_ in the top level directory of the Genode source tree
+merges expressions found in files named _libs.nix_ in each Genode repository.
+The line that imports the file containing the timed_semaphore expression is as
+follows:
+
+! timed_semaphore = importLibrary ./src/lib/timed_semaphore;
+
+As you can see there are no arguments named. This is because the _importLibrary_
+function matches the names of the formal arguments defined in the timed_semaphore
+function to named attributes in a set of utilities and libraries. For the
+implementation of importLibrary see the top-level and intermediate lib.nix files.
