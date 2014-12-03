@@ -16,13 +16,14 @@ let
     inherit system tool libs;
   };
 
-    run = import ./run.nix {
+  run = import ./run.nix {
     inherit system tool pkgs;
   };
+
 in
 { test = builtins.removeAttrs run [ "demo" ]; }
 //
 ( if system == "x86_32-nova" || system == "x86_64-nova"
-  then { demo = run.demo; }
+  then { demo = import ./repos/demo/demo.nix { inherit tool pkgs; }; }
   else { }
 )
