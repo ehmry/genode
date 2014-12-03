@@ -1,7 +1,11 @@
-{ genodeEnv, compileCC, libc, libm, ld }:
+{ genodeEnv, linkComponent, compileCC, libc, libm }:
 
-genodeEnv.mkComponent {
+linkComponent rec {
   name = "test-libc";
-  objects = compileCC { src = ./main.cc; };
-  libs = [ libm libc ld ];
+  libs = [ libm libc ];
+
+  objects = compileCC {
+    src = ./main.cc;
+    systemIncludes = genodeEnv.tool.propagateIncludes libs;
+  };
 }

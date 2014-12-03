@@ -55,27 +55,21 @@ let
 
       cxxFlags = [ "-std=gnu++11" ];
 
-      ccCOpt = ccFlags;
+      ccCFlags = ccFlags;
 
-      ldOpt = ldMarch ++ [ "-gc-sections" ];
+      ldFlags = ldMarch ++ [ "-gc-sections" ];
 
-      asOpt = spec.asMarch;
+      asFlags = spec.asMarch;
 
-      cxxLinkOpt =
-        (map (o: "-Wl,"+o) ldOpt) ++
-        spec.ccMarch ++ [ "-nostdlib -Wl,-nostdlib"];
+      cxxLinkFlags = [ "-nostdlib -Wl,-nostdlib"] ++ spec.ccMarch;
 
       nativeIncludePaths =
         [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include"
         ];
     };
 
-
   # Linker script for dynamically linked programs
   ldScriptDyn = ../../repos/base/src/platform/genode_dyn.ld;
-
-  # Linker script for shared libraries
-  ldScriptSo  = ../../repos/base/src/platform/genode_rel.ld;
 
   staticLibraryLinkPhase = ''
     echo -e "    MERGE    $name"
@@ -93,35 +87,6 @@ let
         echo "$libs" > "$out/nix-support/propagated-libraries"
     fi
   '';
-
-  sharedLibraryLinkPhase = ''
-    echo -e "    MERGE    $name"
-
-    for o in $externalObjects
-    do objects="$objects $o/*.o"
-    done
-
-    local _libs=$(sortDerivations $libs)
-    local libs=""
-
-    for l in $_libs
-    do libs="$libs $l/*.a $l/*.so"
-    done
-
-    mkdir -p $out
-
-    VERBOSE $ld -o $out/$name.lib.so -shared --eh-frame-hdr \
-        $extraLdFlags $ldOpt $ldFlags \
-	-T $ldScriptSo \
-        --entry=$entryPoint \
-	--whole-archive \
-	--start-group \
-        $libs $objects \
-	--end-group \
-	--no-whole-archive \
-        $($cc $ccMarch -print-libgcc-file-name)
-  '';
-
 
   ## could propagatedIncludes replace systemIncludes?
 
@@ -162,13 +127,13 @@ let
     mkdir -p $out
 
     [[ "$ldTextAddr" ]] && \
-        cxxLinkOpt="$cxxLinkOpt -Wl,-Ttext=$ldTextAddr"
+        cxxLinkFlags="$cxxLinkFlags -Wl,-Ttext=$ldTextAddr"
 
     for s in $ldScripts
-    do cxxLinkOpt="$cxxLinkOpt -Wl,-T -Wl,$s"
+    do cxxLinkFlags="$cxxLinkFlags -Wl,-T -Wl,$s"
     done
 
-    VERBOSE $cxx $cxxLinkOpt \
+    VERBOSE $cxx $cxxLinkFlags \
 	-Wl,--whole-archive -Wl,--start-group \
         $objects $libs \
 	-Wl,--end-group -Wl,--no-whole-archive \
@@ -191,24 +156,18 @@ let
           if builtins.hasAttr "propagatedIncludes" attrs then
             [ "out" "include" ]
           else [ "out" ];
-      } //
-      (if attrs.shared or false then
-         { mergePhase = sharedLibraryLinkPhase;
-           entryPoint = attrs.entryPoint or "0x0";
-           inherit ldScriptSo;
-         }
-       else
-         { mergePhase = staticLibraryLinkPhase; }
-      )
-      // attrs
+        mergePhase = staticLibraryLinkPhase;
+      } // attrs
     );
 
     mkComponent = attrs: env.mk (
-      let anyShared' = anyShared (attrs.libs or []); in
+      let
+        anyShared' = anyShared (attrs.libs or []);
+      in
       { mergePhase  = componentLinkPhase;
         fixupPhase = componentFixupPhase;
         ldTextAddr = attrs.ldTextAddr or env.spec.ldTextAddr or "";
-        ldOpt = attrs.ldOpt or env.ldOpt ++ (
+        ldFlags = attrs.ldFlags or env.ldFlags ++ (
           if anyShared' then
             # Add a list of symbols that shall
             # always be added to the dynsym section
@@ -241,21 +200,34 @@ rec {
   genodePortEnv = addSubMks genodeEnv;
   genodeEnvAdapters = import ./adapters.nix;
 
-  compileS =
+  compiles =
   { src
   , localIncludes ? []
   , ... } @ args:
-  derivation (
+  shellDerivation (
     { inherit (stdAttrs) cc ccFlags nativeIncludePaths;
       inherit genodeEnv;
     } //
     args //
     {
-      name = "${baseNameOf (toString src)}-object";
-      system = builtins.currentSystem;
-      builder = shell;
-      args = [ "-e" ./compile-s.sh ];
+      name = dropSuffix ".s" (baseNameOf (toString src)) + ".o";
+      script = ./compile-s.sh;
+      localIncludes = findLocalIncludes src localIncludes;
+    }
+  );
 
+  compileS =
+  { src
+  , localIncludes ? []
+  , ... } @ args:
+  shellDerivation (
+    { inherit (stdAttrs) cc ccFlags nativeIncludePaths;
+      inherit genodeEnv;
+    } //
+    args //
+    {
+      name = dropSuffix ".S" (baseNameOf (toString src)) + ".o";
+      script = ./compile-S.sh;
       localIncludes = findLocalIncludes src localIncludes;
     }
   );
@@ -264,17 +236,14 @@ rec {
   { src
   , localIncludes ? []
   , ... } @ args:
-  derivation (
+  shellDerivation (
     { inherit (stdAttrs) cc ccFlags nativeIncludePaths;
       inherit genodeEnv;
     } //
     args //
     {
       name = dropSuffix ".c" (baseNameOf (toString src)) + ".o";
-      system = builtins.currentSystem;
-      builder = shell;
-      args = [ "-e" ./compile-c.sh ];
-
+      script = ./compile-c.sh;
       localIncludes = findLocalIncludes src localIncludes;
     }
   );
@@ -283,17 +252,14 @@ rec {
   { src
   , localIncludes ? []
   , ... } @ args:
-  derivation (
+  shellDerivation (
     { inherit (stdAttrs) cxx ccFlags cxxFlags nativeIncludePaths;
       inherit genodeEnv;
     } //
     args //
     {
       name = dropSuffix ".cc" (baseNameOf (toString src)) + ".o";
-      system = builtins.currentSystem;
-      builder = shell;
-      args = [ "-e" ./compile-cc.sh ];
-
+      script = ./compile-cc.sh;
       localIncludes = findLocalIncludes src localIncludes;
     }
   );
@@ -312,30 +278,56 @@ rec {
         fixName (builtins.substring 1 l s);
     symbolName = "_binary_" + fixName s;
   in
-  derivation {
+  shellDerivation {
     name =
       if builtins.typeOf binary == "path"
       then symbolName + ".o"
       else "binary";
-    system = builtins.currentSystem;
-    builder = tool.shell;
-    args = [ "-e" ./transform-binary.sh ];
-
+    script = ./transform-binary.sh;
     inherit genodeEnv binary symbolName;
-    inherit (stdAttrs) as asOpt;
+    inherit (stdAttrs) as asFlags;
   };
 
   # Compile objects from a port derivation.
   compileCPort =
   { name ? "objects", ... } @ args:
-  derivation (
+  shellDerivation (
     { inherit name genodeEnv;
       inherit (stdAttrs) cc ccFlags nativeIncludePaths;
     } // args // {
-      system = builtins.currentSystem;
-      builder = tool.shell;
-      args = [ "-e" ./compile-c-port.sh ];
+      script = ./compile-c-port.sh;
     }
   );
+
+  # Link together a shared library.
+  # This function must be preloaded with an ldso-startup library.
+  linkSharedLibrary =
+  { ldso-startup }:
+  { ldScriptSo ? ../../repos/base/src/platform/genode_rel.ld
+  , entryPoint ? "0x0"
+  , libs ? []
+  , ... } @ args:
+  shellDerivation ( args // {
+    script = ./link-shared-library.sh;
+    libs = [ ldso-startup ] ++ libs;
+    inherit genodeEnv ldScriptSo entryPoint;
+    inherit (stdAttrs) ld ldFlags cc ccMarch;
+  }) // { shared = true; };
+
+  # Link together a component with shared libraries.
+  # Must be prepared with a dynamic linker.
+  linkDynamicComponent =
+  { dynamicLinker
+  ,  dynDl ? ../../repos/base/src/platform/genode_dyn.dl
+  , ldTextAddr ? spec.ldTextAddr
+  , ldScripts ? [ ../../repos/base/src/platform/genode_dyn.ld ]
+  , libs ? []
+  , ... } @ args:
+  shellDerivation ( args // {
+    script = ./link-dynamic-component.sh;
+    inherit genodeEnv dynDl ldTextAddr dynamicLinker ldScripts;
+    inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
+    libs = libs ++ [ dynamicLinker ];
+  });
 
 }

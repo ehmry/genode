@@ -1,4 +1,5 @@
-{ genodeEnv, compileCC, compileLibc, libcSrc
+{ genodeEnv, linkSharedLibrary, compileCC, compileLibc, libcSrc
+, base, config
 , libc-string, libc-locale, libc-stdlib, libc-stdio, libc-gen
 , libc-gdtoa, libc-inet, libc-stdtime, libc-regex, libc-compat
 , libc-setjmp, ldso-startup }:
@@ -44,14 +45,12 @@ let
   };
 
 in
-genodeEnv.mkLibrary {
+linkSharedLibrary {
   name = "libc";
-  shared = true;
   libs =
-    [ ldso-startup
-      libc-string libc-locale libc-stdlib libc-stdio libc-gen
-      libc-gdtoa libc-inet libc-stdtime libc-regex libc-compat
-      libc-setjmp
+    [ libc-string libc-locale libc-stdlib libc-stdio
+      libc-gen libc-gdtoa libc-inet libc-stdtime
+      libc-regex libc-compat libc-setjmp
     ];
 
   objects = map compileCC'
@@ -62,7 +61,7 @@ genodeEnv.mkLibrary {
       "plugin.cc" "plugin_registry.cc" "select.cc" "exit.cc"
       "environ.cc" "nanosleep.cc" "libc_mem_alloc.cc"
       "pread_pwrite.cc" "readv_writev.cc" "poll.cc"
-      "libc_pdbg.cc" "vfs_plugin.cc" "rtc.cc"
+      "libc_pdbg.cc" "vfs_plugin.cc" "rtc.cc" "dynamic_linker.cc"
     ];
 
   externalObjects = compileLibc {
@@ -86,8 +85,7 @@ genodeEnv.mkLibrary {
 
   };
 
-  ldOpt =
-    [ "--version-script=${sourceDir}/Version.def" ] ++ genodeEnv.ldOpt;
+  extraLdFlags = [ "--version-script=${sourceDir}/Version.def" ];
 
   propagatedIncludes = map (fn: "${libcSrc}/${fn}")
     [ "include/libc"

@@ -16,8 +16,6 @@ run {
     { target = "/"; source = libs.libc; }
     { target = "/"; source = libs.libm; }
 
-     #build "core init test/ldso test/ldso/dl"
-
     { target = "/config";
       source = builtins.toFile "config" ''
 	<config>
@@ -41,10 +39,6 @@ run {
       '';
     }
   ];
-
-#	core init test-ldso test-ldso_lib_1.lib.so
-#	test-ldso_lib_2.lib.so test-ldso_lib_dl.lib.so
-#	ld.lib.so libc.lib.so libm.lib.so
 
   testScript = ''
 append qemu_args "-nographic -m 64"

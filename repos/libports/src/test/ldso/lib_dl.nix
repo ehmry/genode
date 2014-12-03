@@ -1,9 +1,8 @@
-{ genodeEnv, compileCC, test-ldso_lib_1, ldso-startup }:
+{ linkSharedLibrary, compileCC, test-ldso_lib_1 }:
 
-genodeEnv.mkLibrary {
+linkSharedLibrary {
   name = "test-ldso_lib_dl";
-  shared = true;
-  libs = [ test-ldso_lib_1 ldso-startup ];
+  libs = [ test-ldso_lib_1 ];
   objects = compileCC {
     src = ./lib_dl.cc;
     localIncludes = [ ./include ];

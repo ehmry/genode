@@ -80,4 +80,4 @@ done
 
 test "$prefix" && cd $prefix
 
-VERBOSE $cc $extraFlags $ccFlags $includeOpts -c $src -o $out
+VERBOSE $cc $extraFlags $ccFlags -D__ASSEMBLY__ $includeOpts -c $src -o $out

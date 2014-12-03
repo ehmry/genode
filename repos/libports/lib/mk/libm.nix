@@ -1,4 +1,4 @@
-{ genodeEnv, compileSubLibc, libcSrc, libc }:
+{ genodeEnv, linkSharedLibrary, compileSubLibc, libcSrc, libc }:
 let
   libmDir = "${libcSrc}/lib/msun";
 
@@ -8,9 +8,8 @@ let
     if genodeEnv.isx86_64 then "${libcSrc}/include/libc-amd64" else
     throw "no libc for ${genodeEnv.system}";
 in
-genodeEnv.mkLibrary rec {
+linkSharedLibrary rec {
   name = "libm";
-  shared = true;
   libs = [ libc ];
 
   externalObjects = compileSubLibc {

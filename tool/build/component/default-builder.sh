@@ -1,3 +1,0 @@
-source $component/setup
-
-componentBuild

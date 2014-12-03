@@ -1,14 +1,14 @@
-{ genodeEnv, compileCC
-, base, test-ldso_lib_1, test-ldso_lib_2, libc, libm, ld }:
+{ genodeEnv, linkComponent, compileCC
+, base, test-ldso_lib_1, test-ldso_lib_2, libc, libm }:
 
-genodeEnv.mkComponent rec {
+linkComponent rec {
   name = "test-ldso";
-  libs = [ test-ldso_lib_1 test-ldso_lib_2 libc libm ld ];
+  libs = [ test-ldso_lib_1 test-ldso_lib_2 libc libm ];
+
   objects = compileCC {
     src = ./main.cc;
     localIncludes = [ ./include ];
-
-    systemIncludes = genodeEnv.tool.propagatedIncludes libs;
-    # TODO: is this a worthwhile function? ^
+    systemIncludes = genodeEnv.tool.propagateIncludes libs;
   };
+
 }

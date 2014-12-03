@@ -1,4 +1,5 @@
-{ genodeEnv, repoDir, compileCC, compileS, baseLibs, ldso-startup }:
+{ genodeEnv, linkSharedLibrary, compileCC, compiles, repoDir
+, baseLibs, ldso-startup }:
 
 let
   archDir =
@@ -17,18 +18,16 @@ let
     then [ ("-T" + (repoDir + "/src/platform/context_area.nostdlib.ld")) ]
     else [ "-T${./linker.ld}" ];
 in
-genodeEnv.mkLibrary {
+linkSharedLibrary {
   name = "ld";
-  shared = true;
-  libs = baseLibs ++ [ ldso-startup ]; # this should be automatic.
+  libs = baseLibs;
   objects =
     ( map compileCC' [ ./main.cc ./test.cc ./file.cc ] ) ++
-    [ ( compileS { src = archDir + "/jmp_slot.s"; } ) ];
+    [ ( compiles { src = archDir + "/jmp_slot.s"; } ) ];
 
   entryPoint = "_start";
 
   extraLdFlags =
     [ "-Bsymbolic-functions" "--version-script=${./symbol.map}" ] ++
     kernelLdFlags;
-
 }

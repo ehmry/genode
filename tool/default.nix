@@ -13,6 +13,17 @@ with builtins;
 let tool = rec {
   inherit nixpkgs;
 
+  shell = nixpkgs.bash + "/bin/sh";
+
+  # Save some typing when creating derivation that use our shell.
+  shellDerivation = { script, ... } @ args:
+    derivation ( (removeAttrs args [ "script" ]) //
+      { system = builtins.currentSystem;
+        builder = shell;
+        args = [ "-e" script ];
+      }
+    );
+
   ##
   # Determine if any of the following libs are shared.
   anyShared = libs:
@@ -55,7 +66,9 @@ let tool = rec {
   else
     (substring 0 1 s) + (replaceInString a b (substring 1 sl s));
 
-  bootImage = import ./boot-image { inherit nixpkgs; };
+  # Bootability is not assured, so its really system image.
+  systemImage = import ./system-image { inherit nixpkgs; };
+  bootImage = systemImage; # get rid of this
 
   filterOut = filters: filteree:
     filter (e: !(elem (baseNameOf e) filters)) filteree;
@@ -75,7 +88,7 @@ let tool = rec {
   name: contents:
   derivation {
     inherit name contents;
-    system = currentSystem;
+    system = builtins.currentSystem;
     builder = shell;
     PATH="${nixpkgs.coreutils}/bin";
     args = [ "-e" "-c" ''
@@ -86,24 +99,21 @@ let tool = rec {
 
   preparePort = import ./prepare-port { inherit nixpkgs; };
 
-  propagatedIncludes = pkgs:
+  # Concatenate the propagatedIncludes found in pkgs.
+  propagateIncludes = pkgs:
     let pkg = head pkgs; in
     if pkgs == [] then [] else
-    if hasAttr "include" pkg then [ pkg.include ] else []
-    ++ propagatedIncludes (tail pkgs);
-
-  shell = nixpkgs.bash + "/bin/sh";
+    (pkg.propagatedIncludes or []) ++ (propagateIncludes (tail pkgs));
 
   wildcard =
   path: glob:
   let
-    relativePaths = import (derivation {
+    relativePaths = import (shellDerivation {
       name = "files.nix";
-      system = currentSystem;
-      builder = shell;
       PATH="${nixpkgs.coreutils}/bin";
+      script = ./wildcard.sh;
       inherit path glob;
-      args = [ "-e" ./wildcard.sh ];
+
     });
   in
   map (rp: (path+"/${rp}")) relativePaths;
@@ -114,11 +124,9 @@ let tool = rec {
   let
     dirName = dir.name or baseNameOf (toString dir);
   in
-  import (derivation {
+  import (shellDerivation {
     name = "${dirName}-glob.nix";
-    system = currentSystem;
-    builder = shell;
-    args = [ "-e" ./from-glob.sh ];
+    script = ./from-glob.sh;
     #PATH="${nixpkgs.coreutils}/bin";
     inherit dir glob;
   });
@@ -129,8 +137,6 @@ let tool = rec {
     trace "FIXME: pathsFromGlob causes excessive hashing"
     import (derivation {
       name = "${baseNameOf path}-glob.nix";
-      system = currentSystem;
-      builder = shell;
       args = [ "-e" "-O" "nullglob" ./path-from-glob.sh ];
       inherit dir glob path;
     });

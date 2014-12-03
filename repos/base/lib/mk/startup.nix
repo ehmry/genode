@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC, compileS, baseDir, repoDir, syscall }:
+{ genodeEnv, compileCC, compiles, baseDir, repoDir, syscall }:
 
 let
   sourceDir = baseDir+"/src/platform";
@@ -20,5 +20,5 @@ genodeEnv.mkLibrary {
     (map (src: compileCC { inherit src systemIncludes; })
       [ (sourceDir+"/_main.cc") (sourceDir+"/init_main_thread.cc") ]
     ) ++
-    [ (compileS { src = (archDir+"/crt0.s"); }) ];
+    [ (compiles { src = (archDir+"/crt0.s"); }) ];
 }

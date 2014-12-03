@@ -1,5 +1,5 @@
 /*
- * \brief  Function to create a boot image directory
+ * \brief  Function to create a system image directory
  * \author Emery Hemingway
  * \date   2014-08-13
  */
@@ -11,7 +11,7 @@ derivation {
   name = name+"-boot-image";
   system = builtins.currentSystem;
   builder = nixpkgs.bash+"/bin/sh";
-  args = [ "-e" ./boot-image.sh ];
+  args = [ "-e" ./system-image.sh ];
   PATH = nixpkgs.coreutils+"/bin";
 
   sources = map (x: x.source) contents;

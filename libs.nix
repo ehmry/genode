@@ -13,7 +13,7 @@ let
     f (
       builtins.intersectAttrs
         (builtins.functionArgs f)
-        (libs // extraAttrs )
+        (libs // { inherit linkSharedLibrary; } // extraAttrs )
     );
 
   libs' = tool.mergeSets (
@@ -29,6 +29,10 @@ let
       [ base-common base startup cxx
         timed_semaphore alarm config syscall
       ];
+  };
+
+  linkSharedLibrary = tool.linkSharedLibrary {
+    inherit (libs') ldso-startup;
   };
 
 in libs

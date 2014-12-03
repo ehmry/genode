@@ -17,7 +17,7 @@ let
   });
 
   callBaseLibrary = callLibrary {
-    inherit (tool) genodeEnv compileS;
+    inherit (tool) genodeEnv compiles compileS;
     inherit compileCC baseDir repoDir;
   };
   importBaseLibrary = path: callBaseLibrary (import path);

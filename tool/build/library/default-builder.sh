@@ -1,3 +1,0 @@
-source $library/setup
-
-libraryBuild
