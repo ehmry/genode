@@ -99,11 +99,15 @@ let tool = rec {
 
   preparePort = import ./prepare-port { inherit nixpkgs; };
 
-  # Concatenate the propagatedIncludes found in pkgs.
-  propagateIncludes = pkgs:
-    let pkg = head pkgs; in
+  # Concatenate the named attr found in pkgs.
+  propagate = attrName: pkgs:
+    let
+      pkg = head pkgs;
+      propagate' = propagate attrName;
+    in
     if pkgs == [] then [] else
-    (pkg.propagatedIncludes or []) ++ (propagateIncludes (tail pkgs));
+    (if hasAttr attrName pkg then getAttr attrName pkg else []) ++
+    (propagate' (tail pkgs));
 
   wildcard =
   path: glob:

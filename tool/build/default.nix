@@ -184,15 +184,13 @@ let
   };
 
   spec =
-    if system == "x86_32-linux" then import ../../specs/x86_32-linux.nix else
+    if system == "i686-linux" then import ../../specs/x86_32-linux.nix else
     if system == "x86_64-linux" then import ../../specs/x86_64-linux.nix else
     if system == "x86_32-nova"  then import ../../specs/x86_32-nova.nix  else
     if system == "x86_64-nova"  then import ../../specs/x86_64-nova.nix  else
     abort "unknown system type ${system}";
 
-  toolchain = nixpkgs.callPackage ../toolchain/precompiled {
-    glibc = nixpkgs.glibc_multi;
-  };
+  toolchain = nixpkgs.callPackage ../toolchain/precompiled {};
 
 in
 rec {
@@ -306,12 +304,24 @@ rec {
 
   # Compile objects from a port derivation.
   compileCCRepo =
-  { name ? "objects", sources, ... } @ args:
+  { name ? "objects"
+  , sources
+  , extraFlags ? []
+  , systemIncludes ? []
+  , libs ? []
+  , ... } @ args:
   shellDerivation (
     { inherit name genodeEnv;
-      inherit (stdAttrs) cxx ccFlags cxxFlags nativeIncludePaths;
-    } // args // {
+      inherit (stdAttrs) cxx ccFlags cxxFlags;
+    } // (removeAttrs args [ "libs" ]) // {
       script = ./compile-cc-port.sh;
+
+      systemIncludes =
+        systemIncludes ++
+        (propagate "propagatedIncludes" libs) ++
+        stdAttrs.nativeIncludePaths;
+
+      extraFlags = extraFlags ++ (propagate "propagatedFlags" libs);
     }
   );
 
