@@ -1,24 +1,25 @@
-/*
- * \author Emery Hemingway
- * \date   2014-09-30
- */
+{ genodeEnv, linkSharedLibrary, compileCRepo
+, zlibSrc
+, libc }:
 
-{ tool }: with tool;
-{ zlib }:
-{ libc }:
+with genodeEnv.tool;
 
-buildLibrary {
+linkSharedLibrary rec {
   name = "zlib";
-  shared = true;
   libs = [ libc ];
-  sources = fromDir zlib [
-    "adler32.c" "compress.c" "crc32.c" "deflate.c" "gzclose.c"
-    "gzlib.c" "gzread.c" "gzwrite.c" "infback.c" "inffast.c"
-    "inflate.c" "inftrees.c" "trees.c" "uncompr.c" "zutil.c"
-  ];
-  includeDirs = [ ];
+  externalObjects = compileCRepo {
+    sourceRoot = zlibSrc;
+    sources =
+      [ "adler32.c" "compress.c" "crc32.c" "deflate.c" "gzclose.c"
+        "gzlib.c" "gzread.c" "gzwrite.c" "infback.c" "inffast.c"
+        "inflate.c" "inftrees.c" "trees.c" "uncompr.c" "zutil.c"
+      ];
+    systemIncludes = propagateIncludes libs;
+  };
+
   propagatedIncludes =
     [ (newDir "zlib-include" (
-        fromDir zlib [ "zconf.h" "zlib.h" ]) )
-  ];
+        map (fn: "${zlibSrc}/${fn}") [ "zconf.h" "zlib.h" ]
+      ))
+    ];
 }

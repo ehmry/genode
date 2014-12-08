@@ -87,7 +87,8 @@ linkSharedLibrary {
 
   extraLdFlags = [ "--version-script=${sourceDir}/Version.def" ];
 
-  propagatedIncludes = map (fn: "${libcSrc}/${fn}")
+  propagatedIncludes = map
+    (fn: "${libcSrc}/${fn}")
     [ "include/libc"
       ( if genodeEnv.isx86_32 then "include/libc-i386"  else
         if genodeEnv.isx86_64 then "include/libc-amd64" else

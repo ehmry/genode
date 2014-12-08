@@ -12,8 +12,11 @@ let
     in f (builtins.intersectAttrs (builtins.functionArgs f) (tool.nixpkgs // tool) );
 in
 {
-  libc   = callPort ./libc.nix;
-  libpng = callPort ./libpng.nix;
-  x86emu = callPort ./x86emu.nix;
-  zlib   = callPort ./zlib.nix;
+  libc    = callPort ./libc.nix;
+  libpng  = callPort ./libpng.nix;
+  sdl     = callPort ./sdl.nix;
+  sdl_net = callPort ./sdl_net.nix;
+  stdcxx  = callPort ./stdcxx.nix;
+  x86emu  = callPort ./x86emu.nix;
+  zlib    = callPort ./zlib.nix;
 }

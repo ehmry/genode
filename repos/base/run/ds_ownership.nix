@@ -41,6 +41,8 @@ run {
 
   testScript =
     ''
+      append qemu_args "-nographic -m 64"
+
       run_genode_until {.*Test ended.*\.} 10
 
       grep_output {\[init -\> test-ds_ownership\] Test ended}

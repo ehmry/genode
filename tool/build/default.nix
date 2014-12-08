@@ -197,8 +197,13 @@ let
 in
 rec {
   genodeEnv     = addSubMks genodeEnv';
-  genodePortEnv = addSubMks genodeEnv;
   genodeEnvAdapters = import ./adapters.nix;
+
+  ## TODO
+  # Deduplicate the following functions.
+  # It shouldn't be hard, the scripts can
+  # be broken apart into files to be sourced
+  # by other scripts.
 
   compiles =
   { src
@@ -289,13 +294,24 @@ rec {
   };
 
   # Compile objects from a port derivation.
-  compileCPort =
-  { name ? "objects", ... } @ args:
+  compileCRepo =
+  { name ? "objects", sources, ... } @ args:
   shellDerivation (
     { inherit name genodeEnv;
       inherit (stdAttrs) cc ccFlags nativeIncludePaths;
     } // args // {
       script = ./compile-c-port.sh;
+    }
+  );
+
+  # Compile objects from a port derivation.
+  compileCCRepo =
+  { name ? "objects", sources, ... } @ args:
+  shellDerivation (
+    { inherit name genodeEnv;
+      inherit (stdAttrs) cxx ccFlags cxxFlags nativeIncludePaths;
+    } // args // {
+      script = ./compile-cc-port.sh;
     }
   );
 

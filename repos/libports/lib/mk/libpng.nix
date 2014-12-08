@@ -1,28 +1,32 @@
-/*
- * \author Emery Hemingway
- * \date   2014-09-30
- */
+{ genodeEnv, linkSharedLibrary, compileCRepo
+, libpngSrc
+, libc, libm, zlib }:
 
-{ tool }: with tool;
-{ libpng }:
-{ libc, libm, zlib }:
+with genodeEnv.tool;
 
-buildLibrary {
+linkSharedLibrary rec {
   name = "libpng";
-  shared = true;
   libs = [ libc libm zlib ];
 
-  ccDef = [ "-DHAVE_CONFIG_H" "-DPNG_CONFIGURE_LIBPNG" ];
+  externalObjects = compileCRepo {
+    sourceRoot = libpngSrc;
 
-  sources = fromDir libpng [
-    "png.c" "pngset.c" "pngget.c" "pngrutil.c" "pngtrans.c"
-    "pngwutil.c" "pngread.c" "pngrio.c" "pngwio.c" 
-    "pngwrite.c" "pngrtran.c" "pngwtran.c" "pngmem.c" 
-    "pngerror.c" "pngpread.c"
-  ];
-  includeDirs = [ ../../src/lib/libpng ]; # find 'config.h'
-  propagatedIncludes = 
+    sources =
+      [ "png.c" "pngset.c" "pngget.c" "pngrutil.c" "pngtrans.c"
+        "pngwutil.c" "pngread.c" "pngrio.c" "pngwio.c" 
+        "pngwrite.c" "pngrtran.c" "pngwtran.c" "pngmem.c" 
+        "pngerror.c" "pngpread.c"
+      ];
+
+    extraFlags =
+      [ "-DHAVE_CONFIG_H" "-DPNG_CONFIGURE_LIBPNG" ];
+
+    systemIncludes = [ ../../src/lib/libpng ] ++ (propagateIncludes libs);
+  };
+
+  propagatedIncludes =
     [ (newDir "libpng-include" (
-        fromDir libpng [ "pngconf.h" "png.h" "pngpriv.h" ]))
+        fromDir libpngSrc [ "pngconf.h" "png.h" "pngpriv.h" ]
+      ))
     ];
 }

@@ -4,31 +4,27 @@
  * \date   2014-09-18
  */
 
-{ tool, callPackage, baseIncludes, osIncludes }:
+{ tool, callComponent }:
 
 let
 
-  # overide the build.component function
-  build' = tool.build // {
-    component = { includeDirs ? [], ... } @ args:
-      tool.build.component (args // {
-        includeDirs =  builtins.concatLists [
-          includeDirs osIncludes baseIncludes
-        ];
-      });
-  };
-
-  importComponent = path:
-    callPackage (import path { inherit tool; build = build'; });
+  # Append 'Src' to each attribute in ports.
+  ports = builtins.listToAttrs (
+    map
+      (n: { name = n+"Src"; value = builtins.getAttr n ports; })
+      (builtins.attrNames (import ./ports { inherit tool; }))
+  );
+  
+  callComponent' = callComponent (
+    { inherit (tool) genodeEnv compileCCRepo;
+    } // ports
+  );
     
-  ports = import ./ports { inherit tool; };
 
+  importComponent = path: callComponent' (import path);
+  
 in
 {
-  app = {
-    #dosbox = callPackage (import ./src/app/dosbox {
-    #  inherit tool; build = build'; inherit (ports) dosbox;
-    #});
-  };
-
+  app =
+    { dosbox = importComponent ./src/app/dosbox; };
 }

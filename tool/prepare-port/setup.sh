@@ -301,41 +301,40 @@ unpackPhase() {
         unpackFile $a
     done
 
-    runHook postUnpack
-}
-
-unpackPhase() {
-    runHook preUnpack
-
-    if [ -z "$srcs" ]; then
-        if [ -z "$src" ]; then
-            echo 'variable $src or $srcs should point to the source'
-            exit 1
-        fi
-        srcs="$src"
+    # Find the source directory.
+    if [ -n "$setSourceRoot" ]; then
+        runOneHook setSourceRoot
+    elif [ -z "$sourceRoot" ]; then
+        sourceRoot=
+        for i in *; do
+            if [ -d "$i" ]; then
+                case $dirsBefore in
+                    *\ $i\ *)
+                        ;;
+                    *)
+                        if [ -n "$sourceRoot" ]; then
+                            echo "unpacker produced multiple directories"
+                            exit 1
+                        fi
+                        sourceRoot="$i"
+                        ;;
+                esac
+            fi
+        done
     fi
 
-    # To determine the source directory created by unpacking the
-    # source archives, we record the contents of the current
-    # directory, then look below which directory got added.  Yeah,
-    # it's rather hacky.
-    local dirsBefore=""
-    for i in *; do
-        if [ -d "$i" ]; then
-            dirsBefore="$dirsBefore $i "
-        fi
-    done
+    if [ -z "$sourceRoot" ]; then
+        echo "unpacker appears to have produced no directories"
+        exit 1
+    fi
 
-    # Unpack all source archives.
-    for i in $srcs; do
-        unpackFile $i
-    done
+    echo "source root is $sourceRoot"
 
     # By default, add write permission to the sources.  This is often
     # necessary when sources have been copied from other store
     # locations.
     if [ "$dontMakeSourcesWritable" != 1 ]; then
-        chmod -R u+w ./
+        chmod -R u+w "$sourceRoot"
     fi
 
     runHook postUnpack

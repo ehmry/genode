@@ -107,9 +107,9 @@ let
       [ ./include ];
   });
 
- compileCPort =
+ compileCRepo =
   attrs:
-  tool.compileCPort (attrs // {
+  tool.compileCRepo (attrs // {
     systemIncludes =
      (attrs.systemIncludes or []) ++
       ( import ../base/include { inherit (tool) genodeEnv; }) ++
@@ -117,8 +117,8 @@ let
   });
 
   callLibrary' = callLibrary (
-    { inherit (tool) genodeEnv;
-      inherit compileLibc compileSubLibc compileCC compileCPort;
+    { inherit (tool) genodeEnv compileCCRepo;
+      inherit compileLibc compileSubLibc compileCC compileCRepo;
     } // ports'
   );
   importLibrary = path: callLibrary' (import path);
@@ -140,8 +140,11 @@ in
   libc = importLibrary ./lib/mk/libc.nix;
   libm = importLibrary ./lib/mk/libm.nix;
 
-  #libpng = importLibrary ./lib/mk/libpng.nix;
-  #zlib   = importLibrary ./lib/mk/zlib.nix;
+  libpng  = importLibrary ./lib/mk/libpng.nix;
+  pthread = importLibrary ./src/lib/pthread;
+  sdl     = importLibrary ./src/lib/sdl;
+  sdl_net = importLibrary ./src/lib/sdl_net;
+  zlib    = importLibrary ./lib/mk/zlib.nix;
 
   test-ldso_lib_1  = importLibrary ./src/test/ldso/lib_1.nix;
   test-ldso_lib_2  = importLibrary ./src/test/ldso/lib_2.nix;

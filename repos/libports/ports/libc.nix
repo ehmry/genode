@@ -92,6 +92,8 @@ preparePort {
       }
     ) subdirs;
 
+  sourceRoot = ".";
+    
   repos = map (x: x.name) subdirs;
   dirs  = map (x: x.dir ) subdirs;
 

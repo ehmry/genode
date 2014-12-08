@@ -10,13 +10,7 @@ let
 
   ld = callComponent {} ({ld}: ld);
 
-  ports = import ./ports { inherit tool; };
-
-  includes =
-    [ #(ports.libc + "/include/libc")
-      #(ports.libc + "/include/libc-amd64")
-      ./include/libc-genode
-    ];
+  includes = [ ./include/libc-genode ];
 
   importInclude = p: import p { inherit (tool) genodeEnv; };
 
@@ -48,7 +42,8 @@ in
   driver.framebuffer = importComponent ./src/drivers/framebuffer/vesa;
 
   test =
-    { ldso = importComponent ./src/test/ldso;
-      libc = importComponent ./src/test/libc;
+    { ldso    = importComponent ./src/test/ldso;
+      libc    = importComponent ./src/test/libc;
+      pthread = importComponent ./src/test/pthread;
     };
 }

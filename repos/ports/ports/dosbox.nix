@@ -3,11 +3,11 @@
  * \date   2014-09-19
  */
 
-{ preparePort, wildcard, fetchsvn }:
+{ preparePort, fetchsvn }:
 
 let rev = "3837"; in
-preparePort {
-  name = "dosbox-rev${rev}";
+preparePort rec {
+  name = "dosbox-r${rev}";
 
   src = fetchsvn {
     url = http://svn.code.sf.net/p/dosbox/code-0/dosbox/trunk;
@@ -15,7 +15,8 @@ preparePort {
     sha256 = "1difbi5civmp9xjbcljcnhbjl7zwqqlkhhldghq46jbfs5g4rs0y";
   };
 
-  patches = wildcard "${../src/app/dosbox/patches}/*.patch";
-
+  postUnpack = "cd ${name}";
+  
+  patches = "${../src/app/dosbox/patches}/*.patch";
   patchFlags = "-p2";
 }

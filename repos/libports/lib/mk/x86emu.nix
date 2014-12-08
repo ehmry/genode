@@ -2,7 +2,7 @@
 # x86 real-mode emulation library
 #
 
-{ genodeEnv, compileCPort, x86emuSrc }:
+{ genodeEnv, compileCRepo, x86emuSrc }:
 
 let
   includeDir = x86emuSrc + "/include/x86emu";
@@ -10,7 +10,7 @@ in
 genodeEnv.mkLibrary {
   name = "x86emu";
 
-  externalObjects = compileCPort {
+  externalObjects = compileCRepo {
     extraFlags = [ "-fomit-frame-pointer" "-I." ];
     sourceRoot = x86emuSrc;
     sources =

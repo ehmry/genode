@@ -78,8 +78,8 @@ let tool = rec {
   # not the original absolute path
   fromDir =
   dir: names:
-  assert typeOf dir == "path";
-  map (name: [ (dir+"/${name}") name ]) names;
+  #assert typeOf dir == "path";
+  map (name: dir+"/"+name) names;
 
   fromPath = path: [ [ path (baseNameOf (toString path)) ] ];
   fromPaths = paths: map (p: [ p (baseNameOf (toString p)) ]) paths;
@@ -184,6 +184,7 @@ let tool = rec {
         sp = head searchPath;
         fn' = sp + "/${fn}";
       in
+      if builtins.typeOf fn' != "path" then [] else
       if pathExists fn' then
         [ { key = fn'; relative = fn; } ]
       else findFile fn (tail searchPath);
