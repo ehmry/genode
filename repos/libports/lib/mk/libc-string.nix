@@ -3,9 +3,9 @@
  * library and the complete libc
  */
 
-{ genodeEnv, compileSubLibc }:
+{ linkStaticLibrary, compileSubLibc }:
 let dir = "lib/libc/string"; in
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "libc-string";
 
   externalObjects = compileSubLibc {

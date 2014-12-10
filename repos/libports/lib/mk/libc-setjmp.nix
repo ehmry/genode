@@ -1,6 +1,6 @@
-{ genodeEnv, compileSubLibc }:
+{ genodeEnv, linkStaticLibrary, compileSubLibc }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "libc-setjmp";
   externalObjects = compileSubLibc {
     sources =

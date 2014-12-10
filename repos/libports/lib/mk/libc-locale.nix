@@ -1,6 +1,6 @@
-{ genodeEnv, compileSubLibc }:
+{ linkStaticLibrary, compileSubLibc }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "libc-locale";
   externalObjects = compileSubLibc {
     sources = [ "lib/libc/locale/*.c" ];

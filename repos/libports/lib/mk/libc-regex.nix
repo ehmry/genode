@@ -1,6 +1,6 @@
-{ genodeEnv, compileSubLibc }:
+{ linkStaticLibrary, compileSubLibc }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "libc-regex";
   externalObjects = compileSubLibc {
     sources = [ "lib/libc/regex/*.c" ];

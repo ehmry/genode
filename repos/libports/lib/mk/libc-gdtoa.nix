@@ -1,6 +1,6 @@
-{ genodeEnv, compileSubLibc }:
+{ linkStaticLibrary, compileSubLibc }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "libc-gdtoa";
   externalObjects = compileSubLibc {
     sources = [ "contrib/gdtoa/*.c" "lib/libc/gdtoa/*.c" ];

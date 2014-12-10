@@ -1,4 +1,4 @@
-{ genodeEnv, compileSubLibc }:
+{ genodeEnv, linkStaticLibrary, compileSubLibc }:
 
 let
   repoSrcDir = ../../src/lib/libc;
@@ -35,7 +35,7 @@ let
     else throw "incomplete libc-gen expression for ${genodeEnv.system}";
 
 in
-genodeEnv.mkLibrary rec {
+linkStaticLibrary rec {
   name = "libc-gen";
 
   externalObjects = compileSubLibc (genodeEnv.tool.mergeSet archArgs {

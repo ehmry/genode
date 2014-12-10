@@ -88,20 +88,10 @@ let
     fi
   '';
 
-  ## could propagatedIncludes replace systemIncludes?
-
   libraryFixupPhase = ''
     if [ -n "$libs" ]; then
         mkdir -p "$out/nix-support"
         echo "$libs" > "$out/nix-support/propagated-libraries"
-    fi
-
-    if [ -n "$propagatedIncludes" ]; then
-        mkdir -p $include
-
-        for i in $propagatedIncludes; do
-            cp -ru --no-preserve=mode $i/* $include
-        done
     fi
   '';
   #*/
@@ -319,6 +309,14 @@ rec {
       script = ./compile-cc-port.sh;
     }
   );
+
+  # Link together a static library.
+  linkStaticLibrary = args:
+    shellDerivation ( args // {
+      script = ./link-static-library.sh;
+      inherit genodeEnv;
+      inherit (stdAttrs) ar;
+    });
 
   # Link together a shared library.
   # This function must be preloaded with an ldso-startup library.
