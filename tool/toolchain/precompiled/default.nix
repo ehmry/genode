@@ -1,6 +1,10 @@
 { stdenv, fetchurl, patchelf, glibc, zlib, gcc }:
 
-let genodeVersion = "14.11"; in
+let
+  genodeVersion = "14.11";
+  glibcVersion = (builtins.parseDrvName glibc.name).version;
+
+in
 stdenv.mkDerivation rec {
   name = "genode-toolchain-${genodeVersion}";
   version = "4.7.4";
@@ -48,7 +52,7 @@ stdenv.mkDerivation rec {
   '';
 
   fixupPhase = ''
-    interp=${glibc}/lib/ld-2.19.so
+    interp=${glibc}/lib/ld-${glibcVersion}.so
     if [ ! -f "$interp" ] ; then
        echo new interpreter $interp does not exist,
        echo cannot patch binaries
