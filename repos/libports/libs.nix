@@ -144,6 +144,7 @@ in
   pthread = importLibrary ./src/lib/pthread;
   sdl     = importLibrary ./src/lib/sdl;
   sdl_net = importLibrary ./src/lib/sdl_net;
+  stdcxx  = importLibrary ./lib/mk/stdcxx.nix;
   zlib    = importLibrary ./lib/mk/zlib.nix;
 
   test-ldso_lib_1  = importLibrary ./src/test/ldso/lib_1.nix;
