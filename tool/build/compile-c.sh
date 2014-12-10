@@ -74,7 +74,7 @@ if ! test "$(readlink $prefix$srcName)" = $src; then
 fi
 
 includeOpts="-I."
-for i in $systemIncludes $nativeIncludePaths
+for i in $systemIncludes
 do includeOpts="$includeOpts -I$i"
 done
 

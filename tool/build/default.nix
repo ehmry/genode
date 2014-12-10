@@ -63,7 +63,7 @@ let
 
       cxxLinkFlags = [ "-nostdlib -Wl,-nostdlib"] ++ spec.ccMarch;
 
-      nativeIncludePaths =
+      nativeIncludes =
         [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include"
         ];
     };
@@ -192,6 +192,19 @@ let
 
   toolchain = nixpkgs.callPackage ../toolchain/precompiled {};
 
+  propagateCompileArgs = args:
+    let libs = args.libs or []; in
+    (removeAttrs args [ "libs" ]) //
+    { extraFlags =
+        (args.extraFlags or []) ++
+        (propagate "propagatedFlags" libs);
+
+      systemIncludes =
+        (args.systemIncludes or []) ++
+        (propagate "propagatedIncludes" libs) ++
+        stdAttrs.nativeIncludes;
+    };
+
 in
 rec {
   genodeEnv     = addSubMks genodeEnv';
@@ -208,7 +221,7 @@ rec {
   , localIncludes ? []
   , ... } @ args:
   shellDerivation (
-    { inherit (stdAttrs) cc ccFlags nativeIncludePaths;
+    { inherit (stdAttrs) cc ccFlags;
       inherit genodeEnv;
     } //
     args //
@@ -224,7 +237,7 @@ rec {
   , localIncludes ? []
   , ... } @ args:
   shellDerivation (
-    { inherit (stdAttrs) cc ccFlags nativeIncludePaths;
+    { inherit (stdAttrs) cc ccFlags;
       inherit genodeEnv;
     } //
     args //
@@ -236,15 +249,10 @@ rec {
   );
 
   compileC =
-  { src
-  , localIncludes ? []
-  , ... } @ args:
-  shellDerivation (
-    { inherit (stdAttrs) cc ccFlags nativeIncludePaths;
+  { src, ... } @ args:
+  shellDerivation ( (propagateCompileArgs args) //
+    { inherit (stdAttrs) cc ccFlags;
       inherit genodeEnv;
-    } //
-    args //
-    {
       name = dropSuffix ".c" (baseNameOf (toString src)) + ".o";
       script = ./compile-c.sh;
       localIncludes = findLocalIncludes src localIncludes;
@@ -255,12 +263,9 @@ rec {
   { src
   , localIncludes ? []
   , ... } @ args:
-  shellDerivation (
-    { inherit (stdAttrs) cxx ccFlags cxxFlags nativeIncludePaths;
+  shellDerivation ( (propagateCompileArgs args) //
+    { inherit (stdAttrs) cxx ccFlags cxxFlags;
       inherit genodeEnv;
-    } //
-    args //
-    {
       name = dropSuffix ".cc" (baseNameOf (toString src)) + ".o";
       script = ./compile-cc.sh;
       localIncludes = findLocalIncludes src localIncludes;
@@ -293,11 +298,12 @@ rec {
 
   # Compile objects from a port derivation.
   compileCRepo =
-  { name ? "objects", sources, ... } @ args:
-  shellDerivation (
+  { name ? "objects"
+  , sources
+  , ... } @ args:
+  shellDerivation ( (propagateCompileArgs args) //
     { inherit name genodeEnv;
-      inherit (stdAttrs) cc ccFlags nativeIncludePaths;
-    } // args // {
+      inherit (stdAttrs) cc ccFlags;
       script = ./compile-c-port.sh;
     }
   );
@@ -306,22 +312,11 @@ rec {
   compileCCRepo =
   { name ? "objects"
   , sources
-  , extraFlags ? []
-  , systemIncludes ? []
-  , libs ? []
   , ... } @ args:
-  shellDerivation (
+  shellDerivation ( (propagateCompileArgs args) //
     { inherit name genodeEnv;
       inherit (stdAttrs) cxx ccFlags cxxFlags;
-    } // (removeAttrs args [ "libs" ]) // {
       script = ./compile-cc-port.sh;
-
-      systemIncludes =
-        systemIncludes ++
-        (propagate "propagatedIncludes" libs) ++
-        stdAttrs.nativeIncludePaths;
-
-      extraFlags = extraFlags ++ (propagate "propagatedFlags" libs);
     }
   );
 

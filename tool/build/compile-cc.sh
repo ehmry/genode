@@ -74,7 +74,7 @@ if ! test "$(readlink $prefix$srcName)" = $src; then
 fi
 
 includeFlags="-I."
-for i in $systemIncludes $nativeIncludePaths
+for i in $systemIncludes
 do includeFlags="$includeFlags -I$i"
 done
 

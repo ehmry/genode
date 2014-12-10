@@ -13,7 +13,7 @@ let
     let version = builtins.readFile ../../VERSION; in
     tool.compileCC {
       src = ./src/core/version.cc;
-      extraFlags = ''-DGENODE_VERSION="\"${version}\""'';
+      extraFlags = [ ''-DGENODE_VERSION="\"${version}\""'' ];
     };
 
   compileCC =

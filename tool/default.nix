@@ -103,11 +103,15 @@ let tool = rec {
   propagate = attrName: pkgs:
     let
       pkg = head pkgs;
-      propagate' = propagate attrName;
     in
     if pkgs == [] then [] else
-    (if hasAttr attrName pkg then getAttr attrName pkg else []) ++
-    (propagate' (tail pkgs));
+    ( if hasAttr attrName pkg
+      then getAttr attrName pkg
+      else []
+    ) ++
+    (propagate attrName (tail pkgs));
+
+  singleton = x: [x];
 
   wildcard =
   path: glob:
