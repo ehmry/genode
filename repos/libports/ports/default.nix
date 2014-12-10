@@ -14,6 +14,7 @@ in
 {
   libc    = callPort ./libc.nix;
   libpng  = callPort ./libpng.nix;
+  lwip    = callPort ./lwip.nix;
   sdl     = callPort ./sdl.nix;
   sdl_net = callPort ./sdl_net.nix;
   stdcxx  = callPort ./stdcxx.nix;

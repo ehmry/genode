@@ -141,6 +141,7 @@ in
   libm = importLibrary ./lib/mk/libm.nix;
 
   libpng  = importLibrary ./lib/mk/libpng.nix;
+  lwip    = importLibrary ./src/lib/lwip;
   pthread = importLibrary ./src/lib/pthread;
   sdl     = importLibrary ./src/lib/sdl;
   sdl_net = importLibrary ./src/lib/sdl_net;
