@@ -26,7 +26,8 @@ let
        args // { dynamicLinker = args.dynamicLinker or libs.ld; }
      )
   else
-    tool.linkStaticComponent args;
+    # TODO: get rid of this
+    tool.genodeEnv.mkComponent args;
 in
 tool.mergeSets ([ { inherit libs; } ] ++ (
   map

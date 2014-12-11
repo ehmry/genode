@@ -56,6 +56,7 @@ in
       signal      = importComponent ./src/test/signal;
       testnit     = importComponent ./src/test/nitpicker;
       timer       = importComponent ./src/test/timer;
+      xml_generator = importComponent ./src/test/xml_generator;
     };
 
   init = importComponent ./src/init;
