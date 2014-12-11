@@ -10,8 +10,6 @@ let
 
   ld = callComponent {} ({ld}: ld);
 
-  includes = [ ./include/libc-genode ];
-
   importInclude = p: import p { inherit (tool) genodeEnv; };
 
   compileCC =
@@ -20,21 +18,12 @@ let
     systemIncludes =
      (attrs.systemIncludes or []) ++
      (importInclude ../base/include) ++
-     (importInclude ./include) ++
-     includes;
+     (importInclude ./include);
   });
 
-  # Prepare genodeEnv.
-  genodeEnv' = tool.genodeEnvAdapters.addSystemIncludes
-    tool.genodeEnv (
-      ( import ../base/include { inherit (tool) genodeEnv; }) ++
-      includes
-    );
-
-  genodeEnv = tool.genodeEnvAdapters.addDynamicLinker
-    genodeEnv' "${ld}/ld.lib.so";
-
-  callComponent' = callComponent { inherit genodeEnv compileCC; };
+  callComponent' = callComponent {
+    inherit (tool) genodeEnv; inherit compileCC;
+  };
   importComponent = path: callComponent' (import path);
 
 in

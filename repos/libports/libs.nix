@@ -124,7 +124,7 @@ in
   libc_lwip          = importLibrary ./src/lib/libc_lwip;
   libc_lwip_nic_dhcp = importLibrary ./src/lib/libc_lwip_nic_dhcp;
 
-  libpng  = importLibrary ./lib/mk/libpng.nix;
+  libpng  = importLibrary ./src/lib/libpng;
   lwip    = importLibrary ./src/lib/lwip;
   pthread = importLibrary ./src/lib/pthread;
   sdl     = importLibrary ./src/lib/sdl;

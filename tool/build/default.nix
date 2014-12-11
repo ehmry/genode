@@ -311,12 +311,13 @@ rec {
   );
 
   # Link together a static library.
-  linkStaticLibrary = args:
-    shellDerivation ( args // {
-      script = ./link-static-library.sh;
-      inherit genodeEnv;
-      inherit (stdAttrs) ar;
-    });
+  linkStaticLibrary =
+  { libs ? [], ... } @ args:
+  shellDerivation ( args // {
+    script = ./link-static-library.sh;
+    inherit genodeEnv;
+    inherit (stdAttrs) ar;
+  }) // { shared = false; inherit libs; };
 
   # Link together a shared library.
   # This function must be preloaded with an ldso-startup library.
@@ -342,11 +343,14 @@ rec {
   , ldScripts ? [ ../../repos/base/src/platform/genode_dyn.ld ]
   , libs ? []
   , ... } @ args:
+  let
+    libs' = libs;
+  in
   shellDerivation ( args // {
     script = ./link-dynamic-component.sh;
     inherit genodeEnv dynDl ldTextAddr dynamicLinker ldScripts;
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
-    libs = libs ++ [ dynamicLinker ];
+    libs = (findLibraries libs') ++ [ dynamicLinker ];
   });
 
 }

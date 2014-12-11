@@ -8,21 +8,20 @@
 
 let
 
+  ports = import ./ports { inherit tool; };
   # Append 'Src' to each attribute in ports.
-  ports = builtins.listToAttrs (
+  ports' = builtins.listToAttrs (
     map
       (n: { name = n+"Src"; value = builtins.getAttr n ports; })
-      (builtins.attrNames (import ./ports { inherit tool; }))
+      (builtins.attrNames ports)
   );
-  
+
   callComponent' = callComponent (
-    { inherit (tool) genodeEnv compileCCRepo;
-    } // ports
+    { inherit (tool) genodeEnv compileCCRepo; } // ports'
   );
-    
 
   importComponent = path: callComponent' (import path);
-  
+
 in
 {
   app =

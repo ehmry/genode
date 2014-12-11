@@ -9,7 +9,7 @@ let
   compileCC' = src: compileCC {
     inherit src;
     systemIncludes =
-      [ (genodeEnv.tool.filterInclude ../libc) ] ++ libcIncludes;
+      [ (genodeEnv.tool.filterHeaders ../libc) ] ++ libcIncludes;
   };
 in
 linkSharedLibrary {

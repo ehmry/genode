@@ -1,5 +1,5 @@
-{ genodeEnv, compileCC }:
+{ linkStaticLibrary, compileCC }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "config"; objects = compileCC { src = ./config.cc; };
 }

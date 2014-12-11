@@ -5,6 +5,7 @@ let
 in
 preparePort {
   name = "sdl-${version}";
+  outputs = [ "source" "include" ];
 
   src = fetchurl {
     url = "http://www.libsdl.org/release/SDL-${version}.tar.gz";
@@ -21,4 +22,15 @@ preparePort {
     ];
 
   patchFlags = "-p3";
+
+  preInstall =
+    ''
+      mkdir -p $include/SDL
+      mv include/*.h $include/SDL
+
+      # Some local includes.
+      cp ${../include/SDL}/*.h $include/SDL
+
+      rm -r include
+    '';
 }

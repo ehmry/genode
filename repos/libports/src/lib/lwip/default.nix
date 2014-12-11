@@ -49,4 +49,6 @@ linkSharedLibrary rec {
     extraFlags = [ "-DERRNO" ];
   };
 
+  propagatedIncludes = [ ../../../include/lwip lwipSrc.include ];
+
 }

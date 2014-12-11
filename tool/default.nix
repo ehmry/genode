@@ -44,7 +44,7 @@ let tool = rec {
 
   ##
   # Filter out everything but *.h on a path.
-  filterInclude = dir: filterSource
+  filterHeaders = dir: filterSource
     (path: type: hasDotH path || type == "directory")
     dir;
 
@@ -256,7 +256,24 @@ let tool = rec {
         in includesFound;
     });
 
-    includesSet =
+  ##
+  # Recursively find static libraries.
+  findLibraries = libs:
+    let
+      list = libs: map
+        (lib: { key = lib.name; inherit lib; }) libs;
+    in
+  map (s: s.lib) (genericClosure {
+    startSet = list libs;
+    operator =
+      { key, lib }:
+      # TODO: remove this dubugging logic
+      if !hasAttr "shared" lib then throw "${key} missing 'shared'}" else
+      if !hasAttr "libs" lib then throw "${key} missing 'libs'}" else
+      if lib.shared then [] else list lib.libs;
+  });
+
+  includesSet =
     sources: path:
     listToAttrs (
      map

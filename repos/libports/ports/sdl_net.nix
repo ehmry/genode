@@ -2,6 +2,7 @@
 
 preparePort rec {
   name = "SDL_net-1.2.8";
+  outputs = [ "source" "include" ];
 
   src = fetchurl {
     url = "http://www.libsdl.org/projects/SDL_net/release/${name}.tar.gz";
@@ -14,4 +15,10 @@ preparePort rec {
     ];
 
  patchFlags = "-p3";
+
+ preInstall =
+   ''
+     mkdir -p $include/SDL
+     cp SDL_net.h $include/SDL
+   '';
 }

@@ -9,19 +9,20 @@ linkSharedLibrary rec {
   libs = [ libc libm zlib ];
 
   externalObjects = compileCRepo {
+    inherit libs;
     sourceRoot = libpngSrc;
 
     sources =
       [ "png.c" "pngset.c" "pngget.c" "pngrutil.c" "pngtrans.c"
-        "pngwutil.c" "pngread.c" "pngrio.c" "pngwio.c" 
-        "pngwrite.c" "pngrtran.c" "pngwtran.c" "pngmem.c" 
+        "pngwutil.c" "pngread.c" "pngrio.c" "pngwio.c"
+        "pngwrite.c" "pngrtran.c" "pngwtran.c" "pngmem.c"
         "pngerror.c" "pngpread.c"
       ];
 
     extraFlags =
       [ "-DHAVE_CONFIG_H" "-DPNG_CONFIGURE_LIBPNG" ];
 
-    systemIncludes = [ ../../src/lib/libpng ] ++ (propagateIncludes libs);
+    systemIncludes = [ (genodeEnv.tool.filterHeaders ../libpng) ];
   };
 
   propagatedIncludes =

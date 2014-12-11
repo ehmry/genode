@@ -5,38 +5,29 @@ with genodeEnv.tool;
 
 let
 
-  sdlInclude = shellDerivation {
-    name = "include-SDL";
-    script = builtins.toFile "include-SDL.sh" ''
-      out=$out/SDL
-      mkdir -p $out
-      cp $sdlSrc/include/*.h $out
-    '';#*/
-    PATH = "${nixpkgs.coreutils}/bin";
-    inherit sdlSrc;
-  };
-
-
   localIncludes = map
     (fn: "${sdlSrc}/${fn}")
     ( [ "include" ] ++
       (map (d: "src/"+d) [ "audio" "events" "timer" "video" ])
     );
 
+  libs = [ libc pthread ];
+
   systemIncludes =
-    [ ../../../include/SDL sdlInclude ] ++
-    genodeEnv.tool.propagateIncludes [ libc ];
+    [ ../../../include/SDL
+      sdlSrc.include
+      "${sdlSrc.include}/SDL"
+    ];
 
   compileCC' = src: compileCC {
-    inherit src systemIncludes;
+    inherit src libs systemIncludes;
     extraFlags = map (f: "-I"+f) localIncludes;
   };
 
 in
-linkSharedLibrary rec {
+linkSharedLibrary {
   name = "sdl";
-
-  libs = [ libc pthread ];
+  inherit libs;
 
   objects = map
     compileCC'
@@ -48,7 +39,7 @@ linkSharedLibrary rec {
     ];
 
   externalObjects = compileCRepo {
-    inherit name systemIncludes;
+    inherit systemIncludes libs;
     sourceRoot = sdlSrc;
     inherit localIncludes;
     sources = genodeEnv.tool.fromDir "src"
@@ -57,6 +48,7 @@ linkSharedLibrary rec {
 
         # stdlib files
         "stdlib/SDL_getenv.c"
+        "stdlib/SDL_string.c"
 
         # thread subsystem
         "thread/SDL_thread.c"
@@ -72,13 +64,13 @@ linkSharedLibrary rec {
         "timer/SDL_timer.c"
 
         # video subsystem
-        "src/video/*.c"
+        "video/*.c"
 
         # event subsystem
-        "src/events/*.c"
+        "events/*.c"
 
         # audio subsystem
-        "src/audio/*.c"
+        "audio/*.c"
 
         # file I/O subsystem
         "file/SDL_rwops.c"
@@ -93,5 +85,6 @@ linkSharedLibrary rec {
       ];
   };
 
-  propagatedIncludes = [ sdlInclude ../../../include ];
+  propagatedIncludes =
+    [ sdlSrc.include "${sdlSrc.include}/SDL" ../../../include ];
 }

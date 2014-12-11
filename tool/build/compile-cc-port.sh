@@ -16,7 +16,8 @@ for src in $sources; do
 
     MSG_COMP $base
 
-    base="${base%.?}"
+    base="${base%.cc}"
+    base="${base%.cpp}"
     object="${base}.o"
 
     # apply per-file ccFlags
