@@ -1,8 +1,8 @@
-{ linkStaticLibrary, compileSubLibc }:
+{ linkStaticLibrary, compileLibc }:
 
 linkStaticLibrary {
   name = "libc-compat";
-  externalObjets = compileSubLibc {
+  externalObjets = compileLibc {
     sources = [ "lib/libc/compat-43/*.c" ];
   };
 }

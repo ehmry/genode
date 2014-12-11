@@ -79,6 +79,7 @@ let
 in
 preparePort {
   name = "libc-freebsd-${version}";
+  outputs = [ "source" "include" ];
 
   builder = ./libc-builder.sh;
 
@@ -93,7 +94,7 @@ preparePort {
     ) subdirs;
 
   sourceRoot = ".";
-    
+
   repos = map (x: x.name) subdirs;
   dirs  = map (x: x.dir ) subdirs;
 

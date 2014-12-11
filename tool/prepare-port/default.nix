@@ -7,7 +7,7 @@ let
       nixpkgs.findutils
       nixpkgs.diffutils
       nixpkgs.gawk
-      nixpkgs.gnugrep      
+      nixpkgs.gnugrep
       nixpkgs.gnused
       nixpkgs.gnutar
       nixpkgs.patch
@@ -25,13 +25,14 @@ let
     inherit initialPath;
   };
 in
-{ name, ... } @ attrs:
-derivation ( attrs // {
-  name = name+"-port";
+{ name
+, outputs ? [ "source" ]
+, ... } @ attrs:
+derivation (attrs // {
+  inherit name outputs;
   preparePort = result;
   system = builtins.currentSystem;
 
   builder = attrs.realBuilder or shell;
   args = attrs.args or [ "-e" (attrs.builder or ./default-builder.sh) ];
-
 })

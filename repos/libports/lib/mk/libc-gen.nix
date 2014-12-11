@@ -1,4 +1,4 @@
-{ genodeEnv, linkStaticLibrary, compileSubLibc }:
+{ genodeEnv, linkStaticLibrary, compileLibc }:
 
 let
   repoSrcDir = ../../src/lib/libc;
@@ -38,7 +38,7 @@ in
 linkStaticLibrary rec {
   name = "libc-gen";
 
-  externalObjects = compileSubLibc (genodeEnv.tool.mergeSet archArgs {
+  externalObjects = compileLibc (genodeEnv.tool.mergeSet archArgs {
     inherit name;
     sources = [ "${genDir}/*.c" ];
 
@@ -47,13 +47,7 @@ linkStaticLibrary rec {
       # lets drop it
       [ "getosreldate.c" "sem.c" "valloc.c" "getpwent.c" ];
 
-      localIncludes =
-        [ ( if genodeEnv.isx86_32 then "include/libc-i386"  else
-            if genodeEnv.isx86_64 then "include/libc-amd64" else
-            if genodeEnv.isArm    then "include/libc-arm"    else
-            throw "no libc for ${genodeEnv.system}"
-          )
-        ];
+      localIncludes = [ "lib/libc/locale" ];
 
       systemIncludes =
         [ # libc_pdbg.h

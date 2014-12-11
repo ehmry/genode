@@ -1,8 +1,8 @@
-{ genodeEnv, linkStaticLibrary, compileSubLibc }:
+{ genodeEnv, linkStaticLibrary, compileLibc }:
 
 linkStaticLibrary {
   name = "libc-setjmp";
-  externalObjects = compileSubLibc {
+  externalObjects = compileLibc {
     sources =
       if genodeEnv.isx86_32 then
         [ "lib/libc/i386/gen/_setjmp.S" "lib/libc/i386/gen/setjmp.S" ]

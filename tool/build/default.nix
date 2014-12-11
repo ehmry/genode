@@ -186,11 +186,11 @@ let
     let libs = args.libs or []; in
     (removeAttrs args [ "libs" ]) //
     { extraFlags =
-        (args.extraFlags or []) ++
+        args.extraFlags or [] ++
         (propagate "propagatedFlags" libs);
 
       systemIncludes =
-        (args.systemIncludes or []) ++
+        args.systemIncludes or [] ++
         (propagate "propagatedIncludes" libs) ++
         stdAttrs.nativeIncludes;
     };

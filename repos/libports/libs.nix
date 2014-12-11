@@ -29,74 +29,51 @@ let
   #endif
 
   libcArchInclude =
-    if tool.genodeEnv.isArm    then "include/libc-arm"    else
-    if tool.genodeEnv.isx86_32 then "include/libc-i386"  else
-    if tool.genodeEnv.isx86_64 then "include/libc-amd64" else
+    if tool.genodeEnv.isArm    then "libc-arm"    else
+    if tool.genodeEnv.isx86_32 then "libc-i386"  else
+    if tool.genodeEnv.isx86_64 then "libc-amd64" else
     throw "no libc for ${tool.genodeEnv.system}";
 
+  libcIncludes =
+    [ ./include/libc-genode ] ++
+    ( map
+        (d: "${ports.libc.include}/"+d)
+        [ "libc" libcArchInclude ]
+    );
+
   compileLibc =
-  args:
-  derivation (tool.genodeEnv.stdAttrs // args // {
-    name = (args.name or "libc")+"-objects";
-    system = builtins.currentSystem;
-    builder = tool.shell;
-    args = [ "-e" ./compile-libc.sh ];
-    inherit (tool) genodeEnv;
+  { sourceRoot ? ports.libc
+  , sources
+  , extraFlags ? []
+  , localIncludes ? []
+  , systemIncludes ? []
+  , ... } @ args:
+  compileCRepo (args // {
+    inherit sourceRoot sources;
+    extraFlags = extraFlags ++
+      [ # Generate position independent code to allow linking of
+        # static libc code into shared libraries
+        # (define is evaluated by assembler files)
+        "-DPIC"
 
-    sourceRoot = args.sourceRoot or ports.libc;
+        # Prevent gcc headers from defining __size_t.
+        # This definition is done in machine/_types.h.
+        "-D__FreeBSD__=8"
 
-    # Use default warning level rather than -Wall because we do
-    # not want to touch
-    # the imported source code to improve build aesthetics
-    # ccWarn = null;
-    # ^ has no effect
+        # Prevent gcc-4.4.5 from generating code for the family of
+        # 'sin' and 'cos' functions because the gcc-generated code
+        # would actually call 'sincos' or 'sincosf', which is a GNU
+        # extension, not provided by our libc.
+        "-fno-builtin-sin" "-fno-builtin-cos"
+        "-fno-builtin-sinf" "-fno-builtin-cosf"
+      ];
 
-    ccFlags = args.ccFlags or [] ++ [
-      # Generate position independent code to allow linking of
-      # static libc code into shared libraries
-      # (define is evaluated by assembler files)
-      "-DPIC"
 
-      # Prevent gcc headers from defining __size_t.
-      # This definition is done in machine/_types.h.
-      "-D__FreeBSD__=8"
+    localIncludes = localIncludes ++ [ "lib/libc/include" ];
 
-      # Prevent gcc-4.4.5 from generating code for the family of
-      # 'sin' and 'cos' functions because the gcc-generated code
-      # would actually call 'sincos' or 'sincosf', which is a GNU
-      # extension, not provided by our libc.
-      "-fno-builtin-sin" "-fno-builtin-cos"
-      "-fno-builtin-sinf" "-fno-builtin-cosf"
-    ]
-    ++ tool.genodeEnv.ccFlags;
+    systemIncludes = systemIncludes ++ libcIncludes;
 
-    localIncludes = (args.localIncludes or []) ++
-      [ "lib/libc/include" ];
-
-    systemIncludes = (args.systemIncludes or []) ++
-      #map (p: "${ports.libc}/${p}")
-        [ "include/libc"
-          "lib/libc/include"
-          # Add platform-specific libc headers
-          # to standard include search paths
-          libcArchInclude
-        ]
-      ++ [ ./include/libc-genode ];
   });
-
-  # Function to compile the sub-libraries of our libc.
-  compileSubLibc = args:
-    compileLibc (args // {
-      localIncludes = args.localIncludes or [] ++
-        [ "lib/libc/locale"
-          "lib/libc/include"
-          "lib/libc/stdio"
-          "lib/libc/net"
-          "contrib/gdtoa"
-          "sys"
-          libcArchInclude
-        ];
-      });
 
  compileCC =
   attrs:
@@ -118,7 +95,7 @@ let
 
   callLibrary' = callLibrary (
     { inherit (tool) genodeEnv compileCCRepo;
-      inherit compileLibc compileSubLibc compileCC compileCRepo;
+      inherit compileLibc libcIncludes compileCC compileCRepo;
     } // ports'
   );
   importLibrary = path: callLibrary' (import path);
@@ -130,15 +107,22 @@ in
   libc-gen     = importLibrary ./lib/mk/libc-gen.nix;
   libc-gdtoa   = importLibrary ./lib/mk/libc-gdtoa.nix;
   libc-inet    = importLibrary ./lib/mk/libc-inet.nix;
+  libc-isc     = importLibrary ./lib/mk/libc-isc.nix;
+  libc-nameser = importLibrary ./lib/mk/libc-nameser.nix;
+  libc-net     = importLibrary ./lib/mk/libc-net.nix;
   libc-regex   = importLibrary ./lib/mk/libc-regex.nix;
+  libc-resolv  = importLibrary ./lib/mk/libc-resolv.nix;
+  libc-rpc     = importLibrary ./lib/mk/libc-rpc.nix;
   libc-stdlib  = importLibrary ./lib/mk/libc-stdlib.nix;
   libc-stdtime = importLibrary ./lib/mk/libc-stdtime.nix;
   libc-setjmp  = importLibrary ./lib/mk/libc-setjmp.nix;
   libc-string  = importLibrary ./lib/mk/libc-string.nix;
   libc-stdio   = importLibrary ./lib/mk/libc-stdio.nix;
-
-  libc = importLibrary ./lib/mk/libc.nix;
+  libc = importLibrary ./src/lib/libc;
   libm = importLibrary ./lib/mk/libm.nix;
+
+  libc_lwip          = importLibrary ./src/lib/libc_lwip;
+  libc_lwip_nic_dhcp = importLibrary ./src/lib/libc_lwip_nic_dhcp;
 
   libpng  = importLibrary ./lib/mk/libpng.nix;
   lwip    = importLibrary ./src/lib/lwip;

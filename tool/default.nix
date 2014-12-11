@@ -40,6 +40,14 @@ let tool = rec {
     then abort "${str} does not have suffix ${suf}"
     else substring 0 (sub strL sufL) str;
 
+  hasDotH = s: substring (sub (stringLength s) 2) 2 s == ".h";
+
+  ##
+  # Filter out everything but *.h on a path.
+  filterInclude = dir: filterSource
+    (path: type: hasDotH path || type == "directory")
+    dir;
+
   ##
   # Determine if a string has the given suffix.
   hasSuffix = suf: str:

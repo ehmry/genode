@@ -1,8 +1,8 @@
-{ linkStaticLibrary, compileSubLibc }:
+{ linkStaticLibrary, compileLibc }:
 
 linkStaticLibrary {
   name = "libc-regex";
-  externalObjects = compileSubLibc {
+  externalObjects = compileLibc {
     sources = [ "lib/libc/regex/*.c" ];
     filter =
       [ # 'engine.c' is meant to be included by other compilation

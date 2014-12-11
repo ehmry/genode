@@ -5,7 +5,7 @@ linkComponent rec {
   libs = [ libm libc ];
 
   objects = compileCC {
+    inherit libs;
     src = ./main.cc;
-    systemIncludes = genodeEnv.tool.propagateIncludes libs;
   };
 }

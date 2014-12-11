@@ -1,8 +1,8 @@
 { linkStaticLibrary, compileLibc }:
 
 linkStaticLibrary {
-  name = "libc-locale";
+  name = "libc-resolv";
   externalObjects = compileLibc {
-    sources = [ "lib/libc/locale/*.c" ];
+    sources = [ "lib/libc/resolv/*.c" ];
   };
 }

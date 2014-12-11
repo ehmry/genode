@@ -1,8 +1,8 @@
 { linkStaticLibrary, compileLibc }:
 
 linkStaticLibrary {
-  name = "libc-locale";
+  name = "libc-nameser";
   externalObjects = compileLibc {
-    sources = [ "lib/libc/locale/*.c" ];
+    sources = [ "lib/libc/nameser/*.c" ];
   };
 }

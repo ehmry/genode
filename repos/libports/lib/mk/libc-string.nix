@@ -3,12 +3,13 @@
  * library and the complete libc
  */
 
-{ linkStaticLibrary, compileSubLibc }:
+{ linkStaticLibrary, compileLibc }:
+
 let dir = "lib/libc/string"; in
 linkStaticLibrary {
   name = "libc-string";
 
-  externalObjects = compileSubLibc {
+  externalObjects = compileLibc {
     sources = [ "${dir}/*.c" ];
     filter = map
       (fn: "${dir}/${fn}")

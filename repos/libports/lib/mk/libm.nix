@@ -1,4 +1,4 @@
-{ genodeEnv, linkSharedLibrary, compileSubLibc, libcSrc, libc }:
+{ genodeEnv, linkSharedLibrary, compileLibc, libcSrc, libc }:
 let
   libmDir = "${libcSrc}/lib/msun";
 
@@ -12,12 +12,12 @@ linkSharedLibrary rec {
   name = "libm";
   libs = [ libc ];
 
-  externalObjects = compileSubLibc {
+  externalObjects = compileLibc {
     inherit name;
     sourceRoot = libmDir;
 
     # 'e_rem_pio2.c' uses '__inline'
-    ccFlags = [ "-D__inline=inline" ] ++ genodeEnv.ccFlags;
+    extraFlags = [ "-D__inline=inline" ];
 
     # Work-around to get over doubly defined symbols produced by
     # several sources that include 'e_rem_pio2.c' and 'e_rem_pio2f.c'.
@@ -83,7 +83,6 @@ linkSharedLibrary rec {
       ) ++ [ archIncludeDir ];
 
       systemIncludes = [ "${libcSrc}/include/libc" archIncludeDir ];
-
   };
 
 }

@@ -1,8 +1,9 @@
 { linkStaticLibrary, compileLibc }:
 
 linkStaticLibrary {
-  name = "libc-locale";
+  name = "libc-isc";
   externalObjects = compileLibc {
-    sources = [ "lib/libc/locale/*.c" ];
+    sources = [ "lib/libc/isc/*.c" ];
+    systemIncludes = [ "sys" ];
   };
 }

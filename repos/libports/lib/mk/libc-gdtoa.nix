@@ -1,8 +1,8 @@
-{ linkStaticLibrary, compileSubLibc }:
+{ linkStaticLibrary, compileLibc }:
 
 linkStaticLibrary {
   name = "libc-gdtoa";
-  externalObjects = compileSubLibc {
+  externalObjects = compileLibc {
     sources = [ "contrib/gdtoa/*.c" "lib/libc/gdtoa/*.c" ];
     filter =
       (map (fn: "contrib/gdtoa/${fn}")
@@ -11,6 +11,6 @@ linkStaticLibrary {
       (map (fn: "lib/libc/gdtoa/${fn}")
         [ "machdep_ldisQ.c" "machdep_ldisx.c" ]
       );
-    localIncludes = [ "include/libc" ];
+    localIncludes = [ "contrib/gdtoa" ];
   };
 }

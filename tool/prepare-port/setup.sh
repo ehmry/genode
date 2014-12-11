@@ -32,18 +32,6 @@ exitHandler() {
 
     if [ $exitCode != 0 ]; then
         runHook failureHook
-
-        # If the builder had a non-zero exit code and
-        # $succeedOnFailure is set, create the file
-        # `$out/nix-support/failed' to signal failure, and exit
-        # normally.  Otherwise, return the original exit code.
-        if [ -n "$succeedOnFailure" ]; then
-            echo "build failed with exit code $exitCode (ignored)"
-            mkdir -p "$out/nix-support"
-            echo -n $exitCode > "$out/nix-support/failed"
-            exit 0
-        fi
-
     else
         runHook exitHook
     fi
@@ -211,11 +199,11 @@ for i in $crossPkgs; do
 done
 
 
-# Set the prefix.  This is generally $out, but it can be overriden,
+# Set the prefix.  This is generally $source, but it can be overriden,
 # for instance if we just want to perform a test build/install to a
-# temporary location and write a build report to $out.
+# temporary location and write a build report to $source.
 if [ -z "$prefix" ]; then
-    prefix="$out";
+    prefix="$source";
 fi
 
 
@@ -273,8 +261,6 @@ unpackFile() {
 
 
 unpackPhase() {
-    #mkdir -p $out/$name ; cd $out/$name
-
     runHook preUnpack
 
     if [ -z "$srcs" ]; then
@@ -381,7 +367,7 @@ installPhase() {
 
 
 genericBuild() {
-    header "preparing $out"
+    header "preparing $source"
 
     if [ -n "$buildCommand" ]; then
         eval "$buildCommand"

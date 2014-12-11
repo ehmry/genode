@@ -1,7 +1,7 @@
-{ linkStaticLibrary, compileSubLibc }:
+{ linkStaticLibrary, compileLibc }:
 linkStaticLibrary {
   name = "libc-inet";
-  externalObjects = compileSubLibc {
+  externalObjects = compileLibc {
     sources = [ "lib/libc/inet/*.c" ];
   };
 }
