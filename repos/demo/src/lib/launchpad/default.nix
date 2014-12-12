@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC, base, config }:
+{ linkStaticLibrary, compileCC, base, config }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "launchpad";
   libs = [ base config ];
   objects = compileCC { src = ./launchpad.cc; };

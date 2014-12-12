@@ -34,5 +34,6 @@ in
     { ldso    = importComponent ./src/test/ldso;
       libc    = importComponent ./src/test/libc;
       pthread = importComponent ./src/test/pthread;
+      sdl     = importComponent ./src/test/sdl;
     };
 }

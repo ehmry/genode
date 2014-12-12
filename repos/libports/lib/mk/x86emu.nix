@@ -2,12 +2,13 @@
 # x86 real-mode emulation library
 #
 
-{ genodeEnv, compileCRepo, x86emuSrc }:
+{ linkStaticLibrary, compileCRepo, x86emuSrc }:
 
 let
-  includeDir = x86emuSrc + "/include/x86emu";
+  includeDir = x86emuSrc.include;
+  systemIncludes = [ includeDir ../../include/x86emu ];
 in
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "x86emu";
 
   externalObjects = compileCRepo {
@@ -16,9 +17,8 @@ genodeEnv.mkLibrary {
     sources =
       [ "decode.c" "fpu.c" "ops.c" "ops2.c" "prim_ops.c" "sys.c" ];
     localIncludes  = [ includeDir ];
-    systemIncludes = [ includeDir ../../include/x86emu ];
+    inherit systemIncludes;
   };
 
-  propagatedIncludes =
-    [ (x86emuSrc + "/include") ../../include/x86emu ];
+  propagatedIncludes = systemIncludes;
 }

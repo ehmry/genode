@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC
+{ genodeEnv, linkComponent, compileCC
 , baseDir, repoDir, versionObject
 , base-common }:
 
@@ -12,11 +12,11 @@ let
       (genCoreDir + "/include")
     ];
 in
-genodeEnv.mkComponent {
+linkComponent {
   name = "core";
   libs = [ base-common ];
 
-  ldScriptsStatic = [ (repoDir + "/src/platform/roottask.ld") ];
+  ldScripts = [ (repoDir + "/src/platform/roottask.ld") ];
   ldTextAddr = "0x100000";
 
   objects = map (src: compileCC { inherit src systemIncludes; }) (

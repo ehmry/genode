@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC, base }:
+{ genodeEnv, linkComponent, compileCC, base }:
 
-if genodeEnv.isx86 then genodeEnv.mkComponent {
+if genodeEnv.isx86 then linkComponent {
   name = "acpi_drv";
   libs = [ base ];
   objects = map

@@ -1,11 +1,12 @@
-{ genodeEnv, compileCC, transformBinary, base, blit, scout_gfx }:
+{ linkStaticLibrary, compileCC, transformBinary
+, base, blit, scout_gfx }:
 
 let
   compileCC' = src: compileCC {
     inherit src; systemIncludes = [ ../scout ];
   };
 in
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "scout_widgets";
   libs = [ base blit scout_gfx ];
   objects =

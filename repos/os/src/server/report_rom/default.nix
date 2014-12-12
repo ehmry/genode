@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC, base, server, config }:
+{ linkComponent, compileCC, base, server, config }:
 
-genodeEnv.mkComponent {
+linkComponent {
   name = "report_rom";
   libs = [ base server config ];
   objects = compileCC {

@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC, alarm }:
+{ linkStaticLibrary, compileCC, alarm }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "timed_semaphore";
   libs = [ alarm ];
   objects = compileCC { src = ./timed_semaphore.cc; };

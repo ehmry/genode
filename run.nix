@@ -8,12 +8,11 @@
 
 let
 
-  spec =
-    if system == "i868-linux" then import specs/x86_32-linux.nix else
-    if system == "x86_64-linux" then import specs/x86_64-linux.nix else
-    if system == "x86_32-nova"  then import specs/x86_32-nova.nix  else
-    if system == "x86_64-nova"  then import specs/x86_64-nova.nix  else
-    abort "unknown system type ${system}";
+    #if system == "i868-linux" then import specs/x86_32-linux.nix else
+    #if system == "x86_64-linux" then import specs/x86_64-linux.nix else
+    #if system == "x86_32-nova"  then import specs/x86_32-nova.nix  else
+    #if system == "x86_64-nova"  then import specs/x86_64-nova.nix  else
+    #abort "unknown system type ${system}";
 
   linuxRun = import ./repos/base-linux/tool/run { inherit tool pkgs; };
   novaRun  = import ./repos/base-nova/tool/run  { inherit tool pkgs; };
@@ -28,7 +27,7 @@ let
   callRun = f:
     f (builtins.intersectAttrs
         (builtins.functionArgs f)
-        { inherit spec run pkgs; }
+        { inherit tool run pkgs; }
       );
 
   importRun = p: callRun (import p);
@@ -58,5 +57,6 @@ builtins.listToAttrs (builtins.concatLists (map
     ./repos/base-nova
     ./repos/os
     ./repos/libports
+    ./repos/ports
   ]
 ))

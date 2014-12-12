@@ -101,9 +101,9 @@ Library expressions
 
 We shall start with a simple example, the timed_semaphone library.
 
-! { genodeEnv, compileCC, alarm }:
+! { linkStaticLibrary, compileCC, alarm }:
 !
-! genodeEnv.mkLibrary {
+! linkStaticLibrary {
 !   name = "timed_semaphore";
 !   libs = [ alarm ];
 !   objects = [ (compileCC { src = ./timed_semaphore.cc; }) ];
@@ -116,12 +116,11 @@ Function signature
 The first line declares that a function with three arguments follows,
 the arguments are:
 
-:genodeEnv:
-  Set of attributes that comprise the standard genodeEnv. We will
-  be using _mkLibrary_, a function that links a library together.
+:linkStaticLibrary:
+  Function to link objects and libraries into a static library.
 
 :compileCC:
-  Function that compiles a c++ source file into an object file.
+  Function to compile a c++ source file into an object file.
 
 :alarm: The _alarm_ Library. Defined elsewhere, just as this libary.
 
@@ -129,27 +128,25 @@ By stating build inputs as arguments to a function, we make it easy to overide
 inputs in a calling environment.
 
 
-mkLibrary
+linkStaticLibrary
 ~~~~~~~~~
 
-Next we see that this function is really a wrapper to the function
-_genodeEnv.mkLibrary_. Note that this is a functional language, and
-_mkLibrary_ is merely an attribute in the _genodeEnv_ set, not a method.
-
-The arguments to _mkLibrary_ are passed as a set of named attributes.
+_LinkStaticLibrary_ links objects and libraries together to form a static library.
+The arguments to _linkStaticLibrary_ are passed as a set of named attributes.
 They are:
 
 :name: Name of the library.
 :libs: List of libraries to link into the output.
 :objects: List of object files to link into the output.
 
-The result of this function is a directory containing the file _${name}.lib.a.
+The result of this function is a set containing a output path for _${name}.lib.a_,
+and metadata used when linking this library to other libraries and components.
 
 
 compileCC
 ~~~~~~~~~
 
-CompileCC compiles the C++ source at _src_ and returns the object file. The value
+_CompileCC_ compiles the C++ source at _src_ and returns the object file. The value
 bound to _src_ is not of the string type, it is of the _path_ type, a file that
 will be isolated by Nix prior to building. CompileCC takes other arguments,
 most notably _extraFlags_ for extra compiler option flags, and _localIncudes_

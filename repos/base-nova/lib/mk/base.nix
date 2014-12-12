@@ -4,7 +4,8 @@
  * \date   2013-02-14
  */
 
-{ genodeEnv, compileCC, baseDir, repoDir, base-common }:
+{ linkStaticLibrary, compileCC, baseDir, repoDir, baseIncludes
+, base-common }:
 
 let
   compileCC' = src: compileCC {
@@ -12,7 +13,7 @@ let
     systemIncludes = [ (baseDir + "/src/base/env") ];
   };
 in
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "base";
   libs = [ base-common ];
   objects = map compileCC' (
@@ -27,4 +28,5 @@ genodeEnv.mkLibrary {
         ]
     )
   );
+  propagatedIncludes = baseIncludes;
 }

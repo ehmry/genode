@@ -1,7 +1,7 @@
 { genodeEnv, compileCC, base }:
 
 if !genodeEnv.isx86 then null else
-genodeEnv.mkComponent {
+linkComponent {
   name = "test-pci";
   libs = [ base ];
   objects = compileCC { src = ./test.cc; };

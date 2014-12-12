@@ -4,20 +4,19 @@
  * \date   2014-09-15
  */
 
- { tool, callComponent }:
+{ tool, callComponent }:
 
 let
 
   importInclude = p: import p { inherit (tool) genodeEnv; };
 
-  compileCC =
-  attrs:
-  tool.compileCC (attrs // {
-    systemIncludes =
-     (attrs.systemIncludes or []) ++
-     (importInclude ../base/include) ++
-     (import ./include { inherit (tool) genodeEnv; });
-  });
+  compileCC = attrs:
+    tool.compileCC (attrs // {
+      systemIncludes =
+       (attrs.systemIncludes or []) ++
+       (importInclude ../base/include) ++
+       (importInclude ./include);
+    });
 
   callComponent' = callComponent {
     inherit (tool) genodeEnv transformBinary;
@@ -42,8 +41,10 @@ in
     };
 
   server =
-    { report_rom = importComponent ./src/server/report_rom;
-      nitpicker  = importComponent ./src/server/nitpicker;
+    { nitpicker  = importComponent ./src/server/nitpicker;
+      report_rom = importComponent ./src/server/report_rom;
+      tar_fs     = importComponent ./src/server/tar_fs;
+      tar_rom    = importComponent ./src/server/tar_rom;
     };
 
   test =

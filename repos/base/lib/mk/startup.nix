@@ -1,4 +1,5 @@
-{ genodeEnv, compileCC, compiles, baseDir, repoDir, syscall }:
+{ genodeEnv, linkStaticLibrary, compileCC, compiles, baseDir, repoDir
+, syscall }:
 
 let
   sourceDir = baseDir+"/src/platform";
@@ -11,7 +12,7 @@ let
   systemIncludes = map (d: d+"/src/platform") [ repoDir baseDir ];
 
 in
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "startup";
 
   libs = [ syscall ];

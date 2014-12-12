@@ -16,8 +16,18 @@ let
       (builtins.attrNames ports)
   );
 
+  importInclude = p: import p { inherit (tool) genodeEnv; };
+
+  compileCC =
+  attrs:
+  tool.compileCC (attrs // {
+    systemIncludes =
+     (attrs.systemIncludes or []) ++
+     (importInclude ../base/include);
+  });
+
   callComponent' = callComponent (
-    { inherit (tool) genodeEnv compileCCRepo; } // ports'
+    { inherit compileCC; } // ports'
   );
 
   importComponent = path: callComponent' (import path);
@@ -26,4 +36,7 @@ in
 {
   app =
     { dosbox = importComponent ./src/app/dosbox; };
+
+  noux.minimal = importComponent ./src/noux/minimal;
+  noux.net     = importComponent ./src/noux/net;
 }

@@ -1,6 +1,6 @@
-{ spec, run, pkgs }:
+{ tool, run, pkgs }:
 
-if spec.kernel != "nova" then null else
+if tool.genodeEnv.spec.kernel != "nova" then null else
 
 run {
   name = "ds_ownership";

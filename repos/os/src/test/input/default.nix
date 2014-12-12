@@ -1,6 +1,6 @@
 { genodeEnv, compileCC, base }:
 
-genodeEnv.mkComponent {
+linkComponent {
   name = "test-input";
   libs = [ base ];
   objects = compileCC { src = ./test.cc; };

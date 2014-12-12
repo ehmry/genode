@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC }:
+{ linkStaticLibrary, compileCC }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "scout_gfx";
   objects = compileCC { src = ./sky_texture_painter.cc; };
 }

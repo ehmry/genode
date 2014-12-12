@@ -1,7 +1,7 @@
 { linkComponent, compileCC, base, config }:
 
 linkComponent {
-  name = "bomb";
+  name = "tar_rom";
   libs = [ base config ];
-  objects = compileCC { src = ./main.cc; };
+  objects = [ (compileCC { src = ./main.cc; }) ];
 }

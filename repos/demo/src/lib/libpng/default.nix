@@ -1,20 +1,17 @@
-{ genodeEnv, compileC, mini_c, libz_static }:
+{ linkStaticLibrary, compileC, mini_c, libz_static }:
 let
-  compileC' = src: compileC {
-    inherit src;
-    extraFlags =
-      [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ];
-    localIncludes =
-      [ ../../../include/libpng_static
-        ../../../include/libz_static
-      ];
-    systemIncludes = [ ../../../include/mini_c ];
-  };
-in
-genodeEnv.mkLibrary {
-  name = "libpng_static";
   libs = [ mini_c libz_static ];
 
+  compileC' = src: compileC {
+    inherit src libs;
+    extraFlags =
+      [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ];
+    localIncludes = [ ../../../include/libpng_static ];
+  };
+in
+linkStaticLibrary {
+  name = "libpng_static";
+  inherit libs;
   objects = map (fn: compileC' (./contrib + "/${fn}"))
     [ "png.c"      "pngerror.c" "pngget.c"   "pngmem.c"
       "pngpread.c" "pngread.c"  "pngrio.c"   "pngrtran.c"

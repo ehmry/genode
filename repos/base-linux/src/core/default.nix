@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC
+{ genodeEnv, linkComponent, compileCC
 , baseDir, repoDir, versionObject
 , base-common, cxx, startup, syscall }:
 
@@ -19,7 +19,7 @@ let
     ];
 
 in
-genodeEnv.mkComponent {
+linkComponent {
   name = "core";
   libs = [ base-common cxx startup syscall ];
 

@@ -3,7 +3,7 @@
 # \author Alexander Boettcher
 #
 
-{ spec, run, pkgs }:
+{ tool, run, pkgs }:
 
 
 #if {
@@ -14,7 +14,7 @@
 #	exit 0
 #}
 
-if spec.kernel != "nova" then null else
+if tool.genodeEnv.spec.kernel != "nova" then null else
 
 run {
   name = "affinity";

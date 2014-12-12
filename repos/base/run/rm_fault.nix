@@ -1,9 +1,9 @@
-{ spec, run, pkgs }:
+{ tool, run, pkgs }:
 
 #if {[have_spec linux] || [have_spec pistachio]} {
 #	puts "Platform does not support managed dataspaces"; exit }
 
-if spec.kernel == "linux"
+if tool.genodeEnv.spec.kernel == "linux"
 then null # "Platform does not support managed dataspaces"
 else
 

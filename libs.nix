@@ -13,7 +13,7 @@ let
     f (
       builtins.intersectAttrs
         (builtins.functionArgs f)
-        ( libs //
+        ( tool // libs //
           { inherit (tool) linkStaticLibrary;
             linkSharedLibrary = tool.linkSharedLibrary {
               inherit (libs') ldso-startup;

@@ -38,7 +38,6 @@ let
     throw "no base components for ${tool.genodeEnv.system}";
 
   callBasePackage = callComponent {
-    inherit (tool) genodeEnv;
     inherit compileCC baseDir repoDir versionObject;
   };
   importBaseComponent = path: callBasePackage (import path);
@@ -56,7 +55,7 @@ impl // {
         { name = dir;
           value = callComponent' (
             { base }:
-            tool.genodeEnv.mkComponent {
+            tool.linkStaticComponent {
               name = "test-"+dir;
               libs = [ base ];
               objects = compileCC {

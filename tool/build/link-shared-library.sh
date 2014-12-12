@@ -1,5 +1,7 @@
 source $genodeEnv/setup
 
+runHook preLink
+
 MSG_MERGE $name
 
 objects=$(sortDerivations $objects)
@@ -27,3 +29,5 @@ VERBOSE $ld -o $out/$name.lib.so \
 	    --end-group \
 	    --no-whole-archive \
             $($cc $ccMarch -print-libgcc-file-name)
+
+runHook postLink

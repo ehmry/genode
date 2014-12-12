@@ -4,7 +4,7 @@
 # \author Alexander Boettcher
 #
 
-{ spec, run, pkgs }:
+{ tool, run, pkgs }:
 
 #if {
 #	![have_spec hw_arndale] &&
@@ -14,7 +14,7 @@
 #	exit 0
 #}
 
-if spec.kernel != "nova" then null else
+if tool.genodeEnv.spec.kernel != "nova" then null else
 
 run {
   name = "mp_server";

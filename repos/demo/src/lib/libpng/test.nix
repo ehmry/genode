@@ -1,6 +1,6 @@
 { genodeEnv, compileCC, base, libpng_static }:
 
-genodeEnv.mkComponent {
+linkComponent {
   name = "test-libpng_static";
   libs = [ base libpng_static ];
 

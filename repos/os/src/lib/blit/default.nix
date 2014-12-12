@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC }:
+{ genodeEnv, linkStaticLibrary, compileCC }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "blit";
   objects = compileCC {
     src = ./blit.cc;

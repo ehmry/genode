@@ -1,6 +1,6 @@
-{ spec, run, pkgs }:
+{ tool, run, pkgs }:
 
-if spec.kernel == "linux" then null else
+if tool.genodeEnv.spec.kernel == "linux" then null else
 
 run {
   name = "cap_integrity";

@@ -1,14 +1,14 @@
-{ genodeEnv, compileCC, base, alarm, syscall }:
+{ genodeEnv, linkStaticLibrary, compileCC, base, alarm, syscall }:
 
 let
   arch =
     if genodeEnv.isLinux then
-      rec { libs = [ syscall ];
+      rec {
+        libs = [ syscall ];
         localIncludes = [ ./include ./include_periodic ];
         object = compileCC {
+          inherit libs;
           src = ./linux/platform_timer.cc;
-          inherit localIncludes;
-          systemIncludes = [ syscall.include ];
         };
       }
     else
@@ -16,11 +16,11 @@ let
     else
     throw "no timer for ${genodeEnv.system}";
 in
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "timer";
   libs = [ base alarm ] ++ arch.libs or [];
   objects =
     [ (compileCC { src = ./main.cc; inherit (arch) localIncludes; })
       (arch.object or null)
-    ];  
+    ];
 }

@@ -71,30 +71,6 @@ let
   # Linker script for dynamically linked programs
   ldScriptDyn = ../../repos/base/src/platform/genode_dyn.ld;
 
-  staticLibraryLinkPhase = ''
-    echo -e "    MERGE    $name"
-
-    for o in $externalObjects
-    do objects="$objects $o/*.o"
-    done
-
-    mkdir -p $out
-    VERBOSE $ar -rc $out/$name.lib.a $objects
-
-    if [ -n "$libs" ]; then
-        libs=$(sortDerivations $libs)
-        mkdir -p "$out/nix-support"
-        echo "$libs" > "$out/nix-support/propagated-libraries"
-    fi
-  '';
-
-  libraryFixupPhase = ''
-    if [ -n "$libs" ]; then
-        mkdir -p "$out/nix-support"
-        echo "$libs" > "$out/nix-support/propagated-libraries"
-    fi
-  '';
-  #*/
 
   componentLinkPhase = ''
     echo -e "    LINK     $name"
@@ -133,46 +109,6 @@ let
 
   componentFixupPhase = " ";
 
-
-  genodeEnv' = import ./genode-env.nix {
-     inherit system tool spec stdAttrs;
-  }; # wtf is this?
-
-  addSubMks = env: env // {
-
-    mkLibrary = attrs: env.mk (
-      { fixupPhase = libraryFixupPhase;
-        outputs =
-          if builtins.hasAttr "propagatedIncludes" attrs then
-            [ "out" "include" ]
-          else [ "out" ];
-        mergePhase = staticLibraryLinkPhase;
-      } // attrs
-    );
-
-    mkComponent = attrs: env.mk (
-      let
-        anyShared' = anyShared (attrs.libs or []);
-      in
-      { mergePhase  = componentLinkPhase;
-        fixupPhase = componentFixupPhase;
-        ldTextAddr = attrs.ldTextAddr or env.spec.ldTextAddr or "";
-        ldFlags = attrs.ldFlags or env.ldFlags ++ (
-          if anyShared' then
-            # Add a list of symbols that shall
-            # always be added to the dynsym section
-            [ "--dynamic-list=${../../repos/base/src/platform/genode_dyn.dl}"
-              # Assume that 'dynamicLinker' has been added to attrs.
-              "--dynamic-linker=${attrs.dynamicLinker}"
-              "--eh-frame-hdr"
-            ]
-          else []
-        );
-      } // attrs
-    );
-
-  };
-
   spec =
     if system == "i686-linux" then import ../../specs/x86_32-linux.nix else
     if system == "x86_64-linux" then import ../../specs/x86_64-linux.nix else
@@ -183,7 +119,9 @@ let
   toolchain = nixpkgs.callPackage ../toolchain/precompiled {};
 
   propagateCompileArgs = args:
-    let libs = args.libs or []; in
+    let
+      libs = findLinkLibraries args.libs or [];
+    in
     (removeAttrs args [ "libs" ]) //
     { extraFlags =
         args.extraFlags or [] ++
@@ -197,7 +135,21 @@ let
 
 in
 rec {
-  genodeEnv     = addSubMks genodeEnv';
+  # Utility flags to test the type of platform.
+  is32Bit  = spec.bits == 32;
+  is64Bit  = spec.bits == 64;
+  isArm = spec.platform == "arm";
+  isx86 = spec.platform == "x86";
+  isx86_32 = isx86 && is32Bit;
+  isx86_64 = isx86 && is64Bit;
+
+  isLinux = spec.kernel == "linux";
+  isNova  = spec.kernel == "nova";
+  isNOVA  = isNova;
+
+  genodeEnv = import ./genode-env.nix {
+     inherit system tool spec stdAttrs;
+  };
   genodeEnvAdapters = import ./adapters.nix;
 
   ## TODO
@@ -239,7 +191,9 @@ rec {
   );
 
   compileC =
-  { src, ... } @ args:
+  { src
+  , localIncludes ? []
+  , ... } @ args:
   shellDerivation ( (propagateCompileArgs args) //
     { inherit (stdAttrs) cc ccFlags;
       inherit genodeEnv;
@@ -316,7 +270,7 @@ rec {
   shellDerivation ( args // {
     script = ./link-static-library.sh;
     inherit genodeEnv;
-    inherit (stdAttrs) ar;
+    inherit (stdAttrs) ar ld ldFlags cxx objcopy;
   }) // { shared = false; inherit libs; };
 
   # Link together a shared library.
@@ -334,8 +288,23 @@ rec {
     inherit (stdAttrs) ld ldFlags cc ccMarch;
   }) // { shared = true; };
 
+  # Link together a component with static libraries.
+  linkStaticComponent =
+  { ldTextAddr ? spec.ldTextAddr
+  , ldScripts ? [ ../../repos/base/src/platform/genode.ld ]
+  , libs ? []
+  , ... } @ args:
+  let
+    libs' = libs;
+  in
+  shellDerivation ( args // {
+    script = ./link-static-component.sh;
+    inherit genodeEnv ldTextAddr ldScripts;
+    inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
+    libs = findLinkLibraries libs';
+  }) // { libs = findRuntimeLibraries libs'; };
+
   # Link together a component with shared libraries.
-  # Must be prepared with a dynamic linker.
   linkDynamicComponent =
   { dynamicLinker
   ,  dynDl ? ../../repos/base/src/platform/genode_dyn.dl
@@ -350,7 +319,7 @@ rec {
     script = ./link-dynamic-component.sh;
     inherit genodeEnv dynDl ldTextAddr dynamicLinker ldScripts;
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
-    libs = (findLibraries libs') ++ [ dynamicLinker ];
-  });
+    libs = (findLinkLibraries libs') ++ [ dynamicLinker ];
+  }) // { libs = findRuntimeLibraries libs'; };
 
 }

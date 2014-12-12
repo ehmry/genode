@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC, timer }:
+{ linkComponent, compileCC, timer }:
 
-genodeEnv.mkComponent {
+linkComponent {
   name = "timer";
   libs = [ timer ];
   objects = compileCC { src = ./empty.cc; };

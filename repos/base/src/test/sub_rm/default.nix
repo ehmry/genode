@@ -1,7 +1,7 @@
-{ genodeEnv, compileCC, repoDir, base }:
+{ linkComponent, compileCC, repoDir, base }:
 
 let platformInclude = repoDir+"/src/test/sub_rm"; in
-genodeEnv.mkComponent {
+linkComponent {
   name = "test-sub_rm";
   libs = [ base ];
   objects = compileCC {

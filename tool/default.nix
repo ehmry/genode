@@ -44,6 +44,7 @@ let tool = rec {
 
   ##
   # Filter out everything but *.h on a path.
+  # Prevents files that exist alongside headers from changing header path hash.
   filterHeaders = dir: filterSource
     (path: type: hasDotH path || type == "directory")
     dir;
@@ -257,21 +258,36 @@ let tool = rec {
     });
 
   ##
-  # Recursively find static libraries.
-  findLibraries = libs:
+  # Recursively find libraries needed to link a component.
+  findLinkLibraries = libs:
     let
-      list = libs: map
-        (lib: { key = lib.name; inherit lib; }) libs;
+      list = libs:
+        map
+          (lib: { key = lib.name; inherit lib; })
+          (filter (x: x != null) libs);
     in
-  map (s: s.lib) (genericClosure {
+    if libs == [] then [] else
+    map (x: x.lib) (genericClosure {
+      startSet = list libs;
+      operator =
+        { key, lib }:
+        if lib.shared then [] else list lib.libs;
+    });
+
+  ##
+  # Recursively find shared libraries.
+  findRuntimeLibraries = libs:
+    let
+      filter = libs: builtins.filter (lib: lib.shared) libs;
+      list = libs:
+        map (lib: { key = lib.name; inherit lib; }) libs;
+    in
+  filter (map (x: x.lib) (genericClosure {
     startSet = list libs;
     operator =
       { key, lib }:
-      # TODO: remove this dubugging logic
-      if !hasAttr "shared" lib then throw "${key} missing 'shared'}" else
-      if !hasAttr "libs" lib then throw "${key} missing 'libs'}" else
-      if lib.shared then [] else list lib.libs;
-  });
+      list ([lib ] ++ lib.libs);
+  }));
 
   includesSet =
     sources: path:

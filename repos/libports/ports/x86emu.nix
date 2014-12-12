@@ -5,6 +5,7 @@ let
 in
 preparePort {
   name = "x86emu-${version}";
+  outputs = [ "source" "include" ];
 
   src = fetchurl {
     url = "http://ftp.x.org/pub/individual/xserver/xorg-server-${version}.tar.bz2";
@@ -12,13 +13,19 @@ preparePort {
   };
 
   tarFlags = [ "--strip-components=4" "xorg-server-${version}/hw/xfree86/x86emu" ];
+  sourceRoot = ".";
 
-  patchPhase = ''
-    sed -i 's/private;/private_ptr;/g' x86emu/regs.h
-    mkdir -p include/x86emu/x86emu
-    mv x86emu.h include/x86emu/
-    mv x86emu/regs.h x86emu/types.h include/x86emu/x86emu
-  '';
+  patchPhase =
+    ''
+      sed -i 's/private;/private_ptr;/g' x86emu/regs.h
+    '';
+
+  preInstall =
+    ''
+      mkdir -p $include/x86emu/x86emu
+      cp x86emu.h $include/x86emu/
+      cp x86emu/regs.h x86emu/types.h $include/x86emu/x86emu/
+    '';
 
   #meta.license = "MIT";
 }

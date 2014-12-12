@@ -14,7 +14,7 @@ let
     f (
       builtins.intersectAttrs
         (builtins.functionArgs f)
-        (libs // { inherit linkComponent; } // extraAttrs)
+        (tool // libs // { inherit linkComponent; } // extraAttrs)
     );
 
   importPkgs = p: import p { inherit tool callComponent; };
@@ -23,11 +23,10 @@ let
   linkComponent = args:
   if tool.anyShared (args.libs or []) then
     tool.linkDynamicComponent (
-       args // { dynamicLinker = args.dynamicLinker or libs.ld; }
-     )
+      { dynamicLinker = libs.ld; } // args
+    )
   else
-    # TODO: get rid of this
-    tool.genodeEnv.mkComponent args;
+    tool.linkStaticComponent args;
 in
 tool.mergeSets ([ { inherit libs; } ] ++ (
   map

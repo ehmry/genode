@@ -17,7 +17,7 @@ do libs_="$libs_ $l/*.a $l/*.so"
 done
 
 
-for f in $extraLdFlags $ldFlags --dynamic-list="$dynDl"
+for f in $extraLdFlags $ldFlags
 do cxxLdFlags="$cxxLdFlags -Wl,$f"
 done
 
@@ -28,14 +28,10 @@ for s in $ldScripts
 do scriptFlags="$scriptFlags -Wl,-T -Wl,$s"
 done
 
-[ -d "$dynamicLinker" ] && dynamicLinker=$dynamicLinker/*.lib.so
-
 mkdir -p $out
 
 VERBOSE $cxx \
             $cxxLdFlags $cxxLinkFlags \
-            -Wl,--dynamic-linker=$(basename $dynamicLinker) \
-            -Wl,--eh-frame-hdr \
             $scriptFlags \
 	    -Wl,--whole-archive -Wl,--start-group \
             $objects $libs_ \

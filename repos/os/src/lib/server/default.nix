@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC }:
+{ linkStaticLibrary, compileCC }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "server";
   objects = compileCC { src = ./server.cc; };
 }

@@ -1,6 +1,7 @@
-{ genodeEnv, compileCC, transformBinary, base, blit, config, server }:
+{ linkComponent, compileCC, transformBinary
+, base, blit, config, server }:
 
-genodeEnv.mkComponent {
+linkComponent {
   name = "nitpicker";
   libs = [ base blit config server ];
   objects =

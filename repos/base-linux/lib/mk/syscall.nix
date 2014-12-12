@@ -1,6 +1,6 @@
-{ genodeEnv, compileS, baseDir, repoDir }:
+{ genodeEnv, linkStaticLibrary, compileS, baseDir, repoDir }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "syscall";
   objects =
     if genodeEnv.isArm then map

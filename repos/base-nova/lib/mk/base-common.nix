@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC, baseDir, repoDir, cxx, startup }:
+{ genodeEnv, linkStaticLibrary, compileCC, baseDir, repoDir, cxx, startup }:
 
 let
   compileCC' = src: compileCC {
@@ -15,7 +15,7 @@ let
     if genodeEnv.isx86_64 then "x86_64" else
     abort "bad spec for ${genodeEnv.system}";
 in
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "base-common";
   libs = [ cxx startup ];
 

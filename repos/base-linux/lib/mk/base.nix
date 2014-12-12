@@ -4,7 +4,8 @@
 # \date   2014-02-21
 #
 
-{ genodeEnv, compileCC, baseDir, repoDir
+{ genodeEnv, linkStaticLibrary, compileCC
+, baseDir, repoDir, baseIncludes
 , startup, cxx, base-common, syscall }:
 let
   systemIncludes =
@@ -13,7 +14,7 @@ let
       (genodeEnv.toolchain.glibc+"/include")
     ];
 in
-genodeEnv.mkLibrary (genodeEnv.tool.mergeSets [
+linkStaticLibrary (genodeEnv.tool.mergeSets [
 ( import ./base.inc.nix {
    inherit genodeEnv compileCC baseDir repoDir base-common syscall cxx;
 })
@@ -26,6 +27,7 @@ genodeEnv.mkLibrary (genodeEnv.tool.mergeSets [
     [ (baseDir+"/src/base/thread/thread.cc")
       (repoDir+"/src/base/thread/thread_linux.cc")
     ];
+  propagatedIncludes = baseIncludes;
 }
 
 ])

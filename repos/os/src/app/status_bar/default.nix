@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC, transformBinary, base }:
+{ linkComponent, compileCC, transformBinary, base }:
 
-genodeEnv.mkComponent {
+linkComponent {
   name = "status_bar";
   libs = [ base ];
   objects =

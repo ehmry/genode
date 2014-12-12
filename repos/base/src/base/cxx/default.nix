@@ -1,9 +1,7 @@
-{ genodeEnv, compileCC }:
+{ linkStaticLibrary, compileCC }:
 
-genodeEnv.mkLibrary rec {
+linkStaticLibrary rec {
   name = "cxx";
-  shared = false;
-  libs = [ ];
 
   objects = map (src: compileCC { inherit src; })
     [ ./exception.cc ./guard.cc ./malloc_free.cc
@@ -60,23 +58,21 @@ genodeEnv.mkLibrary rec {
   #-include $(CXX_OBJECTS:.o=.d)
   #endif
 
-  # TODO check if these must be passed like this
-  #inherit (build.spec) ccMarch ldMarch;
-  mergePhase = ''
-    outName=supc++.o
+  preLink =
+    ''
+      outName=supc++.o
 
-    libcc_gcc="$($cxx $ccMarch -print-file-name=libsupc++.a) $($cxx $ccMarch -print-file-name=libgcc_eh.a)"
+      libcc_gcc="$($cxx $ccMarch -print-file-name=libsupc++.a) $($cxx $ccMarch -print-file-name=libgcc_eh.a)"
 
-    MSG_MERGE $outName
-    VERBOSE $ld $ldMarch $keepSymbolArgs -r $objects $libcc_gcc -o $outName.tmp
+      MSG_MERGE $outName
+      VERBOSE $ld $ldMarch $keepSymbolArgs -r $objects $libcc_gcc -o $outName.tmp
 
-    mkdir -p $out
+      mkdir -p $out
 
-    MSG_CONVERT $outName
-    VERBOSE $objcopy $localSymbols $redefSymbols $outName.tmp supc++.o
+      MSG_CONVERT $outName
+      VERBOSE $objcopy $localSymbols $redefSymbols $outName.tmp supc++.o
 
-    MSG_MERGE cxx.lib.a
-    VERBOSE $ar -rc $out/cxx.lib.a $outName
+      objects=$outName
   '';
 
 }

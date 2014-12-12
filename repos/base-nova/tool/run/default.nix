@@ -10,7 +10,7 @@ with tool;
 
 let iso = import ../iso { inherit tool; }; in
 
-{ name, contents, testScript }:
+{ name, contents, graphical ? false, testScript }:
 
 let
   hypervisor = tool.nixpkgs.stdenv.mkDerivation rec {
@@ -73,7 +73,7 @@ derivation {
       ./nova.exp
     ];
 
-  inherit testScript;
+  inherit graphical testScript;
 
   diskImage = iso { inherit name; contents = contents'; };
 }

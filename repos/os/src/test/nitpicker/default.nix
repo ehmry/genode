@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC, base }:
+{ linkComponent, compileCC, base }:
 
-genodeEnv.mkComponent {
+linkComponent {
   name = "testnit";
   libs = [ base ];
   objects = compileCC { src = ./test.cc; };

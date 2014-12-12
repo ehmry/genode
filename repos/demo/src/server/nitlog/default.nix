@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC, transformBinary, base, blit }:
+{ linkComponent, compileCC, transformBinary, base, blit }:
 
-genodeEnv.mkComponent {
+linkComponent {
   name = "nitlog";
   libs = [ base blit ];
   objects =

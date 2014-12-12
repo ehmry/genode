@@ -3,14 +3,14 @@
 # \author Norman Feske
 #
 
-{ spec, run, pkgs }:
+{ tool, run, pkgs }:
 
 #if {[have_spec platform_pbxa9] || (![have_spec nova] && ![have_spec foc])} {
 #	puts "Platform is unsupported."
 #	exit 0
 #}
 
-if spec.kernel != "nova" then null else
+if tool.genodeEnv.spec.kernel != "nova" then null else
 
 run {
   name = "affinity_subspace";

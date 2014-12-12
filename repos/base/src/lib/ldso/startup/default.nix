@@ -1,6 +1,6 @@
-{ genodeEnv, compileCC, compileS, syscall }:
+{ linkStaticLibrary, compileCC, compileS, syscall }:
 
-genodeEnv.mkLibrary {
+linkStaticLibrary {
   name = "ldso-startup";
   objects = compileCC { src = ./startup.cc; };
 }

@@ -16,17 +16,17 @@ let
       (import ./include { inherit (tool) genodeEnv; });
   });
 
-  callBaseLibrary = callLibrary {
-    inherit (tool) genodeEnv compiles compileS;
-    inherit compileCC baseDir repoDir;
-  };
-  importBaseLibrary = path: callBaseLibrary (import path);
-
   baseDir = ../base;
   repoDir =
     if tool.genodeEnv.isLinux then ../base-linux else
     if tool.genodeEnv.isNova  then ../base-nova  else
     throw "no base libraries for ${tool.genodeEnv.system}";
+
+  callBaseLibrary = callLibrary {
+    inherit compileCC baseDir repoDir;
+    baseIncludes = import ./include { inherit (tool) genodeEnv; };
+  };
+  importBaseLibrary = path: callBaseLibrary (import path);
 
   impl =
     import (repoDir+"/libs.nix") { inherit tool importBaseLibrary; };

@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC, transformBinary
+{ linkComponent, compileCC, transformBinary
 , launchpad, scout_widgets, libpng_static }:
 
 let
@@ -19,7 +19,7 @@ let
   # ];
   };
 in
-genodeEnv.mkComponent {
+linkComponent {
   name = "scout";
   libs = [ launchpad scout_widgets libpng_static ];
 
