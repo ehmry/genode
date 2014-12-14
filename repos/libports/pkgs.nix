@@ -33,7 +33,10 @@ in
   test =
     { ldso    = importComponent ./src/test/ldso;
       libc    = importComponent ./src/test/libc;
-      pthread = importComponent ./src/test/pthread;
-      sdl     = importComponent ./src/test/sdl;
+      libc_fs_tar_fs =
+        importComponent ./src/test/libc_fs_tar_fs;
+      libc_vfs = importComponent ./src/test/libc_vfs;
+      pthread  = importComponent ./src/test/pthread;
+      sdl      = importComponent ./src/test/sdl;
     };
 }
