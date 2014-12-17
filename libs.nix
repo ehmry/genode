@@ -5,7 +5,8 @@
  */
 
 { system ? builtins.currentSystem
-, tool ? import ./tool { inherit system; }
+, spec ? import ./specs { inherit system; }
+, tool ? import ./tool  { inherit spec; }
 }:
 
 let
@@ -15,6 +16,7 @@ let
         (builtins.functionArgs f)
         ( tool // libs //
           { inherit (tool) linkStaticLibrary;
+            inherit spec;
             linkSharedLibrary = tool.linkSharedLibrary {
               inherit (libs') ldso-startup;
             };

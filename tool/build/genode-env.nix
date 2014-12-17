@@ -4,7 +4,7 @@
  * \date   2014-08-23
  */
 
-{ system, tool, spec, stdAttrs }:
+{ tool, spec, stdAttrs }:
 
 with tool;
 

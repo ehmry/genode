@@ -4,20 +4,16 @@ let
 
   nixpkgs = import <nixpkgs> {};
 
-  tool = import ./tool { inherit system nixpkgs; };
-
-  build = import ./tool/build { inherit system nixpkgs; };
-
-  libs = import ./libs.nix {
-    inherit system tool;
-  };
+  spec = import ./specs { inherit system; };
+  tool = import ./tool  { inherit spec nixpkgs; };
+  libs = import ./libs.nix { inherit system spec tool; };
 
   pkgs = import ./pkgs.nix {
-    inherit system tool libs;
+    inherit system spec tool libs;
   };
 
   run = import ./run.nix {
-    inherit system tool pkgs;
+    inherit system spec tool pkgs;
   };
 
 in

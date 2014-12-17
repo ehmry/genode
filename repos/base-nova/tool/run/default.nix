@@ -13,26 +13,6 @@ let iso = import ../iso { inherit tool; }; in
 { name, contents, graphical ? false, testScript }:
 
 let
-  hypervisor = tool.nixpkgs.stdenv.mkDerivation rec {
-    rev = "f304d54b176ef7b1de9bd6fff6884e1444a0c116";
-    shortRev = builtins.substring 0 7 rev;
-    name = "nova-${shortRev}";
-    src = nixpkgs.fetchgit {
-      url = https://github.com/alex-ab/NOVA.git;
-      inherit rev;
-      sha256 = "0rdqzjzhzx91yamrp3bw4i1lnz780mqk7p0fkvl7p4aaas6n4jkr";
-    };
-    sourceRoot = "git-export/build";
-    makeFlags =
-      if pkgs.system == "x86_32-nova" then [ "ARCH=x86_32" ] else
-      if pkgs.system == "x86_64-nova" then [ "ARCH=x86_64" ] else
-      throw "will not build a ${toString spec.bits} copy of NOVA";
-    preBuild = ''
-      substituteInPlace Makefile --replace '$(call gitrv)' ${shortRev}
-      makeFlagsArray=(INS_DIR=$out)
-    '';
-  };
-
   contents' =
     ( map ({ target, source }:
         { target = "/genode/${target}"; inherit source; })

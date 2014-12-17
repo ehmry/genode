@@ -4,7 +4,7 @@
  * \date   2014-09-30
  */
 
-{ system ? builtins.currentSystem
+{ spec
 , nixpkgs ? import <nixpkgs> { }
 }:
 
@@ -303,4 +303,4 @@ let tool = rec {
 
     ####
 
-}; in tool // import ./build { inherit system tool; }
+}; in tool // import ./build { inherit spec tool; }

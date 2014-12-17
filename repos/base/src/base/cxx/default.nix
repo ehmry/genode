@@ -1,4 +1,4 @@
-{ linkStaticLibrary, compileCC }:
+{ linkStaticLibrary, compileCC, spec }:
 
 linkStaticLibrary rec {
   name = "cxx";
@@ -57,6 +57,8 @@ linkStaticLibrary rec {
   #ifneq ($(filter-out $(MAKECMDGOALS),clean),)
   #-include $(CXX_OBJECTS:.o=.d)
   #endif
+
+  inherit (spec) ccMarch ldMarch;
 
   preLink =
     ''

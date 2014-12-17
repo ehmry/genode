@@ -5,21 +5,14 @@
  */
 
 { system ? builtins.currentSystem
-, tool ? import ./tool { inherit system; }
-, libs ? import ./libs.nix { inherit system tool; }
+, spec ? import ./specs { inherit system; }
+, tool ? import ./tool  { inherit spec; }
+, libs ? import ./libs.nix { inherit system spec tool; }
 }:
 
 let
-  callComponent = extraAttrs: f:
-    f (
-      builtins.intersectAttrs
-        (builtins.functionArgs f)
-        (tool // libs // { inherit linkComponent; } // extraAttrs)
-    );
 
-  importPkgs = p: import p { inherit tool callComponent; };
-
-  # Link a component.
+  # Link a component with ldso from libs.
   linkComponent = args:
   if tool.anyShared (args.libs or []) then
     tool.linkDynamicComponent (
@@ -27,6 +20,16 @@ let
     )
   else
     tool.linkStaticComponent args;
+
+  callComponent = extraAttrs: f:
+    f (
+      builtins.intersectAttrs
+        (builtins.functionArgs f)
+        (tool // libs // { inherit spec linkComponent; } // extraAttrs)
+    );
+
+  importPkgs = p: import p { inherit tool callComponent; };
+
 in
 tool.mergeSets ([ { inherit libs; } ] ++ (
   map
