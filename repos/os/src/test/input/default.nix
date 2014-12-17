@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC, base }:
+{ linkComponent, compileCC, base }:
 
 linkComponent {
   name = "test-input";

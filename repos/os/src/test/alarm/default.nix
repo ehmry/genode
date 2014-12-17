@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC, base, alarm }:
+{ linkComponent, compileCC, base, alarm }:
 
 linkComponent {
   name = "test-alarm";

@@ -21,7 +21,9 @@ let
   };
 
 in
-{ test = builtins.removeAttrs run [ "demo" ]; }
+{ test = builtins.removeAttrs run [ "demo" ];
+  pkgs = builtins.removeAttrs pkgs [ "libs" ];
+}
 //
 ( if system == "x86_32-nova" || system == "x86_64-nova"
   then { demo = import ./repos/demo/demo.nix { inherit tool pkgs; }; }

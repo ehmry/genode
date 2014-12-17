@@ -7,7 +7,7 @@ let
         libs = [ syscall ];
         localIncludes = [ ./include ./include_periodic ];
         object = compileCC {
-          inherit libs;
+          inherit libs localIncludes;
           src = ./linux/platform_timer.cc;
         };
       }

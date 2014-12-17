@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC, base, libpng_static }:
+{ linkComponent, compileCC, base, libpng_static }:
 
 linkComponent {
   name = "test-libpng_static";

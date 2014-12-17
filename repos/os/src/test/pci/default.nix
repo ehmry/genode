@@ -1,4 +1,4 @@
-{ genodeEnv, compileCC, base }:
+{ genodeEnv, linkComponent, compileCC, base }:
 
 if !genodeEnv.isx86 then null else
 linkComponent {

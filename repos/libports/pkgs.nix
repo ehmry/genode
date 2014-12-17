@@ -37,6 +37,6 @@ in
         importComponent ./src/test/libc_fs_tar_fs;
       libc_vfs = importComponent ./src/test/libc_vfs;
       pthread  = importComponent ./src/test/pthread;
-      sdl      = importComponent ./src/test/sdl;
+      #sdl      = importComponent ./src/test/sdl;
     };
 }

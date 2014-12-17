@@ -51,7 +51,7 @@ in
   test =
     { alarm       = importComponent ./src/test/alarm;
       bomb        = importComponent ./src/test/bomb;
-      framebuffer = importComponent ./src/test/framebuffer;
+      #framebuffer = importComponent ./src/test/framebuffer;
       input       = importComponent ./src/test/input;
       nitpicker   = importComponent ./src/test/nitpicker;
       pci         = importComponent ./src/test/pci;
