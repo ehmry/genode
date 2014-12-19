@@ -41,11 +41,12 @@ in
     };
 
   server =
-    { nitpicker  = importComponent ./src/server/nitpicker;
-      report_rom = importComponent ./src/server/report_rom;
-      ram_fs     = importComponent ./src/server/ram_fs;
-      tar_fs     = importComponent ./src/server/tar_fs;
-      tar_rom    = importComponent ./src/server/tar_rom;
+    { log_terminal = importComponent ./src/server/log_terminal;
+      nitpicker    = importComponent ./src/server/nitpicker;
+      report_rom   = importComponent ./src/server/report_rom;
+      ram_fs       = importComponent ./src/server/ram_fs;
+      tar_fs       = importComponent ./src/server/tar_fs;
+      tar_rom      = importComponent ./src/server/tar_rom;
     };
 
   test =

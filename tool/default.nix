@@ -13,17 +13,6 @@ with builtins;
 let tool = rec {
   inherit nixpkgs;
 
-  shell = nixpkgs.bash + "/bin/sh";
-
-  # Save some typing when creating derivation that use our shell.
-  shellDerivation = { script, ... } @ args:
-    derivation ( (removeAttrs args [ "script" ]) //
-      { system = builtins.currentSystem;
-        builder = shell;
-        args = [ "-e" script ];
-      }
-    );
-
   ##
   # Determine if any of the following libs are shared.
   anyShared = libs:
@@ -31,6 +20,8 @@ let tool = rec {
     if libs == [] then false else
     if h.shared or false then true else anyShared (tail libs);
 
+  ##
+  # Drop a suffix from the end of a string.
   dropSuffix = suf: str:
     let
       strL = stringLength str;
@@ -40,101 +31,15 @@ let tool = rec {
     then abort "${str} does not have suffix ${suf}"
     else substring 0 (sub strL sufL) str;
 
-  hasDotH = s: substring (sub (stringLength s) 2) 2 s == ".h";
-
   ##
-  # Filter out everything but *.h on a path.
-  # Prevents files that exist alongside headers from changing header path hash.
-  filterHeaders = dir: filterSource
-    (path: type: hasDotH path || type == "directory")
-    dir;
-
-  ##
-  # Determine if a string has the given suffix.
-  hasSuffix = suf: str:
-    let
-      strL = stringLength str;
-      sufL = stringLength suf;
-    in
-    if lessThan strL sufL then false else
-      substring (sub strL sufL) strL str == suf;
-
-  ##
-  # Replace substring a with substring b in string s.
-  replaceInString =
-  a: b: s:
-  let
-    al = stringLength a;
-    bl = stringLength b;
-    sl = stringLength s;
-  in
-  if al == 0 then s else
-  if sl == 0 then "" else
-  if ((substring 0 al s) == a) then
-    b+(replaceInString a b (substring al sl s))
-  else
-    (substring 0 1 s) + (replaceInString a b (substring 1 sl s));
-
-  # Bootability is not assured, so its really system image.
-  systemImage = import ./system-image { inherit nixpkgs; };
-  bootImage = systemImage; # get rid of this
-
-  filterOut = filters: filteree:
-    filter (e: !(elem (baseNameOf e) filters)) filteree;
-
-  # if anti-quotation was used rather than concatenation,
-  # the result would be a string containing a store path,
-  # not the original absolute path
+  # Generate a list of file paths from a directory and
+  # filenames.
   fromDir =
   dir: names:
   #assert typeOf dir == "path";
   map (name: dir+"/"+name) names;
 
-  fromPath = path: [ [ path (baseNameOf (toString path)) ] ];
-  fromPaths = paths: map (p: [ p (baseNameOf (toString p)) ]) paths;
-
-  newDir =
-  name: contents:
-  derivation {
-    inherit name contents;
-    system = builtins.currentSystem;
-    builder = shell;
-    PATH="${nixpkgs.coreutils}/bin";
-    args = [ "-e" "-c" ''
-      mkdir -p $out ; \
-      for i in $contents; do cp -Hr $i $out; done
-    '' ];
-  };
-
-  preparePort = import ./prepare-port { inherit nixpkgs; };
-
-  # Concatenate the named attr found in pkgs.
-  propagate = attrName: pkgs:
-    let
-      pkg = head pkgs;
-    in
-    if pkgs == [] then [] else
-    ( if hasAttr attrName pkg
-      then getAttr attrName pkg
-      else []
-    ) ++
-    (propagate attrName (tail pkgs));
-
-  singleton = x: [x];
-
-  wildcard =
-  path: glob:
-  let
-    relativePaths = import (shellDerivation {
-      name = "files.nix";
-      PATH="${nixpkgs.coreutils}/bin";
-      script = ./wildcard.sh;
-      inherit path glob;
-
-    });
-  in
-  map (rp: (path+"/${rp}")) relativePaths;
-
+  ##
   # Utility functions for gathering sources.
   fromGlob =
   dir: glob:
@@ -148,15 +53,126 @@ let tool = rec {
     inherit dir glob;
   });
 
-  # Generate a list of paths from a path and a shell glob.
-  pathsFromGlob = dir: glob:
-    let path = toString dir; in
-    trace "FIXME: pathsFromGlob causes excessive hashing"
-    import (derivation {
-      name = "${baseNameOf path}-glob.nix";
-      args = [ "-e" "-O" "nullglob" ./path-from-glob.sh ];
-      inherit dir glob path;
+  fromPath = path: [ [ path (baseNameOf (toString path)) ] ];
+  fromPaths = paths: map (p: [ p (baseNameOf (toString p)) ]) paths;
+
+  ##
+  # Test if a string ends in '.h'.
+  hasDotH = s: substring (sub (stringLength s) 2) 2 s == ".h";
+
+  ##
+  # Filter out everything but *.h on a path.
+  # Prevents files that exist alongside headers from changing header path hash.
+  filterHeaders = dir: filterSource
+    (path: type: hasDotH path || type == "directory")
+    dir;
+
+  ##
+  # Find a filename in a search path.
+  findFile = fn: searchPath:
+    if searchPath == [] then []
+    else
+      let
+        sp = head searchPath;
+        fn' = sp + "/${fn}";
+      in
+      if builtins.typeOf fn' != "path" then [] else
+      if pathExists fn' then
+        [ { key = fn'; relative = fn; } ]
+      else findFile fn (tail searchPath);
+
+  findIncludes = main: path:
+    map (x: [ x.key x.relative ]) (genericClosure {
+      startSet = [ { key = main; relative = baseNameOf (toString main); } ];
+      operator =
+        { key, ... }:
+        let
+          includes = import (includesOf key);
+          includesFound =
+            nixpkgs.lib.concatMap
+              (fn: findFile fn ([ (dirOf main) ] ++ path))
+              includes;
+        in includesFound;
     });
+
+  ##
+  # Recursively find libraries needed to link a component.
+  findLinkLibraries = libs:
+    let
+      list = libs:
+        map
+          (lib: { key = lib.name; inherit lib; })
+          (filter (x: x != null) libs);
+    in
+    if libs == [] then [] else
+    map (x: x.lib) (genericClosure {
+      startSet = list libs;
+      operator =
+        { key, lib }:
+        if lib.shared then [] else list lib.libs;
+    });
+
+  findLocalIncludes = main: path:
+    let path' = [ (dirOf main) ] ++ path; in
+    map (x: [ x.key x.relative ]) (genericClosure {
+      startSet = [ { key = main; relative = baseNameOf (toString main); } ];
+      operator =
+        { key, ... }:
+        let
+          includes = import (localIncludesOf key);
+          includesFound =
+            nixpkgs.lib.concatMap
+              (fn: findFile fn path')
+              includes;
+        in includesFound;
+    });
+
+  ##
+  # Recursively find shared libraries.
+  findRuntimeLibraries = libs:
+    let
+      filter = libs: builtins.filter (lib: lib.shared) libs;
+      list = libs:
+        map (lib: { key = lib.name; inherit lib; }) libs;
+    in
+  filter (map (x: x.lib) (genericClosure {
+    startSet = list libs;
+    operator =
+      { key, lib }:
+      list ([lib ] ++ lib.libs);
+  }));
+
+  ##
+  # Determine if a string has the given suffix.
+  hasSuffix = suf: str:
+    let
+      strL = stringLength str;
+      sufL = stringLength suf;
+    in
+    if lessThan strL sufL then false else
+      substring (sub strL sufL) strL str == suf;
+
+  includesOf = main: derivation {
+    name =
+      if typeOf main == "path"
+      then "${baseNameOf (toString main)}-includes"
+      else "includes";
+    system = currentSystem;
+    builder = "${nixpkgs.perl}/bin/perl";
+    args = [ ./find-includes.pl ];
+    inherit main;
+  };
+
+  localIncludesOf = main: derivation {
+    name =
+      if typeOf main == "path"
+      then "${baseNameOf (toString main)}-local-includes"
+      else "local-includes";
+    system = currentSystem;
+    builder = "${nixpkgs.perl}/bin/perl";
+    args = [ ./find-local-includes.pl ];
+    inherit main;
+  };
 
   ##
   # Merge an attr between two sets.
@@ -189,118 +205,91 @@ let tool = rec {
   if sets == [] then {} else
     mergeSet (head sets) (mergeSets (tail sets));
 
-  ####
-  # from Eelco Dolstra's nix-make
-
-  ##
-  # Find a filename in a search path.
-  findFile = fn: searchPath:
-    if searchPath == [] then []
-    else
-      let
-        sp = head searchPath;
-        fn' = sp + "/${fn}";
-      in
-      if builtins.typeOf fn' != "path" then [] else
-      if pathExists fn' then
-        [ { key = fn'; relative = fn; } ]
-      else findFile fn (tail searchPath);
-
-  includesOf = main: derivation {
-    name =
-      if typeOf main == "path"
-      then "${baseNameOf (toString main)}-includes"
-      else "includes";
-    system = currentSystem;
-    builder = "${nixpkgs.perl}/bin/perl";
-    args = [ ./find-includes.pl ];
-    inherit main;
+  newDir =
+  name: contents:
+  derivation {
+    inherit name contents;
+    system = builtins.currentSystem;
+    builder = shell;
+    PATH="${nixpkgs.coreutils}/bin";
+    args = [ "-e" "-c" ''
+      mkdir -p $out ; \
+      for i in $contents; do cp -Hr $i $out; done
+    '' ];
   };
 
-  localIncludesOf = main: derivation {
-    name =
-      if typeOf main == "path"
-      then "${baseNameOf (toString main)}-local-includes"
-      else "local-includes";
-    system = currentSystem;
-    builder = "${nixpkgs.perl}/bin/perl";
-    args = [ ./find-local-includes.pl ];
-    inherit main;
-  };
-
-  findIncludes = main: path:
-    map (x: [ x.key x.relative ]) (genericClosure {
-      startSet = [ { key = main; relative = baseNameOf (toString main); } ];
-      operator =
-        { key, ... }:
-        let
-          includes = import (includesOf key);
-          includesFound =
-            nixpkgs.lib.concatMap
-              (fn: findFile fn ([ (dirOf main) ] ++ path))
-              includes;
-        in includesFound;
+  ##
+  # Generate a list of paths from a path and a shell glob.
+  pathsFromGlob = dir: glob:
+    let path = toString dir; in
+    trace "FIXME: pathsFromGlob causes excessive hashing"
+    import (derivation {
+      name = "${baseNameOf path}-glob.nix";
+      args = [ "-e" "-O" "nullglob" ./path-from-glob.sh ];
+      inherit dir glob path;
     });
 
-  findLocalIncludes = main: path:
-    let path' = [ (dirOf main) ] ++ path; in
-    map (x: [ x.key x.relative ]) (genericClosure {
-      startSet = [ { key = main; relative = baseNameOf (toString main); } ];
-      operator =
-        { key, ... }:
-        let
-          includes = import (localIncludesOf key);
-          includesFound =
-            nixpkgs.lib.concatMap
-              (fn: findFile fn path')
-              includes;
-        in includesFound;
-    });
+  preparePort = import ./prepare-port { inherit nixpkgs; };
+
+  # Concatenate the named attr found in pkgs.
+  propagate = attrName: pkgs:
+    let
+      pkg = head pkgs;
+    in
+    if pkgs == [] then [] else
+    ( if hasAttr attrName pkg
+      then getAttr attrName pkg
+      else []
+    ) ++
+    (propagate attrName (tail pkgs));
+
 
   ##
-  # Recursively find libraries needed to link a component.
-  findLinkLibraries = libs:
-    let
-      list = libs:
-        map
-          (lib: { key = lib.name; inherit lib; })
-          (filter (x: x != null) libs);
-    in
-    if libs == [] then [] else
-    map (x: x.lib) (genericClosure {
-      startSet = list libs;
-      operator =
-        { key, lib }:
-        if lib.shared then [] else list lib.libs;
-    });
+  # Replace substring a with substring b in string s.
+  replaceInString =
+  a: b: s:
+  let
+    al = stringLength a;
+    bl = stringLength b;
+    sl = stringLength s;
+  in
+  if al == 0 then s else
+  if sl == 0 then "" else
+  if ((substring 0 al s) == a) then
+    b+(replaceInString a b (substring al sl s))
+  else
+    (substring 0 1 s) + (replaceInString a b (substring 1 sl s));
 
-  ##
-  # Recursively find shared libraries.
-  findRuntimeLibraries = libs:
-    let
-      filter = libs: builtins.filter (lib: lib.shared) libs;
-      list = libs:
-        map (lib: { key = lib.name; inherit lib; }) libs;
-    in
-  filter (map (x: x.lib) (genericClosure {
-    startSet = list libs;
-    operator =
-      { key, lib }:
-      list ([lib ] ++ lib.libs);
-  }));
+  shell = nixpkgs.bash + "/bin/sh";
 
-  includesSet =
-    sources: path:
-    listToAttrs (
-     map
-      ( main:
-        { name = "includes_" + (baseNameOf (toString main));
-          value = tail (findLocalIncludes main path);
-        }
-      )
-      sources
+  # Save some typing when creating derivation that use our shell.
+  shellDerivation = { script, ... } @ args:
+    derivation ( (removeAttrs args [ "script" ]) //
+      { system = builtins.currentSystem;
+        builder = shell;
+        args = [ "-e" script ];
+      }
     );
 
-    ####
+  singleton = x: [x];
+
+  # Bootability is not assured, so its really system image.
+  systemImage = import ./system-image { inherit nixpkgs; };
+  bootImage = systemImage; # get rid of this
+
+
+  wildcard =
+  path: glob:
+  let
+    relativePaths = import (shellDerivation {
+      name = "files.nix";
+      PATH="${nixpkgs.coreutils}/bin";
+      script = ./wildcard.sh;
+      inherit path glob;
+
+    });
+  in
+  map (rp: (path+"/${rp}")) relativePaths;
+
 
 }; in tool // import ./build { inherit spec tool; }

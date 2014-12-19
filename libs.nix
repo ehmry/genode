@@ -30,7 +30,7 @@ let
       (repo: import (./repos + "/${repo}/libs.nix") {
         inherit tool callLibrary;
       })
-      [ "base" "os" "demo" "libports" ]
+      [ "base" "os" "demo" "libports" "ports" ]
   );
 
   libs = libs' // {
