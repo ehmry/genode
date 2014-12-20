@@ -4,7 +4,7 @@
  * \date   2014-09-11
  */
 
-{ tool, callLibrary }:
+{ spec, tool, callLibrary }:
 
 let
   compileCC =
@@ -18,8 +18,8 @@ let
 
   baseDir = ../base;
   repoDir =
-    if tool.genodeEnv.isLinux then ../base-linux else
-    if tool.genodeEnv.isNova  then ../base-nova  else
+    if spec.isLinux then ../base-linux else
+    if spec.isNova  then ../base-nova  else
     throw "no base libraries for ${tool.genodeEnv.system}";
 
   callBaseLibrary = callLibrary {
@@ -42,7 +42,7 @@ impl // {
       shared = false;
       propagatedIncludes =
         [ ( tool.filterHeaders
-             ( if tool.isLinux then repoDir+"/src/base/env"
+             ( if spec.isLinux then repoDir+"/src/base/env"
                else baseDir+"/src/base/env"
              )
           )

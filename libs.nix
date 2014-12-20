@@ -28,7 +28,7 @@ let
   libs' = tool.mergeSets (
     map
       (repo: import (./repos + "/${repo}/libs.nix") {
-        inherit tool callLibrary;
+        inherit spec tool callLibrary;
       })
       [ "base" "os" "demo" "libports" "ports" ]
   );

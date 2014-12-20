@@ -2,7 +2,8 @@
 
 let rev = "3837"; in
 preparePort rec {
-  name = "dosbox-r${rev}";
+  name = "dosbox-${version}";
+  version = "r${rev}";
 
   src = fetchsvn {
     url = http://svn.code.sf.net/p/dosbox/code-0/dosbox/trunk;

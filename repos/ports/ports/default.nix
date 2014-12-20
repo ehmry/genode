@@ -1,16 +1,23 @@
-/*
- * \brief  External source code for ports
- * \author Emery Hemingway
- * \date   2014-09-19
- */
-
 { tool ? import ../../../tool { } }:
 
 let
-  callPort = path:
+  importPort = path:
     let f = (import path);
     in f (builtins.intersectAttrs (builtins.functionArgs f) (tool.nixpkgs // tool) );
+
+  hasSuffixNix = tool.hasSuffix ".nix";
 in
-{
-  dosbox = callPort ./dosbox.nix;
-}
+builtins.listToAttrs (
+  builtins.filter
+    (x: x != null)
+    (map
+      (fn:
+         if hasSuffixNix fn && fn != "default.nix" then
+           { name = tool.replaceInString ".nix" "" fn;
+             value = importPort (../ports + "/${fn}");
+           }
+         else null
+      )
+      (builtins.attrNames (builtins.readDir ../ports))
+    )
+)

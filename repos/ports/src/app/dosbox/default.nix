@@ -3,7 +3,7 @@
 , config_args }:
 
 linkComponent rec {
-  name = "dosbox";
+  name = "dosbox-"+dosboxSrc.version;
 
   libs =
     [ libc libm libpng sdl sdl_net stdcxx

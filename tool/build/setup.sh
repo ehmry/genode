@@ -98,6 +98,12 @@ for i in @initialPath@; do
     addToSearchPath PATH $i/sbin
 done
 
+for i in $buildInputs; do
+    [ -d "$i/bin" ]  && addToSearchPath PATH $i/bin
+    [ -d "$i/sbin" ] && addToSearchPath PATH $i/sbin
+done
+
+
 if [ "$NIX_DEBUG" = 1 ]; then
     echo "initial path: $PATH"
 fi

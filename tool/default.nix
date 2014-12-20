@@ -4,7 +4,7 @@
  * \date   2014-09-30
  */
 
-{ spec
+{ spec ? import ../specs { system = builtins.currentSystem; }
 , nixpkgs ? import <nixpkgs> { }
 }:
 

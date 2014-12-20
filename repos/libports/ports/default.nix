@@ -1,23 +1,23 @@
-/*
- * \brief  External source code for libports
- * \author Emery Hemingway
- * \date   2014-09-19
- */
-
 { tool ? import ../../../tool { } }:
 
 let
-  callPort = path:
+  importPort = path:
     let f = (import path);
     in f (builtins.intersectAttrs (builtins.functionArgs f) (tool.nixpkgs // tool) );
+
+  hasSuffixNix = tool.hasSuffix ".nix";
 in
-{
-  libc    = callPort ./libc.nix;
-  libpng  = callPort ./libpng.nix;
-  lwip    = callPort ./lwip.nix;
-  sdl     = callPort ./sdl.nix;
-  sdl_net = callPort ./sdl_net.nix;
-  stdcxx  = callPort ./stdcxx.nix;
-  x86emu  = callPort ./x86emu.nix;
-  zlib    = callPort ./zlib.nix;
-}
+builtins.listToAttrs (
+  builtins.filter
+    (x: x != null)
+    (map
+      (fn:
+         if hasSuffixNix fn && fn != "default.nix" then
+           { name = tool.replaceInString ".nix" "" fn;
+             value = importPort (../ports + "/${fn}");
+           }
+         else null
+      )
+      (builtins.attrNames (builtins.readDir ../ports))
+    )
+)

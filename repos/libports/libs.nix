@@ -4,7 +4,7 @@
  * \date   2014-09-20
  */
 
-{ tool, callLibrary }:
+{ spec, tool, callLibrary }:
 
 let
 
@@ -102,6 +102,8 @@ let
 
 in
 {
+  gmp-mpn = importLibrary ./src/lib/gmp/mpn.nix;
+
   libc-compat  = importLibrary ./lib/mk/libc-compat.nix;
   libc-locale  = importLibrary ./lib/mk/libc-locale.nix;
   libc-gen     = importLibrary ./lib/mk/libc-gen.nix;

@@ -4,7 +4,7 @@
  * \date   2014-09-11
  */
 
-{ tool, callLibrary }:
+{ spec, tool, callLibrary }:
 
 let
 
