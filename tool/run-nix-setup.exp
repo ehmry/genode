@@ -18,6 +18,10 @@ log_file $out/log
 # this comes out with the execute bit set for some reason
 exec chmod -x $out/log
 
+exec mkdir -p $out/nix-support
+set hydra_build_products [ open $out/nix-support/hydra-build-products w]
+puts $hydra_build_products "report testlog $out/log"
+
 proc run_dir { } { global out; return $out }
 proc qemu    { } { global env; return $env(qemu) }
 
