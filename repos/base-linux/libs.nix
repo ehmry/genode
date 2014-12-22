@@ -15,6 +15,14 @@
       propagatedIncludes = [ (tool.filterHeaders ./src/base/env) ];
     };
 
+  lock =
+    { name = "lock";
+      propagatedIncludes =
+        [ (tool.filterHeaders ./src/base/lock)
+          (tool.filterHeaders ../base/src/base/lock)
+        ];
+    };
+
   syscall = importBaseLibrary ./lib/mk/syscall.nix;
 
   #lx_hybrid = callLibrary (
