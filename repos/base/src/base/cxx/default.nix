@@ -15,7 +15,7 @@ linkStaticLibrary rec {
     "malloc" "free" "calloc" "realloc"
     "abort" "fputc" "fputs" "fwrite"
     "stderr" "stract" "strcpy" "strlen"
-    "memcmp" "strncmp" "strcmp" "sprinf"
+    "memcmp" "strncmp" "strcmp" "sprintf"
     "__stderrp"
   ];
 

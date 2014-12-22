@@ -9,5 +9,8 @@
 {
   base = importBaseLibrary ./lib/mk/base.nix;
   base-common = importBaseLibrary ./lib/mk/base-common.nix;
-  syscall = null;
+  lock =
+    { name = "lock";
+      propagatedIncludes = [ (tool.filterHeaders ./src/base/lock) ];
+    };
 }

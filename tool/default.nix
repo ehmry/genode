@@ -57,6 +57,10 @@ let tool = rec {
   fromPaths = paths: map (p: [ p (baseNameOf (toString p)) ]) paths;
 
   ##
+  # Filter out libs that are not derivations
+  filterFakeLibs = libs: filter (lib: hasAttr "shared" lib) libs;
+
+  ##
   # Test if a string ends in '.h'.
   hasDotH = s: substring (sub (stringLength s) 2) 2 s == ".h";
 
@@ -96,21 +100,31 @@ let tool = rec {
     });
 
   ##
-  # Recursively find libraries needed to link a component.
+  # Recursively find libraries.
+  findLibraries = libs:
+    let
+      list = map (lib: { key = lib.name; inherit lib; });
+    in
+    map (x: x.lib) (genericClosure {
+      startSet = list libs;
+      operator = { key, lib }: list lib.libs or [];
+    });
+
+  ##
+  # Recursively find libraries to link.
   findLinkLibraries = libs:
     let
-      list = libs:
-        map
-          (lib: { key = lib.name; inherit lib; })
-          (filter (x: x != null) libs);
+      list = libs: map
+        (lib: { key = lib.name; inherit lib; })
+        (filter (lib: hasAttr "drvPath" lib) libs);
     in
-    if libs == [] then [] else
     map (x: x.lib) (genericClosure {
       startSet = list libs;
       operator =
         { key, lib }:
-        if lib.shared then [] else list lib.libs;
-    });
+        if lib.shared then []
+        else list lib.libs or [];
+      });
 
   findLocalIncludes = main: path:
     let path' = [ (dirOf main) ] ++ path; in

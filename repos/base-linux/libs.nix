@@ -10,6 +10,11 @@
   base = importBaseLibrary ./lib/mk/base.nix;
   base-common = importBaseLibrary ./lib/mk/base-common.nix;
 
+  env =
+    { name = "env";
+      propagatedIncludes = [ (tool.filterHeaders ./src/base/env) ];
+    };
+
   syscall = importBaseLibrary ./lib/mk/syscall.nix;
 
   #lx_hybrid = callLibrary (

@@ -9,6 +9,8 @@
 with tool;
 
 let
+  toolchain = nixpkgs.callPackage ../toolchain/precompiled {};
+
   devPrefix = "genode-${spec.platform}-";
 
   # TODO deduplicate with ../build/genode-env.nix
@@ -68,52 +70,9 @@ let
         ];
     };
 
-  # Linker script for dynamically linked programs
-  ldScriptDyn = ../../repos/base/src/platform/genode_dyn.ld;
-
-
-  componentLinkPhase = ''
-    echo -e "    LINK     $name"
-
-    for o in $externalObjects
-    do objects="$objects $o/*.o"
-    done
-
-    objects=$(sortWords $objects)
-
-    local _libs=$libs
-    local libs=""
-
-    for l in $_libs
-    do findLibs $l libs
-    done
-
-    libs=$(sortDerivations $libs)
-
-    mkdir -p $out
-
-    [[ "$ldTextAddr" ]] && \
-        cxxLinkFlags="$cxxLinkFlags -Wl,-Ttext=$ldTextAddr"
-
-    for s in $ldScripts
-    do cxxLinkFlags="$cxxLinkFlags -Wl,-T -Wl,$s"
-    done
-
-    VERBOSE $cxx $cxxLinkFlags \
-	-Wl,--whole-archive -Wl,--start-group \
-        $objects $libs \
-	-Wl,--end-group -Wl,--no-whole-archive \
-        $($cc $ccMarch -print-libgcc-file-name) \
-        -o $out/$name
-  '';
-
-  componentFixupPhase = " ";
-
-  toolchain = nixpkgs.callPackage ../toolchain/precompiled {};
-
   propagateCompileArgs = args:
     let
-      libs = findLinkLibraries args.libs or [];
+      libs = findLibraries args.libs or [];
     in
     (removeAttrs args [ "libs" ]) //
     { extraFlags =
@@ -128,6 +87,8 @@ let
 
 in
 rec {
+  inherit toolchain;
+
   genodeEnv = import ./genode-env.nix {
      inherit tool spec stdAttrs;
   };
@@ -252,7 +213,8 @@ rec {
     script = ./link-static-library.sh;
     inherit genodeEnv;
     inherit (stdAttrs) ar ld ldFlags cxx objcopy;
-  }) // { shared = false; inherit libs; };
+    libs = filterFakeLibs libs;
+  }) // { shared = false; };
 
   # Link together a shared library.
   # This function must be preloaded with an ldso-startup library.
@@ -264,7 +226,7 @@ rec {
   , ... } @ args:
   shellDerivation ( args // {
     script = ./link-shared-library.sh;
-    libs = [ ldso-startup ] ++ libs;
+    libs = [ ldso-startup ] ++ findLinkLibraries libs;
     inherit genodeEnv ldScriptSo entryPoint;
     inherit (stdAttrs) ld ldFlags cc ccMarch;
   }) // { shared = true; };
@@ -283,7 +245,7 @@ rec {
     inherit genodeEnv ldTextAddr ldScripts;
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
     libs = findLinkLibraries libs';
-  }) // { libs = findRuntimeLibraries libs'; };
+  });
 
   # Link together a component with shared libraries.
   linkDynamicComponent =

@@ -32,24 +32,22 @@ let
     import (repoDir+"/libs.nix") { inherit tool importBaseLibrary; };
 
 in
-impl // {
+{
   cxx          = importBaseLibrary ./src/base/cxx;
-
-  # Env is a fake library for propagating platform_env.h
-  env =
-    { name = "env";
-      libs = [ ];
-      shared = false;
-      propagatedIncludes =
-        [ ( tool.filterHeaders
-             ( if spec.isLinux then repoDir+"/src/base/env"
-               else baseDir+"/src/base/env"
-             )
-          )
-        ];
-    };
-
   ld           = importBaseLibrary ./src/lib/ldso;
   ldso-startup = importBaseLibrary ./src/lib/ldso/startup;
   startup      = importBaseLibrary ./lib/mk/startup.nix;
-}
+
+  ## Env is a fake library for propagating platform_env.h
+  env =
+    { name = "env";
+      propagatedIncludes  = [ (tool.filterHeaders baseDir+"/src/base/env") ];
+    };
+
+  lock =
+    { name = "lock";
+      propagatedIncludes = [ (tool.filterHeaders baseDir+"/src/base/lock") ];
+    };
+  syscall = { name = "syscall"; };
+
+} // impl # Overide with impl

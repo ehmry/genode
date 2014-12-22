@@ -30,6 +30,7 @@ in {
   blit         = importLibrary ./src/lib/blit;
   config       = importLibrary ./src/lib/config;
   config_args  = importLibrary ./src/lib/config_args;
+  dde_kit      = importLibrary ./src/lib/dde_kit;
   init_pd_args = importLibrary ./src/lib/init_pd_args;
   server       = importLibrary ./src/lib/server;
   timed_semaphore = importLibrary ./src/lib/timed_semaphore;

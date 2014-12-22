@@ -51,6 +51,7 @@ in
 
   test =
     { alarm       = importComponent ./src/test/alarm;
+      audio_out   = importComponent ./src/test/audio_out;
       bomb        = importComponent ./src/test/bomb;
       #framebuffer = importComponent ./src/test/framebuffer;
       input       = importComponent ./src/test/input;
