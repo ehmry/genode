@@ -17,17 +17,6 @@ let
       (builtins.attrNames ports)
   );
 
-  ##
-  ## Automatically add the base library for targets that use the libc
-  ##
-  ## We test for an empty 'LIB_MK' variable to determine whether we are currently
-  ## processing a library or a target. We only want to add the base library to
-  ## targets, not libraries.
-  ##
-  #ifeq ($(LIB_MK),)
-  #LIBS += base
-  #endif
-
   libcArchInclude =
     if tool.genodeEnv.isArm    then "libc-arm"    else
     if tool.genodeEnv.isx86_32 then "libc-i386"  else
@@ -103,7 +92,7 @@ let
 in
 {
   gmp-mpn = importLibrary ./src/lib/gmp/mpn.nix;
-
+  icu     = importLibrary ./lib/mk/icu.nix;
   libc-compat  = importLibrary ./lib/mk/libc-compat.nix;
   libc-locale  = importLibrary ./lib/mk/libc-locale.nix;
   libc-gen     = importLibrary ./lib/mk/libc-gen.nix;
