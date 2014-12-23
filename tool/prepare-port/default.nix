@@ -27,6 +27,7 @@ let
 in
 { name
 , outputs ? [ "source" ]
+, preferLocalBuild ? true
 , ... } @ attrs:
 derivation (attrs // {
   inherit name outputs;

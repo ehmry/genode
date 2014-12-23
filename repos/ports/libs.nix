@@ -36,4 +36,5 @@ let
 in
 {
   libc_noux = importLibrary ./src/lib/libc_noux;
+  # seoul_libc_support is imported in ../libports.
 }

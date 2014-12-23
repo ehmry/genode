@@ -35,7 +35,9 @@ let
 in
 {
   app =
-    { dosbox = importComponent ./src/app/dosbox; };
+    { dosbox = importComponent ./src/app/dosbox;
+      seoul  = importComponent ./src/app/seoul;
+    };
 
   noux.minimal = importComponent ./src/noux/minimal;
   noux.net     = importComponent ./src/noux/net;

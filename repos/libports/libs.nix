@@ -112,6 +112,9 @@ in
   libc = importLibrary ./src/lib/libc;
   libm = importLibrary ./lib/mk/libm.nix;
 
+  seoul_libc_support = importLibrary
+    ./../ports/lib/mk/seoul_libc_support.nix;
+
   libc_lock_pipe     = importLibrary ./src/lib/libc_lock_pipe;
   libc_lwip          = importLibrary ./src/lib/libc_lwip;
   libc_lwip_nic_dhcp = importLibrary ./src/lib/libc_lwip_nic_dhcp;
