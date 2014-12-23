@@ -73,6 +73,8 @@ if ! test "$(readlink $prefix$srcName)" = $src; then
     ln -s $src $prefix$srcName
 fi
 
+[ "$PIC" ] && ccFlags="$ccFlags -fPIC"
+
 includeOpts="-I."
 for i in $systemIncludes
 do includeOpts="$includeOpts -I$i"

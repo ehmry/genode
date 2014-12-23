@@ -73,13 +73,14 @@ if ! test "$(readlink $prefix$srcName)" = $src; then
     ln -s $src $prefix$srcName
 fi
 
+[ "$PIC" ] && ccFlags="$ccFlags -fPIC"
+
 includeFlags="-I."
 for i in $systemIncludes
 do includeFlags="$includeFlags -I$i"
 done
 
 test "$prefix" && cd $prefix
-
 
 VERBOSE $cxx $extraFlags $ccFlags $cxxFlags $includeFlags \
             -c $srcName -o $out

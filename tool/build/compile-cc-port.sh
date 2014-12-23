@@ -7,6 +7,8 @@ do includeFlags="$includeFlags -I $i"
 done
 mkdir -p $out
 
+[ "$PIC" ] && ccFlags="$ccFlags -fPIC"
+
 for src in $sources; do
     base=$(basename "$src")
     case $filter in
@@ -25,5 +27,4 @@ for src in $sources; do
 
     VERBOSE $cxx ${!var} $extraFlags $ccFlags $cxxFlags $includeFlags \
             -c "$src" -o "$out/$object"
-
 done

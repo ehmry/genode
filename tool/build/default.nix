@@ -135,10 +135,11 @@ rec {
   compileC =
   { src
   , localIncludes ? []
+  , PIC ? true
   , ... } @ args:
   shellDerivation ( (propagateCompileArgs args) //
     { inherit (stdAttrs) cc ccFlags;
-      inherit genodeEnv;
+      inherit PIC genodeEnv;
       name = dropSuffix ".c" (baseNameOf (toString src)) + ".o";
       script = ./compile-c.sh;
       localIncludes = findLocalIncludes src localIncludes;
@@ -148,10 +149,11 @@ rec {
   compileCC =
   { src
   , localIncludes ? []
+  , PIC ? true
   , ... } @ args:
   shellDerivation ( (propagateCompileArgs args) //
     { inherit (stdAttrs) cxx ccFlags cxxFlags;
-      inherit genodeEnv;
+      inherit PIC genodeEnv;
       name = dropSuffix ".cc" (baseNameOf (toString src)) + ".o";
       script = ./compile-cc.sh;
       localIncludes = findLocalIncludes src localIncludes;
@@ -186,9 +188,10 @@ rec {
   compileCRepo =
   { name ? "objects"
   , sources
+  , PIC ? true
   , ... } @ args:
   shellDerivation ( (propagateCompileArgs args) //
-    { inherit name genodeEnv;
+    { inherit name PIC genodeEnv;
       inherit (stdAttrs) cc ccFlags;
       script = ./compile-c-port.sh;
     }
@@ -198,9 +201,10 @@ rec {
   compileCCRepo =
   { name ? "objects"
   , sources
+  , PIC ? true
   , ... } @ args:
   shellDerivation ( (propagateCompileArgs args) //
-    { inherit name genodeEnv;
+    { inherit name PIC genodeEnv;
       inherit (stdAttrs) cxx ccFlags cxxFlags;
       script = ./compile-cc-port.sh;
     }
