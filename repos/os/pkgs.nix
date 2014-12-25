@@ -33,15 +33,19 @@ in
 
   driver =
     { acpi          = importComponent ./src/drivers/acpi;
+      ahci          = importComponent ./src/drivers/ahci;
       input =
         { ps2       = importComponent ./src/drivers/input/ps2; };
       pci           = importComponent ./src/drivers/pci;
       pci_device_pd = importComponent ./src/drivers/pci/device_pd;
+      nic           = importComponent ./src/drivers/nic/lan9118;
+      rtc           = importComponent ./src/drivers/rtc;
       timer         = importComponent ./src/drivers/timer;
     };
 
   server =
-    { log_terminal = importComponent ./src/server/log_terminal;
+    { loader       = importComponent ./src/server/loader;
+      log_terminal = importComponent ./src/server/log_terminal;
       nitpicker    = importComponent ./src/server/nitpicker;
       report_rom   = importComponent ./src/server/report_rom;
       ram_fs       = importComponent ./src/server/ram_fs;
@@ -54,6 +58,7 @@ in
       audio_out   = importComponent ./src/test/audio_out;
       bomb        = importComponent ./src/test/bomb;
       #framebuffer = importComponent ./src/test/framebuffer;
+      loader      = importComponent ./src/test/loader;
       input       = importComponent ./src/test/input;
       nitpicker   = importComponent ./src/test/nitpicker;
       pci         = importComponent ./src/test/pci;

@@ -26,6 +26,7 @@ let
   importLibrary = path: callLibrary' (import path);
 
 in {
+  ahci         = importLibrary ./src/drivers/ahci/lib.nix;
   alarm        = importLibrary ./src/lib/alarm;
   blit         = importLibrary ./src/lib/blit;
   config       = importLibrary ./src/lib/config;
