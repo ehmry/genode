@@ -1,0 +1,8 @@
+# Put derivation variables in scope, record disk_image product
+set disk_image $env(diskImage)
+
+exec ln -s $disk_image ./[strip_hash $disk_image]
+exec ln -s $disk_image $out/[strip_hash $disk_image]
+puts $hydra_build_products "file iso $disk_image"
+
+set is_qemu_available 1

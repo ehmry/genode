@@ -1,0 +1,3 @@
+## link in the image
+set image_dir $env(imageDir)
+exec ln -s $env(imageDir) $out/image

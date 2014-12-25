@@ -12,7 +12,7 @@ set out  $env(out)
 set name $env(name)
 set test_script $env(testScript)
 
-exec mkdir -p $out
+exec mkdir -p $out/bin
 
 log_file $out/log
 # this comes out with the execute bit set for some reason
@@ -21,6 +21,13 @@ exec chmod -x $out/log
 exec mkdir -p $out/nix-support
 set hydra_build_products [ open $out/nix-support/hydra-build-products w]
 puts $hydra_build_products "report testlog $out/log"
+
+# Write out a script that the user can execute later.
+set user_script_fn $out/bin/$name
+set user_script_fh [ open $user_script_fn w ]
+puts $user_script_fh $env(userScript)
+close $user_script_fh
+exec chmod +x $user_script_fn
 
 proc run_dir { } { global out; return $out }
 proc qemu    { } { global env; return $env(qemu) }
@@ -60,5 +67,4 @@ foreach arg $argv { source $arg }
 ##
 ## Execution of run scripts
 ##
-
-eval $test_script
+if {$env(automatic) == 1} { eval $test_script }

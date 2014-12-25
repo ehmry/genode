@@ -10,7 +10,9 @@ with tool;
 
 let iso = import ../iso { inherit tool; }; in
 
-{ name, contents, graphical ? false, testScript }:
+{ name, contents
+, automatic ? true
+, testScript }:
 
 let
   contents' =
@@ -33,6 +35,7 @@ let
       }
     ];
 
+    diskImage = iso { inherit name; contents = contents'; };
 in
 derivation {
   name = name+"-run";
@@ -50,10 +53,19 @@ derivation {
       ../../../../tool/run-nix-setup.exp
       # setup.exp will source the files that follow
       ../../../../tool/run
+      ./nova-auto.exp
       ./nova.exp
     ];
 
-  inherit graphical testScript;
+  inherit automatic diskImage testScript;
 
-  diskImage = iso { inherit name; contents = contents'; };
+  userScript =
+    ''
+      #!${nixpkgs.expect}/bin/expect
+      set disk_image ${diskImage}
+      source ${ ../../../../tool/run}
+      source ${./nova.exp}
+
+      ${testScript}
+    '';
 }

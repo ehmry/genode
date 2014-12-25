@@ -8,7 +8,9 @@
 
 with tool;
 
-{ name, contents, testScript }:
+{ name, contents
+, automatic ? true
+, testScript }:
 
 let
   contents' = contents ++ [
@@ -22,13 +24,15 @@ let
       source = pkgs.libs.ld;
     }
   ];
+
+  imageDir = bootImage { inherit name; contents = contents'; };
 in
 derivation {
   name = name+"-run";
   system = builtins.currentSystem;
   preferLocalBuild = true;
 
-  PATH = 
+  PATH =
     "${nixpkgs.coreutils}/bin:" +
     "${nixpkgs.which}/bin:" +
     "${nixpkgs.findutils}/bin:" +
@@ -40,10 +44,19 @@ derivation {
       ../../../../tool/run-nix-setup.exp
       # setup.exp will source the files that follow
       ../../../../tool/run
+      ./linux-auto.exp
       ./linux.exp
     ];
 
-  inherit testScript;
+  inherit automatic imageDir testScript;
 
-  image_dir = bootImage { inherit name; contents = contents'; };
+  userScript =
+    ''
+      #!${nixpkgs.expect}/bin/expect
+      set image_dir ${imageDir}
+      source ${ ../../../../tool/run}
+      source ${./linux.exp}
+
+      ${testScript}
+    '';
 }

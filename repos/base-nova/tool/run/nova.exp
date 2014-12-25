@@ -6,12 +6,6 @@
 # This file is meant to be used as '--include' argument for 'tool/run'.
 #
 
-set disk_image $env(diskImage)
-
-exec ln -s $disk_image ./[strip_hash $disk_image]
-exec ln -s $disk_image $out/[strip_hash $disk_image]
-puts $hydra_build_products "file iso $disk_image"
-
 set is_qemu_available 1
 
 ##################################
