@@ -38,7 +38,7 @@ in
         { ps2       = importComponent ./src/drivers/input/ps2; };
       pci           = importComponent ./src/drivers/pci;
       pci_device_pd = importComponent ./src/drivers/pci/device_pd;
-      nic           = importComponent ./src/drivers/nic/lan9118;
+      #nic           = importComponent ./src/drivers/nic/lan9118;
       rtc           = importComponent ./src/drivers/rtc;
       timer         = importComponent ./src/drivers/timer;
     };

@@ -14,7 +14,7 @@ linkStaticLibrary rec {
   libcSymbols = [
     "malloc" "free" "calloc" "realloc"
     "abort" "fputc" "fputs" "fwrite"
-    "stderr" "stract" "strcpy" "strlen"
+    "stderr" "strcat" "strcpy" "strlen"
     "memcmp" "strncmp" "strcmp" "sprintf"
     "__stderrp"
   ];

@@ -33,6 +33,7 @@ in {
   config_args  = importLibrary ./src/lib/config_args;
   dde_kit      = importLibrary ./src/lib/dde_kit;
   init_pd_args = importLibrary ./src/lib/init_pd_args;
+  net-stat     = importLibrary ./src/lib/net/net-stat.nix;
   server       = importLibrary ./src/lib/server;
   timed_semaphore = importLibrary ./src/lib/timed_semaphore;
   timer           = importLibrary ./src/drivers/timer/lib.nix;

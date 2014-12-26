@@ -23,6 +23,7 @@ let
   tool.compileCC (attrs // {
     systemIncludes =
      (attrs.systemIncludes or []) ++
+     [ ./include ] ++
      (importInclude ../base/include);
   });
 
@@ -41,4 +42,6 @@ in
 
   noux.minimal = importComponent ./src/noux/minimal;
   noux.net     = importComponent ./src/noux/net;
+
+  test.vmm_utils = importComponent ./src/test/vmm_utils;
 }

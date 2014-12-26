@@ -34,5 +34,5 @@ in
 tool.mergeSets ([ { inherit libs; } ] ++ (
   map
     (repo: importPkgs (./repos + "/${repo}/pkgs.nix"))
-    [ "base" "os" "demo" "libports" "ports" "gems" "dde_oss" ]
+    [ "base" "os" "demo" "libports" "ports" "gems" "dde_ipxe" "dde_oss" ]
 ))
