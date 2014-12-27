@@ -5,7 +5,7 @@ let
   nixpkgs = import <nixpkgs> {};
 
   spec = import ./specs { inherit system; };
-  tool = import ./tool  { inherit spec nixpkgs; };
+  tool = import ./tool  { inherit spec; };
   libs = import ./libs.nix { inherit system spec tool; };
 
   pkgs = import ./pkgs.nix {

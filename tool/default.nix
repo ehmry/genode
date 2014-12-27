@@ -4,14 +4,20 @@
  * \date   2014-09-30
  */
 
-{ spec ? import ../specs { system = builtins.currentSystem; }
-, nixpkgs ? import <nixpkgs> { }
-}:
+{ spec ? import ../specs { system = builtins.currentSystem; } }:
 
 with builtins;
 
 let tool = rec {
-  inherit nixpkgs;
+
+  nixpkgs =  import <nixpkgs> { };
+
+  nixpkgsCross = import <nixpkgs> {
+    crossSystem =
+      { config = spec.target;
+        libc = "libc_noux";
+      };
+  };
 
   ##
   # Determine if any of the following libs are shared.

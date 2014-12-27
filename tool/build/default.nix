@@ -21,12 +21,13 @@ let
       cc      = "${devPrefix}gcc";
       cxx     = "${devPrefix}g++";
       ld      = "${devPrefix}ld";
-      as      = "${devPrefix}as";
-      ar      = "${devPrefix}ar";
-      nm      = "${devPrefix}nm";
-      objcopy = "${devPrefix}objcopy";
-      ranlib  = "${devPrefix}ranlib";
-      strip   = "${devPrefix}strip";
+
+      ar      = "${spec.target}-ar";
+      as      = "${spec.target}-as";
+      nm      = "${spec.target}-nm";
+      objcopy = "${spec.target}-objcopy";
+      ranlib  = "${spec.target}-ranlib";
+      strip   = "${spec.target}-strip";
 
       ccMarch = spec.ccMarch or [];
       ldMarch = spec.ldMarch or [];

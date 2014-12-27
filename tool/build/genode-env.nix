@@ -28,8 +28,8 @@ let
       setup = ./setup.sh;
       inherit shell toolchain;
       initialPath =
-        (import ./common-path.nix { pkgs = nixpkgs; })
-        ++ [ toolchain ];
+        [ tool.nixpkgsCross.binutilsCross toolchain ] ++
+        (import ./common-path.nix { pkgs = nixpkgs; });
     } //
     stdAttrs //
     rec {
