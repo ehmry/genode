@@ -6,28 +6,21 @@
 
 { genodeEnv, linkStaticLibrary, compileCC
 , baseDir, repoDir, baseIncludes
-, startup, cxx, base-common, syscall }:
-let
-  systemIncludes =
-    [ # thread_linux.cc - linux_syscalls.h
-      (repoDir+"/src/platform")
-      (genodeEnv.toolchain.glibc+"/include")
-    ];
-in
+, startup, cxx, base-common, syscall, env }:
+
 linkStaticLibrary (genodeEnv.tool.mergeSets [
-( import ./base.inc.nix {
-   inherit genodeEnv compileCC baseDir repoDir base-common syscall cxx;
-})
+  ( import ./base.inc.nix {
+     inherit genodeEnv compileCC baseDir repoDir base-common syscall env;
+  })
 
-{
-  name = "base";
-  libs = [ startup cxx ];
+  rec {
+    name = "base";
+    libs = [ startup cxx ];
 
-  objects = map (src: compileCC { inherit src systemIncludes; })
-    [ (baseDir+"/src/base/thread/thread.cc")
-      (repoDir+"/src/base/thread/thread_linux.cc")
-    ];
-  propagatedIncludes = baseIncludes;
-}
-
+    objects = map (src: compileCC { inherit src libs; })
+      [ (baseDir+"/src/base/thread/thread.cc")
+        (repoDir+"/src/base/thread/thread_linux.cc")
+      ];
+    propagate.systemIncludes = baseIncludes;
+  }
 ])

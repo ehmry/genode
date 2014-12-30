@@ -18,10 +18,10 @@ let
   );
 
   libcArchInclude =
-    if tool.genodeEnv.isArm    then "libc-arm"    else
-    if tool.genodeEnv.isx86_32 then "libc-i386"  else
-    if tool.genodeEnv.isx86_64 then "libc-amd64" else
-    throw "no libc for ${tool.genodeEnv.system}";
+    if spec.isArm    then "libc-arm"    else
+    if spec.isx86_32 then "libc-i386"  else
+    if spec.isx86_64 then "libc-amd64" else
+    throw "no libc for ${spec.system}";
 
   libcIncludes =
     [ ./include/libc-genode ] ++
@@ -64,26 +64,25 @@ let
 
   });
 
+  baseInclude = import ../base/include { inherit spec; };
+
  compileCC =
   attrs:
   tool.compileCC (attrs // {
     systemIncludes =
      (attrs.systemIncludes or []) ++
-      ( import ../base/include { inherit (tool) genodeEnv; }) ++
-      [ ./include ];
+      [ ./include baseInclude ];
   });
 
  compileCRepo =
   attrs:
   tool.compileCRepo (attrs // {
     systemIncludes =
-     (attrs.systemIncludes or []) ++
-      ( import ../base/include { inherit (tool) genodeEnv; }) ++
-      [ ./include ];
+     attrs.systemIncludes or [] ++
+     [ ./include baseInclude ];
   });
 
-  callLibrary' = callLibrary (
-    { inherit (tool) genodeEnv compileCCRepo;
+  callLibrary' = callLibrary ({
       inherit compileLibc libcIncludes compileCC compileCRepo;
     } // ports'
   );

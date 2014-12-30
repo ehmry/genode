@@ -13,7 +13,8 @@ let
     [ ./include
       "${ipxeSrc}/include"
       ipxeSrc
-     "${ipxeSrc}/arch/x86/include"
+      "${ipxeSrc}/arch/x86/include"
+      ../../../include
     ] ++
     ( if spec.isi686 then
         [ "${ipxeSrc}/arch/i386/include"
@@ -61,5 +62,5 @@ linkStaticLibrary rec {
     )
   );
 
-  propagatedIncludes = [ ../../../include ];
+  propagate.systemIncludes = [ ../../../include ];
 }

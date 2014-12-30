@@ -1,6 +1,6 @@
-{ genodeEnv }:
+{ spec }:
 
-with genodeEnv;
+with spec;
 
 let includeDir = ../include; in
 [ ( #if isARMv6 then includeDir + "/arm_6" else

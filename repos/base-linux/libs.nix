@@ -12,39 +12,22 @@
 
   env =
     { name = "env";
-      propagatedIncludes = [ (tool.filterHeaders ./src/base/env) ];
+      propagate.systemIncludes =
+        [ (tool.filterHeaders ./src/base/env)
+          (tool.filterHeaders ../base/src/base/env)
+        ];
     };
 
   lock =
     { name = "lock";
-      propagatedIncludes =
+      propagate.systemIncludes =
         [ (tool.filterHeaders ./src/base/lock)
           (tool.filterHeaders ../base/src/base/lock)
         ];
     };
 
-  syscall = importBaseLibrary ./lib/mk/syscall.nix;
+  lx_hybrid = importBaseLibrary ./lib/mk/lx_hybrid.nix;
 
-  #lx_hybrid = callLibrary (
-  #  { base-common, syscall, cxx }:
-  #  build.library {
-  #    name = "lx_hybrid";
-  #    libs = [ base-common syscall cxx ]; # from lib/mk/base.inc
-  #    sources =
-  #      [ ./src/platform/lx_hybrid.cc
-  #        (baseRepo.sourceDir + "/base/cxx/new_delete.cc")
-  #      # from lib/mk/base.inc
-  #        (baseRepo.sourceDir + "/base/console/log_console.cc")
-  #        (baseRepo.sourceDir + "/base/env/env.cc")
-  #        ./src/base/env/platform_env.cc
-  #        (baseRepo.sourceDir + "/base/env/context_area.cc")
-  #      ];
-  #    includeDirs =
-  #      [ ./src/base/env
-  #        ./src/platform
-  #        (baseRepo.sourceDir + "/base/env")
-  #      ];# ++ baseRepo.includeDirs;
-  #  }
-  #);
+  syscall = importBaseLibrary ./lib/mk/syscall.nix;
 
 }

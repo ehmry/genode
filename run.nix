@@ -49,11 +49,15 @@ builtins.listToAttrs (builtins.concatLists (map
     )
   )
 
-  [ ./repos/base
-    ./repos/base-linux
-    ./repos/base-nova
+  ([ ./repos/base
     ./repos/os
     ./repos/libports
     ./repos/ports
-  ]
+    ./repos/dde_oss
+  ] ++
+  ( if spec.isLinux then [ ./repos/base-linux ] else
+    if spec.isNOVA  then [ ./repos/base-nova  ] else
+   [ ]
+  ))
+
 ))

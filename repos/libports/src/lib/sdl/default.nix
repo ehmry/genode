@@ -85,6 +85,6 @@ linkSharedLibrary {
       ];
   };
 
-  propagatedIncludes =
+  propagate.systemIncludes =
     [ sdlSrc.include "${sdlSrc.include}/SDL" ../../../include ];
 }

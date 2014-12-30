@@ -17,7 +17,7 @@ linkSharedLibrary rec {
       ];
   };
 
-  propagatedIncludes =
+  propagate.systemIncludes =
     [ (newDir "zlib-include" (
         map (fn: "${zlibSrc}/${fn}") [ "zconf.h" "zlib.h" ]
       ))

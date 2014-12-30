@@ -7,8 +7,8 @@ linkSharedLibrary rec {
     inherit name libs;
     sourceRoot = sdl_netSrc;
     sources = "SDLnet*.c";
-    localIncludes = sdl.propagatedIncludes;
+    localIncludes = sdl.propagate.systemIncludes;
   };
-  propagatedIncludes =
+  propagate.systemIncludes =
     [ "${sdl_netSrc.include}/SDL" sdl_netSrc.include ];
 }

@@ -8,7 +8,7 @@
 #
 
 
-{ genodeEnv, compileCC, baseDir, repoDir, base-common, syscall, cxx }:
+{ genodeEnv, compileCC, baseDir, repoDir, base-common, syscall, env }:
 
 let
   systemIncludes =
@@ -18,18 +18,16 @@ let
       # platform_env.h - platform_env_common.h
       (repoDir+"/src/base/env")
       (baseDir+"/src/base/env")
-      (repoDir+"/src/platform")
-      (genodeEnv.toolchain.glibc+"/include")
     ];
 in
 {
-  libs = [ base-common syscall cxx ];
+  libs = [ base-common syscall ];
 
-  objects = map (src: compileCC { inherit src systemIncludes; })
-    ( [ (repoDir+"/src/base/env/platform_env.cc") ]
-      ++
-      (map (fn: (baseDir+"/src/base/${fn}"))
-        [ "console/log_console.cc" "env/env.cc" "env/context_area.cc" ]
-      )
-    );
+  objects = map (src: compileCC { inherit src; libs = [ env syscall ]; })
+    [ (repoDir+"/src/base/env/platform_env.cc")
+
+      (baseDir+"/src/base/console/log_console.cc")
+      (baseDir+"/src/base/env/env.cc")
+      (baseDir+"/src/base/env/context_area.cc")
+    ];
 }

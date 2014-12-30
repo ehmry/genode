@@ -18,7 +18,7 @@ linkStaticLibrary {
       );
   };
 
-  propagatedIncludes =
+  propagate.systemIncludes =
     [ "${libcSrc.include}/libc"
-    ] ++ libc.propagatedIncludes;
+    ] ++ libc.propagate.systemIncludes;
 }

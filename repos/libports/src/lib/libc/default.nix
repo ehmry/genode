@@ -44,18 +44,19 @@ linkSharedLibrary {
 
   extraLdFlags = [ "--version-script=${./Version.def}" ];
 
-  propagatedFlags =
-    [ # Prevent gcc headers from defining __size_t.
-      # This definition is done in machine/_types.h.
-      "-D__FreeBSD__=8"
+  propagate =
+    { extraFlags =
+        [ # Prevent gcc headers from defining __size_t.
+          # This definition is done in machine/_types.h.
+          "-D__FreeBSD__=8"
 
-      # Prevent gcc-4.4.5 from generating code for the family of 'sin'
-      # and 'cos' functions because the gcc-generated code would
-      # actually call 'sincos' or 'sincosf', which is a GNU extension,
-      # not provided by our libc.
-      "-fno-builtin-sin" "-fno-builtin-cos"
-      "-fno-builtin-sinf" "-fno-builtin-cosf"
-    ];
-
-  propagatedIncludes = libcIncludes;
+          # Prevent gcc-4.4.5 from generating code for the family of 'sin'
+          # and 'cos' functions because the gcc-generated code would
+          # actually call 'sincos' or 'sincosf', which is a GNU extension,
+          # not provided by our libc.
+          "-fno-builtin-sin" "-fno-builtin-cos"
+          "-fno-builtin-sinf" "-fno-builtin-cosf"
+        ];
+      systemIncludes = libcIncludes;
+    };
 }

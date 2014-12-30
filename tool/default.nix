@@ -201,14 +201,16 @@ let tool = rec {
   let
     a1 = getAttr name s1;
     a2 = getAttr name s2;
-    type = typeOf a1;
+    type1 = typeOf a1;
+    type2 = typeOf a2;
   in
-  assert type == (typeOf a2);
-  if type == "set" then mergeSet a1 a2 else
-  if type == "list" then a1 ++ a2 else
-  if type == "string" then "${a1} ${a2}" else
-  #if type == "int" then add a1 a2 else
-  abort "cannot merge ${type} ${name} ${toString a1} ${toString a2}";
+  if type1 == "null" then a2 else if type2 == "null" then a1 else
+  if type1 != type2 then abort "cannot merge ${name}s of type ${type1} and ${type2}" else
+  if type1 == "set" then mergeSet a1 a2 else
+  if type1 == "list" then a1 ++ a2 else
+  if type1 == "string" then "${a1} ${a2}" else
+  #if type1 == "int" then add a1 a2 else
+  abort "cannot merge ${type1} ${name} ${toString a1} ${toString a2}";
 
   ##
   # Merge two sets together.

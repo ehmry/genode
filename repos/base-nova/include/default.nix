@@ -1,6 +1,6 @@
-{ genodeEnv }:
+{ spec }:
 
-with genodeEnv;
+with spec;
 
 [ ( if is32Bit then ./32bit else
     if is64Bit then ./64bit else

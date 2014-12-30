@@ -4,13 +4,13 @@
  * \date   2014-09-21
  */
 
-{ tool, callComponent }:
+{ spec, tool, callComponent }:
 
 let
 
   ld = callComponent {} ({ld}: ld);
 
-  importInclude = p: import p { inherit (tool) genodeEnv; };
+  importInclude = p: import p { inherit spec; };
 
   compileCC =
   attrs:
@@ -18,17 +18,17 @@ let
     systemIncludes =
      (attrs.systemIncludes or []) ++
      (importInclude ../base/include) ++
-     (importInclude ./include);
+     [ ./include ];
   });
 
-  callComponent' = callComponent {
-    inherit (tool) genodeEnv; inherit compileCC;
-  };
+  callComponent' = callComponent { inherit compileCC; };
   importComponent = path: callComponent' (import path);
 
 in
 {
-  driver.framebuffer = importComponent ./src/drivers/framebuffer/vesa;
+  driver.framebuffer =
+    if spec.hasVESA then importComponent ./src/drivers/framebuffer/vesa
+    else null;
 
   test =
     { ldso    = importComponent ./src/test/ldso;

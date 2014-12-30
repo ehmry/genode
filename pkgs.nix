@@ -28,7 +28,7 @@ let
         (tool // libs // { inherit spec linkComponent; } // extraAttrs)
     );
 
-  importPkgs = p: import p { inherit tool callComponent; };
+  importPkgs = p: import p { inherit spec tool callComponent; };
 
 in
 tool.mergeSets ([ { inherit libs; } ] ++ (

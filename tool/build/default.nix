@@ -71,20 +71,11 @@ let
         ];
     };
 
-  propagateCompileArgs = args:
-    let
-      libs = findLibraries args.libs or [];
-    in
-    (removeAttrs args [ "libs" ]) //
-    { extraFlags =
-        args.extraFlags or [] ++
-        (propagate "propagatedFlags" libs);
-
-      systemIncludes =
-        args.systemIncludes or [] ++
-        (propagate "propagatedIncludes" libs) ++
-        stdAttrs.nativeIncludes;
-    };
+  propagateLibAttrs = attrs:
+    mergeSets (
+      (map (x: x.propagate or {}) (findLibraries attrs.libs or [])) ++
+      [ attrs ]
+    );
 
 in
 rec {
@@ -138,12 +129,14 @@ rec {
   , localIncludes ? []
   , PIC ? true
   , ... } @ args:
-  shellDerivation ( (propagateCompileArgs args) //
+  let args' = propagateLibAttrs args; in
+  shellDerivation (removeAttrs args' [ "libs" ] //
     { inherit (stdAttrs) cc ccFlags;
       inherit PIC genodeEnv;
       name = dropSuffix ".c" (baseNameOf (toString src)) + ".o";
       script = ./compile-c.sh;
       localIncludes = findLocalIncludes src localIncludes;
+      systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;
     }
   );
 
@@ -152,12 +145,14 @@ rec {
   , localIncludes ? []
   , PIC ? true
   , ... } @ args:
-  shellDerivation ( (propagateCompileArgs args) //
+  let args' = propagateLibAttrs args; in
+  shellDerivation (removeAttrs args' [ "libs" ] //
     { inherit (stdAttrs) cxx ccFlags cxxFlags;
       inherit PIC genodeEnv;
       name = dropSuffix ".cc" (baseNameOf (toString src)) + ".o";
       script = ./compile-cc.sh;
       localIncludes = findLocalIncludes src localIncludes;
+      systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;
     }
   );
 
@@ -191,10 +186,12 @@ rec {
   , sources
   , PIC ? true
   , ... } @ args:
-  shellDerivation ( (propagateCompileArgs args) //
+  let args' = propagateLibAttrs args; in
+  shellDerivation (removeAttrs args' [ "libs" ] //
     { inherit name PIC genodeEnv;
       inherit (stdAttrs) cc ccFlags;
       script = ./compile-c-port.sh;
+      systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;
     }
   );
 
@@ -204,22 +201,24 @@ rec {
   , sources
   , PIC ? true
   , ... } @ args:
-  shellDerivation ( (propagateCompileArgs args) //
+  let args' = propagateLibAttrs args; in
+  shellDerivation (removeAttrs args' [ "libs" ] //
     { inherit name PIC genodeEnv;
       inherit (stdAttrs) cxx ccFlags cxxFlags;
       script = ./compile-cc-port.sh;
+      systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;
     }
   );
 
   # Link together a static library.
   linkStaticLibrary =
-  { libs ? [], ... } @ args:
-  shellDerivation ( args // {
+  { libs ? [], propagate ? {}, ... } @ args:
+  shellDerivation (removeAttrs args ["propagate"] // {
     script = ./link-static-library.sh;
     inherit genodeEnv;
     inherit (stdAttrs) ar ld ldFlags cxx objcopy;
     libs = filterFakeLibs libs;
-  }) // { shared = false; };
+  }) // { inherit propagate; shared = false; };
 
   # Link together a shared library.
   # This function must be preloaded with an ldso-startup library.
@@ -228,13 +227,14 @@ rec {
   { ldScriptSo ? ../../repos/base/src/platform/genode_rel.ld
   , entryPoint ? "0x0"
   , libs ? []
+  , propagate ? {}
   , ... } @ args:
-  shellDerivation ( args // {
+  shellDerivation (removeAttrs args ["propagate"] // {
     script = ./link-shared-library.sh;
     libs = [ ldso-startup ] ++ findLinkLibraries libs;
     inherit genodeEnv ldScriptSo entryPoint;
     inherit (stdAttrs) ld ldFlags cc ccMarch;
-  }) // { shared = true; };
+  }) // { inherit propagate; shared = true; };
 
   # Link together a component with static libraries.
   linkStaticComponent =
@@ -242,14 +242,11 @@ rec {
   , ldScripts ? [ ../../repos/base/src/platform/genode.ld ]
   , libs ? []
   , ... } @ args:
-  let
-    libs' = libs;
-  in
-  shellDerivation ( args // {
+  shellDerivation (propagateLibAttrs args // {
     script = ./link-static-component.sh;
     inherit genodeEnv ldTextAddr ldScripts;
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
-    libs = findLinkLibraries libs';
+    libs = findLinkLibraries libs;
   });
 
   # Link together a component with shared libraries.
@@ -260,14 +257,12 @@ rec {
   , ldScripts ? [ ../../repos/base/src/platform/genode_dyn.ld ]
   , libs ? []
   , ... } @ args:
-  let
-    libs' = libs;
-  in
-  shellDerivation ( args // {
+  shellDerivation (propagateLibAttrs args // {
     script = ./link-dynamic-component.sh;
-    inherit genodeEnv dynDl ldTextAddr dynamicLinker ldScripts;
+    inherit genodeEnv dynDl ldTextAddr ldScripts;
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
-    libs = (findLinkLibraries libs') ++ [ dynamicLinker ];
-  }) // { libs = findRuntimeLibraries libs'; };
+    libs = (findLinkLibraries libs) ++ [ dynamicLinker ];
+    dynamicLinker = "${dynamicLinker.name}.lib.so";
+  }) // { libs = findRuntimeLibraries libs; };
 
 }

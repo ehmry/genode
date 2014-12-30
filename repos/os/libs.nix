@@ -13,12 +13,11 @@ let
   f (attrs // {
     systemIncludes =
      (attrs.systemIncludes or []) ++
-     (import ../base/include { inherit (tool) genodeEnv; }) ++
-     (import ./include { inherit (tool) genodeEnv; });
+     (import ../base/include { inherit spec; }) ++
+     (import ./include { inherit spec; });
   });
 
   callLibrary' = callLibrary {
-    inherit (tool) genodeEnv;
     compileS  = addIncludes tool.compileS;
     compileC  = addIncludes tool.compileC;
     compileCC = addIncludes tool.compileCC;

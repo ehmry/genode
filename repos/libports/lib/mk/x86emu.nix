@@ -20,5 +20,5 @@ linkStaticLibrary {
     inherit systemIncludes;
   };
 
-  propagatedIncludes = systemIncludes;
+  propagate = { inherit systemIncludes; };
 }

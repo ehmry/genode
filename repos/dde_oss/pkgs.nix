@@ -1,4 +1,4 @@
-{ tool, callComponent }:
+{ spec, tool, callComponent }:
 
 let
 
@@ -10,21 +10,5 @@ let
       (builtins.attrNames ports)
   );
 
-  importInclude = p: import p { inherit (tool) genodeEnv; };
-  
-  compileCC = attrs:
-    tool.compileCC (attrs // {
-      systemIncludes =
-       (attrs.systemIncludes or []) ++
-       (importInclude ../base/include);
-    });
-
-  callComponent' = callComponent (
-    { inherit compileCC; } // ports'
-  );
-  importComponent = path: callComponent' (import path);
-
 in
-{
-  driver.audio_out = importComponent ./src/drivers/audio_out; 
-}
+{ driver.audio_out =  callComponent ports' (import ./src/drivers/audio_out); }

@@ -21,4 +21,7 @@ spec // rec {
   isLinux = spec.kernel == "linux";
   isNova  = spec.kernel == "nova";
   isNOVA  = isNova;
+
+  hasSDL  = isLinux;
+  hasVESA = isNOVA; # dubious
 }

@@ -25,7 +25,7 @@ linkSharedLibrary rec {
     systemIncludes = [ (genodeEnv.tool.filterHeaders ../libpng) ];
   };
 
-  propagatedIncludes =
+  propagate.systemIncludes =
     [ (newDir "libpng-include" (
         fromDir libpngSrc [ "pngconf.h" "png.h" "pngpriv.h" ]
       ))

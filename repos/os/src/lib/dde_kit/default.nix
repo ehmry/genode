@@ -13,7 +13,7 @@ linkStaticLibrary rec {
       # lib as well. This way, the needed include-search directories are supplied to
       # the build system via the respective 'import-syscall.mk' file.
       #syscall
-      
+
       lock
       # I'm actually using this fake lock library,
       # if lock needs syscall headers, that should
@@ -26,6 +26,6 @@ linkStaticLibrary rec {
         ./memory.cc ./thread.cc ./pci_tree.cc ./pci.cc ./resources.cc ./timer.cc
         ./dde_kit.cc ./spin_lock.cc
       ];
-      
-    propagatedIncludes = [ ../../../include ];
+
+    propagate.systemIncludes = [ ../../../include ];
 }

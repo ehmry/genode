@@ -1,37 +1,32 @@
-/*
- * \brief  
- * \author Emery Hemingway
- * \date   2014-08-16
- *
- * It took me a while to figure out why this didn't work,
- * then I realized I need to use the host GCC.
- * It still doesn't work.
- *
- */
+{ linkComponent, compileCC, shellDerivation, genodeEnv, nixpkgs, lx_hybrid }:
 
- { build, base }:
+let
+ testlib = shellDerivation {
+    name = "lx_testlib";
+    buildInputs = [ nixpkgs.gcc ];
+    source = ./testlib.cc;
+    header = ./testlib.h;
+    inherit genodeEnv;
+    inherit (genodeEnv) ccMarch;
+    script = builtins.toFile "lx_testlib.sh"
+      ''
+        source $genodeEnv/setup
 
-build.test rec {
+        cp $source ./testlib.cc
+        cp $header ./testlib.h
+        mkdir $out
+        MSG_BUILD libtestlib.so
+        VERBOSE g++ $ccMarch -fPIC -c testlib.cc
+        VERBOSE g++ $ccMarch -shared -o $out/libtestlib.so testlib.o
+      '';
+  };
+in
+linkComponent {
   name = "test-lx_hybrid_ctors";
-  libs = [ base.lib.lx_hybrid ];
-  sourceDir = ../lx_hybrid_ctors;
-  sources = [ "${sourceDir}/main.cc" ];
-  includeDirs = [ sourceDir ] ++ base.includeDirs;
+  libs = [ lx_hybrid ];
 
-  phases = [ "buildTestLib" "mergeStaticPhase" ];
-  testlibSrc = ./testlib.cc;
-  buildTestLib = ''
-    includeOpt=""
-    for d in $includeDirs; do
-        includeOpt="$includeOpt -I$d"
-    done
-
-    MSG_BUILD libtestlib.so
-    source ${build.nixpkgs.stdenv}/setup
-    VERBOSE g++ $ccMarch -fPIC -I$sourceDir -I$libc/include \
-        -c $sourceDir/testlib.cc -o testlib.o
-    VERBOSE g++ $ccMarch -shared \
-        -o libtestlib.so testlib.o
-  '';
-
+  objects =
+    [ (compileCC { src = ./main.cc; })
+      "${testlib}/libtestlib.so"
+    ];
 }

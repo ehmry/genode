@@ -13,8 +13,8 @@ let
   tool.compileCC (attrs // {
     systemIncludes =
      (attrs.systemIncludes or []) ++
-      (import ../base/include { inherit (tool) genodeEnv; }) ++
-      (import ./include { inherit (tool) genodeEnv; });
+      (import ../base/include { inherit spec; }) ++
+      [ ./include ];
   });
 
   callLibrary' = callLibrary {

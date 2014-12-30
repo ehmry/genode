@@ -13,18 +13,18 @@ let
     systemIncludes =
      (attrs.systemIncludes or [])
       ++
-      (import ./include { inherit (tool) genodeEnv; });
+      (import ./include { inherit spec; });
   });
 
   baseDir = ../base;
   repoDir =
     if spec.isLinux then ../base-linux else
     if spec.isNova  then ../base-nova  else
-    throw "no base libraries for ${tool.genodeEnv.system}";
+    throw "no base libraries for ${spec.system}";
 
   callBaseLibrary = callLibrary {
     inherit compileCC baseDir repoDir;
-    baseIncludes = import ./include { inherit (tool) genodeEnv; };
+    baseIncludes = import ./include { inherit spec; };
   };
   importBaseLibrary = path: callBaseLibrary (import path);
 
@@ -41,12 +41,12 @@ in
   ## Env is a fake library for propagating platform_env.h
   env =
     { name = "env";
-      propagatedIncludes  = [ (tool.filterHeaders baseDir+"/src/base/env") ];
+      propagate.systemIncludes  = [ (tool.filterHeaders baseDir+"/src/base/env") ];
     };
 
   lock =
     { name = "lock";
-      propagatedIncludes = [ (tool.filterHeaders baseDir+"/src/base/lock") ];
+      propagate.systemIncludes = [ (tool.filterHeaders baseDir+"/src/base/lock") ];
     };
   syscall = { name = "syscall"; };
 

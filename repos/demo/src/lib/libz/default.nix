@@ -15,5 +15,5 @@ linkStaticLibrary {
       "gzio.c"     "infback.c"  "inffast.c" "inflate.c"
       "inftrees.c" "trees.c"    "uncompr.c" "zutil.c"
     ];
-  propagatedIncludes = [ ../../../include/libz_static ];
+  propagate.systemIncludes = [ ../../../include/libz_static ];
 }

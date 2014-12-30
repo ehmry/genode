@@ -28,5 +28,5 @@ linkStaticLibrary {
         ]
     )
   );
-  propagatedIncludes = baseIncludes;
+  propagate.systemIncludes = baseIncludes;
 }

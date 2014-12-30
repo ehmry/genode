@@ -65,6 +65,6 @@ linkSharedLibrary rec {
       ];
   };
 
-  propagatedIncludes = systemIncludes;
+  propagate = { inherit systemIncludes; };
 
 }

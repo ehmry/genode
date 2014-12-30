@@ -1,4 +1,4 @@
-{ genodeEnv, linkStaticLibrary, compileS, baseDir, repoDir }:
+{ genodeEnv, linkStaticLibrary, compileS, baseDir, repoDir, filterHeaders, nixpkgs }:
 
 linkStaticLibrary {
   name = "syscall";
@@ -17,10 +17,9 @@ linkStaticLibrary {
     else
     throw "syscall library unavailable for ${genodeEnv.system}";
 
-  propagatedIncludes =
-    [ # linux_syscalls.h
-      ../../src/platform
-      (genodeEnv.tool.nixpkgs.linuxHeaders+"/include")
-      (genodeEnv.toolchain.glibc+"/include")
-    ];
+    propagate.systemIncludes =
+        [ (filterHeaders (repoDir + /src/platform))
+          "${genodeEnv.toolchain.glibc}/include"
+          "${nixpkgs.linuxHeaders}/include"
+        ];
 }

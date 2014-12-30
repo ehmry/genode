@@ -48,7 +48,7 @@ linkSharedLibrary rec {
       )
     ];
 
-  propagatedIncludes =
+  propagate.systemIncludes =
     [ "${icuSrc.include}/icu/common"
       "${icuSrc.include}/icu/il8n"
     ];

@@ -1,12 +1,12 @@
 { linkComponent, compileCC, filterHeaders
 , base, alarm, config }:
 
-linkComponent {
+linkComponent rec {
   name = "noux";
   libs = [ base alarm config ];
   objects = map
     ( src: compileCC {
-        inherit src;
+        inherit src libs;
         systemIncludes = map
           filterHeaders
           [ ../../noux ../../../include ];

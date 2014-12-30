@@ -1,6 +1,6 @@
-{ genodeEnv }:
+{ spec }:
 
-with genodeEnv;
+with spec;
 
 let
   repoDir =
@@ -29,15 +29,15 @@ in
   )
 ]
 ++
-import (repoDir+"/include") { inherit genodeEnv; }
+import (repoDir+"/include") { inherit spec; }
 ++
-[  
+[
   ( if is32Bit then baseIncDir+"/32bit" else
     if is64Bit then baseIncDir+"/64bit" else
     abort "platform is not known to be 32 or 64 bit"
   )
-  
+
   baseIncDir
 ]
 ++
-import ../../os/include { inherit genodeEnv; }
+import ../../os/include { inherit spec; }

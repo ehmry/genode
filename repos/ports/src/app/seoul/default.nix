@@ -51,4 +51,4 @@ if spec.isNOVA then linkComponent {
     inherit libs systemIncludes extraFlags PIC;
   };
 
-} else { }
+} else null

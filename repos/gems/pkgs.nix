@@ -4,11 +4,11 @@
  * \date   2014-12-12
  */
 
-{ tool, callComponent }:
+{ spec, tool, callComponent }:
 
 let
 
-  importInclude = p: import p { inherit (tool) genodeEnv; };
+  importInclude = p: import p { inherit spec; };
 
   compileCC = attrs:
     tool.compileCC (attrs // {

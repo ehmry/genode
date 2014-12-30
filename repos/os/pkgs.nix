@@ -4,11 +4,11 @@
  * \date   2014-09-15
  */
 
-{ tool, callComponent }:
+{ spec, tool, callComponent }:
 
 let
 
-  importInclude = p: import p { inherit (tool) genodeEnv; };
+  importInclude = p: import p { inherit spec; };
 
   compileCC = attrs:
     tool.compileCC (attrs // {
@@ -19,7 +19,6 @@ let
     });
 
   callComponent' = callComponent {
-    inherit (tool) genodeEnv transformBinary;
     inherit compileCC;
   };
   importComponent = path: callComponent' (import path);
@@ -34,8 +33,10 @@ in
   driver =
     { acpi          = importComponent ./src/drivers/acpi;
       ahci          = importComponent ./src/drivers/ahci;
-      input =
-        { ps2       = importComponent ./src/drivers/input/ps2; };
+      framebuffer   =
+        if spec.hasSDL then importComponent ./src/drivers/framebuffer/sdl else
+        null;
+      input.ps2     = importComponent ./src/drivers/input/ps2;
       pci           = importComponent ./src/drivers/pci;
       pci_device_pd = importComponent ./src/drivers/pci/device_pd;
       #nic           = importComponent ./src/drivers/nic/lan9118;
@@ -56,8 +57,8 @@ in
   test =
     { alarm       = importComponent ./src/test/alarm;
       audio_out   = importComponent ./src/test/audio_out;
+      blk.cli     = importComponent ./src/test/blk/cli;
       bomb        = importComponent ./src/test/bomb;
-      #framebuffer = importComponent ./src/test/framebuffer;
       loader      = importComponent ./src/test/loader;
       input       = importComponent ./src/test/input;
       nitpicker   = importComponent ./src/test/nitpicker;

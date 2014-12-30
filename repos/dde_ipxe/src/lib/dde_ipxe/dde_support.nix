@@ -1,6 +1,6 @@
-{ linkStaticLibrary, compileCC }:
+{ linkStaticLibrary, compileCC, base }:
 
 linkStaticLibrary {
   name = "dde_ipxe_support";
-  objects = [( compileCC { src = ./dde_support.cc; } )];
+  objects = [( compileCC { src = ./dde_support.cc; libs = [ base ]; } )];
 }

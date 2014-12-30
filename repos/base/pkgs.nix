@@ -4,7 +4,7 @@
  * \date   2014-09-04
  */
 
-{ tool, callComponent }:
+{ spec, tool, callComponent }:
 
 let
 
@@ -22,20 +22,20 @@ let
     systemIncludes =
      (attrs.systemIncludes or [])
       ++
-      (import ./include { inherit (tool) genodeEnv; });
+      (import ./include { inherit spec; });
   });
 
   callComponent' = callComponent {
-    inherit (tool) genodeEnv; inherit compileCC;
+    inherit compileCC;
   };
 
   importComponent = path: callComponent' (import path);
 
   baseDir = ../base;
   repoDir =
-    if tool.genodeEnv.isLinux then ../base-linux else
-    if tool.genodeEnv.isNova  then ../base-nova  else
-    throw "no base components for ${tool.genodeEnv.system}";
+    if spec.isLinux then ../base-linux else
+    if spec.isNova  then ../base-nova  else
+    throw "no base components for ${spec.system}";
 
   callBasePackage = callComponent {
     inherit compileCC baseDir repoDir versionObject;
