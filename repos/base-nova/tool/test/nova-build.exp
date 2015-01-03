@@ -1,0 +1,24 @@
+# Put derivation variables in scope.
+set disk_image $env(diskImage)
+set qemu $env(qemu)/bin/qemu-system-x86_64
+
+# Register ISO.
+exec ln -s $disk_image image.iso
+puts $hydra_build_products "file iso $disk_image"
+close $hydra_build_products
+
+
+
+if {$env(graphical) != 1} {
+	set qemu_args "-nographic"
+} else {
+	set qemu_args ""
+}
+
+puts $user_script "set qemu $qemu"
+puts $user_script "set qemu_args $qemu_args"
+puts $user_script "set disk_image $disk_image"
+puts $user_script "source $platform_setup"
+puts $user_script $test_script
+
+close $user_script

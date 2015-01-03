@@ -38,8 +38,9 @@ rec {
       self =
         { inherit name components;
           runtime.requires =
-            [ "CAP" "CPU" "IO_MEM" "LOG" "PD" "RAM" "RM" "ROM" "SIGNAL" ];
+            [ "CAP" "CPU" "IO_MEM" "LOG" "PD" "RAM" "ROM" "SIGNAL" ];
         };
+      requires' = requires self;
     in
     derivation {
       name = name+".xml";
@@ -57,10 +58,11 @@ rec {
       stylesheet = ./nix-conversion.xsl;
 
       xml = builtins.toXML
-        { parent-provides = requires self;
+        { parent-provides = requires';
           children = map startChild components;
         };
-    };
+    } // { runtime.requires = requires'; };
+    # Requires is for checking for outstanding service requirements later.
 
   test =
     let
@@ -70,5 +72,5 @@ rec {
         if spec.isNOVA  then import ../../repos/base-nova/tool/test  args else
         abort "no test framework for ${spec.system}";
     in
-    import ./test (args // { inherit mkInitConfig; } // platform);
+    import ./test (args // { inherit requires mkInitConfig; } // platform);
 }

@@ -1,0 +1,133 @@
+
+##
+# Wait for a specific output of a already running spawned process
+#
+proc wait_for_output { wait_for_re timeout_value running_spawn_id } {
+	global output
+
+	if {$wait_for_re == "forever"} {
+		set timeout -1
+		interact {
+			\003 {
+				send_user "Expect: 'interact' received 'strg+c' and was cancelled\n";
+				exit
+			}
+			-i $running_spawn_id
+		}
+	} else {
+		set timeout $timeout_value
+	}
+
+	expect {
+		-i $running_spawn_id -re $wait_for_re { }
+		eof     { puts stderr "Error: Spawned process died unexpectedly";   exit -3 }
+		timeout { puts stderr "Error: Test execution timed out"; exit -2 }
+	}
+	set output $expect_out(buffer)
+}
+
+
+##
+# Remove color information from output
+#
+proc filter_out_color_escape_sequences { } {
+	global output
+	regsub -all {\e\[.*?m} $output "" output
+}
+
+
+##
+# Remove superfluous empty lines and unify line endings from output
+#
+proc trim_lines { } {
+	global output
+	regsub -all {[\r\n]+} $output "\n" output
+}
+
+
+##
+# Filter output based on the specified pattern
+#
+# Only those lines that match the pattern are preserved.
+#
+proc grep_output {pattern} {
+	global output
+
+	filter_out_color_escape_sequences
+
+	trim_lines
+
+	set output_list [split $output "\n"]
+	set filtered ""
+	foreach line $output_list {
+		if {[regexp $pattern $line]} {
+			append filtered "$line\n"
+		}
+	}
+	set output $filtered
+}
+
+
+
+##
+# Compare output against expected output line by line
+#
+# \param  good   expected test output
+# \global output test output
+#
+# This procedure will exit the program with the error code -1 if the
+# comparison fails.
+#
+proc compare_output_to { good } {
+	global output
+	set output_list [split [strip_whitespace $output] "\n"]
+	set good_list   [split [strip_whitespace $good]   "\n"]
+
+	set i 0
+	set mismatch_cnt 0
+	foreach good_line $good_list {
+		set output_line [strip_whitespace [lindex $output_list $i]]
+		set good_line   [strip_whitespace $good_line]
+
+		if {$output_line != $good_line} {
+			puts ""
+			puts stderr "Line $i of output is unexpected"
+			puts stderr " expected: '$good_line'"
+			puts stderr " got:      '$output_line'"
+			incr mismatch_cnt
+		}
+		incr i
+	}
+
+	#
+	# if $good is empty the foreach-loop isn't entered
+	# so we've to check for it separately
+	#
+	if {![llength $good_list] && [llength $output_list]} {
+		foreach output_line $output_list {
+			set output_line [strip_whitespace $output_line]
+			puts ""
+			puts stderr "Line $i of output is unexpected"
+			puts stderr " got:      '$output_line'"
+			incr mismatch_cnt
+			incr i
+		}
+	}
+
+	if {$mismatch_cnt > 0} {
+		puts "Error: Test failed, $mismatch_cnt unexpected lines of output"
+		exit -1
+	} else {
+		puts "Test succeeded"
+	}
+}
+
+
+##
+# Remove leading and trailing whitespace from string
+#
+proc strip_whitespace {string} {
+	regsub -all {^\s+} $string "" string
+	regsub -all {\s+$} $string "" string
+	return $string
+}
