@@ -1,5 +1,5 @@
 { genodeEnv, linkComponent, compileCC
-, baseDir, repoDir, versionObject
+, baseDir, repoDir, versionObject, coreRuntime
 , base-common, cxx, startup, syscall }:
 
 let
@@ -66,4 +66,6 @@ linkComponent {
       [ (repoDir+"src/platform/context_area.stdlib.ld") ]
     else
       genodeEnv.spec.ldScriptsStatic;
+
+  runtime = coreRuntime;
 }

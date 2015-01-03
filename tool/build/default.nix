@@ -233,7 +233,7 @@ rec {
     script = ./link-shared-library.sh;
     libs = [ ldso-startup ] ++ findLinkLibraries libs;
     inherit genodeEnv ldScriptSo entryPoint;
-    inherit (stdAttrs) ld ldFlags cc ccMarch;
+     inherit (stdAttrs) ld ldFlags cc ccMarch;
   }) // { inherit propagate; shared = true; };
 
   # Link together a component with static libraries.
@@ -242,12 +242,13 @@ rec {
   , ldScripts ? [ ../../repos/base/src/platform/genode.ld ]
   , libs ? []
   , ... } @ args:
-  shellDerivation (propagateLibAttrs args // {
+  let args' = propagateLibAttrs args; in
+  shellDerivation (removeAttrs args' [ "propagate" "runtime" ] // {
     script = ./link-static-component.sh;
     inherit genodeEnv ldTextAddr ldScripts;
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
     libs = findLinkLibraries libs;
-  });
+  }) // { runtime = args'.runtime or { }; };
 
   # Link together a component with shared libraries.
   linkDynamicComponent =
@@ -257,12 +258,13 @@ rec {
   , ldScripts ? [ ../../repos/base/src/platform/genode_dyn.ld ]
   , libs ? []
   , ... } @ args:
-  shellDerivation (propagateLibAttrs args // {
+  let args' = propagateLibAttrs args; in
+  shellDerivation (removeAttrs args' [ "propagate" "runtime" ] // {
     script = ./link-dynamic-component.sh;
     inherit genodeEnv dynDl ldTextAddr ldScripts;
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
     libs = (findLinkLibraries libs) ++ [ dynamicLinker ];
     dynamicLinker = "${dynamicLinker.name}.lib.so";
-  }) // { libs = findRuntimeLibraries libs; };
+  }) // { libs = findRuntimeLibraries libs; runtime = args'.runtime or { }; };
 
 }

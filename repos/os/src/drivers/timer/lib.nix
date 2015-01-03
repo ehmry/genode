@@ -3,16 +3,17 @@
 let
   linux = rec
     { libs = [ syscall ];
-      localIncludes = [ ./include_periodic ];
-      objects =
-        [ (compileCC {
-            inherit libs localIncludes;
-            src = ./linux/platform_timer.cc;
-          })
-        ];
+      sources = [ ./linux/platform_timer.cc ];
+      compile = src: compileCC {
+        inherit src libs;
+        localIncludes = [ ./include ./include_periodic ];
+      };
     };
 
-  nova.localIncludes = [ ./nova ];
+  nova.compile = src: compileCC {
+    inherit src;
+    localIncludes = [ ./include ./nova ];
+  };
 
   arch =
     if spec.isLinux then linux else
@@ -22,10 +23,7 @@ in
 linkStaticLibrary {
   name = "timer";
   libs = [ base alarm ] ++ arch.libs or [];
-  objects =
-    [ (compileCC {
-        src = ./main.cc;
-        localIncludes = [ ./include ] ++ arch.localIncludes or [];
-      })
-    ] ++ arch.objects or [];
+  objects = map arch.compile ([ ./main.cc ] ++ arch.sources or []);
+
+  propagate.runtime.provides = [ "Timer" ];
 }

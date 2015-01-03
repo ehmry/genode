@@ -24,7 +24,9 @@ let
   callRun = f:
     f (builtins.intersectAttrs
         (builtins.functionArgs f)
-        { inherit spec tool run pkgs; }
+        { inherit spec tool run pkgs;
+          runtime = import ./tool/runtime { inherit spec tool pkgs; };
+        }
       );
 
   importRun = p: callRun (import p);
@@ -50,10 +52,10 @@ builtins.listToAttrs (builtins.concatLists (map
   )
 
   ([ ./repos/base
-    ./repos/os
-    ./repos/libports
-    ./repos/ports
-    ./repos/dde_oss
+     ./repos/os
+     ./repos/libports
+     ./repos/ports
+     ./repos/dde_oss
   ] ++
   ( if spec.isLinux then [ ./repos/base-linux ] else
     if spec.isNOVA  then [ ./repos/base-nova  ] else

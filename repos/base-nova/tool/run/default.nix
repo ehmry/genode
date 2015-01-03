@@ -8,8 +8,6 @@
 
 with tool;
 
-let iso = import ../iso { inherit tool; }; in
-
 { name, contents
 , automatic ? true
 , testScript }:
@@ -17,25 +15,27 @@ let iso = import ../iso { inherit tool; }; in
 let
   contents' =
     ( map ({ target, source }:
-        { target = "/genode/${target}"; inherit source; })
+        { target = "/${target}"; inherit source; })
         contents
     ) ++
     [
-      { target = "/genode";
+      { target = "/";
         source = pkgs.core;
       }
-      { target = "/genode";
+      { target = "/";
         source = pkgs.init;
       }
-      { target = "/genode";
-        source = pkgs.libs.ld;
-      }
       { target = "/";
-        source = pkgs.hypervisor;
+        source = pkgs.libs.ld;
       }
     ];
 
-    diskImage = iso { inherit name; contents = contents'; };
+  diskImage = tool.iso {
+    inherit name; contents = contents';
+    kernel = "${pkgs.hypervisor}/hypervisor";
+    kernelArgs = "iommu serial";
+  };
+
 in
 derivation {
   name = name+"-run";

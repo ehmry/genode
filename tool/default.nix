@@ -183,6 +183,20 @@ let tool = rec {
     inherit main;
   };
 
+  ##
+  # Create a bootable ISO.
+  iso =
+  { name, contents, kernel, kernelArgs }:
+  shellDerivation {
+    name = "${name}.iso";
+    script = ./iso.sh;
+    PATH="${nixpkgs.coreutils}/bin:${nixpkgs.cdrkit}/bin:${nixpkgs.binutils}/bin";
+    inherit kernel kernelArgs;
+    inherit (nixpkgs) syslinux cdrkit;
+    sources = map (x: x.source) contents;
+    targets = map (x: x.target) contents;
+  };
+
   localIncludesOf = main: derivation {
     name =
       if typeOf main == "path"

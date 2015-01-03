@@ -1,5 +1,5 @@
 { genodeEnv, linkComponent, compileCC
-, baseDir, repoDir, versionObject
+, baseDir, repoDir, versionObject, coreRuntime
 , base-common }:
 
 let
@@ -63,4 +63,5 @@ linkComponent {
       ]
   ) ++ [ versionObject ];
 
+  runtime = coreRuntime;
 }

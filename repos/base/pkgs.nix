@@ -38,33 +38,42 @@ let
     throw "no base components for ${spec.system}";
 
   callBasePackage = callComponent {
-    inherit compileCC baseDir repoDir versionObject;
+    inherit compileCC baseDir repoDir versionObject coreRuntime;
   };
   importBaseComponent = path: callBasePackage (import path);
 
   impl =
     import (repoDir+"/pkgs.nix") { inherit importBaseComponent; };
 
+  coreRuntime.provides =
+    [ "CAP" "CPU" "LOG" "IO_MEM"
+      "IO_PORT" "IRQ" "PD" "RAM"
+      "ROM" "SIGNAL" "TRACE"
+    ];
+
 in
 impl // {
   test =
-    { sub_rm = importBaseComponent ./src/test/sub_rm; } //
     # No boilerplate for test expressions.
     (builtins.listToAttrs (map
       (dir:
+        let default = ./src/test + "/${dir}/default.nix"; in
         { name = dir;
-          value = callComponent' (
-            { base }:
-            tool.linkStaticComponent {
-              name = "test-"+dir;
-              libs = [ base ];
-              objects = compileCC {
-                src = ./src/test + "/${dir}/main.cc";
-              };
-           });
+          value =
+            if builtins.pathExists default then importBaseComponent default
+            else callComponent' (
+              { base }:
+              tool.linkStaticComponent {
+                name = "test-"+dir;
+                libs = [ base ];
+                objects = compileCC {
+                  src = ./src/test + "/${dir}/main.cc";
+                };
+             });
         }
       )
-      (builtins.filter (x: !(builtins.elem x [ "ada" "sub_rm" ]))
+      (builtins.filter
+        (x: !builtins.elem x [ "ada" ])
         (builtins.attrNames (builtins.readDir ./src/test))
       )
     )) //

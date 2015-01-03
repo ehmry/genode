@@ -3,7 +3,7 @@
 # \author Alexander Boettcher
 #
 
-{ tool, run, pkgs }:
+{ tool, run, pkgs, runtime }:
 
 
 #if {
@@ -16,32 +16,15 @@
 
 if tool.genodeEnv.spec.kernel != "nova" then null else
 
-run {
+run rec {
   name = "affinity";
 
   contents = [
     { target = "/"; source = pkgs.test.affinity; }
     { target = "/config";
-      source = builtins.toFile "config" ''
-	<config>
-		<parent-provides>
-			<service name="LOG"/>
-			<service name="CPU"/>
-			<service name="RM"/>
-			<service name="CAP"/>
-			<service name="SIGNAL"/>
-			<service name="RAM"/>
-			<service name="ROM"/>
-			<service name="IO_MEM"/>
-		</parent-provides>
-		<default-route>
-			<any-service> <parent/> </any-service>
-		</default-route>
-		<start name="test-affinity">
-			<resource name="RAM" quantum="10M"/>
-		</start>
-	</config>
-      '';
+      source = runtime.mkInitConfig {
+        inherit name; components = [ pkgs.test.affinity ];
+      };
     }
   ];
 
