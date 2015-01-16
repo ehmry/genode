@@ -38,7 +38,7 @@ rec {
       self =
         { inherit name components;
           runtime.requires =
-            [ "CAP" "CPU" "IO_MEM" "LOG" "PD" "RAM" "ROM" "SIGNAL" ];
+            [ "CAP" "CPU" "IO_MEM" "LOG" "PD" "RAM" "RM" "ROM" "SIGNAL" ];
         };
       requires' = requires self;
     in

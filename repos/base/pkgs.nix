@@ -48,7 +48,7 @@ let
   coreRuntime.provides =
     [ "CAP" "CPU" "LOG" "IO_MEM"
       "IO_PORT" "IRQ" "PD" "RAM"
-      "ROM" "SIGNAL" "TRACE"
+      "RM" "ROM" "SIGNAL" "TRACE"
     ];
 
 in
