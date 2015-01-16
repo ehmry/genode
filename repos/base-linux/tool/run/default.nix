@@ -13,17 +13,19 @@ with tool;
 , testScript }:
 
 let
-  contents' = contents ++ [
-    { target = "/";
-      source = pkgs.core;
-    }
-    { target = "/";
-      source = pkgs.init;
-    }
-    { target = "/";
-      source = pkgs.libs.ld;
-    }
-  ];
+  contents' =
+    contents ++
+    (tool.libContents contents) ++
+    [ { target = "/";
+        source = pkgs.core;
+      }
+      { target = "/";
+        source = pkgs.init;
+      }
+      { target = "/";
+        source = pkgs.libs.ld;
+      }
+    ];
 
   imageDir = bootImage { inherit name; contents = contents'; };
 in

@@ -197,6 +197,14 @@ let tool = rec {
     targets = map (x: x.target) contents;
   };
 
+  ##
+  # Generate a contents list of runtime libraries for a package.
+  # This will go away as tool.runtime matures.
+  libContents = contents: builtins.concatLists (map (
+    content:
+      map (source: { target = "/"; inherit source; }) content.source.libs or []
+  ) contents);
+
   localIncludesOf = main: derivation {
     name =
       if typeOf main == "path"

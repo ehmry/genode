@@ -14,10 +14,8 @@ with tool;
 
 let
   contents' =
-    ( map ({ target, source }:
-        { target = "/${target}"; inherit source; })
-        contents
-    ) ++
+    contents ++
+    (tool.libContents contents) ++
     [
       { target = "/";
         source = pkgs.core;
