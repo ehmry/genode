@@ -18,10 +18,6 @@ let
   name = "demo";
 
   contents = with pkgs;
-    ( if tool.genodeEnv.isNova then
-       [ { target = "/"; source = hypervisor; } ]
-      else throw "no kernel defined"
-    ) ++
     (map (pkg: { target = "/genode"; source = pkg; })
      ([ core init
         driver.timer
@@ -213,7 +209,11 @@ let
   systemImage = tool.systemImage { inherit name contents; };
 
   # This crap gonna break.
-  diskImage = import ../base-nova/tool/iso { inherit tool; } { inherit name contents; };
+  diskImage = tool.iso {
+    inherit name contents;
+    inherit (pkgs) kernel;
+    kernelArgs = pkgs.kernel.args;
+  };
 
   #iPXEscript =  builtins.toFile "boot.ipxe" ''
   #  #!ipxe

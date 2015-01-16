@@ -20,13 +20,14 @@ stdenv.mkDerivation {
   makeFlags =
     if genodeEnv.is32Bit then [ "ARCH=x86_32" ] else
     if genodeEnv.is64Bit then [ "ARCH=x86_64" ] else
-    throw "will not build a ${toString spec.bits} copy of NOVA";
+    throw "will not build a ${toString spec.bits}bit copy of NOVA";
 
   preBuild =
     ''
       substituteInPlace Makefile --replace '$(call gitrv)' ${shortRev}
       makeFlagsArray=(INS_DIR=$out)
     '';
+  passthru.args = [ "iommu" "serial" ];
 
   postInstall = "mv $out/hypervisor-x86_?? $out/hypervisor";
 }
