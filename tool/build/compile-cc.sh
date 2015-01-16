@@ -77,7 +77,7 @@ fi
 
 includeFlags="-I."
 for i in $systemIncludes
-do includeFlags="$includeFlags -I$i"
+do includeFlags="$includeFlags -I $i"
 done
 
 test "$prefix" && cd $prefix
