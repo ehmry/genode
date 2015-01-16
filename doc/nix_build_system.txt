@@ -173,3 +173,5 @@ As you can see there are no arguments named. This is because the _importLibrary_
 function matches the names of the formal arguments defined in the timed_semaphore
 function to named attributes in a set of utilities and libraries. For the
 implementation of importLibrary see the top-level and intermediate lib.nix files.
+
+http://dspace.library.uu.nl/handle/1874/7540

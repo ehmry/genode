@@ -1,0 +1,71 @@
+diff --git a/src/libexpr/eval.cc b/src/libexpr/eval.cc
+index 298f6a3..7edfd56 100644
+--- a/src/libexpr/eval.cc
++++ b/src/libexpr/eval.cc
+@@ -1451,20 +1451,15 @@ bool EvalState::eqValues(Value & v1, Value & v2)
+ 
+ void EvalState::printStats()
+ {
+-    bool showStats = getEnv("NIX_SHOW_STATS", "0") != "0";
+-    Verbosity v = showStats ? lvlInfo : lvlDebug;
++    Verbosity v = showStats() ? lvlInfo : lvlDebug;
+     printMsg(v, "evaluation statistics:");
+ 
+-    struct rusage buf;
+-    getrusage(RUSAGE_SELF, &buf);
+-    float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
+-
+     uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
+     uint64_t bLists = nrListElems * sizeof(Value *);
+     uint64_t bValues = nrValues * sizeof(Value);
+     uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
+ 
+-    printMsg(v, format("  time elapsed: %1%") % cpuTime);
++    printMsg(v, format("  time elapsed: %1%") % cpuTime());
+     printMsg(v, format("  size of a value: %1%") % sizeof(Value));
+     printMsg(v, format("  environments allocated: %1% (%2% bytes)") % nrEnvs % bEnvs);
+     printMsg(v, format("  list elements: %1% (%2% bytes)") % nrListElems % bLists);
+diff --git a/src/libmain/stack.cc b/src/libmain/stack.cc
+index 41b617d..3ac4f7b 100644
+--- a/src/libmain/stack.cc
++++ b/src/libmain/stack.cc
+@@ -48,24 +48,6 @@ static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
+ 
+ void detectStackOverflow()
+ {
+-#if defined(SA_SIGINFO) && defined (SA_ONSTACK)
+-    /* Install a SIGSEGV handler to detect stack overflows.  This
+-       requires an alternative stack, otherwise the signal cannot be
+-       delivered when we're out of stack space. */
+-    stack_t stack;
+-    stack.ss_size = 4096 * 4 + MINSIGSTKSZ;
+-    stack.ss_sp = new char[stack.ss_size];
+-    if (!stack.ss_sp) throw Error("cannot allocate alternative stack");
+-    stack.ss_flags = 0;
+-    if (sigaltstack(&stack, 0) == -1) throw SysError("cannot set alternative stack");
+-
+-    struct sigaction act;
+-    sigfillset(&act.sa_mask);
+-    act.sa_sigaction = sigsegvHandler;
+-    act.sa_flags = SA_SIGINFO | SA_ONSTACK;
+-    if (sigaction(SIGSEGV, &act, 0))
+-        throw SysError("resetting SIGCHLD");
+-#endif
+ }
+ 
+ 
+diff --git a/src/libutil/util.hh b/src/libutil/util.hh
+index 186ee71..dee4bdd 100644
+--- a/src/libutil/util.hh
++++ b/src/libutil/util.hh
+@@ -397,5 +397,10 @@ void ignoreException();
+    denote nesting etc.). */
+ string filterANSIEscapes(const string & s, bool nixOnly = false);
+ 
++/* Get the desired show stats setting from the environment. */
++bool showStats();
++
++/* Get CPU time usage information */
++float cpuTime();
+ 
+ }

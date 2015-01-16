@@ -16,7 +16,7 @@ let
       (builtins.attrNames ports)
   );
 
-  importInclude = p: import p { inherit (tool) genodeEnv; };
+  importInclude = p: import p { inherit spec; };
 
   compileCC =
   attrs:
@@ -36,5 +36,11 @@ let
 in
 {
   libc_noux = importLibrary ./src/lib/libc_noux;
+
+  libnixexpr = importLibrary ./src/app/nix/libexpr.nix;
+  libnixformat = importLibrary ./src/app/nix/libformat.nix;
+  libnixstore = importLibrary ./src/app/nix/libstore.nix;
+  libnixutil = importLibrary ./src/app/nix/libutil.nix;
+
   # seoul_libc_support is imported in ../libports.
 }

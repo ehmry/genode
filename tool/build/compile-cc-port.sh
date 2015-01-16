@@ -1,7 +1,9 @@
 source $genodeEnv/setup
 
-[ "$sourceRoot" ] && pushd $sourceRoot
-
+if [ "$sourceRoot" ]; then
+    echo sourceRoot is $sourceRoot
+    cd $sourceRoot
+fi
 for i in $localIncludes $systemIncludes
 do includeFlags="$includeFlags -I $i"
 done

@@ -90,6 +90,7 @@ let
 
 in
 {
+  libbz2 = importLibrary ./lib/mk/libbz2.nix;
   gmp-mpn = importLibrary ./src/lib/gmp/mpn.nix;
   icu     = importLibrary ./lib/mk/icu.nix;
   libc-compat  = importLibrary ./lib/mk/libc-compat.nix;
@@ -123,6 +124,7 @@ in
   pthread = importLibrary ./src/lib/pthread;
   sdl     = importLibrary ./src/lib/sdl;
   sdl_net = importLibrary ./src/lib/sdl_net;
+  sqlite = importLibrary ./lib/mk/sqlite.nix;
   stdcxx  = importLibrary ./lib/mk/stdcxx.nix;
   zlib    = importLibrary ./lib/mk/zlib.nix;
 

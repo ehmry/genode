@@ -22,11 +22,29 @@ in
 {
   app =
     { dosbox = importComponent ./src/app/dosbox;
+      nix =
+        { # Corepkgs are Nix expressions required for any evaulation.
+          corepkgs = tool.shellDerivation {
+             name = "nix-corepkgs";
+             inherit (tool) genodeEnv;
+             inherit (ports) nixSrc;
+             script = builtins.toFile "nix-corepkgs.sh"
+               ''
+                 source $genodeEnv/setup
+                 mkdir $out
+                 cp -r $nixSrc/corepkgs $out
+               '';
+           };
+           #nix-instantiate = importComponent ./src/app/nix/nix-instantiate;
+        };
       seoul  = importComponent ./src/app/seoul;
     };
 
   noux.minimal = importComponent ./src/noux/minimal;
   noux.net     = importComponent ./src/noux/net;
 
-  test.vmm_utils = importComponent ./src/test/vmm_utils;
+  test =
+    { nix-eval = importComponent ./src/test/nix-eval;
+      vmm_utils = importComponent ./src/test/vmm_utils;
+    };
 }
