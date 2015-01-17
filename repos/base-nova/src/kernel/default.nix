@@ -3,19 +3,20 @@
 with genodeEnv.tool.nixpkgs;
 
 let
-    rev = "f304d54b176ef7b1de9bd6fff6884e1444a0c116";
+    rev = "2b4f2803218cf92e2982b47a370d60b18bb78a15";
     shortRev = builtins.substring 0 7 rev;
 in
-stdenv.mkDerivation {
+stdenv.mkDerivation rec {
   name = "nova-${shortRev}";
 
-  src = fetchgit {
-    url = https://github.com/alex-ab/NOVA.git;
+  src = fetchFromGitHub {
+    owner = "alex-ab";
+    repo = "NOVA";
     inherit rev;
-    sha256 = "0rdqzjzhzx91yamrp3bw4i1lnz780mqk7p0fkvl7p4aaas6n4jkr";
+    sha256 = "0fdvlyq2nnzq4wpgf6gkyc3nyir50z52lvf663akn7f712kjqr1j";
   };
 
-  sourceRoot = "git-export/build";
+  sourceRoot = "${src.name}/build";
 
   makeFlags =
     if genodeEnv.is32Bit then [ "ARCH=x86_32" ] else
@@ -27,6 +28,7 @@ stdenv.mkDerivation {
       substituteInPlace Makefile --replace '$(call gitrv)' ${shortRev}
       makeFlagsArray=(INS_DIR=$out)
     '';
+
   passthru.args = [ "iommu" "serial" ];
 
   postInstall = "mv $out/hypervisor-x86_?? $out/hypervisor";
