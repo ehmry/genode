@@ -15,7 +15,7 @@ let
       (repoDir + "/src/platform")
 
       # main.cc - core_env.h - platform_env.h - unistd.h ..
-      (genodeEnv.toolchain.glibc+"/include")
+      (genodeEnv.toolchain.libc+"/include")
     ];
 
 in

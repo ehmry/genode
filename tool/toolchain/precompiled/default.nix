@@ -68,5 +68,5 @@ stdenv.mkDerivation rec {
     done
   '';
 
-  passthru = { inherit glibc; };
+  passthru = { libc = glibc; };
 }

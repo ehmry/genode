@@ -19,7 +19,7 @@ linkStaticLibrary {
 
     propagate.systemIncludes =
         [ (filterHeaders (repoDir + /src/platform))
-          "${genodeEnv.toolchain.glibc}/include"
+          "${genodeEnv.toolchain.libc}/include"
           "${nixpkgs.linuxHeaders}/include"
         ];
 }

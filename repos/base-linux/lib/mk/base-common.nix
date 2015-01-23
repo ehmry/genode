@@ -16,7 +16,7 @@ let
         (baseDir+"/src/base/thread")
 
         # ipc.cc - <sys/un.h> <sys/socket.h>
-        (genodeEnv.toolchain.glibc+"/include")
+        (genodeEnv.toolchain.libc+"/include")
       ];
   };
 in
