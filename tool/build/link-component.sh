@@ -17,26 +17,31 @@ do libs_="$libs_ $l/*.a $l/*.so"
 done
 
 
-for f in $extraLdFlags $ldFlags
-do cxxLdFlags="$cxxLdFlags -Wl,$f"
-done
+[ "$dynamicLinker" ] && \
+	ldFlags="$ldFlags --eh-frame-hdr --dynamic-linker=$dynamicLinker"
 
-[[ "$ldTextAddr" ]] && \
-    cxxLinkFlags="$cxxLinkFlags -Wl,-Ttext=$ldTextAddr"
+[ "$dynDl" ] && \
+	ldFlags="$ldFlags --dynamic-list=$dynDl"
+
+[ "$ldTextAddr" ] && \
+	ldFlags="$ldFlags -Ttext=$ldTextAddr"
 
 for s in $ldScripts
-do scriptFlags="$scriptFlags -Wl,-T -Wl,$s"
+do ldFlags="$ldFlags -T $s"
+done
+
+for f in $extraLdFlags $ldFlags 
+do cxxLdFlags="$cxxLdFlags -Wl,$f"
 done
 
 mkdir -p $out
 
 VERBOSE $cxx \
             $cxxLdFlags $cxxLinkFlags \
-            $scriptFlags \
 	    -Wl,--whole-archive -Wl,--start-group \
             $objects $libs_ \
 	    -Wl,--end-group -Wl,--no-whole-archive \
-            $($cc $ccMarch -print-libgcc-file-name) \
+            ${finalArchives:-$($cc $ccMarch -print-libgcc-file-name)} \
             -o $out/$name
 
 runHook postLink

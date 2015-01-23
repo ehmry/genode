@@ -244,7 +244,7 @@ rec {
   , ... } @ args:
   let args' = propagateLibAttrs args; in
   shellDerivation (removeAttrs args' [ "propagate" "runtime" ] // {
-    script = ./link-static-component.sh;
+    script = ./link-component.sh;
     inherit genodeEnv ldTextAddr ldScripts;
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
     libs = findLinkLibraries libs;
@@ -260,7 +260,7 @@ rec {
   , ... } @ args:
   let args' = propagateLibAttrs args; in
   shellDerivation (removeAttrs args' [ "propagate" "runtime" ] // {
-    script = ./link-dynamic-component.sh;
+    script = ./link-component.sh;
     inherit genodeEnv dynDl ldTextAddr ldScripts;
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
     libs = (findLinkLibraries libs) ++ [ dynamicLinker ];
