@@ -1,10 +1,8 @@
-{ run, pkgs }:
+{ spec, tool, run, pkgs }:
 
 with pkgs;
 
 let
-  spec = tool.genodeEnv.spec;
-
   haveFeature = feature: builtins.elem feature
     (spec.features or [ "ps2" "pci" "framebuffer" ]);
 
@@ -13,16 +11,46 @@ let
 
   featureConfig = feature: conf:
     optionalFeature feature "" conf;
+
+  platform =
+    if spec.isLinux then
+      { config =
+          ''
+	<start name="fb_sdl">
+		<resource name="RAM" quantum="4M"/>
+		<provides>
+			<service name="Input"/>
+			<service name="Framebuffer"/>
+		</provides>
+	</start>
+          '';
+      } else
+    if spec.isNOVA then
+      { config =
+          ''
+	<start name="pci_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="PCI"/></provides>
+	</start>
+	<start name="fb_drv">
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="Framebuffer"/></provides>
+	</start>
+	<start name="ps2_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Input"/></provides>
+	</start>
+          '';
+      } else
+    throw "Expression incomplete for ${spec.system}";
+
 in
 run {
   name = "sdl";
+  automatic = false;
 
   contents = [
     { target = "/"; source = test.sdl; }
-  ] ++
-  # TODO: this is good, but move it into run or something
-  ( map (lib: { target = "/"; source = lib; }) test.sdl.libs ) ++
-  [
     { target = "/"; source = driver.timer; }
     { target = "/"; source = driver.framebuffer; }
     { target = "/"; source = driver.pci; }
@@ -46,18 +74,7 @@ run {
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
 	</default-route>
-	<start name="pci_drv">
-		<resource name="RAM" quantum="1M"/>
-		<provides><service name="PCI"/></provides>
-	</start>
-	<start name="fb_drv">
-		<resource name="RAM" quantum="4M"/>
-		<provides><service name="Framebuffer"/></provides>
-	</start>
-	<start name="ps2_drv">
-		<resource name="RAM" quantum="1M"/>
-		<provides><service name="Input"/></provides>
-	</start>
+${platform.config}
 	<start name="timer">
 		<resource name="RAM" quantum="1M"/>
 		<provides><service name="Timer"/></provides>
@@ -78,6 +95,6 @@ run {
   testScript =
     ''
       append qemu_args " -m 256 "
-      run_genode_until "i don't know what" 20
+      run_genode_until forever
     '';
 }
