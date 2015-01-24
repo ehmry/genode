@@ -202,7 +202,7 @@ let tool = rec {
   # This will go away as tool.runtime matures.
   libContents = contents: builtins.concatLists (map (
     content:
-      map (source: { target = "/"; inherit source; }) content.source.libs or []
+      map (source: { target = "/"; inherit source; }) content.source.runtime.libs or []
   ) contents);
 
   localIncludesOf = main: derivation {

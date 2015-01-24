@@ -265,6 +265,6 @@ rec {
     inherit (stdAttrs) ld ldFlags cxx cxxLinkFlags cc ccMarch;
     libs = (findLinkLibraries libs) ++ [ dynamicLinker ];
     dynamicLinker = "${dynamicLinker.name}.lib.so";
-  }) // { libs = findRuntimeLibraries libs; runtime = args'.runtime or { }; };
+  }) // { runtime = args'.runtime or { } // { libs = findRuntimeLibraries libs; }; };
 
 }
