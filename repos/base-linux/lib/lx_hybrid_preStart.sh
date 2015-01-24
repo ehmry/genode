@@ -58,39 +58,20 @@ extraFlags="$extraFlags -Wl,--eh-frame-hdr"
 # Add all libraries and their dependencies specified at the 'lxLibs'
 # variable to the linker command line
 #
-for l in $lxLibs; do
-    objects="$objects $(pkg-config --libs $l/lib/pkgconfig/*.pc)"
+for l in $lxLibs
+do objects="$objects $(pkg-config --libs $l/lib/pkgconfig/*.pc)"
 done
 
 
 #
 # Use the host's startup codes, linker script, and dynamic linker
 #
-#ifneq ($(filter hardening_tool_chain, $(SPECS)),)
-#objects=$objects $( cc $ccMarch -print-file-name=Scrt1.o)
-#objects=$objects $( cc $ccMarch -print-file-name=crti.o)
-#objects=$objects $( $cc $ccMarch -print-file-name=crtbeginS.o)
-#objects=$objects $( $cc $ccMarch -print-file-name=crtendS.o)
-#else
 objects="$objects $(cc $ccMarch -print-file-name=crt1.o)"
 objects="$objects $(cc $ccMarch -print-file-name=crti.o)"
 objects="$objects $($cc $ccMarch -print-file-name=crtbegin.o)"
 objects="$objects $($cc $ccMarch -print-file-name=crtend.o)"
-#endif
 objects="$objects $(cc $ccMarch -print-file-name=crtn.o)"
 objects="$objects -lgcc -lgcc_s -lsupc++ -lc -lpthread"
-
-#USE_HOST_LD_SCRIPT = yes
-
-#ifeq (x86_64,$(findstring x86_64,$(SPECS)))
-#CXX_LINK_OPT += -Wl,--dynamic-linker=/lib64/ld-linux-x86-64.so.2
-#else
-#ifeq (arm,$(findstring arm,$(SPECS)))
-#CXX_LINK_OPT += -Wl,--dynamic-linker=/lib/ld-linux.so.3
-#else
-#CXX_LINK_OPT += -Wl,--dynamic-linker=/lib/ld-linux.so.2
-#endif
-#endif
 
 dynamicLinker="$(cat $gcc/nix-support/dynamic-linker)"
 
@@ -101,6 +82,7 @@ dynamicLinker="$(cat $gcc/nix-support/dynamic-linker)"
 cxx="c++"
 
 unset ldScripts
+unset ldTextAddr
 
 # Remove cxx from libs (libs are found by globbing
 # so an invalid path is not a problem).

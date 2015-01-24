@@ -47,6 +47,7 @@ in
   server =
     { loader       = importComponent ./src/server/loader;
       log_terminal = importComponent ./src/server/log_terminal;
+      lx_fs = importComponent ./src/server/lx_fs;
       nitpicker    = importComponent ./src/server/nitpicker;
       report_rom   = importComponent ./src/server/report_rom;
       ram_blk = importComponent ./src/server/ram_blk;
