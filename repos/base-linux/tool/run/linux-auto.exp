@@ -1,3 +1,13 @@
+set name $env(name)
 ## link in the image
 set image_dir $env(imageDir)
 exec ln -s $image_dir $out/image
+
+# Make the image writeable by running it outside of the store.
+set temp_dir /tmp/$name-run-[pid]
+file mkdir $temp_dir
+foreach f [glob $image_dir/*] {
+	file link $temp_dir/[file tail $f] $f
+}
+
+cd $temp_dir
