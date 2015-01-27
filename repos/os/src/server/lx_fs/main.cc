@@ -212,10 +212,10 @@ class File_system::Session_component : public Session_rpc_object
 				throw Permission_denied();
 
 			Directory *dir = _handle_registry.lookup_and_lock(dir_handle);
-			Node_lock_guard dir_guard(*dir);
+			Node_lock_guard dir_guard(dir);
 
 			Symlink *link = dir->symlink(name.string(), create);
-			Node_lock_guard file_guard(*link);
+			Node_lock_guard file_guard(link);
 			return  _handle_registry.alloc(link);
 		}
 
@@ -303,7 +303,7 @@ class File_system::Session_component : public Session_rpc_object
 				throw Permission_denied();
 
 			Directory *dir = _handle_registry.lookup_and_lock(dir_handle);
-			Node_lock_guard dir_guard(*dir);
+			Node_lock_guard dir_guard(dir);
 
 			dir->unlink(name.string());
 		}
