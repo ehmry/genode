@@ -57,5 +57,9 @@ run {
       }
     ];
 
-  testScript = ''run_genode_until {child "test-libc_vfs" exited with exit value 0.*\n} 20'';
+  testScript =
+    ''
+      file mkdir libc_vfs
+      run_genode_until {child "test-libc_vfs" exited with exit value 0.*\n} 20
+    '';
 }
