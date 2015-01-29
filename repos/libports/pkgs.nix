@@ -45,5 +45,6 @@ in
       libc_vfs = importComponent ./src/test/libc_vfs;
       pthread  = importComponent ./src/test/pthread;
       sdl      = importComponent ./src/test/sdl;
+      sqlite_speedtest = importComponent ./src/test/sqlite_speedtest;
     };
 }
