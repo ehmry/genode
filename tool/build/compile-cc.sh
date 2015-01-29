@@ -82,5 +82,5 @@ done
 
 test "$prefix" && cd $prefix
 
-VERBOSE $cxx $extraFlags $ccFlags $cxxFlags $includeFlags \
+VERBOSE $cxx $extraFlags $ccFlags $cxxFlags $optimization $includeFlags \
             -c $srcName -o $out

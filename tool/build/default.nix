@@ -11,16 +11,14 @@ with tool;
 let
   toolchain = nixpkgs.callPackage ../toolchain/precompiled {};
 
-  devPrefix = "genode-${spec.platform}-";
-
   # TODO deduplicate with ../build/genode-env.nix
   # attributes that should always be present
   stdAttrs = rec
     { verbose = 1;
 
-      cc      = "${devPrefix}gcc";
-      cxx     = "${devPrefix}g++";
-      ld      = "${devPrefix}ld";
+      cc      = "${spec.crossDevPrefix}gcc";
+      cxx     = "${spec.crossDevPrefix}g++";
+      ld      = "${spec.crossDevPrefix}ld";
 
       ar      = "${spec.target}-ar";
       as      = "${spec.target}-as";
@@ -33,12 +31,11 @@ let
       ldMarch = spec.ldMarch or [];
       asMarch = spec.ldMarch or [];
 
-      ccOLevel = "-O2";
       ccWarn   = "-Wall";
 
       ccFlags =
         (spec.ccFlags or []) ++ spec.ccMarch ++
-        [ ccOLevel ccWarn
+        [ ccWarn
 
           # Always compile with '-ffunction-sections' to enable
           # the use of the linker option '-gc-sections'
@@ -53,7 +50,7 @@ let
 
           # It shouldn't be too difficult to make a function to
           # turn this back on for specific components.
-          #"-g"
+          "-g"
         ];
 
       cxxFlags = [ "-std=gnu++11" ];
@@ -128,11 +125,12 @@ rec {
   { src
   , localIncludes ? []
   , PIC ? true
+  , optimization ? "-O2"
   , ... } @ args:
   let args' = propagateLibAttrs args; in
-  shellDerivation (removeAttrs args' [ "libs" ] //
+  shellDerivation (removeAttrs args' [ "libs" "runtime" ] //
     { inherit (stdAttrs) cc ccFlags;
-      inherit PIC genodeEnv;
+      inherit PIC optimization genodeEnv;
       name = dropSuffix ".c" (baseNameOf (toString src)) + ".o";
       script = ./compile-c.sh;
       localIncludes = findLocalIncludes src localIncludes;
@@ -144,11 +142,12 @@ rec {
   { src
   , localIncludes ? []
   , PIC ? true
+  , optimization ? "-O2"
   , ... } @ args:
   let args' = propagateLibAttrs args; in
-  shellDerivation (removeAttrs args' [ "libs" ] //
+  shellDerivation (removeAttrs args' [ "libs" "runtime" ] //
     { inherit (stdAttrs) cxx ccFlags cxxFlags;
-      inherit PIC genodeEnv;
+      inherit PIC optimization genodeEnv;
       name = dropSuffix ".cc" (baseNameOf (toString src)) + ".o";
       script = ./compile-cc.sh;
       localIncludes = findLocalIncludes src localIncludes;
@@ -185,10 +184,11 @@ rec {
   { name ? "objects"
   , sources
   , PIC ? true
+  , optimization ? "-O2"
   , ... } @ args:
   let args' = propagateLibAttrs args; in
-  shellDerivation (removeAttrs args' [ "libs" ] //
-    { inherit name PIC genodeEnv;
+  shellDerivation (removeAttrs args' [ "runtime" "libs" ] //
+    { inherit name PIC optimization genodeEnv;
       inherit (stdAttrs) cc ccFlags;
       script = ./compile-c-port.sh;
       systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;
@@ -200,10 +200,11 @@ rec {
   { name ? "objects"
   , sources
   , PIC ? true
+  , optimization ? "-O2"
   , ... } @ args:
   let args' = propagateLibAttrs args; in
-  shellDerivation (removeAttrs args' [ "libs" ] //
-    { inherit name PIC genodeEnv;
+  shellDerivation (removeAttrs args' [ "runtime" "libs" ] //
+    { inherit name PIC optimization genodeEnv;
       inherit (stdAttrs) cxx ccFlags cxxFlags;
       script = ./compile-cc-port.sh;
       systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;

@@ -15,6 +15,7 @@ run {
 
   contents =
     [ { target = "/"; source = driver.timer; }
+      { target = "/"; source = driver.rtc; }
       { target = "/"; source = test.nix-eval; }
       { target = "/config";
         source = builtins.toFile "config"
@@ -40,6 +41,11 @@ run {
 	<start name="timer">
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Timer"/> </provides>
+	</start>
+
+	<start name="rtc_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Rtc"/> </provides>
 	</start>
 
 	<start name="nix-eval">

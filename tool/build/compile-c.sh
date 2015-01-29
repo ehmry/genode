@@ -82,4 +82,4 @@ done
 
 test "$prefix" && cd $prefix
 
-VERBOSE $cc $extraFlags $ccFlags $includeOpts -c $src -o $out
+VERBOSE $cc $extraFlags $ccFlags $optimization $includeOpts -c $src -o $out

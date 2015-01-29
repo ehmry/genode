@@ -13,8 +13,7 @@ let
   f (attrs // {
     systemIncludes =
      (attrs.systemIncludes or []) ++
-     (import ../base/include { inherit spec; }) ++
-     (import ./include { inherit spec; });
+     (import ../base/include { inherit spec; inherit (tool) filterHeaders; });
   });
 
   callLibrary' = callLibrary {

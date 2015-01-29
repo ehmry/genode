@@ -9,7 +9,9 @@ let
     if genodeEnv.isx86_64 then sourceDir+"/x86_64" else
     abort "no startup library for ${genodeEnv.system}";
 
-  systemIncludes = map (d: d+"/src/platform") [ repoDir baseDir ];
+  systemIncludes = builtins.filter builtins.pathExists
+    (map (d: d+"/src/platform") [ repoDir baseDir ]);
+
 
 in
 linkStaticLibrary {

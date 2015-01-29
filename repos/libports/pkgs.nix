@@ -8,9 +8,15 @@
 
 let
 
-  ld = callComponent {} ({ld}: ld);
+  # Append 'Src' to each attribute in ports.
+  ports =
+    let p = import ./ports { inherit tool; }; in
+    builtins.listToAttrs (map
+      (n: { name = n+"Src"; value = builtins.getAttr n p; })
+      (builtins.attrNames p)
+  );
 
-  importInclude = p: import p { inherit spec; };
+  importInclude = p: import p { inherit spec; inherit (tool) filterHeaders; };
 
   compileCC =
   attrs:
@@ -21,8 +27,9 @@ let
      [ ./include ];
   });
 
-  callComponent' = callComponent { inherit compileCC; };
-  importComponent = path: callComponent' (import path);
+  importComponent = path: callComponent
+    ({ inherit compileCC; } // ports)
+    (import path);
 
 in
 {

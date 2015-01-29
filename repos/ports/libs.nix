@@ -16,7 +16,7 @@ let
       (builtins.attrNames ports)
   );
 
-  importInclude = p: import p { inherit spec; };
+  importInclude = p: import p { inherit spec; inherit (tool) filterHeaders; };
 
   compileCC =
   attrs:

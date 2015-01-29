@@ -7,7 +7,7 @@
 { system ? builtins.currentSystem }:
 
 let
-  spec = import ./specs { inherit system; };
+  spec = import ./spec { inherit system; };
   tool = import ./tool  { inherit spec; };
   libs = import ./libs.nix { inherit system spec tool; };
 in rec {

@@ -1,12 +1,13 @@
-{ spec }:
+{ spec, filterHeaders }:
 
 with spec;
 
 let
   repoDir =
-     if isLinux then ../../base-linux else
-     if isNOVA  then ../../base-nova  else
-     abort "no base support for ${system}";
+     if isFiasco then ../../base-fiasco else
+     if isLinux  then ../../base-linux  else
+     if isNOVA   then ../../base-nova   else
+     abort "base includes not expressed for ${system}";
   baseIncDir = ../include;
 
   platform =
@@ -14,8 +15,7 @@ let
     if isx86_64 then "x86_64" else
     abort "unknown cpu for platform";
 in
-
-[
+map filterHeaders [
   ( if isx86 then baseIncDir+"/x86" else
     if isArm then baseIncDir+"/arm" else
     abort "unknown cpu for platform"
@@ -38,6 +38,5 @@ import (repoDir+"/include") { inherit spec; }
   )
 
   baseIncDir
-]
-++
-import ../../os/include { inherit spec; }
+] ++
+import ../../os/include { inherit spec filterHeaders; }

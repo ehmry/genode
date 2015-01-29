@@ -8,13 +8,12 @@
 
 let
 
-  # The port source expressions.
-  ports = import ./ports { inherit tool; };
   # Append 'Src' to each attribute in ports.
-  ports' = builtins.listToAttrs (
-    map
-      (n: { name = n+"Src"; value = builtins.getAttr n ports; })
-      (builtins.attrNames ports)
+  ports =
+    let p = import ./ports { inherit tool; }; in
+    builtins.listToAttrs (map
+      (n: { name = n+"Src"; value = builtins.getAttr n p; })
+      (builtins.attrNames p)
   );
 
   libcArchInclude =
@@ -26,12 +25,12 @@ let
   libcIncludes =
     [ ./include/libc-genode ] ++
     ( map
-        (d: "${ports.libc.include}/"+d)
+        (d: "${ports.libcSrc.include}/"+d)
         [ "libc" libcArchInclude ]
     );
 
   compileLibc =
-  { sourceRoot ? ports.libc
+  { sourceRoot ? ports.libcSrc
   , sources
   , extraFlags ? []
   , localIncludes ? []
@@ -64,7 +63,7 @@ let
 
   });
 
-  baseInclude = import ../base/include { inherit spec; };
+  baseInclude = import ../base/include { inherit spec; inherit (tool) filterHeaders; };
 
  compileCC =
   attrs:
@@ -82,11 +81,9 @@ let
      [ ./include baseInclude ];
   });
 
-  callLibrary' = callLibrary ({
-      inherit compileLibc libcIncludes compileCC compileCRepo;
-    } // ports'
-  );
-  importLibrary = path: callLibrary' (import path);
+  importLibrary = path: callLibrary
+    ({ inherit compileLibc libcIncludes compileCC compileCRepo; } // ports)
+    (import path);
 
 in
 {

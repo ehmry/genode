@@ -1,6 +1,6 @@
-{ genodeEnv }:
+{ spec, nixpkgs }:
 
-with genodeEnv.tool.nixpkgs;
+with nixpkgs;
 
 let
     rev = "2b4f2803218cf92e2982b47a370d60b18bb78a15";
@@ -19,8 +19,8 @@ stdenv.mkDerivation rec {
   sourceRoot = "${src.name}/build";
 
   makeFlags =
-    if genodeEnv.is32Bit then [ "ARCH=x86_32" ] else
-    if genodeEnv.is64Bit then [ "ARCH=x86_64" ] else
+    if spec.is32Bit then [ "ARCH=x86_32" ] else
+    if spec.is64Bit then [ "ARCH=x86_64" ] else
     throw "will not build a ${toString spec.bits}bit copy of NOVA";
 
   preBuild =

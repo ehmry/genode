@@ -5,7 +5,7 @@
  */
 
 { system ? builtins.currentSystem
-, spec ? import ./specs { inherit system; }
+, spec ? import ./spec { inherit system; }
 , tool ? import ./tool  { inherit spec; }
 , pkgs ? import ./pkgs.nix { inherit system spec tool; }
 }:

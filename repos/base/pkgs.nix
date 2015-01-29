@@ -22,7 +22,7 @@ let
     systemIncludes =
      (attrs.systemIncludes or [])
       ++
-      (import ./include { inherit spec; });
+      (import ./include { inherit spec; inherit (tool) filterHeaders; });
   });
 
   callComponent' = callComponent {
@@ -33,8 +33,9 @@ let
 
   baseDir = ../base;
   repoDir =
-    if spec.isLinux then ../base-linux else
-    if spec.isNova  then ../base-nova  else
+    if spec.isFiasco then ../base-fiasco else
+    if spec.isLinux  then ../base-linux  else
+    if spec.isNova   then ../base-nova   else
     throw "no base components for ${spec.system}";
 
   callBasePackage = callComponent {

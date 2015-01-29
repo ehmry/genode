@@ -1,4 +1,4 @@
-{ genodeEnv, linkStaticLibrary, compileCC, baseDir, repoDir, cxx, startup }:
+{ spec, linkStaticLibrary, compileCC, baseDir, repoDir, cxx, startup }:
 
 let
   compileCC' = src: compileCC {
@@ -11,9 +11,9 @@ let
   };
 
   subdir =
-    if genodeEnv.isx86_32 then "x86_32" else
-    if genodeEnv.isx86_64 then "x86_64" else
-    abort "bad spec for ${genodeEnv.system}";
+    if spec.isx86_32 then "x86_32" else
+    if spec.isx86_64 then "x86_64" else
+    abort "bad spec for ${spec.system}";
 in
 linkStaticLibrary {
   name = "base-common";

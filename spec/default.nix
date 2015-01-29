@@ -2,6 +2,7 @@
 
 let
   spec =
+    if system == "i686-fiasco"  then import ./fiasco.nix else
     if system == "i686-linux"   then import ./i686-linux.nix else
     if system == "x86_64-linux" then import ./x86_64-linux.nix else
     if system == "i686-nova"    then import ./i686-nova.nix  else
@@ -13,14 +14,17 @@ spec // rec {
   is32Bit  = spec.bits == 32;
   is64Bit  = spec.bits == 64;
   isArm = spec.platform == "arm";
+  isArmV6 = false; #FIXME
+  isArmV7 = false; #FIXME
   isx86 = spec.platform == "x86";
   isi686 = isx86 && is32Bit;
   isx86_32 = isi686;
   isx86_64 = isx86 && is64Bit;
 
-  isLinux = spec.kernel == "linux";
-  isNova  = spec.kernel == "nova";
-  isNOVA  = isNova;
+  isFiasco = spec.kernel == "fiasco";
+  isLinux  = spec.kernel == "linux";
+  isNova   = spec.kernel == "nova";
+  isNOVA   = isNova;
 
   hasSDL  = isLinux;
   hasVESA = isNOVA; # dubious

@@ -4,7 +4,7 @@
  * \date   2014-09-30
  */
 
-{ spec ? import ../specs { system = builtins.currentSystem; } }:
+{ spec ? import ../spec { system = builtins.currentSystem; } }:
 
 with builtins;
 
@@ -69,12 +69,14 @@ let tool = rec {
   ##
   # Test if a string ends in '.h'.
   hasDotH = s: substring (sub (stringLength s) 2) 2 s == ".h";
+  hasDotHH = s: substring (sub (stringLength s) 3) 3 s == ".hh";
+  hasDotHPP = s: substring (sub (stringLength s) 4) 4 s == ".hpp";
 
   ##
   # Filter out everything but *.h on a path.
   # Prevents files that exist alongside headers from changing header path hash.
   filterHeaders = dir: filterSource
-    (path: type: hasDotH path || type == "directory")
+    (path: type: hasDotH path || hasDotHH path || hasDotHPP path || type == "directory")
     dir;
 
   ##

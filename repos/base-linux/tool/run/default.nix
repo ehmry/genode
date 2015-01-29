@@ -75,6 +75,6 @@ derivation {
 
       cd $temp_dir
       ${testScript}
-      file delete $temp_dir
+      file delete -force $temp_dir
     '';
 }

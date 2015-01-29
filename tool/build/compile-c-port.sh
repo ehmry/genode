@@ -31,6 +31,6 @@ for src in $sources; do
     # apply per-file ccFlags
     var="ccFlags_${base//./_}"
 
-    VERBOSE $cc ${!var} $extraFlags $ccFlags $includeFlags \
+    VERBOSE $cc ${!var} $extraFlags $ccFlags $optimization $includeFlags \
             -c "$src" -o "$out/$object"
 done
