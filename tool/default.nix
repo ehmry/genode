@@ -338,4 +338,127 @@ let tool = rec {
   map (rp: (path+"/${rp}")) relativePaths;
 
 
+# START CRAZY TOWN
+
+  # Appends string context from another string
+  addContextFrom = a: b: substring 0 0 a + b;
+
+  # Compares strings not requiring context equality
+  # Obviously, a workaround but works on all Nix versions
+  eqStrings = a: b: addContextFrom b a == addContextFrom a b;
+
+
+  ##
+  # Cut a string with a separator and produces a list of strings which were
+  # separated by this separator. e.g.,
+  # `splitString "." "foo.bar.baz"' returns ["foo" "bar" "baz"].
+  # From nixpkgs.
+  splitString = _sep: _s:
+    let
+      sep = addContextFrom _s _sep;
+      s = addContextFrom _sep _s;
+      sepLen = stringLength sep;
+      sLen = stringLength s;
+      lastSearch = sLen - sepLen;
+      startWithSep = startAt:
+        substring startAt sepLen s == sep;
+
+      recurse = index: startAt:
+        let cutUntil = i: [(substring startAt (i - startAt) s)]; in
+        if index < lastSearch then
+          if startWithSep index then
+            let restartAt = index + sepLen; in
+            cutUntil index ++ recurse restartAt restartAt
+          else
+            recurse (index + 1) startAt
+        else
+          cutUntil sLen;
+    in
+      recurse 0 0;
+  ##
+  # What I thought builtins.match would do.
+  matchPattern = pat: str:
+    concatLists (
+      map
+        ( l:
+          let m = match pat l; in
+          if m == null then [] else m
+        )
+        (splitString "\n" str)
+    );
+
+  ##
+  # Generate a set of local ("") and system (<>)
+  # preprocessor include directives from a file.
+  relativeIncludes = file:
+    let
+      matches = pattern: lines:
+        concatLists (filter (x: x != null) (map (match pattern) lines));
+      lines = splitString "\n" (readFile file);
+    in
+    { local  = matches ''.*#include\s*"([^>]*)".*'' lines;
+      system = matches ''.*#include\s*<([^>]*)>.*'' lines;
+    };
+
+  ##
+  # Find a file in a set of directories.
+  findFile' = key: dirs:
+    if dirs == [] then null else
+    let abs = (builtins.head dirs) +"/${key}"; in
+    if builtins.pathExists abs then abs
+    else findFile' key (builtins.tail dirs);
+
+  ##
+  # Generate a set of relative to absolute include mappings from a file.
+  # This set includes a mapping from the orginal file basename to its
+  # absolute path.
+  #
+  # The genericClosure primative applies an operation to a list of sets that
+  # contain the attribute 'key'. This operation returns a similar list of sets,
+  # and genericClosure appends elements of that list that contain a key
+  # that does not already exist in the previous set. All sets returned by this
+  # operation contain a function to resolve the relative path at 'key' into an
+  # absolute one at 'abs', and a function to parse the absolute path at 'abs'
+  # into a list of relative includes at 'inc'. GenericClosure discards any set
+  # with a relative path at 'key' that it has already been seen, and thus due
+  # to lazy evaulation, no relative path is resolved or parsed twice.
+  #
+  includesOfFile = file: searchPath:
+    let
+      concat = sets:
+        if sets == [] then {} else
+        let x = head sets; in
+        (if x.abs == null then {} else { "${x.key}" = x.abs; }) // concat (tail sets);
+    in
+    concat (genericClosure {
+      startSet = [ { key = baseNameOf (toString file); abs = file; inc = relativeIncludes file; } ];
+      operator =
+        { key, abs, inc }: if abs == null then [] else let abs' = abs; in
+          (map 
+            (key: rec { inherit key; abs = (findFile' key searchPath); inc = relativeIncludes abs; })
+            inc.system)
+          ++
+          (map
+            (key: rec { inherit key; abs = (findFile' key (searchPath++[ (dirOf abs') ])); inc = relativeIncludes abs; })
+            inc.local);
+    });
+
+  includesDerivation = searchPath: file:
+    let
+      bn = baseNameOf (toString file);
+      mappings = removeAttrs (includesOfFile file searchPath) [ bn ];
+    in
+    derivation {
+      name = bn+"-includes";
+      system = builtins.currentSystem;
+      builder = shell;
+      args = [ "-e" ./build/include.sh ];
+      relative = builtins.attrNames  mappings;
+      absolute = builtins.attrValues mappings;
+    };
+
+############################################################
+# END CRAZY STUFF
+
+
 }; in tool // import ./build { inherit spec tool; }

@@ -1,4 +1,4 @@
-{ spec, filterHeaders }:
+{ spec }:
 
 with spec;
 
@@ -15,7 +15,7 @@ let
     if isx86_64 then "x86_64" else
     abort "unknown cpu for platform";
 in
-map filterHeaders [
+[
   ( if isx86 then baseIncDir+"/x86" else
     if isArm then baseIncDir+"/arm" else
     abort "unknown cpu for platform"
@@ -39,4 +39,4 @@ import (repoDir+"/include") { inherit spec; }
 
   baseIncDir
 ] ++
-import ../../os/include { inherit spec filterHeaders; }
+import ../../os/include { inherit spec; }

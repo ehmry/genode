@@ -74,6 +74,8 @@ let
       [ attrs ]
     );
 
+  toolchainIncludes = [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include" ];
+
 in
 rec {
   inherit toolchain;
@@ -140,18 +142,22 @@ rec {
 
   compileCC =
   { src
-  , localIncludes ? []
   , PIC ? true
   , optimization ? "-O2"
   , ... } @ args:
-  let args' = propagateLibAttrs args; in
+  let
+    args' = propagateLibAttrs args;
+    mappings = removeAttrs (includesOfFile src args'.includes or []) [ (baseNameOf (toString src)) ];
+  in
   shellDerivation (removeAttrs args' [ "libs" "runtime" ] //
     { inherit (stdAttrs) cxx ccFlags cxxFlags;
       inherit PIC optimization genodeEnv;
       name = dropSuffix ".cc" (baseNameOf (toString src)) + ".o";
       script = ./compile-cc.sh;
-      localIncludes = findLocalIncludes src localIncludes;
-      systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;
+
+      relative = builtins.attrNames  mappings;
+      absolute = builtins.attrValues mappings;
+      externalIncludes = args'.externalIncludes or [] ++ toolchainIncludes;
     }
   );
 

@@ -3,12 +3,9 @@ source $genodeEnv/setup
 
 MSG_COMP $name
 
-# Turn $includes into an array.
-localIncludes=($localIncludes)
-
-#for ((n = 0; n < ${#localIncludes[*]}; n += 2)); do
-#    echo "${localIncludes[$((n + 0))]} <- ${localIncludes[$((n + 1))]}#"
-#done
+# Turn these into an arrays.
+relative=($relative)
+absolute=($absolute)
 
 # Determine how many `..' levels appear in the header file references.
 # E.g., if there is some reference `../../foo.h', then we have to
@@ -17,8 +14,8 @@ localIncludes=($localIncludes)
 # `../../foo.h' resolves to `dotdot/dotdot/../../foo.h' == `foo.h'.
 n=0
 maxDepth=0
-for ((n = 0; n < ${#localIncludes[*]}; n += 2)); do
-    target=${localIncludes[$((n + 1))]}
+for ((n = 0; n < ${#relative[*]}; n += 1)); do
+    target=${relative[n]}
 
     # Split the target name into path components using some IFS magic.
     savedIFS="$IFS"
@@ -45,9 +42,9 @@ for ((n = 0; n < maxDepth; n++)); do
 done
 
 # Create symlinks to the header files.
-for ((n = 0; n < ${#localIncludes[*]}; n += 2)); do
-    source=${localIncludes[n]}
-    target=${localIncludes[$((n + 1))]}
+for ((n = 0; n < ${#relative[*]}; n += 1)); do
+    source=${absolute[n]}
+    target=${relative[n]}
 
     # Create missing directories.  We use IFS magic to split the path
     # into path components.
@@ -75,8 +72,7 @@ fi
 
 [ "$PIC" ] && ccFlags="$ccFlags -fPIC"
 
-includeFlags="-I."
-for i in $systemIncludes
+for i in . $externalIncludes
 do includeFlags="$includeFlags -I $i"
 done
 

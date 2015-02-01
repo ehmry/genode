@@ -1,11 +1,11 @@
-{ genodeEnv, linkStaticLibrary, compileCC, baseDir, repoDir, syscall }:
+{ genodeEnv, linkStaticLibrary, compileCC, baseDir, repoDir, baseIncludes, syscall }:
 
 let
   libs = [ syscall ];
 
   compileCC' = src: compileCC {
     inherit src libs;
-    systemIncludes =
+    includes =
       [ # lock/lock.cc - spin_lock.h,lock_helper.h
         (repoDir+"/src/base/lock") (baseDir+"/src/base/lock")
 
@@ -14,8 +14,10 @@ let
 
         # thread/trace.cc - trace/control.h
         (baseDir+"/src/base/thread")
+      ] ++ baseIncludes;
 
-        # ipc.cc - <sys/un.h> <sys/socket.h>
+    externalIncludes =
+      [ # ipc.cc - <sys/un.h> <sys/socket.h>
         (genodeEnv.toolchain.libc+"/include")
       ];
   };

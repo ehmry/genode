@@ -7,13 +7,12 @@
 { spec, tool, callLibrary }:
 
 let
-   baseIncludes = import ./include { inherit spec; inherit (tool) filterHeaders; };
+   baseIncludes = import ./include { inherit spec; };
 
   compileCC =
   attrs:
   tool.compileCC (attrs // {
-    systemIncludes =
-     (attrs.systemIncludes or []) ++ baseIncludes;
+    includes = (attrs.includes or []) ++ baseIncludes;
   });
 
   baseDir = ../base;
@@ -24,7 +23,7 @@ let
     throw "no base libraries for ${spec.system}";
 
   callBaseLibrary = callLibrary {
-    inherit compileCC baseDir repoDir baseIncludes;
+    inherit baseDir repoDir baseIncludes;
   };
   importBaseLibrary = path: callBaseLibrary (import path);
 

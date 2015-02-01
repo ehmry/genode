@@ -17,9 +17,11 @@ linkStaticLibrary {
     else
     throw "syscall library unavailable for ${genodeEnv.system}";
 
-    propagate.systemIncludes =
-        [ (filterHeaders (repoDir + /src/platform))
-          "${genodeEnv.toolchain.libc}/include"
-          "${nixpkgs.linuxHeaders}/include"
-        ];
+    propagate =
+      { includes = [ (repoDir + /src/platform) ];
+        externalIncludes =
+          [ "${genodeEnv.toolchain.libc}/include"
+            "${nixpkgs.linuxHeaders}/include"
+          ];
+      };
 }

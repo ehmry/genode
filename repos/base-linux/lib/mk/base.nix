@@ -17,10 +17,11 @@ linkStaticLibrary (genodeEnv.tool.mergeSets [
     name = "base";
     libs = [ startup cxx ];
 
-    objects = map (src: compileCC { inherit src libs; })
+    objects = map 
+      (src: compileCC { inherit src libs; includes = baseIncludes; })
       [ (baseDir+"/src/base/thread/thread.cc")
         (repoDir+"/src/base/thread/thread_linux.cc")
       ];
-    propagate.systemIncludes = baseIncludes;
+    propagate.includes = baseIncludes;
   }
 ])
