@@ -87,6 +87,7 @@ let
 
 in
 {
+  jitterentropy = importLibrary ./src/lib/jitterentropy;
   libbz2 = importLibrary ./lib/mk/libbz2.nix;
   gmp-mpn = importLibrary ./src/lib/gmp/mpn.nix;
   icu     = importLibrary ./lib/mk/icu.nix;
