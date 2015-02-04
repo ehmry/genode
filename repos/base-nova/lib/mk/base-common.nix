@@ -3,7 +3,7 @@
 let
   compileCC' = src: compileCC {
     inherit src;
-    systemIncludes =
+    includes =
       [ (repoDir + "/src/base/lock")
         #(baseDir + "/src/base/lock")
         (baseDir + "/src/base/thread")

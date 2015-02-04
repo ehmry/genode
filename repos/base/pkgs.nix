@@ -19,10 +19,8 @@ let
   compileCC =
   attrs:
   tool.compileCC (attrs // {
-    systemIncludes =
-     (attrs.systemIncludes or [])
-      ++
-      (import ./include { inherit spec; inherit (tool) filterHeaders; });
+    includes =
+     (attrs.includes or []) ++ (import ./include { inherit spec; });
   });
 
   callComponent' = callComponent {

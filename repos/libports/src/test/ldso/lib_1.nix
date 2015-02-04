@@ -5,6 +5,6 @@ linkSharedLibrary {
   libs = [ test-ldso_lib_2 ];
   objects = compileCC {
     src = ./lib_1.cc;
-    localIncludes = [ ./include ];
+    includes = [ ./include ];
   };
 }

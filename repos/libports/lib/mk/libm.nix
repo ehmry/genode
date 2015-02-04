@@ -1,6 +1,7 @@
-{ genodeEnv, linkSharedLibrary, compileLibc, libcSrc, libc }:
+{ genodeEnv, linkSharedLibrary, compileC, addPrefix, compileLibc
+, fromLibc, libcSrc, libc }:
 let
-  libmDir = "${libcSrc}/lib/msun";
+  libmDir = "lib/msun";
 
   archIncludeDir =
     if genodeEnv.isArm    then "${libcSrc}/include/libc-arm"   else
@@ -12,9 +13,15 @@ linkSharedLibrary rec {
   name = "libm";
   libs = [ libc ];
 
+  objects = compileC {
+    # remove on update to version 9
+    src = ../../src/lib/libc/log2.c;
+    inherit libs;
+    externalIncludes = [ "${libcSrc}/${libmDir}/src" ];
+  };
+
   externalObjects = compileLibc {
     inherit name;
-    sourceRoot = libmDir;
 
     # 'e_rem_pio2.c' uses '__inline'
     extraFlags = [ "-D__inline=inline" ];
@@ -45,13 +52,10 @@ linkSharedLibrary rec {
     # 'is static but used in inline function which is not static'
     # messages
 
-    sources =
+    sources = addPrefix "${libmDir}/"
       [ "src/*.c"
         "ld80/*.c"
         "bsdsrc/*.c"
-
-        # remove on update to version 9
-        ../../src/lib/libc/log2.c
       ];
 
     filter =
@@ -69,20 +73,19 @@ linkSharedLibrary rec {
         "log2.c" # remove on update to version 9
       ];
 
-    localIncludes =
-      (map (d: "${libmDir}/${d}")
+    externalIncludes = fromLibc (
+      (addPrefix "${libmDir}/"
         [ "src" # finding 'math_private.h'
           "ld80" # finding 'invtrig.h', included by 'e_acosl.c'
           "bsdsrc" # finding 'mathipml.h', included by 'b_exp.c'
         ]
-      ) ++
-      (map (d: "${libcSrc}/${d}")
+      ) ++ (
         [ # finding 'fpmath.h', included by 'invtrig.h'
           "lib/libc/include"
+          "include/libc"
         ]
-      ) ++ [ archIncludeDir ];
-
-      systemIncludes = [ "${libcSrc}/include/libc" archIncludeDir ];
+      ) ++ [ archIncludeDir ]
+    );
   };
 
 }

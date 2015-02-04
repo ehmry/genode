@@ -1,10 +1,10 @@
 { linkStaticLibrary, compileCRepo, compileCC, jitterentropySrc, filterHeaders, spec }:
 
 let
+  headers = [ "${jitterentropySrc.include}/jitterentropy.h" ];
   extraFlags = [ "-DJITTERENTROPY_GENODE" ];
-  systemIncludes =
-    [ jitterentropySrc.include
-      (filterHeaders ../jitterentropy)
+  includes =
+    [ ../jitterentropy
       ( if spec.isArmV6 then ./arm_v6 else
         if spec.isArmV7 then ./arm_v7 else
         if spec.isx86_32 then ./x86_32 else
@@ -12,18 +12,18 @@ let
         throw "jitterentropy not expressed for ${spec.system}"
       )
     ];
+  externalIncludes = [ jitterentropySrc.include ];
 in
 linkStaticLibrary {
   name = "jitterentropy";
   externalObjects = compileCRepo {
-    inherit extraFlags systemIncludes;
-    sourceRoot = jitterentropySrc;
-    sources = "jitterentropy-base.c";
+    inherit headers extraFlags includes externalIncludes;
+    sources = "${jitterentropySrc}/jitterentropy-base.c";
     optimization = "-O0";
   };
   objects = compileCC {
-    inherit extraFlags systemIncludes;
+    inherit extraFlags includes externalIncludes;
     src = ./jitterentropy-base-genode.cc;
   };
-  propagate = { inherit extraFlags systemIncludes; };
+  propagate = { inherit headers extraFlags includes externalIncludes; };
 }

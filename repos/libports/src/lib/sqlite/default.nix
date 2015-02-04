@@ -1,4 +1,5 @@
-{ linkStaticLibrary, compileCC, compileCRepo, sqliteSrc, libc, pthread, jitterentropy
+{ linkStaticLibrary, compileCC, compileCRepo
+, sqliteSrc, libc, pthread, jitterentropy
 , debug ? true }:
 
 linkStaticLibrary rec {
@@ -8,13 +9,12 @@ linkStaticLibrary rec {
   objects = compileCC {
     src = ./genode_vfs.cc;
     libs = [ libc jitterentropy ];
-    systemIncludes = [ sqliteSrc.include ];
+    externalIncludes = [ sqliteSrc.include ];
   };
 
   externalObjects = compileCRepo {
     inherit name libs;
-    sourceRoot = sqliteSrc;
-    sources = "sqlite3.c";
+    sources = "${sqliteSrc}/sqlite3.c";
     extraFlags =
       [ # https://github.com/genodelabs/genode/issues/754
         "-DSQLITE_4_BYTE_ALIGNED_MALLOC"
@@ -26,7 +26,7 @@ linkStaticLibrary rec {
   };
 
   propagate =
-    { systemIncludes = [ sqliteSrc.include ];
-      runtime.requires = [ "Rtc" "Timer" ];
+    { externalIncludes = [ sqliteSrc.include ];
+      runtime.requires = [ "Timer" ];
     };
 }

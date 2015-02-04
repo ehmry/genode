@@ -9,8 +9,7 @@ linkSharedLibrary rec {
   externalObjects = compileCCRepo {
     inherit name libs sourceRoot;
     sources = "*.cc";
-    localIncludes = sourceRoot;
-    systemIncludes = [ ./include "${nixSrc}/src" ];
+    includes = [ ./include "${nixSrc}/src" ];
     # Make sure libc's regex.h comes before stdcxx's regex.h.
     extraFlags = map (i: "-I"+i) libc.propagate.systemIncludes;
   };

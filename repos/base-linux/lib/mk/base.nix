@@ -10,7 +10,7 @@
 
 linkStaticLibrary (genodeEnv.tool.mergeSets [
   ( import ./base.inc.nix {
-     inherit genodeEnv compileCC baseDir repoDir base-common syscall env;
+     inherit genodeEnv compileCC baseDir repoDir baseIncludes base-common syscall env;
   })
 
   rec {

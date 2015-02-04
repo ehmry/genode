@@ -1,15 +1,16 @@
-{ genodeEnv, linkSharedLibrary, compileCC
-, compileLibc, libcSrc, libcIncludes
+{ genodeEnv, linkSharedLibrary, addPrefix, compileCC
+, compileLibc, libcSrc, libcIncludes, libcExternalIncludes
 , base, config
 , libc-string, libc-locale, libc-stdlib, libc-stdio, libc-gen
 , libc-gdtoa, libc-inet, libc-stdtime, libc-regex, libc-compat
 , libc-setjmp, ldso-startup }:
 
 let
+  includes = [ ../libc ] ++ libcIncludes;
+  externalIncludes = libcExternalIncludes;
+
   compileCC' = src: compileCC {
-    inherit src;
-    systemIncludes =
-      [ (genodeEnv.tool.filterHeaders ../libc) ] ++ libcIncludes;
+    inherit src includes externalIncludes;
   };
 in
 linkSharedLibrary {
@@ -32,14 +33,14 @@ linkSharedLibrary {
     ];
 
   externalObjects = compileLibc {
-    sources = map (fn: "lib/libc/string/"+fn)
+    sources = addPrefix "lib/libc/string/"
       [ # Files from string library that are not included in
         # libc-raw_string because they depend on the locale
         # library.
         "strcoll.c" "strxfrm.c" "wcscoll.c" "wcsxfrm.c"
       ];
-
-    localIncludes = [ "lib/libc/locale" ];
+    inherit includes;
+    externalIncludes = [ "${libcSrc}/lib/libc/locale" ];
   };
 
   extraLdFlags = [ "--version-script=${./Version.def}" ];
@@ -57,6 +58,7 @@ linkSharedLibrary {
           "-fno-builtin-sin" "-fno-builtin-cos"
           "-fno-builtin-sinf" "-fno-builtin-cosf"
         ];
-      systemIncludes = libcIncludes;
+      includes = libcIncludes;
+      inherit externalIncludes;
     };
 }

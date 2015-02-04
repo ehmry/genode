@@ -1,4 +1,4 @@
-{ linkComponent, compileCC, filterHeaders
+{ linkComponent, compileCC
 , base, config, server }:
 
 linkComponent {
@@ -6,6 +6,6 @@ linkComponent {
   libs = [ base config server ];
   objects = [(compileCC {
     src = ./main.cc;
-    systemIncludes = [ (filterHeaders ../ram_fs) ];
+    includes = [ ../ram_fs ];
   })];
 }

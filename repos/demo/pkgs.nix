@@ -13,18 +13,16 @@ let
   compileCC =
   attrs:
   tool.compileCC (attrs // {
-    systemIncludes =
-     (attrs.systemIncludes or []) ++
+    includes =
+     (attrs.includes or []) ++
      (importInclude ../base/include) ++
      [ ./include ];
   });
 
-  callComponent' = callComponent {
-    inherit (tool) genodeEnv transformBinary;
-    inherit compileCC;
-  };
-
-  importComponent = path: callComponent' (import path);
+  importComponent = path :callComponent
+    { inherit (tool) genodeEnv transformBinary;
+      inherit compileCC;
+    } (import path);
 
 in
 {

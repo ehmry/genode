@@ -9,9 +9,8 @@ let
     if genodeEnv.isx86_64 then sourceDir+"/x86_64" else
     abort "no startup library for ${genodeEnv.system}";
 
-  systemIncludes = builtins.filter builtins.pathExists
+  includes = builtins.filter builtins.pathExists
     (map (d: d+"/src/platform") [ repoDir baseDir ]);
-
 
 in
 linkStaticLibrary {
@@ -20,7 +19,7 @@ linkStaticLibrary {
   libs = [ syscall ];
 
   objects =
-    (map (src: compileCC { inherit src systemIncludes; })
+    (map (src: compileCC { inherit src includes; })
       [ (sourceDir+"/_main.cc") (sourceDir+"/init_main_thread.cc") ]
     ) ++
     [ (compiles { src = (archDir+"/crt0.s"); }) ];

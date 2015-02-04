@@ -8,19 +8,18 @@
 
 let
 
-  importInclude = p: import p { inherit spec; inherit (tool) filterHeaders; };
+  importInclude = p: import p { inherit spec; };
 
   compileCC = attrs:
     tool.compileCC (attrs // {
-      systemIncludes =
-       (attrs.systemIncludes or []) ++
+      includes =
+       (attrs.includes or []) ++
        (importInclude ../base/include);
     });
 
-  callComponent' = callComponent {
-    inherit compileCC;
-  };
-  importComponent = path: callComponent' (import path);
+  importComponent = path: callComponent
+    { inherit compileCC; }
+    (import path);
 
 in
 {

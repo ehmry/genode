@@ -2,7 +2,7 @@
 
 let
   compileCC' = src: compileCC {
-    inherit src; systemIncludes = [ ../../app/scout ];
+    inherit src; includes = [ ../../app/scout ];
   };
 in
 linkComponent {

@@ -3,7 +3,7 @@
 
 let
   compileCC' = src: compileCC {
-    inherit src; systemIncludes = [ ../scout ];
+    inherit src; includes = [ ../scout ];
   };
 in
 linkStaticLibrary {

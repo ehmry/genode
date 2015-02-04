@@ -1,7 +1,4 @@
-# based on Eelco Dostra's nix-make
 source $genodeEnv/setup
-
-MSG_COMP $name
 
 # Turn these into an arrays.
 relative=($relative)
@@ -63,13 +60,6 @@ for ((n = 0; n < ${#relative[*]}; n += 1)); do
     ln -sf $source $prefix$target
 done
 
-srcName=$(stripHash $src)
-
-# Create a symlink to the source file.
-if ! test "$(readlink $prefix$srcName)" = $src; then
-    ln -s $src $prefix$srcName
-fi
-
 test "$prefix" && cd $prefix
 
 [ "$PIC" ] && ccFlags="$ccFlags -fPIC"
@@ -78,4 +68,29 @@ for i in . $externalIncludes
 do includeFlags="$includeFlags -I $i"
 done
 
-VERBOSE $cc $extraFlags $ccFlags $optimization $includeFlags -c $src -o $out
+mkdir -p $out
+
+for src in $sources; do
+    srcName=$(basename "$src")
+    case $filter in
+    *$srcName*)
+        continue;;
+    esac
+
+    # Create a symlink to the source file.
+    if ! test "$(readlink $prefix$srcName)" = $src; then
+        ln -s $src $prefix$srcName
+    fi
+
+    base="${srcName%.cc}"
+    base="${base%.cpp}"
+    object="${base}.o"
+
+    MSG_COMP $base
+
+    # apply per-file ccFlags
+    var="ccFlags_${base//./_}"
+
+    VERBOSE $cxx ${!var} $extraFlags $ccFlags $cxxFlags $optimization $includeFlags \
+                -c "$src" -o "$out/$object"
+done

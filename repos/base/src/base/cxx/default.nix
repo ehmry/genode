@@ -1,9 +1,9 @@
-{ linkStaticLibrary, compileCC, spec }:
+{ linkStaticLibrary, compileCC, spec, baseIncludes }:
 
 linkStaticLibrary rec {
   name = "cxx";
 
-  objects = map (src: compileCC { inherit src; })
+  objects = map (src: compileCC { inherit src; includes = baseIncludes; })
     [ ./exception.cc ./guard.cc ./malloc_free.cc
       ./misc.cc ./new_delete.cc ./unwind.cc
     ];

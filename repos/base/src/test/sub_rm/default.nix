@@ -6,7 +6,7 @@ linkComponent {
   libs = [ base ];
   objects = compileCC {
     src = ./main.cc;
-    systemIncludes =
+    includes =
       if builtins.pathExists platformInclude
       then [ platformInclude ]
       else [ ../sub_rm ];

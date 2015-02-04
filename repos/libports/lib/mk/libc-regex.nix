@@ -1,4 +1,4 @@
-{ linkStaticLibrary, compileLibc }:
+{ linkStaticLibrary, compileLibc, fromLibc }:
 
 linkStaticLibrary {
   name = "libc-regex";
@@ -10,7 +10,7 @@ linkStaticLibrary {
        "lib/libc/regex/engine.c"
       ];
 
-    localIncludes =
+    externalIncludes = fromLibc
       [ # lib/libc/regex/regcomp.c - lib/libc/locale/collate.h
         "lib/libc/regex"
         "lib/libc/locale"

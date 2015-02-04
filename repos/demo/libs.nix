@@ -11,8 +11,8 @@ let
   compileCC =
   attrs:
   tool.compileCC (attrs // {
-    systemIncludes =
-     (attrs.systemIncludes or []) ++
+    includes =
+     (attrs.includes or []) ++
       (import ../base/include { inherit spec; }) ++
       [ ./include ];
   });

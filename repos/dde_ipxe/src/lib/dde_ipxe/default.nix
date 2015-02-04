@@ -1,7 +1,9 @@
-{ spec, linkStaticLibrary, compileC, compileCRepo, dropSuffix, ipxeSrc
+{ spec, linkStaticLibrary, compileC, compileCRepo, addPrefix, fromDir, dropSuffix, ipxeSrc
 , dde_kit, dde_ipxe_support }:
 
 let
+  fromIpxe = fromDir ipxeSrc;
+
   extraFlags =
     [ "-Wall" "-Wno-address"
       "-fno-builtin-putchar" "-fno-builtin-toupper" "-fno-builtin-tolower"
@@ -9,12 +11,11 @@ let
       "-Ddebug_lib=7"
     ];
 
-  systemIncludes =
-    [ ./include
+  includes = [ ./include ../../../include ];
+  externalIncludes = fromIpxe
+    [ ""
       "${ipxeSrc}/include"
-      ipxeSrc
       "${ipxeSrc}/arch/x86/include"
-      ../../../include
     ] ++
     ( if spec.isi686 then
         [ "${ipxeSrc}/arch/i386/include"
@@ -34,24 +35,25 @@ let
         "arch/i386/core/rdtsc_timer.c"
         "drivers/bus/pciextra.c"
       ] ++
-      (map (f:"core/"+f) [ "iobuf.c" "string.c" "bitops.c" "list.c" "random.c" ]) ++
-      (map (f:"net/"+f)  [ "ethernet.c" "netdevice.c" "nullnet.c" "eth_slow.c" "iobpad.c" ]) ++
-      (map (f:"drivers/bitbash/"+f) [ "bitbash.c" "spi_bit.c" ]) ++
-      (map (f:"drivers/nvs/"+f) [ "nvs.c" "threewire.c" ]) ++
-      (map (f:"drivers/net/"+f) [ "pcnet32.c" "intel.c" "eepro100.c" "realtek.c" "mii.c" ]);
+      (addPrefix "core/" [ "iobuf.c" "string.c" "bitops.c" "list.c" "random.c" ]) ++
+      (addPrefix "net/"  [ "ethernet.c" "netdevice.c" "nullnet.c" "eth_slow.c" "iobpad.c" ]) ++
+      (addPrefix "drivers/bitbash/" [ "bitbash.c" "spi_bit.c" ]) ++
+      (addPrefix "drivers/nvs/" [ "nvs.c" "threewire.c" ]) ++
+      (addPrefix "drivers/net/" [ "pcnet32.c" "intel.c" "eepro100.c" "realtek.c" "mii.c" ]);
 
-in
-linkStaticLibrary rec {
-  name = "dde_ipxe_nic";
   libs = [ dde_kit dde_ipxe_support ];
+in
+linkStaticLibrary {
+  name = "dde_ipxe_nic";
+  inherit libs;
 
   objects = map
-    (src: compileC { inherit src libs extraFlags systemIncludes; })
+    (src: compileC { inherit src libs extraFlags includes externalIncludes; })
     [ ./nic.c ./dde.c ./dummies.c ];
 
   externalObjects = compileCRepo (
-    { sourceRoot = ipxeSrc;
-      inherit sources libs extraFlags systemIncludes;
+    { sources = fromIpxe sources;
+      inherit libs extraFlags includes externalIncludes;
     } // builtins.listToAttrs (
       map
         (s:

@@ -16,13 +16,13 @@ let
       (builtins.attrNames ports)
   );
 
-  importInclude = p: import p { inherit spec; inherit (tool) filterHeaders; };
+  importInclude = p: import p { inherit spec; };
 
   compileCC =
   attrs:
   tool.compileCC (attrs // {
-    systemIncludes =
-     (attrs.systemIncludes or []) ++
+    includes =
+     (attrs.includes or []) ++
      [ ./include ../libports/include ] ++
      (importInclude ../base/include);
   });
@@ -37,10 +37,10 @@ in
 {
   libc_noux = importLibrary ./src/lib/libc_noux;
 
-  libnixexpr = importLibrary ./src/app/nix/libexpr.nix;
-  libnixformat = importLibrary ./src/app/nix/libformat.nix;
-  libnixstore = importLibrary ./src/app/nix/libstore.nix;
-  libnixutil = importLibrary ./src/app/nix/libutil.nix;
+  #libnixexpr = importLibrary ./src/app/nix/libexpr.nix;
+  #libnixformat = importLibrary ./src/app/nix/libformat.nix;
+  #libnixstore = importLibrary ./src/app/nix/libstore.nix;
+  #libnixutil = importLibrary ./src/app/nix/libutil.nix;
 
   # seoul_libc_support is imported in ../libports.
 }

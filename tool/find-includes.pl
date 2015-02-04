@@ -1,21 +1,26 @@
 use strict;
 
-my $root = $ENV{"main"};
 my $out = $ENV{"out"};
 
-open OUT, ">$out" or die "$!";
-print OUT "[\n";
+my %loc = ();
+my %sys = ();
 
-open IN, "<$root" or die "$!, $root";
-while (<IN>) {
-    if (/^\#include\s+\"([^\"]*)\"/) {
-        print OUT "\"$1\"\n";
+foreach (glob $ENV{"file"}) {
+    open SRC, "<$_" or die "$!, $_";
+    while (<SRC>) {
+        if (/^\#include\s+\"([^\"]*)\"/) {
+            $loc{"\"$1\"\n"} = 1;
+        }
+        if (/^\#include\s+\<([^\>]*)\>/) {
+            $sys{"\"$1\"\n"} = 1;
+        }
     }
-    if (/^\#include\s+\<([^\>]*)\>/) {
-        print OUT "\"$1\"\n";
-    }
+    close SRC;
 }
-close IN;
 
-print OUT "]\n";
+my @loc = keys %loc;
+my @sys = keys %sys;
+
+open OUT, ">$out" or die "$!";
+print OUT "{local=[\n @loc];\nsystem=[\n @sys];}\n";
 close OUT;

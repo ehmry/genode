@@ -3,17 +3,15 @@
  * library and the complete libc
  */
 
-{ linkStaticLibrary, compileLibc }:
+{ linkStaticLibrary, addPrefix, compileLibc }:
 
-let dir = "lib/libc/string"; in
+let dir = "lib/libc/string/"; in
 linkStaticLibrary {
   name = "libc-string";
 
   externalObjects = compileLibc {
-    sources = [ "${dir}/*.c" ];
-    filter = map
-      (fn: "${dir}/${fn}")
+    sources = [ "${dir}*.c" ];
+    filter = addPrefix dir
       [ "strcoll.c" "strxfrm.c" "wcscoll.c" "wcsxfrm.c" ];
-    systemIncludes = [ "${dir}" "include" ];
   };
 }

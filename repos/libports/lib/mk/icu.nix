@@ -1,5 +1,5 @@
 { linkSharedLibrary, compileCRepo, compileCCRepo
-, shellDerivation, genodeEnv
+, shellDerivation, genodeEnv, fromDir
 , icuSrc, stdcxx, pthread }:
 
 let
@@ -21,10 +21,9 @@ let
       "-Wno-deprecated-declarations"
     ];
 
-  localIncludes =
-    [ "${icuSrc}/common"
-    ];
+  externalIncludes = [ (icuSrc + "/common") ];
 
+  fromIcu = fromDir icuSrc;
 in
 linkSharedLibrary rec {
   name = "icu";
@@ -35,22 +34,18 @@ linkSharedLibrary rec {
 
   externalObjects =
     [ ( compileCRepo {
-          sourceRoot = icuSrc;
-          sources = "common/*.c il8n/*.cpp"; #*/
-          inherit extraFlags localIncludes libs;
+          sources = fromIcu [ "common/*.c" "il8n/*.c" ];
+          inherit extraFlags externalIncludes libs;
         }
       )
       ( compileCCRepo {
-          sourceRoot = icuSrc;
-          sources = "common/*.cpp il8n/*.cpp"; #*/
-          inherit extraFlags localIncludes libs;
+          sources = fromIcu [ "common/*.cpp" "il8n/*.cpp" ];
+          inherit extraFlags externalIncludes libs;
         }
       )
     ];
 
-  propagate.systemIncludes =
-    [ "${icuSrc.include}/icu/common"
-      "${icuSrc.include}/icu/il8n"
-    ];
+  propagate.externalIncludes = fromDir icuSrc.include
+    [ "icu/common" "icu/il8n" ];
 
 }

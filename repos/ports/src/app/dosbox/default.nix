@@ -1,4 +1,4 @@
-{ genodeEnv, linkComponent, compileCCRepo, dosboxSrc
+{ genodeEnv, linkComponent, compileCCRepo, addPrefix, dosboxSrc
 , libc, libm, libpng, sdl, sdl_net, stdcxx, zlib, libc_lwip_nic_dhcp
 , config_args }:
 
@@ -14,13 +14,14 @@ linkComponent rec {
     inherit name libs;
     sourceRoot = dosboxSrc;
     filter = [ "opl.cpp" ];
-    sources = map
-      (glob: "src/${glob}")
+    sources = addPrefix "${dosboxSrc}/src/"
       [ "dosbox.cpp"
         "cpu/*.cpp" "debug/*.cpp" "dos/*.cpp" "fpu/*.cpp" "gui/*.cpp"
         "hardware/*.cpp" "hardware/serialport/*.cpp" "ints/*.cpp"
         "misc/*.cpp" "shell/*.cpp"
       ];
+
+    headers = [ "${dosboxSrc}/include/dosbox.h" ];
 
     extraFlags =
       [ "-DHAVE_CONFIG_H" "-D_GNU_SOURCE=1" "-D_REENTRANT" ] ++
@@ -36,14 +37,13 @@ linkComponent rec {
         "-Wno-parentheses"
       ];
 
-    localIncludes = [ "include" ];
-
-    systemIncludes =
+    includes =
       [ ../dosbox ] ++
       ( if genodeEnv.isx86_32 then [ ./x86_32 ] else
         if genodeEnv.isx86_64 then [ ./x86_64 ] else
         [ ]
       );
+    externalIncludes = [ "${dosboxSrc}/include" ];
   };
 
 }

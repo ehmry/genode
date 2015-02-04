@@ -6,7 +6,7 @@ let
     inherit src libs;
     extraFlags =
       [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ];
-    localIncludes = [ ../../../include/libpng_static ];
+    includes = [ ../../../include/libpng_static ];
   };
 in
 linkStaticLibrary {

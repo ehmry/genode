@@ -5,7 +5,7 @@
 let
   genCoreDir = baseDir+"/src/core";
 
-  systemIncludes =
+  includes =
     [ (repoDir + "/src/core/include") (genCoreDir + "/include")
       (repoDir + "/src/base/env") (baseDir + "/src/base/env")
       (baseDir + "/src/base/thread")
@@ -15,15 +15,16 @@ let
       (repoDir + "/src/platform")
 
       # main.cc - core_env.h - platform_env.h - unistd.h ..
-      (genodeEnv.toolchain.libc+"/include")
     ];
+
+  externalIncludes = [ (genodeEnv.toolchain.libc+"/include") ];
 
 in
 linkComponent {
   name = "core";
   libs = [ base-common cxx startup syscall ];
 
-  objects = map (src: compileCC { inherit src systemIncludes; }) (
+  objects = map (src: compileCC { inherit src includes externalIncludes; }) (
     map (fn: genCoreDir+"/${fn}")
       [ "main.cc"
         "cpu_session_component.cc"

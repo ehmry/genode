@@ -1,4 +1,4 @@
-{ linkComponent, compileCC, filterHeaders, nixpkgs, lx_hybrid }:
+{ linkComponent, compileCC, nixpkgs, lx_hybrid }:
 
 linkComponent rec {
   name = "fb_sdl";
@@ -7,7 +7,8 @@ linkComponent rec {
   objects = map
     (src: compileCC {
       inherit src libs ;
-      systemIncludes = [ (filterHeaders ../sdl) "${nixpkgs.SDL}/include"  ];
+      includes = [ ../sdl ];
+      extraFlags = "-I ${nixpkgs.SDL}/include";
     })
     [ ./fb_sdl.cc ./input.cc ];
 }

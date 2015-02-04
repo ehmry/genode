@@ -9,7 +9,7 @@
 with tool;
 
 let
-  toolchain = nixpkgs.callPackage ../toolchain/precompiled {};
+  toolchain = nixpkgs.callPackage ../toolchain/precompiled { };
 
   # TODO deduplicate with ../build/genode-env.nix
   # attributes that should always be present
@@ -48,8 +48,6 @@ let
           # Do not compile with standard includes per default.
           "-nostdinc"
 
-          # It shouldn't be too difficult to make a function to
-          # turn this back on for specific components.
           "-g"
         ];
 
@@ -64,8 +62,7 @@ let
       cxxLinkFlags = [ "-nostdlib -Wl,-nostdlib"] ++ spec.ccMarch;
 
       nativeIncludes =
-        [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include"
-        ];
+        [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include" ];
     };
 
   propagateLibAttrs = attrs:
@@ -74,7 +71,7 @@ let
       [ attrs ]
     );
 
-  toolchainIncludes = [ "${toolchain}/lib/gcc/${spec.target}/${toolchain.version}/include" ];
+  oLevel = "-O2";
 
 in
 rec {
@@ -92,62 +89,62 @@ rec {
   # by other scripts.
 
   compiles =
-  { src
-  , localIncludes ? []
-  , ... } @ args:
+  { src , PIC ? true, optimization ? oLevel, ... } @ args:
+  let
+    mappings = includesOfFiles [ src ] args.includes or [];
+  in
   shellDerivation (
     { inherit (stdAttrs) cc ccFlags;
-      inherit genodeEnv;
+      inherit genodeEnv PIC optimization;
     } //
     args //
     {
       name = dropSuffix ".s" (baseNameOf (toString src)) + ".o";
       script = ./compile-s.sh;
-      localIncludes = findLocalIncludes src localIncludes;
+      relative = builtins.attrNames  mappings;
+      absolute = builtins.attrValues mappings;
     }
   );
 
   compileS =
-  { src
-  , localIncludes ? []
-  , ... } @ args:
+  { src, PIC ? true, optimization ? oLevel, ... } @ args:
+  let
+    mappings = includesOfFiles [ src ] args.includes or [];
+  in
   shellDerivation (
     { inherit (stdAttrs) cc ccFlags;
-      inherit genodeEnv;
+      inherit genodeEnv PIC optimization;
     } //
     args //
     {
       name = dropSuffix ".S" (baseNameOf (toString src)) + ".o";
       script = ./compile-S.sh;
-      localIncludes = findLocalIncludes src localIncludes;
+      relative = builtins.attrNames  mappings;
+      absolute = builtins.attrValues mappings;
     }
   );
 
   compileC =
-  { src
-  , localIncludes ? []
-  , PIC ? true
-  , optimization ? "-O2"
-  , ... } @ args:
-  let args' = propagateLibAttrs args; in
+  { src, PIC ? true, optimization ? oLevel, ... } @ args:
+  let
+    args' = propagateLibAttrs args;
+    mappings = includesOfFiles [ src ] args'.includes or [];
+  in
   shellDerivation (removeAttrs args' [ "libs" "runtime" ] //
     { inherit (stdAttrs) cc ccFlags;
       inherit PIC optimization genodeEnv;
       name = dropSuffix ".c" (baseNameOf (toString src)) + ".o";
       script = ./compile-c.sh;
-      localIncludes = findLocalIncludes src localIncludes;
-      systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;
+      relative = builtins.attrNames  mappings;
+      absolute = builtins.attrValues mappings;
     }
   );
 
   compileCC =
-  { src
-  , PIC ? true
-  , optimization ? "-O2"
-  , ... } @ args:
+  { src, PIC ? true, optimization ? oLevel, ... } @ args:
   let
     args' = propagateLibAttrs args;
-    mappings = removeAttrs (includesOfFile src args'.includes or []) [ (baseNameOf (toString src)) ];
+    mappings = includesOfFiles ([ src ] ++ args'.headers or []) args'.includes or [];
   in
   shellDerivation (removeAttrs args' [ "libs" "runtime" ] //
     { inherit (stdAttrs) cxx ccFlags cxxFlags;
@@ -157,7 +154,8 @@ rec {
 
       relative = builtins.attrNames  mappings;
       absolute = builtins.attrValues mappings;
-      externalIncludes = args'.externalIncludes or [] ++ toolchainIncludes;
+      # If there are no unresolved relative includes, externalIncludes could be dropped.
+      externalIncludes = args'.externalIncludes or [] ++ stdAttrs.nativeIncludes;
     }
   );
 
@@ -192,12 +190,18 @@ rec {
   , PIC ? true
   , optimization ? "-O2"
   , ... } @ args:
-  let args' = propagateLibAttrs args; in
+  let
+    args' = propagateLibAttrs args;
+    sources' = if builtins.typeOf sources == "list" then sources else [ sources ];
+    mappings = includesOfFiles (sources' ++ args'.headers or []) args'.includes or [];
+  in
   shellDerivation (removeAttrs args' [ "runtime" "libs" ] //
     { inherit name PIC optimization genodeEnv;
       inherit (stdAttrs) cc ccFlags;
-      script = ./compile-c-port.sh;
-      systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;
+      script = ./compile-c-external.sh;
+      relative = builtins.attrNames  mappings;
+      absolute = builtins.attrValues mappings;
+      externalIncludes = args'.externalIncludes or [] ++ stdAttrs.nativeIncludes;
     }
   );
 
@@ -208,12 +212,18 @@ rec {
   , PIC ? true
   , optimization ? "-O2"
   , ... } @ args:
-  let args' = propagateLibAttrs args; in
+  let
+    args' = propagateLibAttrs args;
+    sources' = if builtins.typeOf sources == "list" then sources else [ sources ];
+    mappings = includesOfFiles (sources' ++ args'.headers or []) args'.includes or [];
+in
   shellDerivation (removeAttrs args' [ "runtime" "libs" ] //
     { inherit name PIC optimization genodeEnv;
       inherit (stdAttrs) cxx ccFlags cxxFlags;
-      script = ./compile-cc-port.sh;
-      systemIncludes = args'.systemIncludes or [] ++ stdAttrs.nativeIncludes;
+      script = ./compile-cc-external.sh;
+      relative = builtins.attrNames  mappings;
+      absolute = builtins.attrValues mappings;
+      externalIncludes = args'.externalIncludes or [] ++ stdAttrs.nativeIncludes;
     }
   );
 

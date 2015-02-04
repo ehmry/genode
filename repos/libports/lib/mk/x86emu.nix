@@ -2,23 +2,21 @@
 # x86 real-mode emulation library
 #
 
-{ linkStaticLibrary, compileCRepo, x86emuSrc }:
+{ linkStaticLibrary, compileCRepo, addPrefix, x86emuSrc }:
 
 let
-  includeDir = x86emuSrc.include;
-  systemIncludes = [ includeDir ../../include/x86emu ];
+  externalIncludes =
+    [  ../../include/x86emu x86emuSrc.include "${x86emuSrc.include}/x86emu" ];
 in
 linkStaticLibrary {
   name = "x86emu";
 
   externalObjects = compileCRepo {
     extraFlags = [ "-fomit-frame-pointer" "-I." ];
-    sourceRoot = x86emuSrc;
-    sources =
+    sources = addPrefix "${x86emuSrc}/"
       [ "decode.c" "fpu.c" "ops.c" "ops2.c" "prim_ops.c" "sys.c" ];
-    localIncludes  = [ includeDir ];
-    inherit systemIncludes;
+    externalIncludes = [ x86emuSrc ] ++ externalIncludes;
   };
 
-  propagate = { inherit systemIncludes; };
+  propagate = { inherit externalIncludes; };
 }

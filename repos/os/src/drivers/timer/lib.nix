@@ -6,13 +6,13 @@ let
       sources = [ ./linux/platform_timer.cc ];
       compile = src: compileCC {
         inherit src libs;
-        localIncludes = [ ./include ./include_periodic ];
+        includes = [ ./include ./include_periodic ];
       };
     };
 
   nova.compile = src: compileCC {
     inherit src;
-    localIncludes = [ ./include ./nova ];
+    includes = [ ./include ./nova ];
   };
 
   arch =

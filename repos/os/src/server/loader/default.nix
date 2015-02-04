@@ -1,4 +1,4 @@
-{ linkComponent, compileCC, filterHeaders, base, init_pd_args }:
+{ linkComponent, compileCC, base, init_pd_args }:
 
 linkComponent {
   name = "loader";
@@ -6,7 +6,7 @@ linkComponent {
   objects =
     [ (compileCC {
         src = ./main.cc;
-        systemIncludes = [ (filterHeaders ../loader) ];
+        includes = [ ../loader ];
       })
     ];
 }

@@ -11,6 +11,6 @@
   base-common = importBaseLibrary ./lib/mk/base-common.nix;
   lock =
     { name = "lock";
-      propagate.systemIncludes = [ (tool.filterHeaders ./src/base/lock) ];
+      propagate.includes = [ ./src/base/lock ];
     };
 }

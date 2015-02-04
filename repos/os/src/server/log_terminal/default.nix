@@ -1,7 +1,7 @@
 { linkComponent, compileCC, base, server }:
 
-linkComponent {
+linkComponent rec {
   name = "log_terminal";
   libs = [ base server ];
-  objects = [(compileCC { src = ./main.cc; })];
+  objects = [(compileCC { src = ./main.cc; inherit libs; })];
 }

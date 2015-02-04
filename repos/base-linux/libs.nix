@@ -12,18 +12,13 @@
 
   env =
     { name = "env";
-      propagate.systemIncludes =
-        [ (tool.filterHeaders ./src/base/env)
-          (tool.filterHeaders ../base/src/base/env)
-        ];
+      propagate.includes =
+        [ ./src/base/env ../base/src/base/env ];
     };
 
   lock =
     { name = "lock";
-      propagate.systemIncludes =
-        [ (tool.filterHeaders ./src/base/lock)
-          (tool.filterHeaders ../base/src/base/lock)
-        ];
+      propagate.includes = [ ./src/base/lock ../base/src/base/lock ];
     };
 
   lx_hybrid = importBaseLibrary ./lib/mk/lx_hybrid.nix;

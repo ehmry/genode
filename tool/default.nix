@@ -20,6 +20,10 @@ let tool = rec {
   };
 
   ##
+  # Add a prefix to a list of strings.
+  addPrefix = prefix: map (s: prefix+s);
+
+  ##
   # Determine if any of the following libs are shared.
   anyShared = libs:
     let h = head libs; in
@@ -40,10 +44,7 @@ let tool = rec {
   ##
   # Generate a list of file paths from a directory and
   # filenames.
-  fromDir =
-  dir: names:
-  #assert typeOf dir == "path";
-  map (name: dir+"/"+name) names;
+  fromDir = dir: map (s: dir+("/"+s));
 
   ##
   # Utility functions for gathering sources.
@@ -174,16 +175,18 @@ let tool = rec {
     if lessThan strL sufL then false else
       substring (sub strL sufL) strL str == suf;
 
-  includesOf = main: derivation {
-    name =
-      if typeOf main == "path"
-      then "${baseNameOf (toString main)}-includes"
-      else "includes";
-    system = currentSystem;
-    builder = "${nixpkgs.perl}/bin/perl";
-    args = [ ./find-includes.pl ];
-    inherit main;
-  };
+  includesOf = file:
+    import (derivation {
+      name =
+        if typeOf file == "path"
+        then "${baseNameOf (toString file)}-includes"
+        else "includes";
+      system = currentSystem;
+      preferLocalBuild = true;
+      builder = "${nixpkgs.perl}/bin/perl";
+      args = [ ./find-includes.pl ];
+      inherit file;
+    });
 
   ##
   # Create a bootable ISO.
@@ -213,6 +216,7 @@ let tool = rec {
       then "${baseNameOf (toString main)}-local-includes"
       else "local-includes";
     system = currentSystem;
+    preferLocalBuild = true;
     builder = "${nixpkgs.perl}/bin/perl";
     args = [ ./find-local-includes.pl ];
     inherit main;
@@ -256,6 +260,7 @@ let tool = rec {
   derivation {
     inherit name contents;
     system = builtins.currentSystem;
+    preferLocalBuild = true;
     builder = shell;
     PATH="${nixpkgs.coreutils}/bin";
     args = [ "-e" "-c" ''
@@ -268,11 +273,11 @@ let tool = rec {
   # Generate a list of paths from a path and a shell glob.
   pathsFromGlob = dir: glob:
     let path = toString dir; in
-    trace "FIXME: pathsFromGlob causes excessive hashing"
     import (derivation {
       name = "${baseNameOf path}-glob.nix";
       args = [ "-e" "-O" "nullglob" ./path-from-glob.sh ];
       inherit dir glob path;
+      preferLocalBuild = true;
     });
 
   preparePort = import ./prepare-port { inherit nixpkgs; };
@@ -403,6 +408,7 @@ let tool = rec {
   ##
   # Find a file in a set of directories.
   findFile' = key: dirs:
+    if substring 0 1 key == "!" then builtins.trace "found a !key" key else
     if dirs == [] then null else
     let abs = (builtins.head dirs) +"/${key}"; in
     if builtins.pathExists abs then abs
@@ -423,39 +429,29 @@ let tool = rec {
   # with a relative path at 'key' that it has already been seen, and thus due
   # to lazy evaulation, no relative path is resolved or parsed twice.
   #
-  includesOfFile = file: searchPath:
+  # A ! is prepended to the files of the initial set, to differentiate them from
+  # files with unsolved locations and to satisfy the requirement that strings
+  # not directly reference store paths in findFile'
+  includesOfFiles = files: searchPath:
     let
       concat = sets:
         if sets == [] then {} else
         let x = head sets; in
-        (if x.abs == null then {} else { "${x.key}" = x.abs; }) // concat (tail sets);
+        (if x.abs == null || substring 0 1 x.key == "!" then {} else { "${x.key}" = x.abs; }) // concat (tail sets);
     in
     concat (genericClosure {
-      startSet = [ { key = baseNameOf (toString file); abs = file; inc = relativeIncludes file; } ];
+      # Can the startSet really be filled with elements sharing a key?
+      startSet = map (abs: { key = "!${abs}"; inherit abs; inc = includesOf abs; }) files;
       operator =
         { key, abs, inc }: if abs == null then [] else let abs' = abs; in
           (map 
-            (key: rec { inherit key; abs = (findFile' key searchPath); inc = relativeIncludes abs; })
+            (key: rec { inherit key; abs = (findFile' key searchPath); inc = includesOf abs; })
             inc.system)
           ++
           (map
-            (key: rec { inherit key; abs = (findFile' key (searchPath++[ (dirOf abs') ])); inc = relativeIncludes abs; })
+            (key: rec { inherit key; abs = (findFile' key (if typeOf abs' == "path" then searchPath ++ [ (dirOf abs') ] else searchPath)); inc = relativeIncludes abs; })
             inc.local);
     });
-
-  includesDerivation = searchPath: file:
-    let
-      bn = baseNameOf (toString file);
-      mappings = removeAttrs (includesOfFile file searchPath) [ bn ];
-    in
-    derivation {
-      name = bn+"-includes";
-      system = builtins.currentSystem;
-      builder = shell;
-      args = [ "-e" ./build/include.sh ];
-      relative = builtins.attrNames  mappings;
-      absolute = builtins.attrValues mappings;
-    };
 
 ############################################################
 # END CRAZY STUFF

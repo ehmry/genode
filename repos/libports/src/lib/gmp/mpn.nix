@@ -1,5 +1,5 @@
 { linkStaticLibrary, compileC, compileCRepo, shellDerivation
-, genodeEnv, spec, nixpkgs
+, genodeEnv, spec, nixpkgs, addPrefix
 , gmpSrc
 , libc }:
 
@@ -51,8 +51,7 @@ linkStaticLibrary rec {
   externalObjects =
     [ (compileCRepo {
         inherit name libs;
-        sourceRoot = "${gmpSrc}/mpn";
-        sources = "${bits}/*.c generic/*.c";
+        sources = addPrefix "${gmpSrc}/mpn/" [ "${bits}/*.c" "generic/*.c" ];
         filter =
           [ # this file uses the 'sdiv_qrnnd'
             # symbol which is not defined
@@ -64,9 +63,9 @@ linkStaticLibrary rec {
         ccFlags_add_n = "-DOPERATION_add_n";
         ccFlags_sub_n = "-DOPERATION_sub_n";
         extraFlags = [ "-DHAVE_CONFIG_H" "-D__GMP_WITHIN_GMP" ];
-        localIncludes = [ "${gmpSrc}/mpn/generic" ];
-        systemIncludes =
-          [ "${gmpInclude}/${bits}"
+        externalIncludes =
+          [ "${gmpSrc}/mpn/generic"
+            "${gmpInclude}/${bits}"
             gmpInclude
             gmpSrc.include
             ../../../include/gcc

@@ -8,7 +8,7 @@ linkComponent {
     src = ./main.cc;
     extraFlags =
       [ "-funroll-loops" "-DPNG_USER_CONFIG" "-Wno-address" ];
-    systemIncludes =
+    includes =
       [ ../../../include/libpng_static
         ../../../include/libz_static
         ../../../include/mini_c

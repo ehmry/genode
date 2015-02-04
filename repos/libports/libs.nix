@@ -16,6 +16,8 @@ let
       (builtins.attrNames p)
   );
 
+  fromLibc = tool.fromDir ports.libcSrc;
+
   libcArchInclude =
     if spec.isArm    then "libc-arm"    else
     if spec.isx86_32 then "libc-i386"  else
@@ -23,21 +25,24 @@ let
     throw "no libc for ${spec.system}";
 
   libcIncludes =
-    [ ./include/libc-genode ] ++
-    ( map
-        (d: "${ports.libcSrc.include}/"+d)
-        [ "libc" libcArchInclude ]
-    );
+    [ ./include/libc-genode ];
+
+  libcExternalIncludes = tool.fromDir
+    ports.libcSrc.include
+    [ "libc" libcArchInclude ];
 
   compileLibc =
-  { sourceRoot ? ports.libcSrc
-  , sources
+  { sources
+  , filter ? []
   , extraFlags ? []
-  , localIncludes ? []
-  , systemIncludes ? []
+  , includes ? []
+  , externalIncludes ? []
   , ... } @ args:
   compileCRepo (args // {
-    inherit sourceRoot sources;
+    # Make sources absolute to the libc source.
+    sources = fromLibc sources;
+    filter = fromLibc filter;
+
     extraFlags = extraFlags ++
       [ # Generate position independent code to allow linking of
         # static libc code into shared libraries
@@ -56,33 +61,30 @@ let
         "-fno-builtin-sinf" "-fno-builtin-cosf"
       ];
 
-
-    localIncludes = localIncludes ++ [ "lib/libc/include" ];
-
-    systemIncludes = systemIncludes ++ libcIncludes;
-
+    includes = includes ++ libcIncludes ++ [ ./src/lib/libc ];
+    externalIncludes = externalIncludes ++ [ "${ports.libcSrc}/lib/libc/include" ] ++ libcExternalIncludes;
   });
 
-  baseInclude = import ../base/include { inherit spec; inherit (tool) filterHeaders; };
+  baseIncludes = import ../base/include { inherit spec; };
 
  compileCC =
   attrs:
   tool.compileCC (attrs // {
-    systemIncludes =
-     (attrs.systemIncludes or []) ++
-      [ ./include baseInclude ];
+    includes =
+     (attrs.includes or []) ++
+      [ ./include ] ++ baseIncludes;
   });
 
  compileCRepo =
   attrs:
   tool.compileCRepo (attrs // {
-    systemIncludes =
-     attrs.systemIncludes or [] ++
-     [ ./include baseInclude ];
+    includes =
+     attrs.includes or [] ++
+     [ ./include ] ++ baseIncludes;
   });
 
   importLibrary = path: callLibrary
-    ({ inherit compileLibc libcIncludes compileCC compileCRepo; } // ports)
+    ( { inherit fromLibc compileLibc libcIncludes libcExternalIncludes compileCC compileCRepo; } // ports )
     (import path);
 
 in
@@ -92,11 +94,11 @@ in
   gmp-mpn = importLibrary ./src/lib/gmp/mpn.nix;
   icu     = importLibrary ./lib/mk/icu.nix;
   libc-compat  = importLibrary ./lib/mk/libc-compat.nix;
-  libc-locale  = importLibrary ./lib/mk/libc-locale.nix;
   libc-gen     = importLibrary ./lib/mk/libc-gen.nix;
   libc-gdtoa   = importLibrary ./lib/mk/libc-gdtoa.nix;
   libc-inet    = importLibrary ./lib/mk/libc-inet.nix;
   libc-isc     = importLibrary ./lib/mk/libc-isc.nix;
+  libc-locale  = importLibrary ./lib/mk/libc-locale.nix;
   libc-nameser = importLibrary ./lib/mk/libc-nameser.nix;
   libc-net     = importLibrary ./lib/mk/libc-net.nix;
   libc-regex   = importLibrary ./lib/mk/libc-regex.nix;

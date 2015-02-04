@@ -6,7 +6,7 @@ linkStaticLibrary {
   objects =
     [( compileCC {
          src = ./main.cc;
-         systemIncludes =
+         includes =
            [ ( if spec.isx86 then ./x86
                else throw "no AHCI library expression for ${spec.system}"
              )

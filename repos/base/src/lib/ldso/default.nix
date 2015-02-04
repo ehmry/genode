@@ -10,7 +10,7 @@ let
 
   compileCC' = src: compileCC {
     inherit src;
-    systemIncludes = [ archDir ./include ];
+    includes = [ archDir ./include ];
   };
 
   kernelLdFlags =

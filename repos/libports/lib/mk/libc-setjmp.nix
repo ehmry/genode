@@ -1,4 +1,4 @@
-{ genodeEnv, linkStaticLibrary, compileLibc }:
+{ genodeEnv, linkStaticLibrary, compileLibc, fromLibc }:
 
 linkStaticLibrary {
   name = "libc-setjmp";
@@ -10,5 +10,6 @@ linkStaticLibrary {
       if genodeEnv.isx86_64 then
         [ "lib/libc/amd64/gen/_setjmp.S" "lib/libc/amd64/gen/setjmp.S" ]
       else throw "incomplete libc-setjmp expression for ${genodeEnv.system}";
+      externalIncludes = fromLibc [ "sys" ];
    };
 }

@@ -5,6 +5,6 @@ if genodeEnv.isx86 then linkComponent {
   libs = [ base ];
   objects = compileCC {
     src = ./x86/main.cc;
-    localIncludes = [ ../ps2 ];
+    includes = [ ../ps2 ];
   };
 } else null

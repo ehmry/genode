@@ -21,8 +21,8 @@ let
   compileCC =
   attrs:
   tool.compileCC (attrs // {
-    systemIncludes =
-     (attrs.systemIncludes or []) ++
+    includes =
+     (attrs.includes or []) ++
      (importInclude ../base/include) ++
      [ ./include ];
   });

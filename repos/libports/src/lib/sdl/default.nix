@@ -1,27 +1,24 @@
-{ genodeEnv, linkSharedLibrary, compileCC, compileCRepo
+{ linkSharedLibrary, compileCC, compileCRepo, fromDir
 , sdlSrc, libc, pthread }:
-
-with genodeEnv.tool;
 
 let
 
-  localIncludes = map
+  externalIncludes = map
     (fn: "${sdlSrc}/${fn}")
     ( [ "include" ] ++
       (map (d: "src/"+d) [ "audio" "events" "timer" "video" ])
-    );
+    ) ++ [ sdlSrc.include "${sdlSrc.include}/SDL" ];
 
   libs = [ libc pthread ];
 
-  systemIncludes =
+  includes =
     [ ../../../include/SDL
-      sdlSrc.include
-      "${sdlSrc.include}/SDL"
+
     ];
 
   compileCC' = src: compileCC {
-    inherit src libs systemIncludes;
-    extraFlags = map (f: "-I"+f) localIncludes;
+    inherit src libs externalIncludes includes;
+    #extraFlags = map (f: "-I"+f) includes;
   };
 
 in
@@ -39,10 +36,9 @@ linkSharedLibrary {
     ];
 
   externalObjects = compileCRepo {
-    inherit systemIncludes libs;
     sourceRoot = sdlSrc;
-    inherit localIncludes;
-    sources = genodeEnv.tool.fromDir "src"
+    inherit libs externalIncludes includes;
+    sources = fromDir "${sdlSrc}/src"
       [ # main files
         "SDL.c" "SDL_error.c" "SDL_fatal.c"
 
@@ -85,6 +81,8 @@ linkSharedLibrary {
       ];
   };
 
-  propagate.systemIncludes =
-    [ sdlSrc.include "${sdlSrc.include}/SDL" ../../../include ];
+  propagate =
+    { externalIncludes = [ sdlSrc.include "${sdlSrc.include}/SDL" ];
+      includes = [ ../../../include ];
+    };
 }

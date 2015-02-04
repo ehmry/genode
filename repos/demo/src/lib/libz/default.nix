@@ -3,8 +3,7 @@
 let
   compileC' = src: compileC {
     inherit src;
-    localIncludes = [ ./contrib ../../../include/libz_static ];
-    systemIncludes = [ ./contrib ];
+    includes = [ ./contrib ../../../include/libz_static ];
     libs = [ mini_c ]; # Just need the headers to compile, not link.
   };
 in
@@ -15,5 +14,5 @@ linkStaticLibrary {
       "gzio.c"     "infback.c"  "inffast.c" "inflate.c"
       "inftrees.c" "trees.c"    "uncompr.c" "zutil.c"
     ];
-  propagate.systemIncludes = [ ../../../include/libz_static ];
+  propagate.includes = [ ../../../include/libz_static ];
 }

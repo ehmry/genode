@@ -8,10 +8,7 @@ linkComponent rec {
     ( src: compileCC {
         inherit src;
         libs = libs ++ [ base ];
-        systemIncludes = map
-          filterHeaders
-          [ ../net ../../noux ../../../include ];
-      }
-    )
+        includes = [ ../net ../../noux ../../../include ];
+    })
     [ ../main.cc ./net.cc ];
 }

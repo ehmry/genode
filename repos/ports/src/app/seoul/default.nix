@@ -1,16 +1,15 @@
-{ spec, linkComponent, transformBinary
+{ spec, linkComponent, transformBinary, fromDir
 , compileCC, compileCCRepo, seoulSrc
 , base, blit, alarm, seoul_libc_support, config }:
 
 let
   libs = [ base blit alarm seoul_libc_support config ];
 
-  systemIncludes =
+  externalIncludes =
     [ "${seoulSrc}/include"
       "${seoulSrc}/genode/include"
-      ../../../include
-      ./include
     ];
+  includes = [ ../../../include ./include ];
 
   extraFlags =
     [ (if spec.is64Bit then "-mcmodel=large" else "")
@@ -22,7 +21,7 @@ let
   PIC = false;
 
   compileCC' = src: compileCC {
-    inherit src libs systemIncludes extraFlags PIC;
+    inherit src libs includes externalIncludes extraFlags PIC;
   };
 in
 if spec.isNOVA then linkComponent {
@@ -46,9 +45,8 @@ if spec.isNOVA then linkComponent {
     );
 
   externalObjects = compileCCRepo {
-    sourceRoot = seoulSrc;
-    sources = [ "model/*.cc" "executor/*.cc" ];
-    inherit libs systemIncludes extraFlags PIC;
+    sources = fromDir seoulSrc [ "model/*.cc" "executor/*.cc" ];
+    inherit libs includes externalIncludes extraFlags PIC;
   };
 
 } else null

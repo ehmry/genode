@@ -1,4 +1,4 @@
-{ spec, linkComponent, compileCC, filterHeaders, toolchain
+{ spec, linkComponent, compileCC, toolchain
 , base, config, server, lx_hybrid }:
 
 if !spec.isLinux then null else
@@ -7,9 +7,7 @@ linkComponent {
   libs = [ base config server lx_hybrid ];
   objects = compileCC {
     src = ./main.cc;
-    systemIncludes = 
-      [ (filterHeaders ../lx_fs)
-        "${toolchain.libc}/include"
-      ];
+    includes = [ ../lx_fs ];
+    externalIncludes = [ "${toolchain.libc}/include" ];
   };
 }

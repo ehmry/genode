@@ -1,18 +1,16 @@
-{ genodeEnv, linkSharedLibrary, compileCRepo
+{ linkSharedLibrary, compileCRepo, newDir, fromDir
 , libpngSrc
 , libc, libm, zlib }:
 
-with genodeEnv.tool;
-
+let fromDir' = fromDir libpngSrc; in
 linkSharedLibrary rec {
   name = "libpng";
   libs = [ libc libm zlib ];
 
   externalObjects = compileCRepo {
     inherit libs;
-    sourceRoot = libpngSrc;
 
-    sources =
+    sources = fromDir'
       [ "png.c" "pngset.c" "pngget.c" "pngrutil.c" "pngtrans.c"
         "pngwutil.c" "pngread.c" "pngrio.c" "pngwio.c"
         "pngwrite.c" "pngrtran.c" "pngwtran.c" "pngmem.c"
@@ -22,12 +20,12 @@ linkSharedLibrary rec {
     extraFlags =
       [ "-DHAVE_CONFIG_H" "-DPNG_CONFIGURE_LIBPNG" ];
 
-    systemIncludes = [ (genodeEnv.tool.filterHeaders ../libpng) ];
+    includes = [ ../libpng ];
   };
 
-  propagate.systemIncludes =
+  propagate.externalIncludes =
     [ (newDir "libpng-include" (
-        fromDir libpngSrc [ "pngconf.h" "png.h" "pngpriv.h" ]
+        fromDir' [ "pngconf.h" "png.h" "pngpriv.h" ]
       ))
     ];
 }

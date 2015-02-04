@@ -1,4 +1,4 @@
-{ linkStaticLibrary, compileCRepo, bzip2Src, libc }:
+{ linkStaticLibrary, compileCRepo, addPrefix, bzip2Src, libc }:
 
 linkStaticLibrary rec {
   name = "libbz2";
@@ -6,11 +6,10 @@ linkStaticLibrary rec {
   externalObjects = compileCRepo {
     inherit name libs;
     extraFlags = [ "-Winline" "-D_FILE_OFFSET_BITS=64" ];
-    sourceRoot = bzip2Src;
-    sources = 
+    sources = addPrefix "${bzip2Src}/"
       [ "blocksort.c" "huffman.c" "crctable.c" "randtable.c"
         "compress.c" "decompress.c" "bzlib.c"
       ];
   };
-  propagate.systemIncludes = [ bzip2Src.include ];
+  propagate.externalIncludes = [ bzip2Src.include ];
 }

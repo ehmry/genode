@@ -1,9 +1,9 @@
-{ linkStaticLibrary, compileLibc }:
+{ linkStaticLibrary, compileLibc, fromLibc }:
 
 linkStaticLibrary {
   name = "libc-stdio";
   externalObjects = compileLibc {
     sources = [ "lib/libc/stdio/*.c" ];
-    localIncludes = [ "lib/libc/locale" "contrib/gdtoa" ];
+    externalIncludes = fromLibc [ "lib/libc/locale" "contrib/gdtoa" ];
   };
 }

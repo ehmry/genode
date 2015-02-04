@@ -8,7 +8,7 @@ let
     inherit src;
     extraFlags = [ "-DPNG_USER_CONFIG" ];
 
-    systemIncludes =
+    includes =
       [ ../../../include/libpng_static
         ../../../include/libz_static
         ../../../include/mini_c

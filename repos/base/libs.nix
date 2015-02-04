@@ -23,7 +23,7 @@ let
     throw "no base libraries for ${spec.system}";
 
   callBaseLibrary = callLibrary {
-    inherit baseDir repoDir baseIncludes;
+    inherit baseDir repoDir baseIncludes compileCC;
   };
   importBaseLibrary = path: callBaseLibrary (import path);
 
@@ -40,12 +40,12 @@ in
   ## Env is a fake library for propagating platform_env.h
   env =
     { name = "env";
-      propagate.systemIncludes  = [ (tool.filterHeaders baseDir+"/src/base/env") ];
+      propagate.includes  = [ (baseDir+"/src/base/env") ];
     };
 
   lock =
     { name = "lock";
-      propagate.systemIncludes = [ (tool.filterHeaders baseDir+"/src/base/lock") ];
+      propagate.includes = [ (baseDir+"/src/base/lock") ];
     };
 
   lx_hybrid.name = "lx_hybrid";

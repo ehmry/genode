@@ -8,6 +8,6 @@ linkComponent rec {
   objects = compileCC {
     inherit libs;
     src = ./main.cc;
-    localIncludes = [ ./include ];
+    includes = [ ./include ];
   };
 }

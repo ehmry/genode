@@ -5,10 +5,8 @@ linkSharedLibrary rec {
   libs = [ libc sdl ];
   externalObjects = compileCRepo {
     inherit name libs;
-    sourceRoot = sdl_netSrc;
-    sources = "SDLnet*.c";
-    localIncludes = sdl.propagate.systemIncludes;
+    sources = "${sdl_netSrc}/SDLnet*.c";
   };
-  propagate.systemIncludes =
+  propagate.externalIncludes =
     [ "${sdl_netSrc.include}/SDL" sdl_netSrc.include ];
 }

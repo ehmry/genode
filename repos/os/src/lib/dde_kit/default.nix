@@ -27,5 +27,5 @@ linkStaticLibrary rec {
         ./dde_kit.cc ./spin_lock.cc
       ];
 
-    propagate.systemIncludes = [ ../../../include ];
+    propagate.includes = [ ../../../include ];
 }

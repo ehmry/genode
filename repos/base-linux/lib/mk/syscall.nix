@@ -1,4 +1,4 @@
-{ genodeEnv, linkStaticLibrary, compileS, baseDir, repoDir, filterHeaders, nixpkgs }:
+{ genodeEnv, linkStaticLibrary, compileS, baseDir, repoDir, nixpkgs }:
 
 linkStaticLibrary {
   name = "syscall";

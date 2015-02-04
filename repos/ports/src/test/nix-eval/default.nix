@@ -8,6 +8,6 @@ linkComponent rec {
     libs = [ base ] ++ libs;
 
     # Make sure libc's regex.h comes before stdcxx's regex.h.
-    extraFlags = map (i: "-I"+i) libc.propagate.systemIncludes;
+    extraFlags = map (i: "-I"+i) libc.propagate.externalncludes;
   };
 }

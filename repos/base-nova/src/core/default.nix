@@ -5,7 +5,7 @@
 let
   genCoreDir = baseDir+"/src/core";
 
-  systemIncludes =
+  includes =
     [ (repoDir + "/src/core/include")
       (repoDir + "/src/base/console")
       (baseDir + "/src/base/thread")
@@ -19,7 +19,7 @@ linkComponent {
   ldScripts = [ (repoDir + "/src/platform/roottask.ld") ];
   ldTextAddr = "0x100000";
 
-  objects = map (src: compileCC { inherit src systemIncludes; }) (
+  objects = map (src: compileCC { inherit src includes; }) (
     map (fn: genCoreDir+"/${fn}")
       [ "main.cc"
         "context_area.cc"

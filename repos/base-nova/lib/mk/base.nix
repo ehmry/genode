@@ -10,7 +10,7 @@
 let
   compileCC' = src: compileCC {
     inherit src;
-    systemIncludes = [ (baseDir + "/src/base/env") ];
+    includes = [ (baseDir + "/src/base/env") ];
   };
 in
 linkStaticLibrary {
@@ -28,5 +28,5 @@ linkStaticLibrary {
         ]
     )
   );
-  propagate.systemIncludes = baseIncludes;
+  propagate.includes = baseIncludes;
 }

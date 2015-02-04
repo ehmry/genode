@@ -1,4 +1,4 @@
-{ genodeEnv, linkStaticLibrary, compileLibc }:
+{ genodeEnv, linkStaticLibrary, addPrefix, compileLibc, fromLibc }:
 
 let
   repoSrcDir = ../../src/lib/libc;
@@ -12,7 +12,7 @@ let
             "lib/libc/i386/gen/flt_rounds.c"
             "lib/libc/i386/gen/makecontext.c"
           ];
-        filter = map (fn: "lib/libc/i386/gen/${fn}")
+        filter = addPrefix "lib/libc/i386/gen/"
           [ "rfork_thread.S" "setjmp.S" "_setjmp.S" "_set_tp.c"
 
             # Filter functions conflicting with libm
@@ -25,7 +25,7 @@ let
           [ "lib/libc/amd64/gen/*.S"
             "lib/libc/amd64/gen/flt_rounds.c"
           ];
-        filter = map (fn: "lib/libc/amd64/gen/${fn}")
+        filter = addPrefix "$lib/libc/amd64/gen/"
           [ "rfork_thread.S" "setjmp.S" "_setjmp.S" "_set_tp.c"
 
             # Filter functions conflicting with libm
@@ -42,17 +42,12 @@ linkStaticLibrary rec {
     inherit name;
     sources = [ "${genDir}/*.c" ];
 
-    filter = map (fn: "${genDir}/${fn}")
+    filter = addPrefix "${genDir}/"
       # this file produces a warning about a missing header file,
       # lets drop it
       [ "getosreldate.c" "sem.c" "valloc.c" "getpwent.c" ];
 
-      localIncludes = [ "lib/libc/locale" ];
-
-      systemIncludes =
-        [ # libc_pdbg.h
-          ../../src/lib/libc
-        ];
+      externalIncludes = fromLibc [ "sys" "lib/libc/locale" ];
     });
 
 }

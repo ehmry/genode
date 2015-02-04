@@ -8,22 +8,22 @@
 #
 
 
-{ genodeEnv, compileCC, baseDir, repoDir, base-common, syscall, env }:
+{ genodeEnv, compileCC, baseDir, repoDir, baseIncludes, base-common, syscall, env }:
 
 let
-  systemIncludes =
+  includes =
     [ # There is a potential problem here, both of the
       # these directories have files named platform_env.h
       #
       # platform_env.h - platform_env_common.h
       (repoDir+"/src/base/env")
       (baseDir+"/src/base/env")
-    ];
+    ] ++ baseIncludes;
 in
 {
   libs = [ base-common syscall ];
 
-  objects = map (src: compileCC { inherit src; libs = [ env syscall ]; })
+  objects = map (src: compileCC { inherit src includes; libs = [ env syscall ]; })
     [ (repoDir+"/src/base/env/platform_env.cc")
 
       (baseDir+"/src/base/console/log_console.cc")

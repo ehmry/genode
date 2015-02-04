@@ -2,7 +2,7 @@
 let
   compileCC' = src: compileCC {
     inherit src;
-    localIncludes = [ ../scout ];
+    includes = [ ../scout ];
   };
 in
 linkComponent {

@@ -7,21 +7,21 @@
 { spec, tool, callLibrary }:
 
 let
+  importInclude = path: import path { inherit spec; };
 
   addIncludes =
   f: attrs:
   f (attrs // {
-    systemIncludes =
-     (attrs.systemIncludes or []) ++
-     (import ../base/include { inherit spec; inherit (tool) filterHeaders; });
+    includes =
+     (attrs.includes or []) ++ (importInclude ../base/include);
   });
 
-  callLibrary' = callLibrary {
-    compileS  = addIncludes tool.compileS;
-    compileC  = addIncludes tool.compileC;
-    compileCC = addIncludes tool.compileCC;
-  };
-  importLibrary = path: callLibrary' (import path);
+  importLibrary = path: callLibrary
+    { osInclude = importInclude ./include;
+      compileS  = addIncludes tool.compileS;
+      compileC  = addIncludes tool.compileC;
+      compileCC = addIncludes tool.compileCC;
+    } (import path);
 
 in {
   ahci         = importLibrary ./src/drivers/ahci/lib.nix;

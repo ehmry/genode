@@ -1,25 +1,19 @@
-{ genodeEnv, linkSharedLibrary, compileCRepo
-, zlibSrc
-, libc }:
+{ linkSharedLibrary, compileCRepo, fromDir, newDir
+, zlibSrc, libc }:
 
-with genodeEnv.tool;
-
+let fromDir' = fromDir zlibSrc; in
 linkSharedLibrary rec {
   name = "zlib";
   libs = [ libc ];
   externalObjects = compileCRepo {
     inherit libs;
-    sourceRoot = zlibSrc;
-    sources =
+    sources = fromDir'
       [ "adler32.c" "compress.c" "crc32.c" "deflate.c" "gzclose.c"
         "gzlib.c" "gzread.c" "gzwrite.c" "infback.c" "inffast.c"
         "inflate.c" "inftrees.c" "trees.c" "uncompr.c" "zutil.c"
       ];
   };
 
-  propagate.systemIncludes =
-    [ (newDir "zlib-include" (
-        map (fn: "${zlibSrc}/${fn}") [ "zconf.h" "zlib.h" ]
-      ))
-    ];
+  propagate.externalncludes =
+    [ (newDir "zlib-include" (fromDir' [ "zconf.h" "zlib.h" ])) ];
 }
