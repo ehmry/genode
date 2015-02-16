@@ -9,7 +9,7 @@ run {
 
   contents = [
     { target = "/"; source = test.rm_session_mmap; }
-    { target = "/"; source = driver.timer; }
+    { target = "/"; source = drivers.timer; }
     { target = "/"; source = test.signal; }
     { target = "/config";
       source = builtins.toFile "config" ''

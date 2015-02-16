@@ -14,8 +14,8 @@ run {
   name = "nix-eval";
 
   contents =
-    [ { target = "/"; source = driver.timer; }
-      { target = "/"; source = driver.rtc; }
+    [ { target = "/"; source = drivers.timer; }
+      { target = "/"; source = drivers.rtc; }
       { target = "/"; source = test.nix-eval; }
       { target = "/config";
         source = builtins.toFile "config"

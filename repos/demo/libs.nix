@@ -4,22 +4,21 @@
  * \date   2014-09-15
  */
 
-{ spec, tool, callLibrary }:
+{ spec, tool, callLibrary
+, baseIncludes, osIncludes, ... }:
 
 let
-
-  compileCC =
-  attrs:
-  tool.compileCC (attrs // {
+  addIncludes =
+  f: attrs:
+  f (attrs // {
     includes =
-     (attrs.includes or []) ++
-      (import ../base/include { inherit spec; }) ++
-      [ ./include ];
+     (attrs.includes or []) ++ [ ./include ];
+    externalIncludes =
+     (attrs.externalIncludes or []) ++ osIncludes ++ baseIncludes;
   });
 
   callLibrary' = callLibrary {
-    inherit (tool) genodeEnv compileC transformBinary;
-    inherit compileCC;
+    compileCC = addIncludes tool.compileCC;
   };
 
   importLibrary = path: callLibrary' (import path);

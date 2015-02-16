@@ -51,10 +51,10 @@ run {
 
   contents = [
     { target = "/"; source = test.sdl; }
-    { target = "/"; source = driver.timer; }
-    { target = "/"; source = driver.framebuffer; }
-    { target = "/"; source = driver.pci; }
-    { target = "/"; source = driver.input.ps2; }
+    { target = "/"; source = drivers.timer; }
+    { target = "/"; source = drivers.framebuffer; }
+    { target = "/"; source = drivers.pci; }
+    { target = "/"; source = drivers.input.ps2; }
     { target = "/config";
       source = builtins.toFile "config" ''
         <config>

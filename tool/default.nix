@@ -19,6 +19,8 @@ let tool = rec {
       };
   };
 
+  inherit (nixpkgs) fetchurl;
+
   ##
   # Add a prefix to a list of strings.
   addPrefix = prefix: map (s: prefix+s);
@@ -342,9 +344,6 @@ let tool = rec {
   in
   map (rp: (path+"/${rp}")) relativePaths;
 
-
-# START CRAZY TOWN
-
   # Appends string context from another string
   addContextFrom = a: b: substring 0 0 a + b;
 
@@ -453,8 +452,24 @@ let tool = rec {
             inc.local);
     });
 
-############################################################
-# END CRAZY STUFF
-
+  ##
+  # Load expressions from a directory path and apply func.
+  loadExpressions = func: path:
+    let
+      dirSet  = builtins.readDir path;
+      default =
+        if builtins.hasAttr "default.nix" dirSet
+        then func (import (path + "/default.nix"))
+        else {};
+    in
+    default // (builtins.listToAttrs (builtins.filter (x: x != {}) (map
+      (name:
+        let more = loadExpressions func (path + "/${name}"); in
+        if builtins.getAttr name dirSet == "directory"
+        then { inherit name; value = more; }
+        else {}
+      )
+      (builtins.attrNames dirSet)
+    )));
 
 }; in tool // import ./build { inherit spec tool; }

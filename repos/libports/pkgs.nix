@@ -4,7 +4,8 @@
  * \date   2014-09-21
  */
 
-{ spec, tool, callComponent }:
+{ spec, tool, callComponent
+, baseIncludes, osIncludes, libportsIncludes, ... }:
 
 let
 
@@ -16,35 +17,9 @@ let
       (builtins.attrNames p)
   );
 
-  importInclude = p: import p { inherit spec; inherit (tool) filterHeaders; };
-
   compileCC =
-  attrs:
-  tool.compileCC (attrs // {
-    includes =
-     (attrs.includes or []) ++
-     (importInclude ../base/include) ++
-     [ ./include ];
-  });
+    tool.addIncludes libportsIncludes (osIncludes ++ baseIncludes) tool.compileCC;
 
-  importComponent = path: callComponent
-    ({ inherit compileCC; } // ports)
-    (import path);
+  callComponent' = callComponent ({ inherit compileCC; } // ports);
 
-in
-{
-  driver.framebuffer =
-    if spec.hasVESA then importComponent ./src/drivers/framebuffer/vesa
-    else null;
-
-  test =
-    { ldso    = importComponent ./src/test/ldso;
-      libc    = importComponent ./src/test/libc;
-      libc_fs_tar_fs =
-        importComponent ./src/test/libc_fs_tar_fs;
-      libc_vfs = importComponent ./src/test/libc_vfs;
-      pthread  = importComponent ./src/test/pthread;
-      sdl      = importComponent ./src/test/sdl;
-      sqlite_speedtest = importComponent ./src/test/sqlite_speedtest;
-    };
-}
+in builtins.removeAttrs (tool.loadExpressions callComponent' ./src) [ "lib" ]

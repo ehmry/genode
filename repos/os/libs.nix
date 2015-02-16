@@ -1,23 +1,11 @@
-/*
- * \brief  OS libraries
- * \author Emery Hemingway
- * \date   2014-09-11
- */
-
-{ spec, tool, callLibrary }:
+{ spec, tool, callLibrary
+, baseIncludes, osIncludes, ... }:
 
 let
-  importInclude = path: import path { inherit spec; };
-
-  addIncludes =
-  f: attrs:
-  f (attrs // {
-    includes =
-     (attrs.includes or []) ++ (importInclude ../base/include);
-  });
+  addIncludes = tool.addIncludes osIncludes baseIncludes;
 
   importLibrary = path: callLibrary
-    { osInclude = importInclude ./include;
+    { inherit baseIncludes osIncludes;
       compileS  = addIncludes tool.compileS;
       compileC  = addIncludes tool.compileC;
       compileCC = addIncludes tool.compileCC;
@@ -27,6 +15,7 @@ in {
   ahci         = importLibrary ./src/drivers/ahci/lib.nix;
   alarm        = importLibrary ./src/lib/alarm;
   blit         = importLibrary ./src/lib/blit;
+  cli_monitor = importLibrary ./src/app/cli_monitor/lib.nix;
   config       = importLibrary ./src/lib/config;
   config_args  = importLibrary ./src/lib/config_args;
   dde_kit      = importLibrary ./src/lib/dde_kit;

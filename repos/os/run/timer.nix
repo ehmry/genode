@@ -12,11 +12,11 @@ run rec {
   name = "timer";
 
   contents = [
-    { target = "/"; source = driver.timer; }
+    { target = "/"; source = drivers.timer; }
     { target = "/"; source = test.timer; }
     { target = "/config";
       source = runtime.mkInitConfig {
-        inherit name; components = [ driver.timer test.timer ];
+        inherit name; components = [ drivers.timer test.timer ];
       };
     }
   ];

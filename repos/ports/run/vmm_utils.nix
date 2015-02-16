@@ -6,7 +6,7 @@ if spec.isNOVA then run {
   name = "vmm_utils";
 
   contents = [
-    { target = "/"; source = driver.timer; }
+    { target = "/"; source = drivers.timer; }
     { target = "/"; source = test.vmm_utils; }
     { target = "/config";
       source = builtins.toFile "config"

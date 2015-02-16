@@ -15,8 +15,8 @@ run {
 
   contents = [
     { target = "/"; source = test.sqlite_speedtest; }
-    { target = "/"; source = driver.timer; }
-    { target = "/"; source = driver.rtc; }
+    { target = "/"; source = drivers.timer; }
+    { target = "/"; source = drivers.rtc; }
     { target = "/"; source = server.ram_fs; }
     { target = "/config";
       source = builtins.toFile "config" ''

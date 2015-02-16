@@ -4,7 +4,8 @@
  * \date   2014-09-20
  */
 
-{ spec, tool, callLibrary }:
+{ spec, tool, callLibrary
+, baseIncludes, osIncludes, libportsIncludes, ... }:
 
 let
 
@@ -65,31 +66,25 @@ let
     externalIncludes = externalIncludes ++ [ "${ports.libcSrc}/lib/libc/include" ] ++ libcExternalIncludes;
   });
 
-  baseIncludes = import ../base/include { inherit spec; };
-
- compileCC =
-  attrs:
-  tool.compileCC (attrs // {
+  addIncludes =
+  f: attrs:
+  f (attrs // {
     includes =
-     (attrs.includes or []) ++
-      [ ./include ] ++ baseIncludes;
+     (attrs.includes or []) ++ libportsIncludes;
+    externalIncludes =
+     (attrs.externalIncludes or []) ++ osIncludes ++ baseIncludes;
   });
 
- compileCRepo =
-  attrs:
-  tool.compileCRepo (attrs // {
-    includes =
-     attrs.includes or [] ++
-     [ ./include ] ++ baseIncludes;
-  });
+ compileCC = addIncludes tool.compileCC;
+ compileCRepo = addIncludes tool.compileCRepo;
 
-  importLibrary = path: callLibrary
-    ( { inherit fromLibc compileLibc libcIncludes libcExternalIncludes compileCC compileCRepo; } // ports )
-    (import path);
+ callLibrary' = callLibrary
+    ( { inherit fromLibc compileLibc libcIncludes libcExternalIncludes compileCC compileCRepo; } // ports );
+
+  importLibrary = path: callLibrary' (import path);
 
 in
 {
-  jitterentropy = importLibrary ./src/lib/jitterentropy;
   libbz2 = importLibrary ./lib/mk/libbz2.nix;
   gmp-mpn = importLibrary ./src/lib/gmp/mpn.nix;
   icu     = importLibrary ./lib/mk/icu.nix;
@@ -109,22 +104,11 @@ in
   libc-setjmp  = importLibrary ./lib/mk/libc-setjmp.nix;
   libc-string  = importLibrary ./lib/mk/libc-string.nix;
   libc-stdio   = importLibrary ./lib/mk/libc-stdio.nix;
-  libc = importLibrary ./src/lib/libc;
   libm = importLibrary ./lib/mk/libm.nix;
 
   seoul_libc_support = importLibrary
     ./../ports/lib/mk/seoul_libc_support.nix;
 
-  libc_lock_pipe     = importLibrary ./src/lib/libc_lock_pipe;
-  libc_lwip          = importLibrary ./src/lib/libc_lwip;
-  libc_lwip_nic_dhcp = importLibrary ./src/lib/libc_lwip_nic_dhcp;
-
-  libpng  = importLibrary ./src/lib/libpng;
-  lwip    = importLibrary ./src/lib/lwip;
-  pthread = importLibrary ./src/lib/pthread;
-  sdl     = importLibrary ./src/lib/sdl;
-  sdl_net = importLibrary ./src/lib/sdl_net;
-  sqlite = importLibrary ./src/lib/sqlite;
   stdcxx  = importLibrary ./lib/mk/stdcxx.nix;
   zlib    = importLibrary ./lib/mk/zlib.nix;
 
@@ -133,4 +117,4 @@ in
   test-ldso_lib_dl = importLibrary ./src/test/ldso/lib_dl.nix;
 
   x86emu = importLibrary ./lib/mk/x86emu.nix;
-}
+} // (tool.loadExpressions callLibrary' ./src/lib)

@@ -82,6 +82,11 @@ rec {
   };
   genodeEnvAdapters = import ./adapters.nix;
 
+  addIncludes = includes': externalIncludes': f: attrs: f (attrs // {
+    includes = (attrs.includes or []) ++ includes';
+    externalIncludes = (attrs.externalIncludes or []) ++ externalIncludes';
+  });
+
   ## TODO
   # Deduplicate the following functions.
   # It shouldn't be hard, the scripts can

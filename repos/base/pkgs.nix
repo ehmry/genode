@@ -4,10 +4,10 @@
  * \date   2014-09-04
  */
 
-{ spec, tool, callComponent }:
+{ spec, tool, callComponent
+, baseIncludes, osIncludes, ... }:
 
 let
-
   # Version string for core.
   versionObject =
     let version = builtins.readFile ../../VERSION; in
@@ -16,16 +16,9 @@ let
       extraFlags = [ ''-DGENODE_VERSION="\"${version}\""'' ];
     };
 
-  compileCC =
-  attrs:
-  tool.compileCC (attrs // {
-    includes =
-     (attrs.includes or []) ++ (import ./include { inherit spec; });
-  });
+  compileCC = tool.addIncludes baseIncludes osIncludes tool.compileCC;
 
-  callComponent' = callComponent {
-    inherit compileCC;
-  };
+  callComponent' = callComponent { inherit compileCC; };
 
   importComponent = path: callComponent' (import path);
 

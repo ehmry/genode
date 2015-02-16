@@ -8,8 +8,8 @@ run {
   name = "rtc";
 
   contents =
-    [ { target = "/"; source = driver.timer; }
-      { target = "/"; source = driver.rtc; }
+    [ { target = "/"; source = drivers.timer; }
+      { target = "/"; source = drivers.rtc; }
       { target = "/"; source = test.rtc; }
       { target = "/config";
         source = builtins.toFile "config.xml"

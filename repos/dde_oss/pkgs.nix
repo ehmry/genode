@@ -1,4 +1,4 @@
-{ spec, tool, callComponent }:
+{ spec, tool, callComponent, ... }:
 
 let
 

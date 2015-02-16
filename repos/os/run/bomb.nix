@@ -4,7 +4,7 @@ run {
   name = "bomb";
 
   contents = [
-    { target = "/"; source = pkgs.driver.timer; }
+    { target = "/"; source = pkgs.drivers.timer; }
     { target = "/"; source = pkgs.test.bomb; }
     { target = "/config";
       source = builtins.toFile "config" ''

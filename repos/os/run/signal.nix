@@ -11,7 +11,7 @@ run {
   name = "signal";
 
   contents = [
-    { target = "/"; source = driver.timer; }
+    { target = "/"; source = drivers.timer; }
     { target = "/"; source = test.signal; }
     { target = "/config";
       source = builtins.toFile "config" ''

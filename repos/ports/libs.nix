@@ -4,7 +4,8 @@
  * \date   2014-12-14
  */
 
-{ spec, tool, callLibrary }:
+{ spec, tool, callLibrary
+, baseIncludes, osIncludes, portsIncludes, ... }:
 
 let
 
@@ -16,31 +17,27 @@ let
       (builtins.attrNames ports)
   );
 
-  importInclude = p: import p { inherit spec; };
-
   compileCC =
-  attrs:
-  tool.compileCC (attrs // {
-    includes =
-     (attrs.includes or []) ++
-     [ ./include ../libports/include ] ++
-     (importInclude ../base/include);
-  });
+    tool.addIncludes portsIncludes (osIncludes ++ baseIncludes) tool.compileCC;
 
-  callLibrary' = callLibrary (
-    { inherit compileCC; } // ports'
-  );
-
-  importLibrary = path: callLibrary' (import path);
+  importLibrary = path: callLibrary
+    ( ports' //
+      { inherit compileCC;
+        nixSrc = ../../../nix;
+      }
+    ) (import path);
 
 in
 {
   libc_noux = importLibrary ./src/lib/libc_noux;
 
-  #libnixexpr = importLibrary ./src/app/nix/libexpr.nix;
-  #libnixformat = importLibrary ./src/app/nix/libformat.nix;
-  #libnixstore = importLibrary ./src/app/nix/libstore.nix;
-  #libnixutil = importLibrary ./src/app/nix/libutil.nix;
+  libnixexpr   = importLibrary ./src/app/nix/libexpr.nix;
+  libnixformat = importLibrary ./src/app/nix/libformat.nix;
+  libnixstore  = importLibrary ./src/app/nix/libstore.nix;
+  libnixutil   = importLibrary ./src/app/nix/libutil.nix;
 
-  # seoul_libc_support is imported in ../libports.
+  # Native Nix libraries
+  nixmain = importLibrary ./src/lib/nixmain/default.nix;
+
+  # seoul_libc_support defined in this repo directory but imported in ../libports.
 }

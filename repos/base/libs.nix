@@ -4,16 +4,12 @@
  * \date   2014-09-11
  */
 
-{ spec, tool, callLibrary }:
+{ spec, tool, callLibrary
+, baseIncludes, osIncludes, ... }:
 
 let
-   baseIncludes = import ./include { inherit spec; };
 
-  compileCC =
-  attrs:
-  tool.compileCC (attrs // {
-    includes = (attrs.includes or []) ++ baseIncludes;
-  });
+  compileCC = tool.addIncludes [] (baseIncludes ++ osIncludes) tool.compileCC;
 
   baseDir = ../base;
   repoDir =
@@ -25,6 +21,7 @@ let
   callBaseLibrary = callLibrary {
     inherit baseDir repoDir baseIncludes compileCC;
   };
+
   importBaseLibrary = path: callBaseLibrary (import path);
 
   impl =

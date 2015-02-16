@@ -12,7 +12,7 @@ run {
   name = "libc_fs_tar_fs";
 
   contents =
-    [ { target = "/"; source = pkgs.driver.timer; }
+    [ { target = "/"; source = pkgs.drivers.timer; }
       { target = "/"; source = pkgs.server.tar_fs; }
       { target = "/"; source = pkgs.libs.libc; }
 

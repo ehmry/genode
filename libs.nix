@@ -10,6 +10,8 @@
 }:
 
 let
+  includes = import ./include.nix { inherit spec; };
+
   callLibrary = extraAttrs: f:
     f (
       builtins.intersectAttrs
@@ -27,9 +29,9 @@ let
 
   libs' = tool.mergeSets (
     map
-      (repo: import (./repos + "/${repo}/libs.nix") {
-        inherit spec tool callLibrary;
-      })
+      (repo: import (./repos + "/${repo}/libs.nix")
+        ({ inherit spec tool callLibrary; } // includes)
+      )
       [ "base" "os" "demo" "libports" "ports" "dde_ipxe" ]
   );
 

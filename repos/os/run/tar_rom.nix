@@ -38,7 +38,7 @@ run {
   name = "tar_rom";
 
   contents = [
-    { target = "/"; source = pkgs.driver.timer; }
+    { target = "/"; source = pkgs.drivers.timer; }
     { target = "/"; source = pkgs.server.tar_rom; }
     { target = "/archive.tar"; source = archive; }
     { target = "/config";

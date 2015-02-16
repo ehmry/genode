@@ -4,41 +4,20 @@
  * \date   2014-09-15
  */
 
-{ spec, tool, callComponent }:
+{ spec, tool, callComponent
+, baseIncludes, osIncludes, demoIncludes, ... }:
 
 let
 
-  importInclude = p: import p { inherit spec; };
-
-  compileCC =
-  attrs:
-  tool.compileCC (attrs // {
-    includes =
-     (attrs.includes or []) ++
-     (importInclude ../base/include) ++
-     [ ./include ];
+  addIncludes =
+  f: attrs:
+  f (attrs // {
+    includes = (attrs.includes or []) ++ demoIncludes;
+    externalIncludes =
+     (attrs.externalIncludes or []) ++ osIncludes ++ baseIncludes;
   });
 
-  importComponent = path :callComponent
-    { inherit (tool) genodeEnv transformBinary;
-      inherit compileCC;
-    } (import path);
+  callComponent' = callComponent
+    { compileCC = addIncludes tool.compileCC; };
 
-in
-{
-  server =
-    { liquid_framebuffer =
-        importComponent ./src/server/liquid_framebuffer;
-      nitlog = importComponent ./src/server/nitlog;
-    };
-
-  app =
-    { launchpad = importComponent ./src/app/launchpad;
-      scout     = importComponent ./src/app/scout;
-    };
-
-  test =
-    { libpng = importComponent ./src/lib/libpng/test.nix;
-    };
-
-}
+in builtins.removeAttrs (tool.loadExpressions callComponent' ./src) [ "lib" ]

@@ -1,29 +1,8 @@
-/*
- * \brief  Gem components
- * \author Emery Hemingway
- * \date   2014-12-12
- */
-
-{ spec, tool, callComponent }:
+{ spec, tool, callComponent
+, baseIncludes, osIncludes, gemsIncludes, ... }:
 
 let
-
-  importInclude = p: import p { inherit spec; };
-
-  compileCC = attrs:
-    tool.compileCC (attrs // {
-      systemIncludes =
-       (attrs.systemIncludes or []) ++
-       (importInclude ../base/include) ++
-       [ ./include ];
-    });
-
-  callComponent' = callComponent {
-    inherit compileCC;
-  };
-  importComponent = path: callComponent' (import path);
-
+  callComponent' = callComponent
+    { compileCC = tool.addIncludes gemsIncludes (baseIncludes ++ osIncludes) tool.compileCC; };
 in
-{
-  server.terminal = importComponent ./src/server/terminal;
-}
+builtins.removeAttrs (tool.loadExpressions callComponent' ./src) [ "lib" ]

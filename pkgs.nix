@@ -11,6 +11,7 @@
 }:
 
 let
+  includes = import ./include.nix { inherit spec; };
 
   # Link a component with ldso from libs.
   linkComponent = args:
@@ -28,7 +29,8 @@ let
         (tool // libs // { inherit spec linkComponent; } // extraAttrs)
     );
 
-  importPkgs = p: import p { inherit spec tool callComponent; };
+  importPkgs = p: import p
+   ({ inherit spec tool callComponent; } // includes);
 
 in
 tool.mergeSets ([ { inherit libs; } ] ++ (
