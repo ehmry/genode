@@ -6,6 +6,6 @@ linkSharedLibrary {
   objects = [(compileCC {
     src = ./plugin.cc;
     libs = [ libc env ];
-    includes = [ ../../../../libports/src/lib/libc ];
+    includes = [ ../../../../libports/src/lib/libc ../../../../libports/include ];
   })];
 }

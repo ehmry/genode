@@ -1,9 +1,10 @@
 { linkComponent, compileCC, filterHeaders
-, base, alarm, config }:
+, base, alarm, config, libc_noux }:
 
-linkComponent rec {
+let libs = [ base alarm config ]; in
+linkComponent {
   name = "noux";
-  libs = [ base alarm config ];
+  libs = libs ++ [ libc_noux ];
   objects = map
     ( src: compileCC {
         inherit src libs;
