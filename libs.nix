@@ -32,7 +32,7 @@ let
       (repo: import (./repos + "/${repo}/libs.nix")
         ({ inherit spec tool callLibrary; } // includes)
       )
-      [ "base" "os" "demo" "libports" "ports" "dde_ipxe" ]
+      [ "base" "os" "demo" "libports" "ports" "dde_ipxe" "gems" ]
   );
 
   libs = libs' // {
