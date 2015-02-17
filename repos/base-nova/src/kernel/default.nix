@@ -29,7 +29,7 @@ stdenv.mkDerivation rec {
       makeFlagsArray=(INS_DIR=$out)
     '';
 
-  passthru.args = [ "iommu" "serial" ];
+  passthru = { name = "hypervisor"; args = [ "iommu" "serial" ]; };
 
   postInstall = "mv $out/hypervisor-x86_?? $out/hypervisor";
 }
