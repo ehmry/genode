@@ -20,7 +20,7 @@ linkSharedLibrary rec {
     extraFlags =
       [ "-DHAVE_CONFIG_H" "-DPNG_CONFIGURE_LIBPNG" ];
 
-    includes = [ ../libpng ];
+    externalIncludes = [ ../libpng ];
   };
 
   propagate.externalIncludes =
