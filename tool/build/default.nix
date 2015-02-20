@@ -142,6 +142,7 @@ rec {
       script = ./compile-c.sh;
       relative = builtins.attrNames  mappings;
       absolute = builtins.attrValues mappings;
+      externalIncludes = args'.externalIncludes or [] ++ stdAttrs.nativeIncludes;
     }
   );
 
