@@ -9,45 +9,56 @@ let
     (component.runtime.libs or []) ++
     runtimeLibs (builtins.tail components);
 
-  scenarios = map
+  cfgs = map
     (name:
       let
         scenario = builtins.getAttr name config.boot.genode.scenarios;
-        genodePkgs = import ./pkgs.nix { system = scenario.system; };
+        genodePkgs = import ./pkgs.nix { inherit (scenario) system; };
         kernel = genodePkgs.kernel;
         componentModules = scenario.romModules genodePkgs;
         romModules = componentModules ++ (runtimeLibs componentModules);
+
+        fileSet = import (pkgs.stdenv.mkDerivation {
+          name = "${name}-boot-files";
+          prefix = name;
+          inherit (scenario) config;
+          builder = builtins.toFile "boot-files-builder.sh"
+            ''
+              source $stdenv/setup
+              format="\"$prefix/%f\"=\"%p\";"
+              config="\"$prefix/config\"=\"$config\";"
+              echo {$config$(find $romModules -type f -printf $format)} > $out
+            '';
+          romModules = [ genodePkgs.init ] ++ romModules;
+        }) // (builtins.listToAttrs (map
+	  (fn: { name = "${name}/${fn}"; value = builtins.getAttr fn scenario.extraFiles; })
+          (builtins.attrNames scenario.extraFiles)
+	));
+
         moduleLines = map
-		  (name: " module @bootRoot@${name} ${name}\n")
-          ( (map (m: m.name) romModules) ++
-            (builtins.attrNames scenario.extraFiles or {})
-          );
+          (file: "module @bootRoot@${file} ${baseNameOf file}\n")
+          (attrNames fileSet);
       in
       { grubEntry =
           ''
             menuentry "Genode - ${name}" {
-              multiboot @bootRoot@${kernel.name} ${toString kernel.args}
-              module @bootRoot@core core
-              module @bootRoot@config config
-              module @bootRoot@init init
+              multiboot @bootRoot@${name}/${kernel.image} ${toString kernel.args}
+	      module @bootRoot@${name}/core core
             ${toString moduleLines}
             }
           '';
-
-        grubFileList =
-          [ { name = "config"; value = scenario.config; } ] ++
-          (map
-            (m: { name = m.name; value = "${m}/${m.name}"; })
-            (romModules ++ [ genodePkgs.kernel genodePkgs.core genodePkgs.init ])
-          );
+        files =
+          { "${name}/${kernel.image}" = "${kernel}/${kernel.image}";
+            "${name}/core" = "${genodePkgs.core}/core";
+          } // fileSet;
       }
     )
     (builtins.attrNames config.boot.genode.scenarios);
 
-  extraFiles = scenarios:
-    let scenario = builtins.head scenarios; in
-    if scenarios == [] then {} else
-    (scenario.extraFiles or {}) // (extraFiles (builtins.tail scenarios));
+  mergeFiles = cfgs:
+    let cfg = builtins.head cfgs; in
+    if cfgs == [] then {} else
+    cfg.files // (mergeFiles (builtins.tail cfgs));
 in
 {
   options = {
@@ -75,14 +86,10 @@ in
   };
 
   config = {
-
     boot.loader.grub =
-      #if config.boot.loader.grub.version != 2 then throw "Genode is only supported with GRUB 2" else
-      { extraEntries = toString (map (s: s.grubEntry) scenarios);
-        extraFiles =
-          (extraFiles scenarios)
-          //
-          (builtins.listToAttrs (builtins.concatLists (map (s: s.grubFileList) scenarios)));
+      { extraEntries = toString (map (cfg: cfg.grubEntry) cfgs);
+        extraFiles = mergeFiles cfgs;
+        extraPrepareConfig = toString (map (subdir: "mkdir -p /boot/"+subdir) (builtins.attrNames config.boot.genode.scenarios));
       };
   };
 }
