@@ -1,43 +1,26 @@
-{ linkComponent, compileCC, transformBinary
+{ linkComponent, compileCC, transformBinary, fromDir
 , launchpad, scout_widgets, libpng_static }:
 
-let
-  demoInclude = ../../../include;
-
-  compileCC' = src: compileCC {
-    inherit src;
-    extraFlags = [ "-DPNG_USER_CONFIG" ];
-
-    includes =
-      [ ../../../include/libpng_static
-        ../../../include/libz_static
-        ../../../include/mini_c
-      ];
-  # [ ../scout
-  #   (demoInclude + "/libpng_static")
-  #
-  # ];
-  };
-in
-linkComponent {
+linkComponent rec {
   name = "scout";
   libs = [ launchpad scout_widgets libpng_static ];
 
   objects =
-    ( map compileCC'
+    ( map
+        (src: compileCC { inherit src libs; })
         [ ./main.cc
           ./about.cc ./browser_window.cc ./doc.cc
           ./launcher.cc ./navbar.cc ./png_image.cc
         ]
     ) ++
     ( map transformBinary
-      (  ( map (fn: (./data + "/${fn}"))
-            [ "ior.map" "cover.rgba" "forward.rgba" "backward.rgba"
-              "home.rgba" "index.rgba" "about.rgba" "pointer.rgba"
-              "nav_next.rgba" "nav_prev.rgba"
-            ]
+      ( (fromDir ./data
+           [ "ior.map" "cover.rgba" "forward.rgba" "backward.rgba"
+             "home.rgba" "index.rgba" "about.rgba" "pointer.rgba"
+             "nav_next.rgba" "nav_prev.rgba"
+           ]
         ) ++
-        ( map (fn: (../../../doc/img + "/${fn}"))
+        (fromDir ../../../doc/img
            [ "genode_logo.png" "launchpad.png" "liquid_fb_small.png"
              "setup.png" "x-ray_small.png"
            ]

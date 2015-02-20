@@ -1,12 +1,12 @@
 { linkStaticLibrary, compileC, compileCC }:
 
 let
-  includes = [ ../../../include/mini_c ];
+  externalIncludes = [ ../../../include/mini_c ];
 in
 linkStaticLibrary {
   name = "mini_c";
   objects =
-    (map (src: compileCC { inherit src includes; })
+    (map (src: compileCC { inherit src externalIncludes; })
       [ ./abort.cc       ./atol.cc
         ./malloc_free.cc ./memcmp.cc
         ./memset.cc
@@ -17,8 +17,8 @@ linkStaticLibrary {
     ) ++
     [ (compileC {
         src = ./mini_c.c;
-        inherit includes;
+        inherit externalIncludes;
       })
     ];
-  propagate = { inherit includes; };
+  propagate = { inherit externalIncludes; };
 }
