@@ -3,7 +3,7 @@
 # \author Alexander Boettcher
 #
 
-{ tool, run, pkgs, runtime }:
+{ tool, runtime, pkgs }:
 
 
 #if {
@@ -16,17 +16,10 @@
 
 if tool.genodeEnv.spec.kernel != "nova" then null else
 
-run rec {
+runtime.test {
   name = "affinity";
 
-  contents = [
-    { target = "/"; source = pkgs.test.affinity; }
-    { target = "/config";
-      source = runtime.mkInitConfig {
-        inherit name; components = [ pkgs.test.affinity ];
-      };
-    }
-  ];
+  components = [ pkgs.test.affinity ];
 
   testScript = ''
 if {[is_qemu_available]} {
@@ -34,7 +27,7 @@ if {[is_qemu_available]} {
 	set want_cpus_y 1
 	set want_cpus_total [expr $want_cpus_x*$want_cpus_y]
 	set rounds "03"
-	append qemu_args "-nographic -m 64 -smp $want_cpus_total,cores=$want_cpus_total "
+	append qemu_args "-m 64 -smp $want_cpus_total,cores=$want_cpus_total "
 } else {
 	set rounds "10"
 	if {[have_spec x86]} { set rounds "40" }

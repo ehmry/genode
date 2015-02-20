@@ -8,6 +8,8 @@ proc run_genode_until {{wait_for_re forever} {timeout_value 0} {running_spawn_id
 	}
 
 	global qemu qemu_args disk_image
-	spawn $qemu $qemu_args -cpu core2duo -serial mon:stdio -cdrom $disk_image
+	eval "spawn $qemu $qemu_args -cpu core2duo -serial mon:stdio"
 	wait_for_output $wait_for_re $timeout_value $spawn_id
 }
+
+proc is_qemu_available {} { return 1 }

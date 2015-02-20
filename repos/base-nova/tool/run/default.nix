@@ -60,7 +60,11 @@ derivation {
   userScript =
     ''
       #!${nixpkgs.expect}/bin/expect
-      set disk_image ${diskImage}
+      set kernel ${pkgs.kernel.name}
+      set kernel_args ${pkgs.kernel.args}
+
+      set system_image ${systemImage}
+
       source ${ ../../../../tool/run}
       source ${./nova.exp}
 

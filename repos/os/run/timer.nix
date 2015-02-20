@@ -4,26 +4,13 @@
  * \date   2012-05-29
  */
 
-{ run, pkgs, runtime }:
+{ runtime, pkgs, ... }:
 
-with pkgs;
-
-run rec {
+runtime.test {
   name = "timer";
 
-  contents = [
-    { target = "/"; source = drivers.timer; }
-    { target = "/"; source = test.timer; }
-    { target = "/config";
-      source = runtime.mkInitConfig {
-        inherit name; components = [ drivers.timer test.timer ];
-      };
-    }
-  ];
+  components = with pkgs;
+    [ drivers.timer test.timer ];
 
-  testScript =
-    ''
-      run_genode_until "--- timer test finished ---" 60
-    '';
-
+  testScript = "run_genode_until \"--- timer test finished ---\" 60";
 }

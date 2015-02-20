@@ -1,7 +1,8 @@
 { tool, requires, mkInitConfig, pkgs
 , platformFunc, platformBuild, platformSetup }:
 
-{ name, components, testScript, automatic ? true, graphical ? false }:
+{ name, components, config ? null
+, testScript, automatic ? true, graphical ? false }:
 
 let
   topInit = mkInitConfig { inherit name components; };
@@ -11,20 +12,19 @@ let
     inherit (pkgs.core) runtime;
   };
 
-  contents =
-    (map
-      (c: { target = "/"; source = c; })
-      (components ++ [ pkgs.core pkgs.init ])
-    ) ++
-    [ { target = "/config";
-        source = topInit;
-      }
-    ];
+  runtimeLibs = components:
+    let component = builtins.head components; in
+    if components == [] then [] else
+    (component.runtime.libs or []) ++
+    runtimeLibs (builtins.tail components);
+
+  automatic = !graphical && automatic;
+
 in
 if outstanding != []
 then throw "${name} test is missing servers for '${toString outstanding}'"
 else
-derivation (platformFunc { inherit name contents; } // {
+derivation (platformFunc { inherit name; } // {
   name = name+"-test";
   system = builtins.currentSystem;
   preferLocalBuild = true;
@@ -37,4 +37,7 @@ derivation (platformFunc { inherit name contents; } // {
 
   inherit automatic graphical platformBuild platformSetup testScript;
   inherit (tool.nixpkgs) expect;
+
+  components = components ++ (runtimeLibs components) ++ [ pkgs.libs.ld ];
+  config = if config != null then config else topInit;
 })

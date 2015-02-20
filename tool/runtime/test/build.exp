@@ -10,13 +10,16 @@ proc strip_hash {store_name} {
 #
 # Variables from the Nix expression.
 #
-set out  $env(out)
-set name $env(name)
-set graphical $env(graphical)
 set setup $env(setup)
 set platform_build $env(platformBuild)
 set platform_setup $env(platformSetup)
 set test_script $env(testScript)
+set graphical $env(graphical)
+
+set out  $env(out)
+set name $env(name)
+set components $env(components)
+set config $env(config)
 
 exec mkdir -p $out/bin $out/nix-support
 set hydra_build_products [ open $out/nix-support/hydra-build-products w]

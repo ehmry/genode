@@ -45,22 +45,22 @@ rec {
     derivation {
       name = name+".xml";
       system = builtins.currentSystem;
-      builder = "${nixpkgs.bash}/bin/sh";
-      args =
-        [ "-c"
-          ''
-            echo $xml | \
-            ${nixpkgs.libxslt}/bin/xsltproc $stylesheet - | \
-            ${nixpkgs.gnused}/bin/sed '/<?/d' > $out
-          ''
-        ];
-
-      stylesheet = ./nix-conversion.xsl;
 
       xml = builtins.toXML
         { parent-provides = requires';
           children = map startChild components;
         };
+
+      builder = "${nixpkgs.bash}/bin/sh";
+      args =
+        [ "-c"
+          ''
+            echo $xml| \
+            ${nixpkgs.libxslt}/bin/xsltproc ${./nix-conversion.xsl} - | \
+            ${nixpkgs.gnused}/bin/sed '/<?/d' > $out
+          ''
+        ];
+
     } // { runtime.requires = requires'; };
     # Requires is for checking for outstanding service requirements later.
 

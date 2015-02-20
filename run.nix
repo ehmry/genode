@@ -10,10 +10,9 @@
 , pkgs ? import ./pkgs.nix { inherit system spec tool; }
 }:
 
-let
-  linuxRun = import ./repos/base-linux/tool/run { inherit tool pkgs; };
-  novaRun  = import ./repos/base-nova/tool/run  { inherit tool pkgs; };
+with builtins;
 
+let
   run =
       if system == "i686-linux" then linuxRun else
       if system == "x86_64-linux" then linuxRun else
@@ -21,45 +20,40 @@ let
       if system == "x86_64-nova" then novaRun else
       abort "no run environment for ${system}";
 
+  # The new rutime tools.
+  runtime = import ./tool/runtime { inherit spec tool pkgs; };
+
   callRun = f:
     f (builtins.intersectAttrs
         (builtins.functionArgs f)
-        { inherit spec tool run pkgs;
-          runtime = import ./tool/runtime { inherit spec tool pkgs; };
-        }
+        { inherit spec tool run runtime pkgs; }
       );
 
-  importRun = p: callRun (import p);
-
   hasSuffixNix = tool.hasSuffix ".nix";
+  dropNix = tool.dropSuffix ".nix";
+
+  repos = readDir ./repos;
+  import' = p: callRun (import p);
+
 in
-builtins.listToAttrs (builtins.concatLists (map
-  (dir:
+listToAttrs (filter (x: x != null) (concatLists (map
+  (repo:
     let
-      dir' = dir + "/run";
-      set = builtins.readDir dir';
+      runDirName = ./repos + "/${repo}/run";
+      runDir =
+        if pathExists runDirName
+        then readDir runDirName
+        else {};
     in
-    builtins.filter (x: x != null) (map
+    map
       (fn:
-        if hasSuffixNix fn then
-          { name = tool.replaceInString ".nix" "" fn;
-            value = importRun (dir'+"/${fn}");
-          }
+        let type = getAttr fn runDir; in
+        if type == "regular" && hasSuffixNix fn
+        then { name = dropNix fn; value = import' (runDirName + "/${fn}"); }
         else null
       )
-      (builtins.attrNames set)
-    )
+      (attrNames runDir)
   )
+  (attrNames repos)
+)))
 
-  ([ ./repos/base
-     ./repos/os
-     ./repos/libports
-     ./repos/ports
-     ./repos/dde_oss
-  ] ++
-  ( if spec.isLinux then [ ./repos/base-linux ] else
-    if spec.isNOVA  then [ ./repos/base-nova  ] else
-   [ ]
-  ))
-
-))

@@ -1,11 +1,22 @@
-# Put derivation variables in scope.
-set system_image $env(systemImage)
+file link $out/core $env(core)/core
+file link $out/init $env(init)/init
+file link $out/config $env(config)
 
-puts $user_script "set system_image $system_image"
+foreach component $env(components) {
+	if [file isdirectory $component] then {
+		foreach file [glob $component/*] {
+			file link $out/[file tail $file] $file
+		}
+	} else {
+		set basename [strip_hash $component]
+		file link $out/$basename $component
+	}
+}
+
 puts $user_script "source $platform_setup"
+puts $user_script "cd $out"
 puts $user_script $test_script
 
 close $user_script
 
-# Link the system image for later reference.
-exec ln -s $system_image $out/image
+cd $out
