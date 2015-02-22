@@ -11,24 +11,24 @@ let
       "-Ddebug_lib=7"
     ];
 
-  includes = [ ./include ../../../include ];
-  externalIncludes = fromIpxe
-    [ ""
-      "${ipxeSrc}/include"
-      "${ipxeSrc}/arch/x86/include"
-    ] ++
-    ( if spec.isi686 then
-        [ "${ipxeSrc}/arch/i386/include"
-          "${ipxeSrc}/arch/i386/include/pcbios"
-        ] else
-      if spec.isx86_64 then
-        [ "${ipxeSrc}/arch/x86_64/include"
-          "${ipxeSrc}/arch/x86_64/include/efi"
-          "${ipxeSrc}/arch/i386/include"
-
-        ] else
-      throw "no dde_ipxe_nic expression for ${spec.system}"
-    );
+  externalIncludes =
+    [ ./include ] ++
+    (fromIpxe (
+      [ ""
+        "include"
+        "arch/x86/include"
+      ] ++
+      ( if spec.isi686 then
+          [ "arch/i386/include"
+            "arch/i386/include/pcbios"
+          ] else
+        if spec.isx86_64 then
+          [ "arch/x86_64/include"
+            "arch/x86_64/include/efi"
+            "arch/i386/include"
+          ] else
+        throw "no dde_ipxe_nic expression for ${spec.system}"
+      )));
 
     sources =
       [ "arch/x86/core/x86_string.c"
@@ -48,12 +48,12 @@ linkStaticLibrary {
   inherit libs;
 
   objects = map
-    (src: compileC { inherit src libs extraFlags includes externalIncludes; })
+    (src: compileC { inherit src libs extraFlags externalIncludes; })
     [ ./nic.c ./dde.c ./dummies.c ];
 
   externalObjects = compileCRepo (
     { sources = fromIpxe sources;
-      inherit libs extraFlags includes externalIncludes;
+      inherit libs extraFlags externalIncludes;
     } // builtins.listToAttrs (
       map
         (s:

@@ -1,4 +1,5 @@
-{ spec, tool, callLibrary, ... }:
+{ spec, tool, callLibrary
+, baseIncludes, osIncludes, ... }:
 
 let
 
@@ -11,7 +12,14 @@ let
         (builtins.attrNames p)
     );
 
-  importLibrary = path: callLibrary ports (import path);
+  addIncludes' = tool.addIncludes [ ./include ] (baseIncludes ++ osIncludes);
+
+  importLibrary = path: callLibrary
+    (ports //
+    { compileC  =  addIncludes' tool.compileC;
+      compileCRepo =  addIncludes' tool.compileCRepo;
+      compileCC =  addIncludes' tool.compileCC;
+    }) (import path);
 
 in {
   dde_ipxe_support = importLibrary ./src/lib/dde_ipxe/dde_support.nix;
