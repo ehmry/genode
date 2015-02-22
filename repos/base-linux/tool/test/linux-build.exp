@@ -1,22 +1,25 @@
-file link $out/core $env(core)/core
-file link $out/init $env(init)/init
-file link $out/config $env(config)
+file mkdir $out/image
+
+file link $out/image/core $env(core)/core
+file link $out/image/init $env(init)/init
+file link $out/image/config $config
 
 foreach component $env(components) {
 	if [file isdirectory $component] then {
 		foreach file [glob $component/*] {
-			file link $out/[file tail $file] $file
+			set bn [file tail $file]
+			file link $out/image/$bn $file
 		}
 	} else {
-		set basename [strip_hash $component]
-		file link $out/$basename $component
+		set bn [strip_hash $component]
+		file link $out/image/$b $component
 	}
 }
 
 puts $user_script "source $platform_setup"
-puts $user_script "cd $out"
+puts $user_script "cd $out/image"
 puts $user_script $test_script
 
 close $user_script
 
-cd $out
+cd $out/image

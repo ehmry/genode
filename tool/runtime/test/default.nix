@@ -35,7 +35,8 @@ derivation (platformFunc { inherit name; } // {
 
   setup = ./setup.exp;
 
-  inherit automatic graphical platformBuild platformSetup testScript;
+  automatic = automatic && !graphical;
+  inherit graphical platformBuild platformSetup testScript;
   inherit (tool.nixpkgs) expect;
 
   components = components ++ (runtimeLibs components) ++ [ pkgs.libs.ld ];
