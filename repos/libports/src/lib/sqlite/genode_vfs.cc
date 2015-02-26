@@ -20,6 +20,7 @@
 #include <file_system_session/connection.h>
 #include <rtc_session/connection.h>
 #include <timer_session/connection.h>
+#include <util/string.h>
 
 /* jitterentropy includes */
 namespace Jitter {
@@ -32,19 +33,13 @@ extern "C" {
 namespace Sqlite {
 
 
+/* Use string operations without qualifier. */
+using namespace Genode;
+
+
 /* Sqlite includes */
 extern "C" {
 #include <sqlite3.h>
-}
-
-extern "C" {
-#include <string.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/file.h>
-#include <sys/param.h>
-#include <unistd.h>
-#include <errno.h>
 }
 
 
@@ -71,7 +66,6 @@ unsigned julian_day(Rtc::Timestamp ts)
 
 
 #define NOT_IMPLEMENTED PWRN("Sqlite::%s not implemented", __func__);
-
 
 static Timer::Connection _timer;
 static Jitter::rand_data *_jitter;
@@ -153,7 +147,12 @@ static int genode_delete(sqlite3_vfs *pVfs, const char *pathname, int dirSync)
 		File_system::Dir_handle dh = st->dir_of(pathname);
 		st->fs.unlink(dh, basename(pathname));
 	}
-	catch (...) { return SQLITE_IOERR_DELETE; }
+	catch (File_system::Lookup_failed) {
+		return SQLITE_IOERR_DELETE_NOENT;
+	}
+	catch (...) {
+		return SQLITE_IOERR_DELETE;
+	}
 	return SQLITE_OK;
 }
 
@@ -170,9 +169,7 @@ static int genode_close(sqlite3_file *pFile)
 			File_system::Dir_handle dh = p->st->dir_of(&p->delete_path[0]);
 			p->st->fs.unlink(dh, basename(&p->delete_path[0]));
 		}
-		catch (File_system::Lookup_failed) {
-			return SQLITE_IOERR_DELETE_NOENT;
-		}
+		catch (File_system::Lookup_failed) { }
 		catch (...) {
 			return SQLITE_IOERR_DELETE;
 		}
@@ -209,9 +206,7 @@ static int genode_write(sqlite3_file *pFile, const void *buf, int count, sqlite_
 		source.submit_packet(packet);
 		source.get_acked_packet();
 	}
-	catch (...) {
-		rc = SQLITE_IOERR_WRITE;
-	}
+	catch (...) { rc = SQLITE_IOERR_WRITE; }
 
 	source.release_packet(packet);
 	return rc;
@@ -268,7 +263,10 @@ static int genode_sync(sqlite3_file *pFile, int flags)
 
 	/* Should sync at the file, but this is the best we can do for now. */
 	try { p->st->fs.sync(); }
-	catch (...) { return SQLITE_IOERR_FSYNC; }
+	catch (...) {
+		PERR("SQLite::%s failed", __func__);
+		return SQLITE_IOERR_FSYNC;
+	}
 	return SQLITE_OK;
 }
 
@@ -331,7 +329,7 @@ static int random_string(char *buf, int len)
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		"0123456789";
 
-	if (genode_randomness(NULL, len, buf)  != (len))
+	if (genode_randomness(0, len, buf)  != (len))
 		return -1;
 
 	for(int i=0; i <len; i++) {
@@ -381,11 +379,11 @@ static int genode_open(
 		#define TEMP_LEN 24
 
 		char *s = &p->delete_path[0];
-		strcpy(s, TEMP_PREFIX);
+		strncpy(s, TEMP_PREFIX, sizeof(TEMP_PREFIX));
 
-		if (random_string(s + sizeof(TEMP_PREFIX)-1, TEMP_LEN-(sizeof(TEMP_PREFIX)))) {
+		if (random_string(s + sizeof(TEMP_PREFIX)-1, TEMP_LEN-(sizeof(TEMP_PREFIX))))
 			return SQLITE_ERROR;
-		}
+
 		p->delete_path[TEMP_LEN-1] = '\0';
 
 		name = (const char*)s;
@@ -441,17 +439,17 @@ static int genode_access(sqlite3_vfs *pVfs, const char *path, int flags, int *pR
 
 static int genode_full_pathname(sqlite3_vfs *pVfs, const char *path_in, int out_len, char *path_out)
 {
-	char dir[File_system::MAX_PATH_LEN];
-	if (path_in[0]=='/') {
+	/*
+	 * No support for current working directory,
+	 * do as our libc does and work from /.
+	 */
+	if (path_in[0]=='/')
 		strncpy(path_out, path_in, out_len);
-	} else {
-		if (getcwd(dir, sizeof(dir)) == 0)
-			return SQLITE_IOERR;
-		if (strcmp(dir, "/") == 0)
-			sqlite3_snprintf(out_len, path_out, "/%s", path_in);
-		else
-			sqlite3_snprintf(out_len, path_out, "%s/%s", dir, path_in);
+	else {
+		path_out[0] = '/';
+		strncpy(path_out+1, path_in, out_len-1);
 	}
+
 	path_out[out_len-1] = '\0';
 	return SQLITE_OK;
 }
@@ -585,7 +583,7 @@ int sqlite3_os_init(void)
 		2,                         /* iVersion */
 		sizeof(Genode_file),       /* szOsFile */
 		File_system::MAX_PATH_LEN, /* mxPathname */
-		NULL,                      /* pNext */
+		0,                      /* pNext */
 		VFS_NAME,                  /* zName */
 		st,                        /* pAppData */
 		genode_open,               /* xOpen */
@@ -599,7 +597,7 @@ int sqlite3_os_init(void)
 		genode_randomness,         /* xRandomness */
 		genode_sleep,              /* xSleep */
 		genode_current_time,       /* xCurrentTime */
-		NULL,                      /* xGetLastError */
+		0,                      /* xGetLastError */
 		genode_current_time_int64, /* xCurrentTimeInt64 */
 	};
 
