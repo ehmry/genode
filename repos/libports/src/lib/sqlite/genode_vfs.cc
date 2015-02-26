@@ -6,11 +6,10 @@
  * In this file VFS refers to the SQLite VFS, not the Genode VFS.
  * See http://sqlite.org/vfs.html for more information.
  *
- * Filesystem calls wrap our libC, clock and timer calls use native
- * service sessions, and there is no file locking support.
- *
- * The filesystem interface is unoptimized and just simple
- * enough to meet the minimum requirements for a legacy VFS.
+ * This implementation of sqlite3_io_methods only meets the first
+ * version of that interface. Implementing the shared memory I/O
+ * methods of the second version should increase performance.
+ * https://www.sqlite.org/c3ref/io_methods.html
  */
 
 /* Genode includes */
@@ -115,12 +114,11 @@ struct Fs_state
 				break;
 
 		if (i) {
-			char s[i];
+			char s[++i];
 			memcpy(s, path, i-1);
 			s[i] = '\0';
 			return fs.dir(s, create);
 		}
-
 		return fs.dir("/", create);
 	}
 };
@@ -416,7 +414,27 @@ static int genode_open(
 
 static int genode_access(sqlite3_vfs *pVfs, const char *path, int flags, int *pResOut)
 {
-	NOT_IMPLEMENTED
+	using namespace File_system;
+	Fs_state *st = (Fs_state*)pVfs->pAppData;
+
+	File_system::Dir_handle dh;
+	File_system::File_handle fh;
+	File_system::Mode mode;
+	switch (flags) {
+	case SQLITE_ACCESS_EXISTS:    mode = STAT_ONLY;  break;
+	case SQLITE_ACCESS_READWRITE: mode = READ_WRITE; break;
+	case SQLITE_ACCESS_READ:      mode = READ_ONLY;  break;
+	}
+	try {
+		dh = st->dir_of(path);
+		fh = st->fs.file(dh, basename(path), mode, false);
+		*pResOut = true;
+	}
+	catch (...) {
+		st->fs.close(fh);
+		st->fs.close(dh);
+		*pResOut = false;
+	}
 	return SQLITE_OK;
 }
 
