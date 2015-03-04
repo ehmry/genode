@@ -18,8 +18,6 @@ let
     (component.runtime.libs or []) ++
     runtimeLibs (builtins.tail components);
 
-  automatic = !graphical && automatic;
-
 in
 if outstanding != []
 then throw "${name} test is missing servers for '${toString outstanding}'"
