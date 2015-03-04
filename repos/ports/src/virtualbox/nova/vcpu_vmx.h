@@ -102,7 +102,7 @@ class Vcpu_handler_vmx : public Vcpu_handler
 			Genode::Thread_base *myself = Genode::Thread_base::myself();
 			Nova::Utcb *utcb = reinterpret_cast<Nova::Utcb *>(myself->utcb());
 
-			unsigned const dubious = utcb->inj_info | utcb->inj_error |
+			unsigned const dubious = utcb->inj_info |
 			                         utcb->intr_state | utcb->actv_state;
 			if (dubious)
 				Vmm::printf("%s - dubious - inj_info=0x%x inj_error=%x"
@@ -135,6 +135,8 @@ class Vcpu_handler_vmx : public Vcpu_handler
 				&This::_vmx_default> (exc_base, Mtd::ALL | Mtd::FPU);
 			register_handler<VMX_EXIT_INT_WINDOW, This,
 				&This::_vmx_irqwin> (exc_base, Mtd::ALL | Mtd::FPU);
+			register_handler<VMX_EXIT_TASK_SWITCH, This,
+				&This::_vmx_default> (exc_base, Mtd::ALL | Mtd::FPU);
 			register_handler<VMX_EXIT_CPUID, This,
 				&This::_vmx_default> (exc_base, Mtd::ALL | Mtd::FPU);
 			register_handler<VMX_EXIT_HLT, This,

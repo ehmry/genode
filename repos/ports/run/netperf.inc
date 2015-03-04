@@ -4,17 +4,29 @@
 # \date   2013-04-18
 #
 
-if {[is_qemu_available]} {
+if {[have_include "power_on/qemu"]} {
 	puts "\nNetperf running on Qemu is not recommended.\n"
 	exit
 }
 
-set use_usb_driver      [expr [have_spec omap4] || [have_spec exynos5] || [have_spec platform_rpi]]
-set use_nic_driver      [expr !$use_usb_driver && ![have_spec platform_imx53]]
+if {[have_spec hw_odroid_xu]} {
+	puts "Run script does not support this platform."
+	exit 0
+}
+
+set use_usb_driver      [expr [have_spec omap4] || [have_spec platform_arndale] || [have_spec platform_rpi]]
+set use_nic_driver      [expr !$use_usb_driver && ![have_spec platform_imx53] && !$use_wifi_driver]
 set use_platform_driver [expr [have_spec platform_arndale] || [have_spec platform_imx53] || [have_spec platform_rpi]]
 
-if {[expr !$use_usb_driver && !$use_nic_driver]} {
+if {[expr !$use_usb_driver && !$use_nic_driver && !$use_wifi_driver]} {
 	puts "\n Run script is not supported on this platform. \n"; exit 0 }
+
+# provide wifi related variables in case we do not use the wifi driver
+if {!$use_wifi_driver} {
+	set wifi_ssid ""
+	set wifi_bssid ""
+	set wifi_psk ""
+}
 
 #
 # Build
@@ -44,23 +56,32 @@ if {$wrong_version} {
 set packet_size 1024
 set netperf_tests "TCP_STREAM TCP_MAERTS"
 
-# start run script generation 
+# start run script generation
 
 if {$use_usb_driver}    { set network_driver "usb_drv" }
 if {$use_nic_driver}    { set network_driver "nic_drv" }
+if {$use_wifi_driver}   { set network_driver "wifi_drv" }
 
 set build_components {
 	core init
-	drivers/pci drivers/timer drivers/nic
+	drivers/pci drivers/timer
 }
 
 append     build_components     " $netperf_target "
+lappend_if $use_nic_driver      build_components drivers/nic
 lappend_if $use_usb_driver      build_components drivers/usb
 lappend_if $use_platform_driver build_components drivers/platform
 lappend_if $use_nic_bridge      build_components server/nic_bridge
 lappend_if [have_spec acpi]     build_components drivers/acpi
 lappend_if [have_spec pci]      build_components drivers/pci/device_pd
 lappend_if [have_spec gpio]     build_components drivers/gpio
+
+append_if $use_wifi_driver      build_components {
+	drivers/wifi
+	server/fs_rom
+	server/ram_fs
+	server/report_rom
+}
 
 build $build_components
 
@@ -148,9 +169,64 @@ append_if $use_nic_driver config {
 		<provides><service name="Nic"/></provides>
 	</start>}
 
+append_if $use_wifi_driver config {
+	<start name="report_rom">
+		<resource name="RAM" quantum="2M"/>
+		<provides> <service name="Report" /> <service name="ROM" /> </provides>
+		<config> <rom/> </config>
+	</start>
+	<start name="config_fs">
+		<binary name="ram_fs"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides> <service name="File_system"/> </provides>
+		<config>
+			<policy label="config_rom" root="/"/>
+			<policy label="wifi_drv -> config" root="/" writeable="yes"/>
+			<content>
+				<inline name="wlan_configuration">}
+append_if $use_wifi_driver config "
+<selected_network ssid=\"$wifi_ssid\" bssid=\"$wifi_bssid\" protection=\"WPA-PSK\" psk=\"$wifi_psk\"/>"
+append_if $use_wifi_driver config {
+				</inline>
+				<inline name="wpa_supplicant.conf"></inline>
+			</content>
+		</config>
+	</start>
+	<start name="config_rom">
+		<binary name="fs_rom"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="ROM"/></provides>
+		<route>
+			<service name="File_system"> <child name="config_fs" /> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="wifi_drv">
+		<resource name="RAM" quantum="32M"/>
+		<provides> <service name="Nic"/> </provides>
+		<config>
+			<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc">
+				<vfs>
+					<dir name="dev">
+						<log/> 
+						<jitterentropy name="random"/>
+						<jitterentropy name="urandom"/>
+					</dir>
+					<dir name="config"> <fs label="config"/> </dir>
+				</vfs>
+			</libc>
+		</config>
+		<route>
+			<service name="Rtc"> <any-child/> </service>
+			<service name="File_system"> <child name="config_fs"/> </service>
+			<service name="ROM"> <if-arg key="label" value="wlan_configuration" /> <child name="config_rom" /> </service>
+			<any-service> <parent/> <any-child /> </any-service>
+		</route>
+	</start>}
+
 append_if [have_spec acpi] config {
 	<start name="acpi">
-		<resource name="RAM" quantum="6M"/>
+		<resource name="RAM" quantum="16M" constrain_phys="yes"/>
 		<binary name="acpi_drv"/>
 		<provides>
 			<service name="PCI"/>
@@ -164,7 +240,7 @@ append_if [have_spec acpi] config {
 
 append_if [expr ![have_spec acpi] && [have_spec pci]] config {
 	<start name="pci_drv">
-		<resource name="RAM" quantum="3M"/>
+		<resource name="RAM" quantum="3M" constrain_phys="yes"/>
 		<provides> <service name="PCI"/> </provides>
 	</start> }
 
@@ -221,6 +297,19 @@ lappend_if $use_usb_driver           boot_modules usb_drv
 lappend_if $use_nic_driver           boot_modules nic_drv
 lappend_if [have_spec nova]          boot_modules pci_device_pd
 
+append_if $use_wifi_driver boot_modules {
+	ram_fs fs_rom report_rom
+	libcrypto.lib.so libssl.lib.so
+	wpa_driver_nl80211.lib.so wpa_supplicant.lib.so
+	vfs_jitterentropy.lib.so
+	wifi.lib.so wifi_drv
+
+	iwlwifi-6000-6.ucode
+	iwlwifi-6000g2a-6.ucode
+	iwlwifi-6000g2b-6.ucode
+	iwlwifi-7260-8.ucode
+}
+
 build_boot_image $boot_modules
 
 #
@@ -236,10 +325,10 @@ append_if [have_spec lan9118] qemu_args " -net nic,model=lan9118 "
 append qemu_args " -net user -redir tcp:12865::12865 -redir tcp:49153::49153 "
 
 run_genode_until {.*and family AF_INET.*} 30
-set serial_id $spawn_id
+set serial_id [output_spawn_id]
 
 set force_ports ""
-if [is_qemu_available] {
+if {[have_include "power_on/qemu"]} {
 	set ip_addr "localhost"
 	set force_ports "-P 49153,49153"
 } elseif [have_spec linux] {
@@ -286,7 +375,3 @@ foreach netperf_test $netperf_tests {
 	}
 	puts "              [lindex $throughput 1] MBit/s ok"
 }
-
-
-puts "\nTest succeeded"
-# vi: set ft=tcl :

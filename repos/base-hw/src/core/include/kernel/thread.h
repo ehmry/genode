@@ -44,8 +44,8 @@ class Kernel::Thread
 :
 	public Cpu::User_context,
 	public Object<Thread, MAX_THREADS, Thread_ids, thread_ids, thread_pool>,
-	public Cpu_job, public Cpu_domain_update, public Ipc_node,
-	public Signal_context_killer, public Signal_handler, public Thread_base
+	public Cpu_domain_update, public Ipc_node, public Signal_context_killer,
+	public Signal_handler, public Thread_base, public Cpu_job
 {
 	friend class Thread_event;
 
@@ -55,7 +55,7 @@ class Kernel::Thread
 
 		enum State
 		{
-			SCHEDULED                   = 1,
+			ACTIVE                      = 1,
 			AWAITS_START                = 2,
 			AWAITS_IPC                  = 3,
 			AWAITS_RESUME               = 4,
@@ -103,14 +103,24 @@ class Kernel::Thread
 		bool _core() const;
 
 		/**
-		 * Resume execution rawly
+		 * Switch from an inactive state to the active state
 		 */
-		void _schedule();
+		void _become_active();
 
 		/**
-		 * Pause execution rawly
+		 * Switch from the active state to the inactive state 's'
 		 */
-		void _unschedule(State const s);
+		void _become_inactive(State const s);
+
+		/**
+		 * Activate our CPU-share and those of our helpers
+		 */
+		void _activate_used_shares();
+
+		/**
+		 * Deactivate our CPU-share and those of our helpers
+		 */
+		void _deactivate_used_shares();
 
 		/**
 		 * Pause execution
@@ -225,6 +235,7 @@ class Kernel::Thread
 		void _call_bin_signal_context();
 		void _call_bin_signal_receiver();
 		void _call_new_vm();
+		void _call_bin_vm();
 		void _call_run_vm();
 		void _call_pause_vm();
 		void _call_access_thread_regs();
@@ -277,7 +288,7 @@ class Kernel::Thread
 		       char const * const label);
 
 		/**
-		 * Prepare thread to get scheduled the first time
+		 * Prepare thread to get active the first time
 		 *
 		 * \param cpu    targeted CPU
 		 * \param pd     targeted domain
@@ -294,6 +305,7 @@ class Kernel::Thread
 
 		void exception(unsigned const cpu);
 		void proceed(unsigned const cpu);
+		Cpu_job * helping_sink();
 
 
 		/***************

@@ -19,7 +19,6 @@
 /* core includes */
 #include <kernel/kernel.h>
 #include <kernel/thread.h>
-#include <kernel/vm.h>
 #include <kernel/irq.h>
 #include <platform_pd.h>
 #include <pic.h>
@@ -34,8 +33,8 @@ bool Thread::_core() const { return pd_id() == core_pd()->id(); }
 
 void Thread::_signal_context_kill_pending()
 {
-	assert(_state == SCHEDULED);
-	_unschedule(AWAITS_SIGNAL_CONTEXT_KILL);
+	assert(_state == ACTIVE);
+	_become_inactive(AWAITS_SIGNAL_CONTEXT_KILL);
 }
 
 
@@ -43,7 +42,7 @@ void Thread::_signal_context_kill_done()
 {
 	assert(_state == AWAITS_SIGNAL_CONTEXT_KILL);
 	user_arg_0(0);
-	_schedule();
+	_become_active();
 }
 
 
@@ -51,13 +50,13 @@ void Thread::_signal_context_kill_failed()
 {
 	assert(_state == AWAITS_SIGNAL_CONTEXT_KILL);
 	user_arg_0(-1);
-	_schedule();
+	_become_active();
 }
 
 
 void Thread::_await_signal(Signal_receiver * const receiver)
 {
-	_unschedule(AWAITS_SIGNAL);
+	_become_inactive(AWAITS_SIGNAL);
 	_signal_receiver = receiver;
 }
 
@@ -66,7 +65,7 @@ void Thread::_receive_signal(void * const base, size_t const size)
 {
 	assert(_state == AWAITS_SIGNAL && size <= _utcb_phys->size());
 	Genode::memcpy(_utcb_phys->base(), base, size);
-	_schedule();
+	_become_active();
 }
 
 
@@ -74,7 +73,8 @@ void Thread::_send_request_succeeded()
 {
 	assert(_state == AWAITS_IPC);
 	user_arg_0(0);
-	_schedule();
+	_state = ACTIVE;
+	if (!Cpu_job::own_share_active()) { _activate_used_shares(); }
 }
 
 
@@ -82,7 +82,8 @@ void Thread::_send_request_failed()
 {
 	assert(_state == AWAITS_IPC);
 	user_arg_0(-1);
-	_schedule();
+	_state = ACTIVE;
+	if (!Cpu_job::own_share_active()) { _activate_used_shares(); }
 }
 
 
@@ -90,7 +91,7 @@ void Thread::_await_request_succeeded()
 {
 	assert(_state == AWAITS_IPC);
 	user_arg_0(0);
-	_schedule();
+	_become_active();
 }
 
 
@@ -98,7 +99,7 @@ void Thread::_await_request_failed()
 {
 	assert(_state == AWAITS_IPC);
 	user_arg_0(-1);
-	_schedule();
+	_become_active();
 }
 
 
@@ -106,7 +107,7 @@ bool Thread::_resume()
 {
 	switch (_state) {
 	case AWAITS_RESUME:
-		_schedule();
+		_become_active();
 		return true;
 	case AWAITS_IPC:
 		Ipc_node::cancel_waiting();
@@ -125,32 +126,36 @@ bool Thread::_resume()
 
 void Thread::_pause()
 {
-	assert(_state == AWAITS_RESUME || _state == SCHEDULED);
-	_unschedule(AWAITS_RESUME);
+	assert(_state == AWAITS_RESUME || _state == ACTIVE);
+	_become_inactive(AWAITS_RESUME);
+}
+
+void Thread::_deactivate_used_shares()
+{
+	Cpu_job::_deactivate_own_share();
+	Ipc_node::for_each_helper([&] (Ipc_node * const h) {
+		static_cast<Thread *>(h)->_deactivate_used_shares(); });
+}
+
+void Thread::_activate_used_shares()
+{
+	Cpu_job::_activate_own_share();
+	Ipc_node::for_each_helper([&] (Ipc_node * const h) {
+		static_cast<Thread *>(h)->_activate_used_shares(); });
+}
+
+void Thread::_become_active()
+{
+	if (_state != ACTIVE) { _activate_used_shares(); }
+	_state = ACTIVE;
 }
 
 
-void Thread::_schedule()
+void Thread::_become_inactive(State const s)
 {
-	if (_state == SCHEDULED) { return; }
-	Cpu_job::_schedule();
-	_state = SCHEDULED;
-}
-
-
-void Thread::_unschedule(State const s)
-{
-	if (_state == SCHEDULED) { Cpu_job::_unschedule(); }
+	if (_state == ACTIVE) { _deactivate_used_shares(); }
 	_state = s;
 }
-
-
-Thread::Thread(unsigned const priority, unsigned const quota,
-               char const * const label)
-:
-	Cpu_job(priority, quota), Thread_base(this), _state(AWAITS_START), _pd(0),
-	_utcb_phys(0), _signal_receiver(0), _label(label)
-{ cpu_exception = RESET; }
 
 
 void Thread::init(Cpu * const cpu, Pd * const pd,
@@ -174,54 +179,25 @@ void Thread::init(Cpu * const cpu, Pd * const pd,
 		Genode::printf("\n");
 	}
 	/* start execution */
-	if (start) { _schedule(); }
+	if (start) { _become_active(); }
 }
 
 
-void Thread::_stop() { _unschedule(STOPPED); }
+void Thread::_stop() { _become_inactive(STOPPED); }
 
 
-void Thread::exception(unsigned const cpu)
-{
-	switch (cpu_exception) {
-	case SUPERVISOR_CALL:
-		_call();
-		return;
-	case PREFETCH_ABORT:
-		_mmu_exception();
-		return;
-	case DATA_ABORT:
-		_mmu_exception();
-		return;
-	case INTERRUPT_REQUEST:
-		_interrupt(cpu);
-		return;
-	case FAST_INTERRUPT_REQUEST:
-		_interrupt(cpu);
-		return;
-	case UNDEFINED_INSTRUCTION:
-		if (_cpu->retry_undefined_instr(&_lazy_state)) { return; }
-		PWRN("undefined instruction");
-		_stop();
-		return;
-	case RESET:
-		return;
-	default:
-		PWRN("unknown exception");
-		_stop();
-		return;
-	}
-}
+Cpu_job * Thread::helping_sink() {
+	return static_cast<Thread *>(Ipc_node::helping_sink()); }
 
 
 void Thread::_receive_yielded_cpu()
 {
-	if (_state == AWAITS_RESUME) { _schedule(); }
+	if (_state == AWAITS_RESUME) { _become_active(); }
 	else { PWRN("failed to receive yielded CPU"); }
 }
 
 
-void Thread::proceed(unsigned const cpu) { mtc()->continue_user(this, cpu); }
+void Thread::proceed(unsigned const cpu) { mtc()->switch_to_user(this, cpu); }
 
 
 char const * Kernel::Thread::pd_label() const
@@ -295,26 +271,26 @@ void Thread::_call_start_thread()
 	Thread * const thread = Thread::pool()->object(user_arg_1());
 	if (!thread) {
 		PWRN("failed to lookup  thread");
-		user_arg_0(0);
+		user_arg_0(-1);
 		return;
 	}
 	/* lookup CPU */
 	Cpu * const cpu = cpu_pool()->cpu(user_arg_2());
 	if (!cpu) {
 		PWRN("failed to lookup CPU");
-		user_arg_0(0);
+		user_arg_0(-2);
 		return;
 	}
 	/* lookup domain */
 	Pd * const pd = Pd::pool()->object(user_arg_3());
 	if (!pd) {
 		PWRN("failed to lookup domain");
-		user_arg_0(0);
+		user_arg_0(-3);
 		return;
 	}
 	/* start thread */
 	thread->init(cpu, pd, (Native_utcb *)user_arg_4(), 1);
-	user_arg_0((Call_ret)thread->_pd->translation_table());
+	user_arg_0(0);
 }
 
 
@@ -399,7 +375,7 @@ void Thread::_call_await_request_msg()
 		user_arg_0(0);
 		return;
 	}
-	_unschedule(AWAITS_IPC);
+	_become_inactive(AWAITS_IPC);
 }
 
 
@@ -408,14 +384,16 @@ void Thread::_call_send_request_msg()
 	Thread * const dst = Thread::pool()->object(user_arg_1());
 	if (!dst) {
 		PWRN("unknown recipient");
-		_unschedule(AWAITS_IPC);
+		_become_inactive(AWAITS_IPC);
 		return;
 	}
+	bool const help = Cpu_job::_helping_possible(dst);
 	void * buf_base;
 	size_t buf_size, msg_size;
 	_utcb_phys->message()->request_info(buf_base, buf_size, msg_size);
-	Ipc_node::send_request(dst, buf_base, buf_size, msg_size);
-	_unschedule(AWAITS_IPC);
+	_state = AWAITS_IPC;
+	Ipc_node::send_request(dst, buf_base, buf_size, msg_size, help);
+	if (!help || !dst->own_share_active()) { _deactivate_used_shares(); }
 }
 
 
@@ -545,6 +523,7 @@ void Thread::_call_update_data_region()
 	auto base = (addr_t)user_arg_1();
 	auto const size = (size_t)user_arg_2();
 	Cpu::flush_data_caches_by_virt_region(base, size);
+	Cpu::invalidate_instr_caches();
 }
 
 
@@ -590,7 +569,7 @@ void Thread::_print_activity(bool const printing_thread)
 	case AWAITS_START: {
 		Genode::printf("\033[32m init\033[0m");
 		break; }
-	case SCHEDULED: {
+	case ACTIVE: {
 		if (!printing_thread) { Genode::printf("\033[32m run\033[0m"); }
 		else { Genode::printf("\033[32m debug\033[0m"); }
 		break; }
@@ -802,52 +781,6 @@ void Thread::_call_bin_signal_receiver()
 }
 
 
-void Thread::_call_new_vm()
-{
-	/* lookup signal context */
-	auto const context = Signal_context::pool()->object(user_arg_3());
-	if (!context) {
-		PWRN("failed to lookup signal context");
-		user_arg_0(0);
-		return;
-	}
-	/* create virtual machine */
-	typedef Genode::Cpu_state_modes Cpu_state_modes;
-	auto const allocator = reinterpret_cast<void *>(user_arg_1());
-	auto const state = reinterpret_cast<Cpu_state_modes *>(user_arg_2());
-	Vm * const vm = new (allocator) Vm(state, context);
-
-	/* return kernel name of virtual machine */
-	user_arg_0(vm->id());
-}
-
-
-void Thread::_call_run_vm()
-{
-	/* lookup virtual machine */
-	Vm * const vm = Vm::pool()->object(user_arg_1());
-	if (!vm) {
-		PWRN("failed to lookup virtual machine");
-		return;
-	}
-	/* run virtual machine */
-	vm->run();
-}
-
-
-void Thread::_call_pause_vm()
-{
-	/* lookup virtual machine */
-	Vm * const vm = Vm::pool()->object(user_arg_1());
-	if (!vm) {
-		PWRN("failed to lookup virtual machine");
-		return;
-	}
-	/* pause virtual machine */
-	vm->pause();
-}
-
-
 int Thread::_read_reg(addr_t const id, addr_t & value) const
 {
 	addr_t Thread::* const reg = _reg(id);
@@ -915,6 +848,7 @@ void Thread::_call()
 	case call_id_bin_signal_context():  _call_bin_signal_context(); return;
 	case call_id_bin_signal_receiver(): _call_bin_signal_receiver(); return;
 	case call_id_new_vm():              _call_new_vm(); return;
+	case call_id_bin_vm():              _call_bin_vm(); return;
 	case call_id_run_vm():              _call_run_vm(); return;
 	case call_id_pause_vm():            _call_pause_vm(); return;
 	case call_id_pause_thread():        _call_pause_thread(); return;

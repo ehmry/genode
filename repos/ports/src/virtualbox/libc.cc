@@ -111,6 +111,7 @@ extern "C" char *getenv(const char *name)
 //		               "+rem_run.e.l.f"
 //		               "+pgm.e.l.f"
 		               "+pdm"
+//		               "+cpum.e.l.f"
 //		               "+dev_pcnet.e.l.f"
 //		               "+dev_pic.e.l.f"
 //		               "+dev_apic.e.l.f"
@@ -118,6 +119,7 @@ extern "C" char *getenv(const char *name)
 //		               "+main.e.l.f"
 //		               "+hgcm.e.l.f"
 //		               "+shared_folders.e.l.f"
+//		               "+drv_host_serial.e.l.f"
 		               ;
 
 	if (Genode::strcmp(name, "VBOX_LOG_FLAGS") == 0 ||
@@ -141,25 +143,6 @@ extern "C" int sigaction(int signum, const struct sigaction *act,
 	return 0;
 }
 
-
-/**
- * Used by RTTimeNow
- */
-extern "C" int gettimeofday(struct timeval *tv, struct timezone *tz)
-{
-	if (!tv)
-		return -1;
-
-	try {
-		static Rtc::Connection rtc;
-		/* we need only seconds, current_time in microseconds */
-		tv->tv_sec = rtc.get_current_time() / 1000000ULL;
-		tv->tv_usec = rtc.get_current_time() % 1000000ULL * 1000;
-		return 0;
-	} catch (...) {
-		return -1;
-	}
-}
 
 /* our libc provides a _nanosleep function */
 extern "C" int _nanosleep(const struct timespec *req, struct timespec *rem);

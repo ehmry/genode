@@ -18,10 +18,6 @@
 #ifndef _LX_EMUL_H_
 #define _LX_EMUL_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 /* DDE Kit includes */
 #include <dde_kit/types.h>
 #include <dde_kit/printf.h>
@@ -325,15 +321,6 @@ enum irqreturn {
 
 typedef enum irqreturn irqreturn_t;
 
-/******************
- ** linux/swab.h **
- ******************/
-
-__u16 __swab16p(const __u16 *);
-__u32 __swab32p(const __u32 *);
-__u64 __swab64p(const __u64 *);
-
-
 /*************************************
  ** linux/byteorder/little_endian.h **
  *************************************/
@@ -388,6 +375,15 @@ u64 get_unaligned_le64(const void *p);
 #else
 #define get_unaligned get_unaligned_le32
 #endif
+
+/*********************************
+ ** linux/unaligned/access_ok.h **
+ *********************************/
+
+static inline u16 get_unaligned_be16(const void *p)
+{
+	return be16_to_cpup((__be16 *)p);
+}
 
 
 /****************
@@ -653,6 +649,8 @@ int strict_strtoul(const char *s, unsigned int base, unsigned long *res);
 long simple_strtoul(const char *cp, char **endp, unsigned int base);
 
 int hex_to_bin(char ch);
+
+unsigned long int_sqrt(unsigned long);
 
 /*
  * Needed by 'usb.h'
@@ -1581,11 +1579,6 @@ bool device_can_wakeup(struct device *dev);
  ** linux/device.h **
  ********************/
 
-#ifdef __cplusplus
-#define class device_class
-#endif
-
-
 #define dev_info(dev, format, arg...) dde_kit_printf("dev_info: "  format, ## arg)
 #define dev_warn(dev, format, arg...) dde_kit_printf("dev_warn: "  format, ## arg)
 #define dev_WARN(dev, format, arg...) dde_kit_printf("dev_WARN: "  format, ## arg)
@@ -1804,10 +1797,6 @@ void *devm_ioremap_resource(struct device *dev, struct resource *res);
 void devm_kfree(struct device *dev, void *p);
 
 void *dev_get_platdata(const struct device *dev);
-
-#ifdef __cplusplus
-#undef class
-#endif
 
 
 /*****************************
@@ -2387,10 +2376,6 @@ typedef enum { PCI_D0 = 0 } pci_power_t;
 /*
  * Deal with C++ keyword used as member name of 'pci_dev'
  */
-#ifdef __cplusplus
-#define class device_class
-#endif /* __cplusplus */
-
 struct msix_entry
 {
 	u32 vector;
@@ -2434,9 +2419,6 @@ struct pci_fixup {
 	unsigned int class_shift;       /* should be 0, 8, 16 */
 	void (*hook)(struct pci_dev *dev);
 };
-#ifdef __cplusplus
-#undef class
-#endif /* __cplusplus */
 
 
 /* quirks */
@@ -2668,19 +2650,13 @@ void cdev_del(struct cdev *);
  ** linux/stat.h **
  ******************/
 
-#define S_IFMT   00170000
-#define S_IFDIR   0040000
-#define S_IFREG   0100000
-#define S_ISVTX   0001000
 #define S_IALLUGO 0007777
 
 #define S_IRUGO   00444
-#define S_IWUSR   00200
 #define S_IXUGO   00111
 #define S_IRWXUGO 00777
 
-#define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
-
+#include <uapi/linux/stat.h>
 
 /*********************
  ** linux/utsname.h **
@@ -2784,9 +2760,7 @@ enum { HID_DEBUG_BUFSIZE=512 };
  ** linux/list.h **
  ******************/
 
-#define new _new
 #include <linux/list.h>
-#undef new
 
 
 /********************
@@ -3842,16 +3816,19 @@ typedef void (*genode_input_event_cb)(enum input_event_type type,
  * Register input handle
  *
  * \param   handler  call-back function on input events
+ * \param   res_x    pixels of screen (width)  - used by usb touch devices
+ * \param   res_y    pixels of screen (height) - used by usb touch devices
  *
  * \return  0 on success; !0 otherwise
  */
-void genode_input_register(genode_input_event_cb handler);
+void genode_input_register(genode_input_event_cb handler, unsigned long res_x,
+                           unsigned long res_y);
 
 
 void genode_evdev_event(struct input_handle *handle, unsigned int type,
                         unsigned int code, int value);
 
-void start_input_service(void *ep);
+void start_input_service(void *ep, unsigned long res_x, unsigned long res_y);
 
 
 /******************
@@ -3906,9 +3883,5 @@ static inline void trace_xhci_dbg_cancel_urb(struct va_format *v) { }
 static inline void trace_xhci_dbg_reset_ep(struct va_format *v) { }
 static inline void trace_xhci_dbg_quirks(struct va_format *v) { }
 static inline void trace_xhci_dbg_address(struct va_format *v) { }
-
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* _LX_EMUL_H_ */

@@ -11,8 +11,8 @@
  * under the terms of the GNU General Public License version 2.
  */
 
-#ifndef _INCLUDE__DRIVERS__BOARD_BASE_H_
-#define _INCLUDE__DRIVERS__BOARD_BASE_H_
+#ifndef _INCLUDE__PLATFORM__VEA9X4__DRIVERS__BOARD_BASE_H_
+#define _INCLUDE__PLATFORM__VEA9X4__DRIVERS__BOARD_BASE_H_
 
 namespace Genode
 {
@@ -65,21 +65,10 @@ namespace Genode
 			PL180_0_IRQ = 9,
 			PL180_1_IRQ = 10,
 
-			/* clocks */
-			TCREF_CLOCK = 66670*1000,
-
-			/* TrustZone Address Space Controller */
-			TZASC_MMIO_BASE = 0x100ec000,
-			TZASC_MMIO_SIZE = 0x1000,
-
-			/* TrustZone Protection Controller */
-			TZPC_MMIO_BASE = 0x100e6000,
-			TZPC_MMIO_SIZE = 0x1000,
-
 			/* CPU */
-			CORTEX_A9_PRIVATE_MEM_BASE = 0x1e000000,
-			CORTEX_A9_PRIVATE_MEM_SIZE = 0x2000,
-			CORTEX_A9_CLOCK = TCREF_CLOCK,
+			CORTEX_A9_PRIVATE_MEM_BASE  = 0x1e000000,
+			CORTEX_A9_PRIVATE_MEM_SIZE  = 0x2000,
+			CORTEX_A9_PRIVATE_TIMER_CLK = 200010000,
 
 			/* wether board provides security extension */
 			SECURITY_EXTENSION = 1,
@@ -90,5 +79,5 @@ namespace Genode
 	};
 }
 
-#endif /* _INCLUDE__DRIVERS__BOARD_BASE_H_ */
+#endif /* _INCLUDE__PLATFORM__VEA9X4__DRIVERS__BOARD_BASE_H_ */
 

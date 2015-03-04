@@ -21,8 +21,8 @@ ENTRY(_start)
 
 PHDRS
 {
-  ro PT_LOAD;
-  rw PT_LOAD;
+	ro PT_LOAD;
+	rw PT_LOAD;
 }
 
 SECTIONS
@@ -30,6 +30,9 @@ SECTIONS
 	.text : {
 		/* begin of program image (link address) */
 		_prog_img_beg = .;
+
+		/* put entry code at the start of the text segment / raw binary */
+		*(.text.crt0)
 
 		*(.init)
 		*(.text .text.* .gnu.linkonce.t.*)
@@ -46,7 +49,7 @@ SECTIONS
 		KEEP (*(SORT(.dtors.*)))
 		KEEP (*(.dtors))
 		_dtors_end = .;
-	} : ro = 0x90909090
+	} : ro = 0x0
 
 	/* Linux: exception section for uaccess mechanism */
 	__ex_table : { *(__ex_table) }

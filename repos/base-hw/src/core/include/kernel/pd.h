@@ -24,14 +24,14 @@
 #include <kernel/configuration.h>
 #include <kernel/object.h>
 #include <kernel/cpu.h>
-#include <translation_table.h>
 #include <assert.h>
+#include <page_slab.h>
+#include <board.h>
 
 /* structure of the mode transition */
 extern int            _mt_begin;
 extern int            _mt_end;
 extern int            _mt_user_entry_pic;
-extern int            _mt_vm_entry_pic;
 extern Genode::addr_t _mt_client_context_ptr;
 extern Genode::addr_t _mt_master_context_begin;
 extern Genode::addr_t _mt_master_context_end;
@@ -77,11 +77,6 @@ class Kernel::Lock
 namespace Kernel
 {
 	/**
-	 * CPU context of the kernel
-	 */
-	class Cpu_context;
-
-	/**
 	 * Controls the mode-transition page
 	 *
 	 * The mode transition page is a small memory region that is mapped by
@@ -112,28 +107,6 @@ namespace Kernel
 	Lock & data_lock();
 }
 
-class Kernel::Cpu_context : Cpu::Context
-{
-	private:
-
-		/**
-		 * Hook for environment specific initializations
-		 *
-		 * \param stack_size  size of kernel stack
-		 * \param table       base of transit translation table
-		 */
-		void _init(size_t const stack_size, addr_t const table);
-
-	public:
-
-		/**
-		 * Constructor
-		 *
-		 * \param table  mode-transition table
-		 */
-		Cpu_context(Genode::Translation_table * const table);
-};
-
 class Kernel::Mode_transition_control
 {
 	friend class Pd;
@@ -143,7 +116,6 @@ class Kernel::Mode_transition_control
 		typedef Early_translations_allocator Allocator;
 		typedef Early_translations_slab      Slab;
 		typedef Genode::Translation_table    Table;
-		typedef Genode::Cpu_state_modes      Cpu_state_modes;
 		typedef Genode::Page_flags           Page_flags;
 
 		Allocator   _allocator;
@@ -174,31 +146,6 @@ class Kernel::Mode_transition_control
 			addr_t const phys      = (addr_t)&_mt_user_entry_pic;
 			addr_t const phys_base = (addr_t)&_mt_begin;
 			return VIRT_BASE + (phys - phys_base);
-		}
-
-		/**
-		 * Continue execution of client context
-		 *
-		 * \param context    targeted CPU context
-		 * \param cpu        kernel name of targeted CPU
-		 * \param entry_raw  raw pointer to assembly entry-code
-		 */
-		void _continue_client(void * const context, unsigned const cpu,
-		                      addr_t const entry_raw)
-		{
-			/* override client-context pointer of the executing CPU */
-			addr_t const context_ptr_base = (addr_t)&_mt_client_context_ptr;
-			size_t const context_ptr_offset = cpu * sizeof(context);
-			addr_t const context_ptr = context_ptr_base + context_ptr_offset;
-			*(void * *)context_ptr = context;
-
-			/* unlock kernel data */
-			data_lock().unlock();
-
-			/* call assembly code that applies the virtual-machine context */
-			typedef void (* Entry)();
-			Entry __attribute__((noreturn)) const entry = (Entry)entry_raw;
-			entry();
 		}
 
 	public:
@@ -236,17 +183,44 @@ class Kernel::Mode_transition_control
 		}
 
 		/**
-		 * Continue execution of 'user' at 'cpu'
+		 * Continue execution of client context
+		 *
+		 * \param context           targeted CPU context
+		 * \param cpu               kernel name of targeted CPU
+		 * \param entry_raw         raw pointer to assembly entry-code
+		 * \param context_ptr_base  base address of client-context pointer region
 		 */
-		void continue_user(Cpu::Context * const user, unsigned const cpu) {
-			_continue_client(user, cpu, _virt_user_entry()); }
+		void switch_to(Cpu::Context * const context,
+		               unsigned const cpu,
+		               addr_t const entry_raw,
+		               addr_t const context_ptr_base)
+		{
+			/* override client-context pointer of the executing CPU */
+			size_t const context_ptr_offset = cpu * sizeof(context);
+			addr_t const context_ptr = context_ptr_base + context_ptr_offset;
+			*(void * *)context_ptr = context;
+
+			/* unlock kernel data */
+			data_lock().unlock();
+
+			/* call assembly code that applies the virtual-machine context */
+			typedef void (* Entry)();
+			Entry __attribute__((noreturn)) const entry = (Entry)entry_raw;
+			entry();
+		}
 
 		/**
-		 * Continue execution of 'vm' at 'cpu'
+		 * Continue execution of user context
+		 *
+		 * \param context           targeted CPU context
+		 * \param cpu               kernel name of targeted CPU
 		 */
-		void continue_vm(Cpu_state_modes * const vm, unsigned const cpu) {
-			_continue_client(vm, cpu, (addr_t)&_mt_vm_entry_pic); }
-
+		 void switch_to_user(Cpu::Context * const context,
+		                     unsigned const cpu)
+		 {
+			 switch_to(context, cpu, _virt_user_entry(),
+			           (addr_t)&_mt_client_context_ptr);
+		 }
 } __attribute__((aligned(Mode_transition_control::ALIGN)));
 
 class Kernel::Pd : public Object<Pd, MAX_PDS, Pd_ids, pd_ids, pd_pool>
@@ -259,10 +233,6 @@ class Kernel::Pd : public Object<Pd, MAX_PDS, Pd_ids, pd_ids, pd_pool>
 
 		Table       * const _table;
 		Platform_pd * const _platform_pd;
-
-		/* keep ready memory for size-aligned extra costs at construction */
-		enum { EXTRA_RAM_SIZE = 2 * Table::MAX_COSTS_PER_TRANSLATION };
-		char _extra_ram[EXTRA_RAM_SIZE];
 
 	public:
 

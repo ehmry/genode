@@ -16,15 +16,22 @@
 #define _KERNEL__CPU_H_
 
 /* core includes */
+#include <translation_table.h>
 #include <timer.h>
 #include <cpu.h>
 #include <kernel/cpu_scheduler.h>
+#include <kernel/irq.h>
 
 /* base includes */
 #include <unmanaged_singleton.h>
 
 namespace Kernel
 {
+	/**
+	 * CPU context of a kernel stack
+	 */
+	class Cpu_context;
+
 	/**
 	 * Context of a job (thread, VM, idle) that shall be executed by a CPU
 	 */
@@ -55,6 +62,28 @@ namespace Kernel
 	 */
 	Cpu_pool * cpu_pool();
 }
+
+class Kernel::Cpu_context : Genode::Cpu::Context
+{
+	private:
+
+		/**
+		 * Hook for environment specific initializations
+		 *
+		 * \param stack_size  size of kernel stack
+		 * \param table       base of transit translation table
+		 */
+		void _init(size_t const stack_size, addr_t const table);
+
+	public:
+
+		/**
+		 * Constructor
+		 *
+		 * \param table  mode-transition table
+		 */
+		Cpu_context(Genode::Translation_table * const table);
+};
 
 class Kernel::Cpu_domain_update : public Double_list_item
 {
@@ -109,19 +138,24 @@ class Kernel::Cpu_job : public Cpu_share
 		void _interrupt(unsigned const id);
 
 		/**
-		 * Insert context into the scheduling of this CPU
+		 * Activate our own CPU-share
 		 */
-		void _schedule();
+		void _activate_own_share();
 
 		/**
-		 * Remove context from the scheduling of this CPU
+		 * Deactivate our own CPU-share
 		 */
-		void _unschedule();
+		void _deactivate_own_share();
 
 		/**
 		 * Yield the currently scheduled CPU share of this context
 		 */
 		void _yield();
+
+		/**
+		 * Return wether we are allowed to help job 'j' with our CPU-share
+		 */
+		bool _helping_possible(Cpu_job * const j) { return j->_cpu == _cpu; }
 
 	public:
 
@@ -134,6 +168,11 @@ class Kernel::Cpu_job : public Cpu_share
 		 * Continue execution on CPU 'id'
 		 */
 		virtual void proceed(unsigned const id) = 0;
+
+		/**
+		 * Return which job currently uses our CPU-share
+		 */
+		virtual Cpu_job * helping_sink() = 0;
 
 		/**
 		 * Construct a job with scheduling priority 'p' and time quota 'q'
@@ -150,6 +189,11 @@ class Kernel::Cpu_job : public Cpu_share
 		 * Link job to CPU 'cpu'
 		 */
 		void affinity(Cpu * const cpu);
+
+		/**
+		 * Return wether our CPU-share is currently active
+		 */
+		bool own_share_active() { return Cpu_share::ready(); }
 
 		/***************
 		 ** Accessors **
@@ -179,39 +223,61 @@ class Kernel::Cpu_idle : public Genode::Cpu::User_context, public Cpu_job
 		 */
 		Cpu_idle(Cpu * const cpu);
 
-		/**
-		 * Handle exception that occured during execution on CPU 'cpu'
-		 */
-		void exception(unsigned const cpu)
-		{
-			switch (cpu_exception) {
-			case INTERRUPT_REQUEST:      _interrupt(cpu); return;
-			case FAST_INTERRUPT_REQUEST: _interrupt(cpu); return;
-			case RESET:                                   return;
-			default: assert(0); }
-		}
 
-		/**
-		 * Continue execution on CPU 'cpu_id'
+		/*
+		 * Cpu_job interface
 		 */
+
+		void exception(unsigned const cpu);
 		void proceed(unsigned const cpu_id);
+		Cpu_job * helping_sink() { return this; }
 };
 
-class Kernel::Cpu : public Genode::Cpu
+class Kernel::Cpu : public Genode::Cpu,
+                    public Irq::Pool
 {
 	private:
 
 		typedef Cpu_job Job;
 
+		/**
+		 * Inter-processor-interrupt object of the cpu
+		 */
+		struct Ipi : Irq
+		{
+			bool pending = false;
+
+
+			/*********************
+			 **  Irq interface  **
+			 *********************/
+
+			void occurred();
+
+			/**
+			 * Constructor
+			 *
+			 * \param p  interrupt pool this irq shall reside in
+			 */
+			Ipi(Irq::Pool &p);
+
+			/**
+			 * Trigger the ipi
+			 *
+			 * \param cpu_id  id of the cpu this ipi object is related to
+			 */
+			void trigger(unsigned const cpu_id);
+		};
+
 		unsigned const _id;
 		Cpu_idle       _idle;
 		Timer * const  _timer;
 		Cpu_scheduler  _scheduler;
-		bool           _ip_interrupt_pending;
+		Ipi        _ipi_irq;
+		Irq            _timer_irq; /* timer irq implemented as empty event */
 
 		unsigned _quota() const { return _timer->ms_to_tics(cpu_quota_ms); }
-		unsigned _fill() const { return _timer->ms_to_tics(cpu_fill_ms); }
-		Job * _head() const { return static_cast<Job *>(_scheduler.head()); }
+		unsigned _fill() const  { return _timer->ms_to_tics(cpu_fill_ms); }
 
 	public:
 
@@ -219,25 +285,29 @@ class Kernel::Cpu : public Genode::Cpu
 		 * Construct object for CPU 'id' with scheduling timer 'timer'
 		 */
 		Cpu(unsigned const id, Timer * const timer)
-		:
-			_id(id), _idle(this), _timer(timer),
-			_scheduler(&_idle, _quota(), _fill()),
-			_ip_interrupt_pending(false) { }
-
-		/**
-		 * Check if IRQ 'i' was due to a scheduling timeout
-		 */
-		bool timer_irq(unsigned const i) { return _timer->interrupt_id(_id) == i; }
-
-		/**
-		 * Notice that the IPI of the CPU isn't pending anymore
-		 */
-		void ip_interrupt_handled() { _ip_interrupt_pending = false; }
+		: _id(id), _idle(this), _timer(timer),
+		  _scheduler(&_idle, _quota(), _fill()),
+		  _ipi_irq(*this),
+		  _timer_irq(_timer->interrupt_id(_id), *this) { }
 
 		/**
 		 * Raise the IPI of the CPU
 		 */
-		void trigger_ip_interrupt();
+		void trigger_ip_interrupt() { _ipi_irq.trigger(_id); }
+
+		/**
+		 * Deliver interrupt to the CPU
+		 *
+		 * \param irq_id  id of the interrupt that occured
+		 * \returns true if the interrupt belongs to this CPU, otherwise false
+		 */
+		bool interrupt(unsigned const irq_id)
+		{
+			Irq * const irq = object(irq_id);
+			if (!irq) return false;
+			irq->occurred();
+			return true;
+		}
 
 		/**
 		 * Schedule 'job' at this CPU
@@ -250,7 +320,7 @@ class Kernel::Cpu : public Genode::Cpu
 		void exception()
 		{
 			/* update old job */
-			Job * const old_job = _head();
+			Job * const old_job = scheduled_job();
 			old_job->exception(_id);
 
 			/* update scheduler */
@@ -260,7 +330,7 @@ class Kernel::Cpu : public Genode::Cpu
 			_scheduler.update(quota);
 
 			/* get new job */
-			Job * const new_job = _head();
+			Job * const new_job = scheduled_job();
 			quota = _scheduler.head_quota();
 			assert(quota);
 			_timer->start_one_shot(quota, _id);
@@ -277,6 +347,12 @@ class Kernel::Cpu : public Genode::Cpu
 		/***************
 		 ** Accessors **
 		 ***************/
+
+		/**
+		 * Returns the currently active job
+		 */
+		Job * scheduled_job() const {
+			return static_cast<Job *>(_scheduler.head())->helping_sink(); }
 
 		unsigned id() const { return _id; }
 		Cpu_scheduler * scheduler() { return &_scheduler; }
@@ -314,6 +390,11 @@ class Kernel::Cpu_pool
 		 * Return object of primary CPU
 		 */
 		Cpu * primary_cpu() const { return cpu(Cpu::primary_id()); }
+
+		/**
+		 * Return object of current CPU
+		 */
+		Cpu * executing_cpu() const { return cpu(Cpu::executing_id()); }
 
 		/*
 		 * Accessors

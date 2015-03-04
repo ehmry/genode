@@ -32,7 +32,14 @@ class Genode::Pic : public Mmio
 {
 	public:
 
-		enum { NR_OF_IRQ = 109 };
+		enum {
+			/*
+			 * FIXME: dummy ipi value on non-SMP platform, should be removed
+			 *        when SMP is an aspect of CPUs only compiled where necessary
+			 */
+			IPI       = 0,
+			NR_OF_IRQ = 109,
+		};
 
 	protected:
 
@@ -91,7 +98,7 @@ class Genode::Pic : public Mmio
 		/**
 		 * Constructor
 		 */
-		Pic() : Mmio(Board::TZIC_MMIO_BASE)
+		Pic() : Mmio(Board::IRQ_CONTROLLER_BASE)
 		{
 			for (unsigned i = 0; i < NR_OF_IRQ; i++) {
 				write<Intsec::Nonsecure>(1, i);
@@ -146,10 +153,6 @@ class Genode::Pic : public Mmio
 		void mask(unsigned const i) {
 			if (valid(i)) { write<Enclear::Clear_enable>(1, i); } }
 
-		/**
-		 * Wether an interrupt is inter-processor interrupt of a CPU
-		 */
-		bool is_ip_interrupt(unsigned, unsigned) { return false; }
 
 		/*************
 		 ** Dummies **

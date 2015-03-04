@@ -18,7 +18,9 @@
 #include <input/root.h>
 #include <os/ring_buffer.h>
 
+#include <extern_c_begin.h>
 #include <lx_emul.h>
+#include <extern_c_end.h>
 
 #undef RELEASE
 
@@ -65,21 +67,17 @@ static void input_callback(enum input_event_type type,
 		case EVENT_TYPE_WHEEL:   t = Input::Event::WHEEL; break;
 	}
 
-	try {
-		input_session().submit(Input::Event(t, code,
-		                                    absolute_x, absolute_y,
-		                                    relative_x, relative_y));
-	} catch (Input::Event_queue::Overflow) {
-		PWRN("input ring buffer overflow");
-	}
+	input_session().submit(Input::Event(t, code,
+	                                    absolute_x, absolute_y,
+	                                    relative_x, relative_y));
 }
 
 
-void start_input_service(void *ep_ptr)
+void start_input_service(void *ep_ptr, unsigned long res_x, unsigned long res_y)
 {
 	Rpc_entrypoint *ep = static_cast<Rpc_entrypoint *>(ep_ptr);
 
 	env()->parent()->announce(ep->manage(&input_root(ep)));
 
-	genode_input_register(input_callback);
+	genode_input_register(input_callback, res_x, res_y);
 }

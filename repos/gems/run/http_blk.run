@@ -4,9 +4,14 @@
 # \date   2013-11-29
 #
 
-set use_usb_driver      [expr [have_spec omap4] || [have_spec exynos5]]
+if {[have_spec hw_odroid_xu]} {
+	puts "Run script does not support this platform."
+	exit 0
+}
+
+set use_usb_driver      [expr [have_spec omap4] || [have_spec platform_arndale] || [have_spec platform_rpi]]
 set use_nic_driver      [expr !$use_usb_driver && ![have_spec platform_imx53]]
-set use_platform_driver [expr [have_spec platform_arndale] || [have_spec platform_imx53]]
+set use_platform_driver [expr [have_spec platform_arndale] || [have_spec platform_imx53] || [have_spec platform_rpi]]
 
 if {[expr !$use_usb_driver && !$use_nic_driver]} {
 	puts "\n Run script is not supported on this platform. \n"; exit 0 }
@@ -63,6 +68,7 @@ append_if $use_platform_driver config {
 	<start name="platform_drv">
 		<resource name="RAM" quantum="1M" />
 		<provides><service name="Regulator"/></provides>
+		<provides><service name="Platform"/></provides>
 	</start>}
 
 append_if [have_spec gpio] config {
@@ -91,7 +97,7 @@ append_if $use_nic_driver config {
 
 append_if [have_spec acpi] config {
 	<start name="acpi">
-		<resource name="RAM" quantum="6M"/>
+		<resource name="RAM" quantum="6M" constrain_phys="yes"/>
 		<binary name="acpi_drv"/>
 		<provides>
 			<service name="PCI"/>
@@ -105,7 +111,7 @@ append_if [have_spec acpi] config {
 
 append_if [expr ![have_spec acpi] && [have_spec pci]] config {
 	<start name="pci_drv">
-		<resource name="RAM" quantum="3M"/>
+		<resource name="RAM" quantum="3M" constrain_phys="yes"/>
 		<provides> <service name="PCI"/> </provides>
 	</start>}
 

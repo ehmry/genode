@@ -9,12 +9,11 @@ INC_DIR += $(REP_DIR)/src/core/include/spec/arm
 
 # add C++ sources
 SRC_CC += spec/arm/kernel/thread_base.cc
+SRC_CC += spec/arm/kernel/thread.cc
+SRC_CC += spec/arm/kernel/cpu.cc
 
 # add assembly sources
 SRC_S += spec/arm/crt0.s
-
-# use dummy boot-modules per default
-BOOT_MODULES_VPATH = $(REP_DIR)/src/core/spec/arm
 
 # include less specific configuration
 include $(REP_DIR)/lib/mk/core.inc

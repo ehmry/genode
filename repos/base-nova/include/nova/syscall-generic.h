@@ -129,16 +129,24 @@ namespace Nova {
 
 		unsigned cpus() const {
 			unsigned cpu_num = 0;
-			const char * cpu_desc =
-				reinterpret_cast<const char *>(this) + cpu_desc_offset;
 
-			for (unsigned i = 0; i < cpu_max(); i++) {
-				if ((*cpu_desc) & 0x1) cpu_num++;
-				cpu_desc += cpu_desc_size; 
-			}
+			for (unsigned i = 0; i < cpu_max(); i++)
+				if (is_cpu_enabled(i))
+					cpu_num++;
 
 			return cpu_num;
 		}
+
+		bool is_cpu_enabled(unsigned i) const {
+			if (i >= cpu_max())
+				return false;
+
+			const char * cpu_desc = reinterpret_cast<const char *>(this) +
+			                        cpu_desc_offset + i * cpu_desc_size;
+
+			return (*cpu_desc) & 0x1;
+		}
+
 	} __attribute__((packed));
 
 
@@ -362,8 +370,8 @@ namespace Nova {
 
 			enum {
 				RIGHT_EC_RECALL = 0x1U,
-				RIGHT_PT_CALL   = 0x1U,
-				RIGHT_PT_CTRL   = 0x2U,
+				RIGHT_PT_CALL   = 0x2U,
+				RIGHT_PT_CTRL   = 0x1U,
 				RIGHT_SM_UP     = 0x1U,
 				RIGHT_SM_DOWN   = 0x2U
 			};
@@ -466,7 +474,7 @@ namespace Nova {
 					unsigned limit;
 					mword_t  base;
 #ifndef __x86_64__
-					mword_t  reserved;	
+					mword_t  reserved;
 #endif
 				} es, cs, ss, ds, fs, gs, ldtr, tr;
 				struct {
@@ -474,7 +482,7 @@ namespace Nova {
 					unsigned limit;
 					mword_t  base;
 #ifndef __x86_64__
-					mword_t  reserved1;	
+					mword_t  reserved1;
 #endif
 				} gdtr, idtr;
 				unsigned long long tsc_val, tsc_off;
@@ -486,6 +494,14 @@ namespace Nova {
 			mword_t hotspot;
 			bool is_del() { return hotspot & 0x1; }
 		};
+
+#ifdef __x86_64__
+		inline mword_t read_efer() { return efer; }
+		inline void write_efer(mword_t e) { efer = e; }
+#else
+		inline mword_t read_efer() { return 0UL; }
+		inline void write_efer(mword_t) { }
+#endif
 
 		/**
 		 * Set number of untyped message words

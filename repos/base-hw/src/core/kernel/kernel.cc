@@ -25,7 +25,6 @@
 
 /* core includes */
 #include <kernel/pd.h>
-#include <kernel/vm.h>
 #include <platform_pd.h>
 #include <trustzone.h>
 #include <timer.h>
@@ -51,18 +50,9 @@ Genode::Native_utcb * _main_thread_utcb;
 
 namespace Kernel
 {
-	/**
-	 * Return interrupt-controller singleton
-	 */
-	Pic * pic() { return unmanaged_singleton<Pic>(); }
-
 	/* import Genode types */
-	typedef Genode::umword_t       umword_t;
 	typedef Genode::Core_thread_id Core_thread_id;
-}
 
-namespace Kernel
-{
 	Pd_ids * pd_ids() { return unmanaged_singleton<Pd_ids>(); }
 	Thread_ids * thread_ids() { return unmanaged_singleton<Thread_ids>(); }
 	Signal_context_ids * signal_context_ids() { return unmanaged_singleton<Signal_context_ids>(); }
@@ -161,16 +151,13 @@ namespace Kernel
 	 */
 	bool private_interrupt(unsigned const irq)
 	{
-		for (unsigned i = 0; i < NR_OF_CPUS; i++) {
-			if (irq == Timer::interrupt_id(i)) { return 1; }
-		}
-		return 0;
+		for (unsigned i = 0; i < NR_OF_CPUS; i++)
+			if (irq == Timer::interrupt_id(i)) return true;
+		if (irq == Pic::IPI) return true;
+		return false;
 	}
-}
 
 
-namespace Kernel
-{
 	/**
 	 * Get attributes of the mode transition region in every PD
 	 */
@@ -183,7 +170,6 @@ namespace Kernel
 	size_t thread_size()          { return sizeof(Thread); }
 	size_t signal_context_size()  { return sizeof(Signal_context); }
 	size_t signal_receiver_size() { return sizeof(Signal_receiver); }
-	size_t vm_size()              { return sizeof(Vm); }
 	unsigned pd_alignm_log2() { return Genode::Translation_table::ALIGNM_LOG2; }
 	size_t pd_size() { return sizeof(Genode::Translation_table) + sizeof(Pd); }
 
@@ -201,6 +187,9 @@ namespace Kernel
 	addr_t   core_tt_base;
 	unsigned core_pd_id;
 }
+
+
+Pic * Kernel::pic() { return unmanaged_singleton<Pic>(); }
 
 
 /**
@@ -228,6 +217,9 @@ extern "C" void init_kernel_up()
 
 	/* initialize all CPU objects */
 	cpu_pool();
+
+	/* initialize PIC */
+	pic();
 
 	/* go multiprocessor mode */
 	Cpu::start_secondary_cpus(&_start_secondary_cpus);
@@ -261,11 +253,11 @@ void init_kernel_mp_primary()
 	t.sp = (addr_t)s + STACK_SIZE;
 	t.init(cpu_pool()->primary_cpu(), core_pd(), &utcb, 1);
 
-	/* initialize interrupt objects */
-	static Genode::uint8_t _irqs[Pic::NR_OF_IRQ * sizeof(Irq)];
+	/* initialize user interrupt objects */
+	static Genode::uint8_t _irqs[Pic::NR_OF_IRQ * sizeof(User_irq)];
 	for (unsigned i = 0; i < Pic::NR_OF_IRQ; i++) {
 		if (private_interrupt(i)) { continue; }
-		new (&_irqs[i * sizeof(Irq)]) Irq(i);
+		new (&_irqs[i * sizeof(User_irq)]) User_irq(i);
 	}
 	/* kernel initialization finished */
 	Genode::printf("kernel initialized\n");
@@ -288,6 +280,9 @@ extern "C" void init_kernel_mp()
 	Cpu::invalidate_data_caches();
 	Cpu::invalidate_instr_caches();
 	Cpu::data_synchronization_barrier();
+
+	/* locally initialize interrupt controller */
+	pic()->init_cpu_local();
 
 	/* initialize CPU in physical mode */
 	Cpu::init_phys_kernel();
@@ -319,9 +314,8 @@ extern "C" void init_kernel_mp()
 	 */
 	perf_counter()->enable();
 
-	/* locally initialize interrupt controller */
+	/* enable timer interrupt */
 	unsigned const cpu = Cpu::executing_id();
-	pic()->init_cpu_local();
 	pic()->unmask(Timer::interrupt_id(cpu), cpu);
 
 	/* do further initialization only as primary CPU */

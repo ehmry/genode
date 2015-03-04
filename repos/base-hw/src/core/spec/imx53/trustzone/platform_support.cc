@@ -39,22 +39,25 @@ void Kernel::init_trustzone(Pic * pic)
 	/* set exception vector entry */
 	Cpu::mon_exception_entry_at((Genode::addr_t)&_mon_kernel_entry);
 
-	/* enable coprocessor access for TZ VMs */
-	Cpu::allow_coprocessor_nonsecure();
+	/* enable coprocessor 10 + 11 access for TZ VMs */
+	Cpu::Nsacr::access_t v = 0;
+	Cpu::Nsacr::Cpnsae10::set(v, 1);
+	Cpu::Nsacr::Cpnsae11::set(v, 1);
+	Cpu::Nsacr::write(v);
 
 	/* configure non-secure interrupts */
 	for (unsigned i = 0; i < Pic::NR_OF_IRQ; i++) {
-		if ((i != Imx53::Board::EPIT_1_IRQ) &&
-			(i != Imx53::Board::EPIT_2_IRQ) &&
-			(i != Imx53::Board::I2C_2_IRQ)  &&
-			(i != Imx53::Board::I2C_3_IRQ)  &&
-			(i < Imx53::Board::GPIO1_IRQL || i > Imx53::Board::GPIO4_IRQH) &&
-			(i < Imx53::Board::GPIO5_IRQL || i > Imx53::Board::GPIO7_IRQH))
+		if ((i != Board::EPIT_1_IRQ) &&
+			(i != Board::EPIT_2_IRQ) &&
+			(i != Board::I2C_2_IRQ)  &&
+			(i != Board::I2C_3_IRQ)  &&
+			(i < Board::GPIO1_IRQL || i > Board::GPIO4_IRQH) &&
+			(i < Board::GPIO5_IRQL || i > Board::GPIO7_IRQH))
 			pic->unsecure(i);
 	}
 
 	/* configure central security unit */
-	Genode::Csu csu(Imx53::Board::CSU_BASE);
+	Genode::Csu csu(Board::CSU_BASE);
 }
 
 
@@ -92,7 +95,7 @@ Native_region * Platform::_core_only_mmio_regions(unsigned const i)
 		{ Board::EPIT_1_MMIO_BASE, Board::EPIT_1_MMIO_SIZE },
 
 		/* interrupt controller */
-		{ Board::TZIC_MMIO_BASE, Board::TZIC_MMIO_SIZE },
+		{ Board::IRQ_CONTROLLER_BASE, Board::IRQ_CONTROLLER_SIZE },
 
 		/* central security unit */
 		{ Board::CSU_BASE, Board::CSU_SIZE },

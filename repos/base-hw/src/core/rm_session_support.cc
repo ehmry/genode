@@ -82,8 +82,8 @@ int Pager_activation_base::apply_mapping()
 	} catch(Allocator::Out_of_memory) {
 		PERR("Translation table needs to much RAM");
 	} catch(...) {
-		PERR("Invalid mapping %p -> %p (%zx)", (void*)_mapping.phys_address,
-			 (void*)_mapping.virt_address, 1 << _mapping.size_log2);
+		PERR("Invalid mapping %p -> %p (%lx)", (void*)_mapping.phys_address,
+			 (void*)_mapping.virt_address, 1UL << _mapping.size_log2);
 	}
 	return -1;
 }
@@ -96,19 +96,26 @@ void Pager_activation_base::entry()
 	_cap_valid.unlock();
 	while (1)
 	{
-		/* await fault */
-		Pager_object * o;
-		while (1) {
-			Signal s = Signal_receiver::wait_for_signal();
-			o = dynamic_cast<Pager_object *>(s.context());
-			if (o) {
-				o->fault_occured(s);
-				break;
-			}
-			PWRN("unknown pager object");
+		/* receive fault */
+		Signal s = Signal_receiver::wait_for_signal();
+		Pager_object * po = static_cast<Pager_object *>(s.context());
+
+		/*
+		 * Synchronize access and ensure that the object is still managed
+		 *
+		 * FIXME: The implicit lookup of the oject isn't needed.
+		 */
+		unsigned const pon = po->cap().local_name();
+		Object_pool<Pager_object>::Guard pog(_ep->lookup_and_lock(pon));
+		if (!pog) {
+			PWRN("failed to lookup pager object");
+			continue;
 		}
+		/* let pager object go to fault state */
+		pog->fault_occured(s);
+
 		/* fetch fault data */
-		Platform_thread * const pt = (Platform_thread *)o->badge();
+		Platform_thread * const pt = (Platform_thread *)pog->badge();
 		if (!pt) {
 			PWRN("failed to get platform thread of faulter");
 			continue;
@@ -126,12 +133,15 @@ void Pager_activation_base::entry()
 			PWRN("failed to read fault data");
 			continue;
 		}
-		/* handle fault */
-		if (o->pager(*this)) { continue; }
+		/* try to resolve fault directly via local region managers */
+		if (pog->pager(*this)) { continue; }
+
+		/* apply mapping that was determined by the local region managers */
 		if (apply_mapping()) {
 			PWRN("failed to apply mapping");
 			continue;
 		}
-		o->fault_resolved();
+		/* let pager object go back to no-fault state */
+		pog->fault_resolved();
 	}
 }

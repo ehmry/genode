@@ -34,36 +34,15 @@ namespace Genode
 			PMU_MMIO_BASE = 0x10040000,
 			PMU_MMIO_SIZE = 0x5000,
 
-			/* interrupt controller */
-			GIC_CPU_MMIO_BASE = 0x10480000,
-			GIC_CPU_MMIO_SIZE = 0x00010000,
-
-			/* UART */
-			UART_2_MMIO_BASE = 0x12C20000,
-			UART_2_CLOCK     = 100000000,
-			UART_2_IRQ       = 85,
-
 			/* USB */
 			USB_HOST20_IRQ = 103,
 			USB_DRD30_IRQ  = 104,
 
-			/* SATA/AHCI */
-			SATA_IRQ = 147,
-
-			/* I2C */
-			I2C_HDMI_IRQ = 96,
-
-			/* SD card */
-			SDMMC0_IRQ = 107,
+			/* UART */
+			UART_2_CLOCK = 100000000,
 
 			/* wether board provides security extension */
 			SECURITY_EXTENSION = 1,
-
-			/* IRAM */
-			IRAM_BASE = 0x02020000,
-
-			/* hardware name of the primary processor */
-			PRIMARY_MPIDR_AFF_0 = 0,
 		};
 	};
 }

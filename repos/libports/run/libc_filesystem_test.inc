@@ -4,8 +4,13 @@
 # \date   2011-05-27
 #
 
+if {[have_spec hw_odroid_xu]} {
+	puts "Run script does not support this platform."
+	exit 0
+}
+
 # use SD on ARM
-set use_sd_card_drv [expr [have_spec omap4] || [have_spec exynos5] || [have_spec pl180]]
+set use_sd_card_drv [expr [have_spec omap4] || [have_spec platform_arndale] || [have_spec pl180]]
 
 # use ATAPI on x86 (deprecated)
 #set use_atapi_drv   [have_spec x86]
@@ -30,7 +35,7 @@ if {[have_spec linux]} {
 if {[expr [have_spec 64bit] && $use_atapi_drv]} {
 	puts "ATAPI driver does not support 64 bit."; exit 0 }
 
-if {![is_qemu_available]} {
+if {![have_include "power_on/qemu"]} {
 	puts "\nPlease setup your native sd or hard drive. Remove this fail stop";
 	puts "check when you have prepared your native environment.\n";
 	exit 0
@@ -119,7 +124,7 @@ append config {
 
 append_if [have_spec acpi] config {
 	<start name="acpi">
-		<resource name="RAM" quantum="8M"/>
+		<resource name="RAM" quantum="8M" constrain_phys="yes"/>
 		<binary name="acpi_drv"/>
 		<provides>
 			<service name="PCI"/>
@@ -133,7 +138,7 @@ append_if [have_spec acpi] config {
 
 append_if [expr ![have_spec acpi] && [have_spec pci]] config {
 	<start name="pci_drv">
-		<resource name="RAM" quantum="5M"/>
+		<resource name="RAM" quantum="5M" constrain_phys="yes"/>
 		<provides><service name="PCI"/></provides>
 	</start>}
 
@@ -218,7 +223,5 @@ append_if $use_sd_card_drv qemu_args " -drive file=$disk_image,if=sd,cache=write
 run_genode_until ".*child \"test-libc_$filesystem\" exited with exit value 0.*" 60
 
 exec rm -f $disk_image
-
-puts "\nTest succeeded\n"
 
 # vi: set ft=tcl :

@@ -221,10 +221,19 @@ class Genode::Arm
 		 */
 		struct Psr : Register<32>
 		{
-			static constexpr access_t usr = 16;
-			static constexpr access_t svc = 19;
+			/**
+			 * CPU mode
+			 */
+			struct M : Bitfield<0,5>
+			{
+				enum {
+					USR = 16,
+					SVC = 19,
+					MON = 22,
+					HYP = 26,
+				};
+			};
 
-			struct M : Bitfield<0,5> { }; /* CPU mode */
 			struct F : Bitfield<6,1> { }; /* FIQ disable */
 			struct I : Bitfield<7,1> { }; /* IRQ disable */
 			struct A : Bitfield<8,1> { }; /* async. abort disable */
@@ -260,7 +269,7 @@ class Genode::Arm
 			{
 				access_t v = 0;
 				init_common(v);
-				M::set(v, usr);
+				M::set(v, M::USR);
 				return v;
 			}
 
@@ -271,7 +280,7 @@ class Genode::Arm
 			{
 				access_t v = 0;
 				init_common(v);
-				M::set(v, svc);
+				M::set(v, M::SVC);
 				I::set(v, 1);
 				return v;
 			}
@@ -345,6 +354,7 @@ class Genode::Arm
 			addr_t translation_table() const {
 				return Ttbr0::Ba::masked(ttbr0); }
 
+
 			/**
 			 * Assign translation-table base 'table'
 			 */
@@ -409,37 +419,43 @@ class Genode::Arm
 			{
 				switch (cpu_exception) {
 
-				case PREFETCH_ABORT: {
+				case PREFETCH_ABORT:
+					{
+						/* check if fault was caused by a translation miss */
+						Ifsr::access_t const fs = Ifsr::Fs::get(Ifsr::read());
+						if (fs != Ifsr::section && fs != Ifsr::page)
+							return false;
 
-					/* check if fault was caused by a translation miss */
-					Ifsr::access_t const fs = Ifsr::Fs::get(Ifsr::read());
-					if (fs != Ifsr::section && fs != Ifsr::page) { return 0; }
+						/* fetch fault data */
+						w = 0;
+						va = ip;
+						return true;
+					}
+				case DATA_ABORT:
+					{
+						/* check if fault was caused by translation miss */
+						Dfsr::access_t const fs = Dfsr::Fs::get(Dfsr::read());
+						if (fs != Dfsr::section && fs != Dfsr::page)
+							return false;
 
-					/* fetch fault data */
-					w = 0;
-					va = ip;
-					return 1; }
+						/* fetch fault data */
+						Dfsr::access_t const dfsr = Dfsr::read();
+						w = Dfsr::Wnr::get(dfsr);
+						va = Dfar::read();
+						return true;
+					}
 
-				case DATA_ABORT: {
-
-					/* check if fault was caused by translation miss */
-					Dfsr::access_t const fs = Dfsr::Fs::get(Dfsr::read());
-					if (fs != Dfsr::section && fs != Dfsr::page) { return 0; }
-
-					/* fetch fault data */
-					Dfsr::access_t const dfsr = Dfsr::read();
-					w = Dfsr::Wnr::get(dfsr);
-					va = Dfar::read();
-					return 1; }
-
-				default: return 0; }
+				default:
+					return false;
+				};
 			}
+
 		};
 
 		/**
 		 * Returns true if current execution context is running in user mode
 		 */
-		static bool is_user() { return Psr::M::get(Psr::read()) == Psr::usr; }
+		static bool is_user() { return Psr::M::get(Psr::read()) == Psr::M::USR; }
 
 		/**
 		 * Invalidate all entries of all instruction caches

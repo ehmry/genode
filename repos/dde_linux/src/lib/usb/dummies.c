@@ -102,18 +102,9 @@ int    strncmp(const char *cs, const char *ct, size_t count) { TRACE; return 0; 
 char  *strncpy(char *dst, const char *src, size_t s) { TRACE; return NULL; }
 char  *strchr(const char *s, int n) { TRACE; return NULL; }
 char  *strrchr(const char *s, int n) { TRACE; return NULL; }
-size_t strlcpy(char *dest, const char *src, size_t size) { TRACE; return 0; }
 char  *strsep(char **s,const char *d) { TRACE; return NULL; }
 char  *kstrdup(const char *s, gfp_t gfp) { TRACE; return 0; }
 char  *strstr(const char *h, const char *n) { TRACE; return 0; }
-
-
-/*****************
- ** linux/nls.h **
- *****************/
-
-int utf16s_to_utf8s(const wchar_t *pwcs, int len,
-                    enum utf16_endian endian, u8 *s, int maxlen) { TRACE; return 0; }
 
 
 /*******************
@@ -345,7 +336,6 @@ void device_unregister(struct device *dev) { TRACE; }
 void device_lock(struct device *dev) { TRACE; }
 int  device_trylock(struct device *dev) { TRACE; return 0; }
 void device_unlock(struct device *dev) { TRACE; }
-void device_del(struct device *dev) { TRACE; }
 void device_initialize(struct device *dev) { TRACE; }
 int  device_attach(struct device *dev) { TRACE; return 0; }
 int  device_is_registered(struct device *dev) { TRACE; return 0; }
@@ -1105,3 +1095,10 @@ struct dwc3;
 int dwc3_debugfs_init(struct dwc3 *d){ SKIP;  return 0;  }
 void dwc3_debugfs_exit(struct dwc3 *d) { SKIP; }
 
+/**************************
+ ** linux/power_supply.h **
+ **************************/
+#include <linux/power_supply.h>
+int power_supply_register(struct device *parent, struct power_supply *psy) { TRACE; return 0; }
+void power_supply_unregister(struct power_supply *psy) { TRACE; }
+int power_supply_powers(struct power_supply *psy, struct device *dev) { TRACE; return 0; }

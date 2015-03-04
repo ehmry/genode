@@ -19,8 +19,8 @@
 #include <base/sleep.h>
 #include <os/timed_semaphore.h>
 #include <util/allocator_fap.h>
+#include <util/random.h>
 #include <util/string.h>
-
 
 extern "C" void wait_for_continue();
 enum { SUPPORTED_RUMP_VERSION = 17 };
@@ -112,6 +112,13 @@ int rumpuser_thread_create(func f, void *arg, const char *name,
 
 	return 0;
 }
+
+
+void rumpuser_thread_exit()
+{
+	Genode::sleep_forever();
+}
+
 
 int errno;
 void rumpuser_seterrno(int e) { errno = e; }
@@ -223,11 +230,11 @@ int rumpuser_malloc(size_t len, int alignment, void **memp)
 {
 	Genode::Lock::Guard guard(_alloc_lock);
 
-	int align = Genode::log2(alignment);
+	int align = alignment ? Genode::log2(alignment) : 0;
 	*memp     = allocator()->alloc(len, align);
 
 	if (verbose)
-		PWRN("ALLOC: p: %p, s: %zx, a: %d", *memp, len, align);
+		PWRN("ALLOC: p: %p, s: %zx, a: %d %d", *memp, len, align, alignment);
 
 
 	return *memp ? 0 : -1;
@@ -289,15 +296,7 @@ int rumpuser_clock_sleep(int enum_rumpclock, int64_t sec, long nsec)
 
 int rumpuser_getrandom(void *buf, size_t buflen, int flags, size_t *retp)
 {
-	Timer::Connection *timer = myself()->timer();
-
-	uint8_t *rndbuf;
-	for (*retp = 0, rndbuf = (uint8_t *)buf; *retp < buflen; (*retp)++) {
-		*rndbuf++ = timer->elapsed_ms() & 0xff;
-		timer->msleep(timer->elapsed_ms() & 0xf);
-	}
-
-	return 0;
+	return rumpuser_getrandom_backend(buf, buflen, flags, retp);
 }
 
 

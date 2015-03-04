@@ -50,7 +50,6 @@ SRC_CC += pager.cc
 SRC_CC += _main.cc
 SRC_CC += kernel/kernel.cc
 SRC_CC += kernel/thread.cc
-SRC_CC += kernel/vm.cc
 SRC_CC += kernel/signal_receiver.cc
 SRC_CC += kernel/irq.cc
 SRC_CC += kernel/pd.cc
@@ -62,10 +61,13 @@ SRC_S += boot_modules.s
 # provide Genode version information
 include $(BASE_DIR)/src/core/version.inc
 
-# switch to specific boot-modules if further images shall be available
+# switch to build-specific boot-modules if further images shall be available
 ifneq ($(wildcard $(BUILD_BASE_DIR)/boot_modules.s),)
   BOOT_MODULES_VPATH = $(BUILD_BASE_DIR)
   INC_DIR += $(BOOT_MODULES_VPATH)
+else
+  # use dummy boot-modules per default
+  BOOT_MODULES_VPATH = $(REP_DIR)/src/core/
 endif
 vpath boot_modules.s $(BOOT_MODULES_VPATH)
 

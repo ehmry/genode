@@ -213,22 +213,22 @@ class Genode::Cpu : public Arm_v7
 
 	public:
 
-		enum
+		/**
+		 * Auxiliary Control Register
+		 */
+		struct Actlr : Register<32>
 		{
-			/* common */
-			PERIPH_CLK = Board::CORTEX_A9_CLOCK,
+			struct Smp : Bitfield<6, 1> { };
 
-			/* interrupt controller */
-			PL390_DISTRIBUTOR_MMIO_BASE = Board::CORTEX_A9_PRIVATE_MEM_BASE + 0x1000,
-			PL390_DISTRIBUTOR_MMIO_SIZE = 0x1000,
-			PL390_CPU_MMIO_BASE = Board::CORTEX_A9_PRIVATE_MEM_BASE + 0x100,
-			PL390_CPU_MMIO_SIZE = 0x100,
+			static access_t read()
+			{
+				access_t v;
+				asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (v) :: );
+				return v;
+			}
 
-			/* timer */
-			PRIVATE_TIMER_MMIO_BASE = Board::CORTEX_A9_PRIVATE_MEM_BASE + 0x600,
-			PRIVATE_TIMER_MMIO_SIZE = 0x10,
-			PRIVATE_TIMER_IRQ = 29,
-			PRIVATE_TIMER_CLK = PERIPH_CLK
+			static void write(access_t const v) {
+				asm volatile ("mcr p15, 0, %0, c1, c0, 1" :: "r" (v) : ); }
 		};
 
 		/**

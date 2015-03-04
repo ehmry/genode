@@ -1,15 +1,15 @@
 #
 # \brief  Build config for Genodes core process
 # \author Stefan Kalkowski
-# \date   2013-11-25
+# \date   2015-02-09
 #
 
-# add include paths
-INC_DIR += $(REP_DIR)/src/core/include/spec/odroid_xu
-
 # add C++ sources
-SRC_CC += spec/odroid_xu/platform_support.cc
-SRC_CC += cpu.cc
+SRC_CC += spec/exynos5/board.cc
+SRC_CC += spec/arm_gic/pic.cc
+SRC_CC += platform_services.cc
+SRC_CC += kernel/vm_thread.cc
+SRC_CC += spec/arm/kernel/cpu_context.cc
 
-# include less specific library parts
+# include less specific configuration
 include $(REP_DIR)/lib/mk/exynos5/core.inc

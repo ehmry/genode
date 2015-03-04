@@ -27,7 +27,6 @@
 namespace Genode
 {
 	class Platform_thread;
-	class Tlb;
 
 	typedef unsigned Native_thread_id;
 
@@ -113,7 +112,7 @@ namespace Genode
 		 * Thread-context area configuration.
 		 */
 		static constexpr addr_t context_area_virtual_base() {
-			return 0x40000000UL; }
+			return 0xe0000000UL; }
 		static constexpr addr_t context_area_virtual_size() {
 			return 0x10000000UL; }
 

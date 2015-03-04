@@ -18,7 +18,7 @@
 #include <util/mmio.h>
 
 /* core includes */
-#include <cpu.h>
+#include <board.h>
 
 namespace Genode
 {
@@ -27,7 +27,7 @@ namespace Genode
 	 */
 	class Timer : public Mmio
 	{
-		enum { TICS_PER_MS = Cpu::PRIVATE_TIMER_CLK / 1000, };
+		enum { TICS_PER_MS = Board::CORTEX_A9_PRIVATE_TIMER_CLK / 1000 };
 
 		/**
 		 * Load value register
@@ -61,7 +61,7 @@ namespace Genode
 			/**
 			 * Constructor
 			 */
-			Timer() : Mmio(Cpu::PRIVATE_TIMER_MMIO_BASE)
+			Timer() : Mmio(Board::PRIVATE_TIMER_MMIO_BASE)
 			{
 				write<Control::Timer_enable>(0);
 			}
@@ -69,10 +69,8 @@ namespace Genode
 			/**
 			 * Return kernel name of timer interrupt
 			 */
-			static unsigned interrupt_id(unsigned)
-			{
-				return Cpu::PRIVATE_TIMER_IRQ;
-			}
+			static unsigned interrupt_id(unsigned) {
+				return Board::PRIVATE_TIMER_IRQ; }
 
 			/**
 			 * Start single timeout run

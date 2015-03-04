@@ -12,7 +12,9 @@
  */
 
 #include <signal.h>
+#include <extern_c_begin.h>
 #include <lx_emul.h>
+#include <extern_c_end.h>
 
 static Signal_helper *_signal = 0;
 
@@ -293,5 +295,8 @@ void tasklet_schedule(struct tasklet_struct *tasklet)
 
 void tasklet_hi_schedule(struct tasklet_struct *tasklet)
 {
-	tasklet_schedule(tasklet);
+	/*
+	 * High priority, execute immediately
+	 */
+	tasklet->func(tasklet->data);
 }
