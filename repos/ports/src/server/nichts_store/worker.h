@@ -8,6 +8,7 @@
 #include <base/printf.h>
 
 /* Nix native includes */
+#include <nichts/types.h>
 #include <nix/main.h>
 
 /* Nix includes */
@@ -17,7 +18,10 @@
 #include <store.hh>
 #include <build.hh>
 
-#include "types.h"
+
+
+
+#inculde
 
 
 using namespace Genode;
@@ -40,6 +44,18 @@ class Nichts_store::Worker : public Rpc_object<Nix_build::Session, Session_compo
 		Signal_context    _failure_context;
 		Signal_receiver   _sig_rec;
 
+		void start_builder_noux(Derivation &drv);
+
+		void start_builder(Derivation &drv)
+		{
+			if (drv.platform.rfind("noux"))
+				start_builder_noux(drv);
+			else {
+				PERR("building %s is unsupported", drv.platform.c_str());
+				throw Nichts_store::Build_failure();
+			}
+		};
+
 		register_outputs(Derivation &drv)
 		{
 			PDBG("not implemented");
@@ -49,13 +65,10 @@ class Nichts_store::Worker : public Rpc_object<Nix_build::Session, Session_compo
 		{
 			using namespace nix;
 
+			/* The derivation stored at drv_path. */
+			Derivation drv = parse_derivation(_store.read_string(drv_path));
 
-			DrvPathWithOutputs dpwo = parseDrvPathWithOutputs(drv_path);
-
-
-
-			/* The derivation stored at drvPath. */
-			Derivation drv;
+			start_builder(drv);
 
 			/* Install a timeout before blocking on a signal from the child. */
 			if (!_sig_rec.pending() {
@@ -85,6 +98,7 @@ class Nichts_store::Worker : public Rpc_object<Nix_build::Session, Session_compo
 				break;
 			default:
 				PERR("Unknown signal context received");
+				throw Nichts_store::Build_failure();
 			}
 
 			/* Register the outputs in the database as valid. */
