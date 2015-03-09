@@ -3,7 +3,12 @@
 
 #include <string>
 
+#include <nichts_store_session/nichts_store_session.h>
 #include <nichts/types.h>
+
+
+using namespace std;
+using namespace Nichts;
 
 
 static void expect(std::istream & str, const string & s)
@@ -11,7 +16,7 @@ static void expect(std::istream & str, const string & s)
     char s2[s.size()];
     str.read(s2, s.size());
     if (string(s2, s.size()) != s)
-        throw FormatError(format("expected string ‘%1%’") % s);
+		throw Nichts_store::Build_failure();
 }
 
 
@@ -44,15 +49,6 @@ static Path parse_path(std::istream & str)
 }
 
 
-static String_set parse_strings(std::istream & str, bool arePaths)
-{
-    StringSet res;
-    while (!end_of_list(str))
-        res.insert(arePaths ? parse_path(str) : parse_string(str));
-    return res;
-}
-
-
 static bool end_of_list(std::istream & str)
 {
     if (str.peek() == ',') {
@@ -67,6 +63,15 @@ static bool end_of_list(std::istream & str)
 }
 
 
+static String_set parse_strings(std::istream & str, bool arePaths)
+{
+    String_set res;
+    while (!end_of_list(str))
+        res.insert(arePaths ? parse_path(str) : parse_string(str));
+    return res;
+}
+
+
 namespace Nichts_store {
 
 	Derivation parse_derivation(const string &s)
@@ -77,11 +82,11 @@ namespace Nichts_store {
 		expect(str, "Derive([");
 
 		/* Parse the list of outputs. */
-		while (!endOfList(str)) {
-			DerivationOutput out;
+		while (!end_of_list(str)) {
+			Derivation_output out;
 			 expect(str, "("); string id = parse_string(str);
 			expect(str, ","); out.path = parse_path(str);
-			expect(str, ","); out.hashAlgo = parse_string(str);
+			expect(str, ","); out.hash_algo = parse_string(str);
 			expect(str, ","); out.hash = parse_string(str);
 			expect(str, ")");
 			drv.outputs[id] = out;
@@ -91,9 +96,9 @@ namespace Nichts_store {
 		 expect(str, ",[");
 		while (!end_of_list(str)) {
 			expect(str, "(");
-			Path drvPath = parse_path(str);
+			Nichts::Path drv_path = parse_path(str);
 			expect(str, ",[");
-			drv.input_drvs[drvPath] = parse_strings(str, false);
+			drv.input_drvs[drv_path] = parse_strings(str, false);
 			expect(str, ")");
 		}
 
@@ -103,7 +108,7 @@ namespace Nichts_store {
 
 		/* Parse the builder arguments. */
 		expect(str, ",[");
-		while (!endOfList(str))
+		while (!end_of_list(str))
 			drv.args.push_back(parse_string(str));
 
 		/* Parse the attribute set. */

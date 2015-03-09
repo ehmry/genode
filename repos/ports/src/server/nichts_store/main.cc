@@ -7,17 +7,15 @@
 /* Nix native includes */
 #include <nix/main.h>
 
-/* Nix includes */
-#include <store.hh>
-
-#include "session.h"
+/* Local includes */
+#include "worker.h"
 
 
 namespace Nichts_store {
 
-	class Session_component;
-	class    Root_component;
-	class              Main;
+	class Worker;
+	class Root_component;
+	class Main;
 
 	using namespace Genode;
 };
@@ -29,8 +27,6 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 
 		Ram_session_capability _ram;
 
-		nix::Store _store;
-
 	protected:
 
 		/**
@@ -41,7 +37,7 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 		 */
 		Worker *_create_session(const char *args, Affinity const &affinity) override
 		{
-			return new(md_alloc()) Worker(affinity, _ram, *md_alloc(), _store);
+			return new(md_alloc()) Worker(affinity, _ram, *md_alloc());
 		}
 
 		void _upgrade_session(Session_component *s, const char *args override
@@ -60,7 +56,6 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 		:
 			Genode::Root_component<Session_component>(&ep.rpc_ep(), &md_alloc),
 			_ram(ram),
-			_store(true)
 		{
 			env()->parent()->announce(ep.manage(nix_store_root));
 		}
