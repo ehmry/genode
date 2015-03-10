@@ -26,9 +26,9 @@ namespace Nichts_store {
 	/*
 	 * Exception Types
 	 */
-	class Exception     : public Genode::Exception { };
-	class Build_timeout : public Exception;
-	class Build_failure : public Exception;
+	struct Exception     : Genode::Exception { };
+	struct Build_timeout : Exception { };
+	struct Build_failure : Exception { };
 
 	struct Session : public Genode::Session
 	{
@@ -52,8 +52,8 @@ namespace Nichts_store {
 
 		/* TODO: make this function throw exceptions. */
 		GENODE_RPC_THROW(Rpc_realise, void, realise,
-		                 GENODE_TYPE_LIST(Build_timeout,
-		                                  Build_failure)
+		                 GENODE_TYPE_LIST(),//Build_timeout,
+		                                  //Build_failure)
 		                 Path const&, Mode);
 		GENODE_RPC_INTERFACE(Rpc_realise);
 	};

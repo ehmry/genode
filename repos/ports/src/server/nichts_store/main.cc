@@ -5,7 +5,7 @@
 #include <base/printf.h>
 
 /* Nix native includes */
-#include <nix/main.h>
+//#include <nix/main.h>
 
 /* Local includes */
 #include "worker.h"
@@ -37,12 +37,7 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 		 */
 		Worker *_create_session(const char *args, Affinity const &affinity) override
 		{
-			return new(md_alloc()) Worker(affinity, _ram, *md_alloc());
-		}
-
-		void _upgrade_session(Session_component *s, const char *args override
-		{
-			s->upgrade(args);
+			return new(md_alloc()) Worker(affinity, _ram, md_alloc());
 		}		
 
 	public:
@@ -54,10 +49,10 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 		               Genode::Allocator &md_alloc,
 		               Ram_session_capability ram)
 		:
-			Genode::Root_component<Session_component>(&ep.rpc_ep(), &md_alloc),
-			_ram(ram),
+			Genode::Root_component<Worker>(&ep.rpc_ep(), &md_alloc),
+			_ram(ram)
 		{
-			env()->parent()->announce(ep.manage(nix_store_root));
+			env()->parent()->announce(ep.manage(*this));
 		}
 };
 
@@ -74,8 +69,8 @@ struct Nichts_store::Main
 	Main(Server::Entrypoint &ep) : ep(ep)
 	{
 		/* Initialise common configuration. */
-		PLOG("initializing nix config...");
-		nix::main::init();
+		//PLOG("initializing nix config...");
+		//nix::main::init();
 	}
 };
 

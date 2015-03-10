@@ -2,6 +2,10 @@
 #define _NICHTS_STORE__DERIVATION_H_
 
 #include <string>
+#include <istream>
+
+/*Genode includes. */
+#include <util/token.h>
 
 #include <nichts_store_session/nichts_store_session.h>
 #include <nichts/types.h>
@@ -74,10 +78,36 @@ static String_set parse_strings(std::istream & str, bool arePaths)
 
 namespace Nichts_store {
 
-	Derivation parse_derivation(const string &s)
+	Derivation parse_derivation(char const *s)
 	{
+		typedef ::Genode::Token<Scanner_policy_identifier_with_underline> Token;
+
 		Derivation drv;
 
+		Token token(s, strlen(s));
+		if (strncmp(s, "Derive(", sizeof("Derive("))) {
+			PERR("bad derivation %s", s);
+			throw Build_failure();
+		};
+
+		
+
+
+
+		Aterm::List outputs(drv.term());
+
+		Aterm::List input_drvs(drv.next());
+
+		Aterm::List input_srcs(drv.next());
+
+		Aterm::String platform(drv.next());
+		Aterm::String builder(drv.next());
+		Aterm::List args(drv.next());
+		Aterm::List env(drv.next());
+
+		/***************************************/
+
+		Derivation drv;
 		std::istringstream str(s);
 		expect(str, "Derive([");
 

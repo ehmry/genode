@@ -1,10 +1,10 @@
 { linkComponent, compileCC
 , libc, libm, stdcxx
-, nixmain, server }:
+, config, server }:
 
 linkComponent rec {
   name = "nichts_store";
-  libs = [ server nixmain stdcxx ];
+  libs = [ server config stdcxx ];
   objects = compileCC {
     src = ./main.cc;
     inherit libs;

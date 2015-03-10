@@ -2,17 +2,20 @@
 #define _NICHTS_STORE__WORKER_H_
 
 /* Genode includes */
+#include <base/affinity.h>
+#include <base/signal.h>
 #include <root/component.h>
-#include <os/server.h>
 #include <ram_session/client.h>
 #include <timer_session/connection.h>
 #include <file_system_session/connection.h>
 #include <nichts_store_session/nichts_store_session.h>
 #include <base/printf.h>
+#include <os/config.h>
+#include <os/server.h>
 
 /* Nix native includes */
 #include <nichts/types.h>
-#include <nix/main.h>
+//#include <nix/main.h>
 
 #include "derivation.h"
 
@@ -42,9 +45,9 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 {
 	private:
 
-		Affinity                &_affinity;
+		Affinity const           _affinity;
 		Ram_session_client       _ram;
-		Allocator                _alloc;
+		//Allocator                _alloc;
 		Genode::Allocator_avl    _fs_block_alloc;
 		File_system::Connection  _fs;
 
@@ -83,6 +86,37 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 				return _fs.dir("/", false);
 		}
 
+		/**
+		 * Create a unique temporary directory using `name'
+		 * as a base. Directories are rooted at /tmp.
+		 */
+		File_system::Path create_temp_dir(char const *name) {
+			using namespace File_system;
+
+			/* Create /tmp if it is missing. */
+			try {
+				Dir_handle tmp_dir = _fs.dir("/tmp", false);
+				_fs.close(tmp_dir);
+			}
+			catch (Lookup_failed) {
+				Dir_handle tmp_dir = _fs.dir("/tmp", true);
+				_fs.close(tmp_dir);
+			}
+
+			/* Create a new and unique subdir. */
+			int counter(1);
+			char unique[File_system::Path::MAX_SIZE];
+			while (1) {
+				Genode::snprintf(&unique[0], sizeof(unique),
+				                 "/tmp/%s-%d", name, counter);
+				try {
+					_fs.dir(unique, true);
+					break;
+				}
+				catch (Node_already_exists) { };
+			}
+			return File_system::Path(unique);
+		};
 
 		std::string read_file(char const *path)
 		{
@@ -141,8 +175,6 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 		void _realise(const char *drv_path, Nichts_store::Mode mode)
 		{
-			using namespace nix;
-
 			/* The derivation stored at drv_path. */
 			Derivation drv = parse_derivation(read_file(drv_path));
 
@@ -152,55 +184,48 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 			if (!_sig_rec.pending()) {
 				/* Stop after 12 hours. */
 				enum { FAILSAFE = 43200 };
-				time_t timeout(FAILSAFE);
+				unsigned long timeout(FAILSAFE);
 				try {
-			 	   timeout = Genode::config()->xml_node().attribute_value<time_t>("timeout", FAILSAFE);
+			 	   timeout = Genode::config()->xml_node().attribute_value<unsigned long>("timeout", FAILSAFE);
 				} catch (...) {}
 
 				if(timeout)
 					/* Convert from seconds to microseconds. */
 					_timer.trigger_once(timeout* 1000000);
-				}
 			}
 
 			Signal signal = _sig_rec.wait_for_signal();
 
-			switch (signal.context()) {
-			case (_timeout_context):
-				throw Nichts_store::Build_timeout();
-			case (_failure_context):
-				throw Nichts_store::Build_failure();
-			case (_success_context):
+			Signal_context *ctx = signal.context();
+
+			if (ctx == &_success_context)
 				PLOG("Successfully realised %s", drv_path);
-				break;
-			default:
+			else if (ctx == &_failure_context)
+				throw Nichts_store::Build_failure();
+			else if (ctx == &_timeout_context)
+				throw Nichts_store::Build_timeout();
+			else {
 				PERR("Unknown signal context received");
 				throw Nichts_store::Build_failure();
 			}
 
 			/* Register the outputs in the database as valid. */
-			register_outputs(drv);
+			//register_outputs(drv);
 		}
 
 	public:
 
-		Session_component(Affinity const         &affinity
-		                  Ram_session_capability  ram,
-		                  Allocator              &session_alloc,
-		                  nix::Store             &store,)
+		Worker(Affinity const         &affinity,
+		       Ram_session_capability  ram,
+		       Allocator              *session_alloc)
 		:
 			_affinity(affinity),
 			_ram(ram),
-			_alloc(session_alloc),
-			_fs_block_alloc(_alloc),
+			//_alloc(session_alloc),
+			_fs_block_alloc(session_alloc),
 			_fs(_fs_block_alloc)
 		{
 			_timer.sigh(_sig_rec.manage(&_timeout_context));
-		}
-
-		void upgrade(char const *args)
-		{
-			Genode::env()->parent()->upgrade_session, args);
 		}
 
 		/*********************************
@@ -211,7 +236,7 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 		{
 			PLOG("realise path \"%s\"", drvPath.string());
 			try {
-				_realise(Nichts::Path(drvPath.string()), mode);
+				_realise(drvPath.string(), mode);
 			}
 			catch (Nichts_store::Exception e) { throw e; }
 			catch (...) { throw Nichts_store::Exception(); }
