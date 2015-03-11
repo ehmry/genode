@@ -37,14 +37,14 @@ namespace Nichts_store {
 
 };
 
-Nichts_store::Worker::start_builder_noux(Derivation &drv)
+void Nichts_store::Worker::start_builder_noux(Derivation &drv)
 {
 
 	/*********************
 	 ** Noux config ROM **
 	 *********************/
 	enum { CONFIG_SIZE = 4096 }; /* This may not be big enough */
-	Genode::Ram_dataspace_capability config_ds = _alloc->alloc(CONFIG_SIZE);
+	Genode::Ram_dataspace_capability config_ds = env()->heap()->alloc(CONFIG_SIZE);
 	char* config_ds_addr = Genode::env()->rm_session()->attach(config_ds);
 	Genode::Xml_generator xml(config_ds_addr, CONFIG_SIZE, "config", [&]
 	{
