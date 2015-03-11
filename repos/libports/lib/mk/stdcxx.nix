@@ -1,4 +1,4 @@
-{ linkSharedLibrary, compileCCRepo, fromDir, stdcxxSrc, libc }:
+{ linkSharedLibrary, compileCCRepo, fromDir, stdcxxSrc, libc, libm }:
 
 let
   internalInclude = ../../include/stdcxx;
@@ -26,7 +26,7 @@ in
 linkSharedLibrary rec {
   name = "stdcxx";
 
-  libs = [ libc ];
+  libs = [ libc libm ];
 
   externalObjects = compileCCRepo rec {
     inherit headers libs includes externalIncludes;

@@ -115,9 +115,13 @@ struct Server::Constructor_component : Rpc_object<Server::Constructor,
 	void construct() { Server::construct(global_ep()); }
 };
 
+extern "C" void wait_for_continue(void);
 
 int main(int argc, char **argv)
 {
+	//PERR("wait_for_continue");
+	//wait_for_continue();
+
 	static Server::Constructor_component constructor;
 
 	static Server::Entrypoint ep;

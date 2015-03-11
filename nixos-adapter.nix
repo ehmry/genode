@@ -29,7 +29,7 @@ let
               config="\"$prefix/config\"=\"$config\";"
               echo {$config$(find $romModules -type f -printf $format)} > $out
             '';
-          romModules = [ genodePkgs.init ] ++ romModules;
+          romModules = [ genodePkgs.init genodePkgs.libs.ld ] ++ romModules;
         }) // (builtins.listToAttrs (map
 	  (fn: { name = "${name}/${fn}"; value = builtins.getAttr fn scenario.extraFiles; })
           (builtins.attrNames scenario.extraFiles)
