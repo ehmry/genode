@@ -1,7 +1,7 @@
 /* Genode includes */
 #include <root/component.h>
 #include <os/server.h>
-#include <nix_build_session/nix_build_session.h>
+#include <nichts_store_session/nichts_store_session.h>
 #include <base/printf.h>
 
 /* Nix native includes */

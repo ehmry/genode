@@ -23,15 +23,13 @@ namespace Nichts_store {
 
 	typedef Rpc_in_buffer<MAX_PATH_LEN> Path;
 
-	/*
-	 * Exception Types
-	 */
-	struct Exception     : Genode::Exception { };
-	struct Build_timeout : Exception { };
-	struct Build_failure : Exception { };
+	class Exception     : public Genode::Exception { };
+	class Build_timeout : public Exception { };
+	class Build_failure : public Exception { };
 
 	struct Session : public Genode::Session
 	{
+
 		static const char *service_name() { return "Nichts_store"; }
 
 		virtual ~Session() { }

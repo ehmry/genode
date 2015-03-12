@@ -1,6 +1,9 @@
 #include <rom_session/connection.h>
+#include <file_system_session/file_system_session.h>
 #include <util/xml_generator.h>
 #include <util/xml_node.h>
+
+#include <nichts/util.h>
 
 #include "worker.h"
 
@@ -10,14 +13,6 @@ static void env_node(Genode::Xml_generator xml, const char *name, const char *va
 	return xml.node("env", [&] {
 		xml.attribute("name", name);
 		xml.attribute("value", value);
-	});
-}
-
-static void env_node(Genode::Xml_generator xml, const string name, const string value)
-{
-	return xml.node("env", [&] {
-		xml.attribute("name", name.c_str());
-		xml.attribute("value", value.c_str());
 	});
 }
 
@@ -39,16 +34,16 @@ namespace Nichts_store {
 
 void Nichts_store::Worker::start_builder_noux(Derivation &drv)
 {
+	char const *tmp_dir = create_temp_dir(Nichts::store_path_to_name(drv.path())).string();
 
 	/*********************
 	 ** Noux config ROM **
 	 *********************/
 	enum { CONFIG_SIZE = 4096 }; /* This may not be big enough */
-	Genode::Ram_dataspace_capability config_ds = env()->heap()->alloc(CONFIG_SIZE);
+	Genode::Ram_dataspace_capability config_ds = Genode::env()->ram_session()->alloc(CONFIG_SIZE);
 	char* config_ds_addr = Genode::env()->rm_session()->attach(config_ds);
 	Genode::Xml_generator xml(config_ds_addr, CONFIG_SIZE, "config", [&]
 	{
-		tmp_dir = create_temp_dir(store_path_to_name(drv.path));
 
 		xml.attribute("verbose", "yes");
 
@@ -62,7 +57,7 @@ void Nichts_store::Worker::start_builder_noux(Derivation &drv)
 			 ** Builder **
 			 *************/
 
-			xml.attribute("name", drv.builder.c_str());
+			xml.attribute("name", drv.builder());
 			xml.attribute("trace_syscalls", "yes");
 			xml.attribute("verbose", "yes");
 
@@ -93,53 +88,45 @@ void Nichts_store::Worker::start_builder_noux(Derivation &drv)
 			env_node(xml, "NIX_STORE", "/nix/store");
 
 			/* The maximum number of cores to utilize for parallel building. */
-			env_node(xml, "NIX_BUILD_CORES", (format("%d") % settings.buildCores).str());
-
-			/* Add all bindings specified in the derivation. */
-			foreach (StringPairs::iterator, i, drv.env)
-				env_node(xml, i->first, i->second);
+			env_node(xml, "NIX_BUILD_CORES", "1");
 
 			/* For convenience, set an environment pointing to the top build
 			 * directory.
 			 */
-			env_node(xml, "NIX_BUILD_TOP", tmpDir);
+			env_node(xml, "NIX_BUILD_TOP", tmp_dir);
 
-				/* Also set TMPDIR and variants to point to this directory. */
-				env_node(xml, "TMPDIR", tmpDir);
-				env_node(xml, "TEMPDIR", tmpDir);
-				env_node(xml, "TMP", tmpDir);
-				env_node(xml, "TEMP", tmpDir);
+			/* Also set TMPDIR and variants to point to this directory. */
+			env_node(xml, "TMPDIR", tmp_dir);
+			env_node(xml, "TEMPDIR", tmp_dir);
+			env_node(xml, "TMP", tmp_dir);
+			env_node(xml, "TEMP", tmp_dir);
 
-				/* Set the working directory to the build directory. */
-				env_node(xml, "NOUX_CWD", tmpDir);
+			/* Set the working directory to the build directory. */
+			env_node(xml, "NOUX_CWD", tmp_dir);
 
-				/* Explicitly set PWD to prevent problems with chroot builds.  In
-				 * particular, dietlibc cannot figure out the cwd because the
-				 * inode of the current directory doesn't appear in .. (because
-				 * getdents returns the inode of the mount point).
-				 */
-				env_node(xml, "PWD", tmpDir);
+			/* Explicitly set PWD to prevent problems with chroot builds.  In
+			 * particular, dietlibc cannot figure out the cwd because the
+			 * inode of the current directory doesn't appear in .. (because
+			 * getdents returns the inode of the mount point).
+			 */
+			env_node(xml, "PWD", tmp_dir);
 
-				/* Compatibility hack with Nix <= 0.7: if this is a fixed-output
-				 * derivation, tell the builder, so that for instance `fetchurl'
-				 * can skip checking the output.  On older Nixes, this environment
-				 * variable won't be set, so `fetchurl' will do the check.
-				 */
-				 if (fixedOutput) env_node(xml, "NIX_OUTPUT_CHECKED", "1");
+			Derivation::Env_pair *drv_env = drv.env();
+			while (drv_env) {
+				char k[drv_env->key.len()];
+				drv_env->key.string(k, sizeof(k));
+				char v[drv_env->value.len()];
+				drv_env->value.string(v, sizeof(v));
 
-				/***************
-				 ** Arguments **
-				 ***************/
+				env_node(xml, k, v);
+				drv_env = drv_env->next();		
+			}
 
-				/* Fill in the arguments. */
-				Strings args;
-				string builderBasename = baseNameOf(drv.builder);
-				args.push_back(builderBasename);
-				foreach (Strings::iterator, i, drv.args)
-					xml.node("arg", [&] {
-						xml.attribute("value", rewriteHashes(*i, rewritesToTmp).c_str());
-					});
-			});
 		});
+	});
+
+	PLOG("%s", config_ds_addr);
+
+	Genode::env()->rm_session()->detach(config_ds_addr);
 
 }

@@ -1,7 +1,7 @@
 #ifndef _INCLUDE__NICHTS_STORE_SESSION__CONNECTION_H_
 #define _INCLUDE__NICHTS_STORE_SESSION__CONNECTION_H_
 
-#include <nix_build_session/client.h>
+#include <nichts_store_session/client.h>
 #include <base/connection.h>
 
 

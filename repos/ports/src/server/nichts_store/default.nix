@@ -1,10 +1,9 @@
 { linkComponent, compileCC
-, libc, stdcxx
-, config, server }:
+, base, server, config }:
 
 linkComponent rec {
   name = "nichts_store";
-  libs = [ server config stdcxx libc];
+  libs = [ base server config ];
   objects = map
     (src: compileCC { inherit src libs; })
     [ ./main.cc ./noux.cc ];

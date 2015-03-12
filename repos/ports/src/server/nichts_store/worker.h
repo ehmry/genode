@@ -12,9 +12,10 @@
 #include <base/printf.h>
 #include <os/config.h>
 #include <os/server.h>
+#include <util/token.h>
 
 /* Nix native includes */
-#include <nichts/types.h>
+//#include <nichts/types.h>
 //#include <nix/main.h>
 
 #include "derivation.h"
@@ -95,11 +96,11 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 			/* Create /tmp if it is missing. */
 			try {
-				Dir_handle tmp_dir = _fs.dir("/tmp", false);
+				Dir_handle tmp_dir = _fs.dir("/nix/tmp", false);
 				_fs.close(tmp_dir);
 			}
 			catch (Lookup_failed) {
-				Dir_handle tmp_dir = _fs.dir("/tmp", true);
+				Dir_handle tmp_dir = _fs.dir("/nix/tmp", true);
 				_fs.close(tmp_dir);
 			}
 
@@ -118,11 +119,27 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 			return File_system::Path(unique);
 		};
 
-		std::string read_file(char const *path)
+		void start_builder_noux(Derivation &drv);
+
+		void start_builder(Derivation &drv)
+		{
+			//if (drv.platform.rfind("noux"))
+				start_builder_noux(drv);
+			//else {
+			//	PERR("building %s is unsupported", drv.platform.c_str());
+			//	throw Nichts_store::Build_failure();
+			//}
+		};
+
+		void register_outputs(Derivation &drv)
+		{
+			PDBG("not implemented");
+		}
+
+		Nichts_store::Derivation read_derivation(char const *path)
 		{
 			using namespace File_system;
 
-			std::string str;
 			File_handle file;
 			File_system::Session::Tx::Source &source = *_fs.tx();
 			File_system::Packet_descriptor packet_in, packet_out;
@@ -141,42 +158,27 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 				packet_out = source.get_acked_packet();
 
-				str.insert(0, source.packet_content(packet_out), packet_out.length());
+				Derivation drv(source.packet_content(packet_out), packet_out.length());
 
+				source.release_packet(packet_out);
+				source.release_packet(packet_in);
+				_fs.close(file);
+
+				return drv;
 			}
+
 			catch (Genode::Exception &e) {
 				source.release_packet(packet_out);
 				source.release_packet(packet_in);
 				_fs.close(file);
 				throw e;
 			}
-			source.release_packet(packet_out);
-			source.release_packet(packet_in);
-			_fs.close(file);
-			return str;
 		};
-
-		void start_builder_noux(Derivation &drv);
-
-		void start_builder(Derivation &drv)
-		{
-			if (drv.platform.rfind("noux"))
-				start_builder_noux(drv);
-			else {
-				PERR("building %s is unsupported", drv.platform.c_str());
-				throw Nichts_store::Build_failure();
-			}
-		};
-
-		void register_outputs(Derivation &drv)
-		{
-			PDBG("not implemented");
-		}
 
 		void _realise(const char *drv_path, Nichts_store::Mode mode)
 		{
 			/* The derivation stored at drv_path. */
-			Derivation drv = parse_derivation(read_file(drv_path));
+			Derivation drv = read_derivation(drv_path);
 
 			start_builder(drv);
 

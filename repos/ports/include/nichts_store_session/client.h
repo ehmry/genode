@@ -2,7 +2,7 @@
 #define _INCLUDE__NICHTS_STORE_SESSION__CLIENT_H_
 
 #include <base/rpc_client.h>
-#include <nix_store_session/nix_store_session.h>
+#include <nichts_store_session/nichts_store_session.h>
 
 
 namespace Nichts_store {
