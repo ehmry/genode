@@ -6,5 +6,5 @@ linkComponent rec {
   libs = [ base server config ];
   objects = map
     (src: compileCC { inherit src libs; })
-    [ ./main.cc ./noux.cc ];
+    [ ./main.cc ];
 }

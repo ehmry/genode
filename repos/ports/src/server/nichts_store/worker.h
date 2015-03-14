@@ -1,46 +1,64 @@
+/*
+ * \brief  Worker, the Nichts_store session component
+ * \author Emery Hemingway
+ * \date   2015-03-13
+ */
+
 #ifndef _NICHTS_STORE__WORKER_H_
 #define _NICHTS_STORE__WORKER_H_
 
 /* Genode includes */
+#include <cap_session/cap_session.h>
 #include <base/affinity.h>
-#include <base/signal.h>
-#include <root/component.h>
-#include <ram_session/client.h>
-#include <timer_session/connection.h>
-#include <file_system_session/connection.h>
-#include <nichts_store_session/nichts_store_session.h>
 #include <base/printf.h>
+#include <base/service.h>
+#include <base/signal.h>
+#include <ram_session/client.h>
+#include <root/component.h>
 #include <os/config.h>
 #include <os/server.h>
-#include <util/token.h>
+#include <file_system_session/connection.h>
+#include <timer_session/connection.h>
+#include <nichts_store_session/nichts_store_session.h>
 
-/* Nix native includes */
-//#include <nichts/types.h>
-//#include <nix/main.h>
-
+/* Local includes */
+#include "builder.h"
 #include "derivation.h"
+#include "noux.h"
+
 
 namespace Nichts_store {
+
 	class Worker;
+
+	/**
+	 * Return base-name portion of null-terminated path string
+	 */
+	static char const *basename(char const *path)
+	{
+		char const *start = path;
+
+		for (; *path; path++)
+			if (*path == '/')
+				start = path + 1;
+
+		return start;
+	}
+
+	Genode::Dataspace_capability noux_ds_cap()
+	{
+		try {
+			static Genode::Rom_connection rom("noux");
+			static Genode::Dataspace_capability noux_ds = rom.dataspace();
+			return noux_ds;
+		} catch (...) { PERR("failed to obtain Noux binary dataspace"); }
+
+		return Genode::Dataspace_capability();
+	}
+
 };
 
 using namespace Genode;
-
-
-/**
- * Return base-name portion of null-terminated path string
- */
-static char const *basename(char const *path)
-{
-	char const *start = path;
-
-	for (; *path; path++)
-		if (*path == '/')
-			start = path + 1;
-
-	return start;
-}
-
 
 class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 {
@@ -48,9 +66,11 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 		Affinity const           _affinity;
 		Ram_session_client       _ram;
-		//Allocator                _alloc;
+		//Allocator              _alloc;
 		Genode::Allocator_avl    _fs_block_alloc;
 		File_system::Connection  _fs;
+		Cap_session              *_cap;
+		Service_registry        &_parent_services;
 
 		/* Timer session for issuing timeouts. */
 		Timer::Connection _timer;
@@ -59,33 +79,6 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 		Signal_context    _success_context;
 		Signal_context    _failure_context;
 		Signal_receiver   _sig_rec;
-
-		File_system::Dir_handle dir_of(const char *path, bool create)
-		{
-			using namespace File_system;
-				int i;
-				for (i = Genode::strlen(path); i != 0; --i)
-					if (path[i] == '/')
-						break;
-
-				if (i) {
-					char path_[++i];
-					Genode::memcpy(path_, path, i-1);
-					path_[i] = '\0';
-					try {
-						return _fs.dir(path_, create);
-					}
-					catch (Lookup_failed) {
-						/* Apply this funtion to the parent and close the result. */
-						_fs.close(dir_of(path_, true));
-						return _fs.dir(path_, create);
-					}
-					catch (Node_already_exists) {
-						return _fs.dir(path_, false);
-					}
-				}
-				return _fs.dir("/", false);
-		}
 
 		/**
 		 * Create a unique temporary directory using `name'
@@ -106,10 +99,10 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 			/* Create a new and unique subdir. */
 			int counter(1);
-			char unique[File_system::Path::MAX_SIZE];
+			char unique[File_system::MAX_PATH_LEN];
 			while (1) {
 				Genode::snprintf(&unique[0], sizeof(unique),
-				                 "/tmp/%s-%d", name, counter);
+				                 "/nix/tmp/%s-%d", name, counter);
 				try {
 					_fs.dir(unique, true);
 					break;
@@ -119,33 +112,25 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 			return File_system::Path(unique);
 		};
 
-		void start_builder_noux(Derivation &drv);
-
-		void start_builder(Derivation &drv)
-		{
-			//if (drv.platform.rfind("noux"))
-				start_builder_noux(drv);
-			//else {
-			//	PERR("building %s is unsupported", drv.platform.c_str());
-			//	throw Nichts_store::Build_failure();
-			//}
-		};
-
 		void register_outputs(Derivation &drv)
 		{
 			PDBG("not implemented");
 		}
 
-		Nichts_store::Derivation read_derivation(char const *path)
+		void load_derivation(Derivation &drv, char const *path)
 		{
 			using namespace File_system;
 
 			File_handle file;
 			File_system::Session::Tx::Source &source = *_fs.tx();
 			File_system::Packet_descriptor packet_in, packet_out;
+			if (strcmp(path, "/nix/store", sizeof("/nix/store") -1)) {
+				PERR("%s is not in the nix store!", path);
+				throw Build_failure();
+			}
 
 			try {
-				Dir_handle dir = dir_of(path, false);
+				Dir_handle dir = _fs.dir("/nix/store", false);
 				file = _fs.file(dir, basename(path), READ_ONLY, false);
 				_fs.close(dir);
 
@@ -158,29 +143,44 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 				packet_out = source.get_acked_packet();
 
-				Derivation drv(source.packet_content(packet_out), packet_out.length());
+				drv.load(source.packet_content(packet_out), packet_out.length());
 
 				source.release_packet(packet_out);
 				source.release_packet(packet_in);
 				_fs.close(file);
-
-				return drv;
 			}
 
-			catch (Genode::Exception &e) {
+			catch (File_system::Exception) {
+				PERR("Failed to read file %s", path);
 				source.release_packet(packet_out);
 				source.release_packet(packet_in);
 				_fs.close(file);
-				throw e;
+				throw Invalid_derivation();
 			}
 		};
 
 		void _realise(const char *drv_path, Nichts_store::Mode mode)
 		{
 			/* The derivation stored at drv_path. */
-			Derivation drv = read_derivation(drv_path);
+			Derivation drv;
+			load_derivation(drv, drv_path);
+			PINF("derivation loaded");
 
-			start_builder(drv);
+			char out_path[MAX_PATH_LEN];
+			drv.path(out_path, sizeof(out_path));
+
+			enum { CONFIG_SIZE = 4096 }; /* This may not be big enough */
+			Genode::Ram_dataspace_capability config_ds =
+				Genode::env()->ram_session()->alloc(CONFIG_SIZE);
+
+			/* Write a config for Noux to the dataspace. */
+			noux_config(config_ds, CONFIG_SIZE, drv);
+
+			Builder child(out_path, _cap,
+			              noux_ds_cap(), config_ds,
+			              _sig_rec.manage(&_success_context),
+			              _sig_rec.manage(&_failure_context),
+			              _parent_services);
 
 			/* Install a timeout before blocking on a signal from the child. */
 			if (!_sig_rec.pending()) {
@@ -188,25 +188,28 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 				enum { FAILSAFE = 43200 };
 				unsigned long timeout(FAILSAFE);
 				try {
-			 	   timeout = Genode::config()->xml_node().attribute_value<unsigned long>("timeout", FAILSAFE);
+					timeout = Genode::config()->xml_node().attribute_value<unsigned long>("timeout", FAILSAFE);
 				} catch (...) {}
 
-				if(timeout)
+				if (timeout)
 					/* Convert from seconds to microseconds. */
 					_timer.trigger_once(timeout* 1000000);
 			}
 
-			Signal signal = _sig_rec.wait_for_signal();
+			Signal_context *ctx = _sig_rec.wait_for_signal().context();
 
-			Signal_context *ctx = signal.context();
+			/* Free the config before handling the exit. */
+			Genode::env()->ram_session()->free(config_ds);
 
 			if (ctx == &_success_context)
 				PLOG("Successfully realised %s", drv_path);
-			else if (ctx == &_failure_context)
+			else if (ctx == &_failure_context) {
+				PERR("builder for %s failed", drv_path);
 				throw Nichts_store::Build_failure();
-			else if (ctx == &_timeout_context)
+			} else if (ctx == &_timeout_context) {
+				PERR("builder for %s timed out", drv_path);
 				throw Nichts_store::Build_timeout();
-			else {
+			} else {
 				PERR("Unknown signal context received");
 				throw Nichts_store::Build_failure();
 			}
@@ -217,15 +220,24 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 	public:
 
+		/**
+		 * Constructor
+		 *
+		 * TODO: should each worker maintain its own sessions thru the parent?
+		 */
 		Worker(Affinity const         &affinity,
 		       Ram_session_capability  ram,
-		       Allocator              *session_alloc)
+		       Allocator              *session_alloc,
+		       Cap_session            *cap,
+		       Service_registry       &parent_services)
 		:
 			_affinity(affinity),
 			_ram(ram),
 			//_alloc(session_alloc),
 			_fs_block_alloc(session_alloc),
-			_fs(_fs_block_alloc)
+			_fs(_fs_block_alloc),
+			_cap(cap),
+			_parent_services(parent_services)
 		{
 			_timer.sigh(_sig_rec.manage(&_timeout_context));
 		}

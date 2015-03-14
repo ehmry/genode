@@ -1,3 +1,9 @@
+/*
+ * \brief  Aterm formated derivation parsing
+ * \author Emery Hemingway
+ * \date   2015-03-13
+ */
+
 #ifndef _NICHTS_STORE__DERIVATION_H_
 #define _NICHTS_STORE__DERIVATION_H_
 
@@ -8,6 +14,11 @@
 #include <util/list.h>
 #include <util/string.h>
 #include <util/token.h>
+
+#include "aterm_parser.h"
+
+
+using namespace Aterm;
 
 
 namespace Nichts_store {
@@ -22,281 +33,202 @@ namespace Nichts_store {
 		}
 	}
 
+	typedef Genode::List<Aterm::Parser::String> String_list;
+
 	class Derivation {
 
 		public:
 
-			struct Invalid : public Genode::Exception { };
+			struct Output : Genode::List<Output>::Element
+			{
+				Parser::String id;
+				Parser::String path;
+				Parser::String algo;
+				Parser::String hash;
+			};
 
-			typedef ::Genode::Token<Genode::Scanner_policy_identifier_with_underline> Token;
+			struct Input : Genode::List<Input>::Element
+			{
+				Nichts_store::Path path;
+				String_list        ids;
+
+				~Input()
+				{
+					while (ids.first()) {
+						Parser::String *id = ids.first();
+						ids.remove(id);
+						destroy(Genode::env()->heap(), id);
+					}
+				}
+			};
+
+			struct Env_pair : Genode::List<Env_pair>::Element
+			{
+				Parser::String key;
+				Parser::String value;
+
+				Env_pair(Parser::String k, Parser::String v)
+				: key(k), value(v) { }
+			};
 
 		private:
 
-		Token eat_list(Token &t)
-		{
-			if (*(t.start()) == '[') return t.next();
-			throw Invalid();
-		}
-
-		Token end_list(Token &t)
-		{
-			if (*(t.start()) == ']') return t.next();
-			throw Invalid();
-		}
-
-		Token eat_tuple(Token &t)
-		{
-			if (*(t.start()) == '(') return t.next();
-			throw Invalid();
-		}
-
-		Token end_tuple(Token &t)
-		{
-			if (*(t.start()) == ')') return t.next();
-			throw Invalid();
-		}
-
-		Token eat_string(Token &t)
-		{
-			if (t.type() == Token::STRING) return t.next();
-			throw Invalid();
-		}
-	
-		Token eat_comma(Token &t)
-		{
-			if (*(t.start()) == ',') return t.next();
-			throw Invalid();
-		}
-
-		/* TODO: PATH_MAX_LEN is already defined in the RPC session. */
-		enum { ID_MAX_LEN = 128 };
-		enum { PATH_MAX_LEN = 512 };
-		enum { ARG_MAX_LEN = 1024 };
-
-		class Id :
-			public Genode::String<ID_MAX_LEN>,
-			public Genode::List<Id>::Element
-		{
-			public:
-				Id() { };
-				Id(Token &t)
-					: Genode::String<ID_MAX_LEN>(t.start(), t.len()) { };
-		};
-
-		class Path :
-			public Genode::String<PATH_MAX_LEN>,
-			public Genode::List<Path>::Element
-		{
-			public:
-				Path() { };
-				Path(Token &t)
-					: Genode::String<PATH_MAX_LEN>(t.start(), t.len()) { };
-		};
-
-		class Arg :
-			public Genode::String<ARG_MAX_LEN>,
-			public Genode::List<Arg>::Element
-		{
-			public:
-				Arg() { };
-				Arg(Token &t)
-					: Genode::String<ARG_MAX_LEN>(t.start(), t.len()) { };
-		};
-
-		struct Output : public Genode::List<Output>::Element {
-			Id id;
-			Path path;
-			Token hash_algo;
-			Token hash;
-		};
-
-		struct Input : public Genode::List<Input>::Element {
-			Token path;
-			Genode::List<Id> ids;
-
-			~Input()
-			{
-				while (ids.first()) {
-					auto t = ids.first();
-					ids.remove(t);
-					destroy(Genode::env()->heap(), t);
-				}
-			}
-		};
+			Genode::List<Output>   _outputs;
+			Genode::List<Input>    _inputs;
+			String_list            _sources;
+			Parser::String         _platform;
+			Parser::String         _builder;
+			String_list            _args;
+			Genode::List<Env_pair> _env;
+			char                  *_buf;
 
 		public:
 
-			struct Env_pair : public Genode::List<Env_pair>::Element {
-				Token key, value;
-				Env_pair (Token &k, Token &v) : key(k), value(v) { };
-			};
-
-			Genode::List<Output>   outputs;
-			Genode::List<Input>    inputs;
-			Genode::List<Path>     sources;
-			Token                  platform;
-			Path                   _builder;
-			Genode::List<Arg>      args;
-			Genode::List<Env_pair> _env;
-
-			/**
-			 * Constructor
-			 */
-			Derivation(char const *buf, int len)
+			void load(char const *buf, int len)
 			{
-				if (Genode::strcmp(buf, "Derive", sizeof("Derive") -1 )) {
-					throw Invalid();
-				}
-				Token t(buf, len);
-				t = t.next(); t = eat_tuple(t);
+				_buf = new (Genode::env()->heap()) char[len];
 
-				/*******************
-				 ** Read outputs. **
-				 *******************/
-				t = eat_list(t);
-				for (t = eat_tuple(t); ; t = eat_tuple(t)) {
-					Output *o = new (Genode::env()->heap()) Output;
-					o->id = Id(t);                   t = eat_string(t);
-					t = eat_comma(t);
-					o->path = Path(t);           t = eat_string(t);
+				memcpy(_buf, buf, len);
+				Aterm::Parser parser(_buf, len);
 
-					t = o->hash_algo = eat_comma(t); t = eat_string(t);
-					t = o->hash = eat_comma(t);      t = eat_string(t);
-					outputs.insert(o);
+				parser.constructor("Derive", [&]
+				{
+					parser.list([&]
+					{
+						parser.tuple([&]
+						{
+							Output *o = new (Genode::env()->heap()) Output;
 
-					t = end_tuple(t);
-					if (t[0] != ',') break;
-					t = eat_comma(t);
-				};
-				t = end_list(t);
-				t = eat_comma(t);
+							o->id   = parser.string();
+							o->path = parser.string();
+							o->algo = parser.string();
+							o->hash = parser.string();
 
-				/*****************************
-				 ** Read input derivations. **
-				 *****************************/
-				t = eat_list(t);
-				for (t = eat_tuple(t); ; t = eat_tuple(t)) {
-					Input *i = new (Genode::env()->heap()) Input;
-					i->path = t; t = eat_string(t);
-					t = eat_comma(t);
-					t = eat_list(t);
-					while (1) {
-						Id *id = new (Genode::env()->heap()) Id(t);
-						t = eat_string(t);
-						i->ids.insert(id);
+							_outputs.insert(o);
+						});
+					});
 
-						if (t[0] != ',') break;
-						t = eat_comma(t);
+					parser.list([&]
+					{
+						parser.tuple([&]
+						{
+							Input *i = new (Genode::env()->heap()) Input;
+							Parser::String p = parser.string();
+							i->path = Path(p.start(), p.len());
+							parser.list([&] {
+								i->ids.insert(new (Genode::env()->heap())
+									Parser::String(parser.string()));
+							});
+							_inputs.insert(i);
+						});
+					});
+
+					parser.list([&]
+					{
+						_sources.insert(new (Genode::env()->heap())
+							Parser::String(parser.string()));
+					});
+
+					_platform = parser.string();
+					_builder  = parser.string();
+				
+					String_list reverse;
+					parser.list([&]
+					{
+						Parser::String *arg = new (Genode::env()->heap())
+							Parser::String(parser.string());
+
+						reverse.insert(arg);
+					});
+					while (Parser::String *arg = reverse.first()) {
+						reverse.remove(arg);
+						_args.insert(arg);
 					}
-					inputs.insert(i);
-					t = end_list(t);
-					t = end_tuple(t);
 
-					if (t[0] != ',') break;
-					t = eat_comma(t);
-				}
-				t = end_list(t);
-				t = eat_comma(t);
+					parser.list([&]
+					{
+						parser.tuple([&]
+						{
+							Env_pair *p = new (Genode::env()->heap())
+								Env_pair(parser.string(), parser.string());
 
-				/*************************
-				 ** Read simple inputs. **
-				 *************************/
-				t = eat_list(t);
-				while (1) {
-					Path *p = new (Genode::env()->heap()) Path(t);
-					sources.insert(p);
-					t = eat_string(t);
-
-					if (t[0] != ',') break;
-					t = eat_comma(t);
-				}
-				t = end_list(t);
-				t = eat_comma(t);
-
-
-				/********************
-				 ** Read platform. **
-				 ********************/
-				platform = t;
-				t = eat_string(t);
-				t = eat_comma(t);
-
-				/*******************
-				 ** Read builder. **
-				 *******************/
-				_builder = Path(t);
-				t = eat_string(t);
-				t = eat_comma(t);
-
-
-				/****************
-				 ** Read args. **
-				 ****************/
-				t = eat_list(t);
-				while (1) {
-					Arg *a = new (Genode::env()->heap()) Arg(t);
-					args.insert(a);
-					t = eat_string(t);
-
-					if (t[0] != ',') break;
-					t = eat_comma(t);
-				}
-				t = end_list(t);
-				t = eat_comma(t);
-
-				/***********************
-				 ** Read environment. **
-				 ***********************/
-				t = eat_list(t);
-				while (1) {
-					Token k, v;
-					t = k = eat_tuple(t);
-					t = eat_string(t);
-					t = v = eat_comma(t);
-					t = eat_string(t);
-
-					Env_pair *p =  new (Genode::env()->heap())
-						Env_pair { k, v };
-
-					_env.insert(p);
-
-					t = end_tuple(t);
-					if (t[0] != ',') break;
-					t = eat_comma(t);
-				}
-				t = end_list(t);
-
-				t = end_tuple(t);
+							_env.insert(p);
+						});
+					});
+				});
 			}
 
 			~Derivation()
 			{
-				clear<Output>(outputs);
+				clear<Output>(_outputs);
 
-				while (inputs.first()) {
-					Input *i = inputs.first();
-					clear<Id>(i->ids);
-					inputs.remove(i);
+				while (_inputs.first()) {
+					Input *i = _inputs.first();
+					clear<Parser::String>(i->ids);
+					_inputs.remove(i);
 					destroy(Genode::env()->heap(), i);
 				}
 
-				clear<Path>(sources);
-				clear<Arg>(args);
+				clear<Parser::String>(_sources);
+				clear<Parser::String>(_args);
 				clear<Env_pair>(_env);
+
+				destroy(Genode::env()->heap(), _buf);
 			}
 
-			char const *builder()
+			/**
+			 * Return the front of the outputs linked list.
+			 */
+			Output *output() { return _outputs.first(); }
+
+			/**
+			 * Return the front of the inputs linked list.
+			 */
+			Input *input() { return _inputs.first(); }
+
+			/**
+			 * Return the front of the sources linked list.
+			 */
+			Parser::String *source() { return _sources.first(); }
+
+			/**
+			 * Return the builder platform.
+			 */
+			void platform(char *dest, int len)
 			{
-				return _builder.string();
+				_platform.string(dest, len);
 			}
 
-			char const *path()
+			/**
+			 * Return the builder executable filename.
+			 */
+			void builder(char *dest, int len)
 			{
-				Output *o = outputs.first();
-				return o->path.string();
+				_builder.string(dest, len);
 			}
 
+			/**
+			 * Return the store path of the first output.
+			 */
+			void path(char *dest, size_t len)
+			{
+				Output *o = _outputs.first();
+				if (!o) throw Build_failure();
+				o->path.string(dest, len);
+			}
+
+			/**
+			 * Return a pointer to the front of the
+			 * builder arguments linked list.
+			 */
+			Parser::String *arg() { return _args.first(); }
+
+			/**
+			 * Return a pointer to the front of the
+			 * builder environment linked list.
+			 */
 			Env_pair *env() { return _env.first(); }
+
 	};
 
 };

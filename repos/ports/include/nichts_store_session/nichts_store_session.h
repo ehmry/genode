@@ -23,9 +23,10 @@ namespace Nichts_store {
 
 	typedef Rpc_in_buffer<MAX_PATH_LEN> Path;
 
-	class Exception     : public Genode::Exception { };
-	class Build_timeout : public Exception { };
-	class Build_failure : public Exception { };
+	struct Exception  : Genode::Exception { };
+	struct Invalid_derivation : Exception { };
+	struct Build_timeout      : Exception { };
+	struct Build_failure      : Exception { };
 
 	struct Session : public Genode::Session
 	{
@@ -38,9 +39,11 @@ namespace Nichts_store {
 		 * Realise the ouputs of a derivation file in the Nichts store
 		 * according to the given mode.
 		 *
-		 * \throw Build_timeout  build process has timed out
-		 * \throw Build_failure  build process has failed, this
-		 *                       indicates a permanent failure
+		 * \throw Invalid_derivation  derivation file was incompatible
+		 *                            or failed to parse
+		 * \throw Build_timeout       build process has timed out
+		 * \throw Build_failure       build process has failed, this
+		 *                            indicates a permanent failure
 		 */
 		virtual void realise(Path const  &drvPath, Mode mode) = 0;
 
@@ -50,8 +53,8 @@ namespace Nichts_store {
 
 		/* TODO: make this function throw exceptions. */
 		GENODE_RPC_THROW(Rpc_realise, void, realise,
-		                 GENODE_TYPE_LIST(),//Build_timeout,
-		                                  //Build_failure)
+		                 GENODE_TYPE_LIST(Invalid_derivation,
+		                                  Build_timeout, Build_failure),
 		                 Path const&, Mode);
 		GENODE_RPC_INTERFACE(Rpc_realise);
 	};
