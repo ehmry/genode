@@ -17,8 +17,19 @@ int main(int, char **)
 
 	Genode::config()->xml_node().for_each_sub_node("drv", [&] (Genode::Xml_node drv_node) {
 		char path[Nichts_store::MAX_PATH_LEN];
-
 		drv_node.value(path, sizeof(path));
-		srv.realise(path);
+
+		try {
+			srv.realise(path);
+		}
+		catch (Nichts_store::Invalid_derivation) {
+			PERR("%s was invalid", path);
+		}
+		catch (Nichts_store::Build_timeout) {
+			PERR("%s timed out", path);
+		}
+		catch (Nichts_store::Build_failure) {
+			PERR("%s failed to build", path);
+		}
 	});
 }
