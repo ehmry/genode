@@ -70,7 +70,7 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 			 * Terminal is a service that should be managed by each worker.
 			 */
 			static char const *service_names[] = {
-				"LOG", "ROM", "CAP", "CPU", "SIGNAL", "RAM", "RM", "PD",
+				"LOG", "ROM", "CAP", "CPU", "SIGNAL", "RM", "PD",
 				"Timer", "File_system", "Terminal", 0 };
 			for (unsigned i = 0; service_names[i]; ++i)
 				_parent_services.insert(new (Genode::env()->heap()) Genode::Parent_service(service_names[i]));

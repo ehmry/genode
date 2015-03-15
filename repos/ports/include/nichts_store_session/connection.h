@@ -11,7 +11,7 @@ namespace Nichts_store {
 	{
 		Connection()
 		:
-			Genode::Connection<Session>(session("ram_quota=1M")),
+			Genode::Connection<Session>(session("ram_quota=32M")),
 			Session_client(cap())
 		{}
 	};
