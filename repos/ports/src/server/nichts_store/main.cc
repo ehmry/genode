@@ -65,10 +65,13 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 			/*
 			 * Whitelist of services that should be routed
 			 * from our parent to our builders.
+			 *
+			 * TODO:
+			 * Terminal is a service that should be managed by each worker.
 			 */
 			static char const *service_names[] = {
-				"LOG", "ROM", "CAP", "CPU", "SIGNAL", "RAM", "RM",
-				"Timer", "File_system", 0 };
+				"LOG", "ROM", "CAP", "CPU", "SIGNAL", "RAM", "RM", "PD",
+				"Timer", "File_system", "Terminal", 0 };
 			for (unsigned i = 0; service_names[i]; ++i)
 				_parent_services.insert(new (Genode::env()->heap()) Genode::Parent_service(service_names[i]));
 

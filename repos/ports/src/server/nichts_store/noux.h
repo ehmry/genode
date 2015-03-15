@@ -131,7 +131,6 @@ namespace Nichts_store {
 			});
 		});
 
-		PLOG("%s", config_ds_addr);
 		Genode::env()->rm_session()->detach(config_ds_addr);
 	};
 

@@ -83,8 +83,13 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 		} _label;
 
+		Signal_context    _timeout_context;
+		Signal_context    _success_context;
+		Signal_context    _failure_context;
+		Signal_receiver   _sig_rec;
+
 		/**
-		 * Resources that may be made available to builders.
+		 * Resources made available to builders.
 		 */
 		struct Resources
 		{
@@ -102,7 +107,12 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 				cpu(label, priority, affinity)
 			{
 				ram.ref_account(Genode::env()->ram_session_cap());
-				Genode::env()->ram_session()->transfer_quota(ram.cap(), ram_quota);
+				Genode::env()->ram_session()->transfer_quota(ram.cap(), ram_quota);			}
+			
+			void sigh(Signal_context_capability sig_cap)
+			{
+				/* register default exception handler */
+				cpu.exception_handler(Thread_capability(), sig_cap);
 			}
 		} _resources;
 
@@ -115,11 +125,6 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 		/* Timer session for issuing timeouts. */
 		Timer::Connection _timer;
-
-		Signal_context    _timeout_context;
-		Signal_context    _success_context;
-		Signal_context    _failure_context;
-		Signal_receiver   _sig_rec;
 
 	public:
 
@@ -142,6 +147,9 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 			_parent_services(parent_services)
 		{
 			_timer.sigh(_sig_rec.manage(&_timeout_context));
+
+			/* Connecting this signal blocks the child from starting. */
+			//_resources.sigh(_sig_rec.manage(&_failure_context));
 		}
 
 	private:
@@ -231,9 +239,6 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 			Derivation drv(&_session_alloc);
 			load_derivation(drv, drv_path);
 
-			char out_path[MAX_PATH_LEN];
-			drv.path(out_path, sizeof(out_path));
-
 			enum { CONFIG_SIZE = 4096 }; /* This may not be big enough */
 			Genode::Ram_dataspace_capability config_ds =
 				_resources.ram.alloc(CONFIG_SIZE);
@@ -241,11 +246,13 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 			/* Write a config for Noux to the dataspace. */
 			noux_config(config_ds, CONFIG_SIZE, drv);
 
-			Builder child(out_path, _cap,
+			Builder child(_label.buf, Native_pd_args(), _cap,
 			              noux_ds_cap(), config_ds,
 			              _sig_rec.manage(&_success_context),
 			              _sig_rec.manage(&_failure_context),
-			              _parent_services);
+			              _parent_services,
+			              _resources.ram,
+			              _resources.cpu);
 
 			/* Install a timeout before blocking on a signal from the child. */
 			if (!_sig_rec.pending()) {
@@ -261,6 +268,7 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 					_timer.trigger_once(timeout* 1000000);
 			}
 
+			PINF("waiting for signal...");
 			Signal_context *ctx = _sig_rec.wait_for_signal().context();
 
 			/* Free the config before handling the exit. */
