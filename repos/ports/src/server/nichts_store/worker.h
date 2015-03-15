@@ -8,8 +8,9 @@
 #define _NICHTS_STORE__WORKER_H_
 
 /* Genode includes */
-#include <cap_session/cap_session.h>
+#include <base/snprintf.h>
 #include <base/affinity.h>
+#include <base/allocator_guard.h>
 #include <base/printf.h>
 #include <base/service.h>
 #include <base/signal.h>
@@ -17,6 +18,7 @@
 #include <root/component.h>
 #include <os/config.h>
 #include <os/server.h>
+#include <cap_session/cap_session.h>
 #include <file_system_session/connection.h>
 #include <timer_session/connection.h>
 #include <nichts_store_session/nichts_store_session.h>
@@ -60,13 +62,52 @@ namespace Nichts_store {
 
 using namespace Genode;
 
+
+/**
+ * Worker represents a build 'slot' at the server.
+ */
 class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 {
 	private:
 
-		Affinity const           _affinity;
-		Ram_session_client       _ram;
-		//Allocator              _alloc;
+		struct Label
+		{
+			char buf[sizeof("worker_x_y")];
+
+			Label(Affinity const &affinity)
+			{
+				snprintf(buf, sizeof(buf), "worker_%d_%d",
+				         affinity.location().xpos(),
+				         affinity.location().ypos());
+			}
+
+		} _label;
+
+		/**
+		 * Resources that may be made available to builders.
+		 */
+		struct Resources
+		{
+			Affinity        affinity;
+			Ram_connection  ram;
+			Cpu_connection  cpu;
+			Rm_connection   rm;
+
+
+			Resources(char const *label, long priority,
+			          Affinity const &aff, size_t ram_quota)
+			:
+				affinity(aff),
+				ram(label),
+				cpu(label, priority, affinity)
+			{
+				ram.ref_account(Genode::env()->ram_session_cap());
+				Genode::env()->ram_session()->transfer_quota(ram.cap(), ram_quota);
+			}
+		} _resources;
+
+		Genode::Allocator_guard  _session_alloc;
+
 		Genode::Allocator_avl    _fs_block_alloc;
 		File_system::Connection  _fs;
 		Cap_session              *_cap;
@@ -79,6 +120,31 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 		Signal_context    _success_context;
 		Signal_context    _failure_context;
 		Signal_receiver   _sig_rec;
+
+	public:
+
+		/**
+		 * Constructor
+		 */
+		Worker(long                    priority,
+		       Affinity const         &affinity,
+		       Allocator              *session_alloc,
+		       size_t                  ram_quota,
+		       Cap_session            *cap,
+		       Service_registry       &parent_services)
+		:
+			_label(affinity),
+			_resources(_label.buf, priority, affinity, ram_quota),
+			_session_alloc(session_alloc, ram_quota),
+			_fs_block_alloc(&_session_alloc),
+			_fs(_fs_block_alloc),
+			_cap(cap),
+			_parent_services(parent_services)
+		{
+			_timer.sigh(_sig_rec.manage(&_timeout_context));
+		}
+
+	private:
 
 		/**
 		 * Create a unique temporary directory using `name'
@@ -162,16 +228,15 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 		void _realise(const char *drv_path, Nichts_store::Mode mode)
 		{
 			/* The derivation stored at drv_path. */
-			Derivation drv;
+			Derivation drv(&_session_alloc);
 			load_derivation(drv, drv_path);
-			PINF("derivation loaded");
 
 			char out_path[MAX_PATH_LEN];
 			drv.path(out_path, sizeof(out_path));
 
 			enum { CONFIG_SIZE = 4096 }; /* This may not be big enough */
 			Genode::Ram_dataspace_capability config_ds =
-				Genode::env()->ram_session()->alloc(CONFIG_SIZE);
+				_resources.ram.alloc(CONFIG_SIZE);
 
 			/* Write a config for Noux to the dataspace. */
 			noux_config(config_ds, CONFIG_SIZE, drv);
@@ -199,7 +264,7 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 			Signal_context *ctx = _sig_rec.wait_for_signal().context();
 
 			/* Free the config before handling the exit. */
-			Genode::env()->ram_session()->free(config_ds);
+			_resources.ram.free(config_ds);
 
 			if (ctx == &_success_context)
 				PLOG("Successfully realised %s", drv_path);
@@ -219,28 +284,6 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 		}
 
 	public:
-
-		/**
-		 * Constructor
-		 *
-		 * TODO: should each worker maintain its own sessions thru the parent?
-		 */
-		Worker(Affinity const         &affinity,
-		       Ram_session_capability  ram,
-		       Allocator              *session_alloc,
-		       Cap_session            *cap,
-		       Service_registry       &parent_services)
-		:
-			_affinity(affinity),
-			_ram(ram),
-			//_alloc(session_alloc),
-			_fs_block_alloc(session_alloc),
-			_fs(_fs_block_alloc),
-			_cap(cap),
-			_parent_services(parent_services)
-		{
-			_timer.sigh(_sig_rec.manage(&_timeout_context));
-		}
 
 		/*********************************
 		 ** Nichts_store session interface **

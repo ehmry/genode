@@ -23,16 +23,6 @@ using namespace Aterm;
 
 namespace Nichts_store {
 
-	template <typename T>
-	static void clear(Genode::List<T> list)
-	{
-		while (list.first()) {
-			T *e = list.first();
-			list.remove(e);
-			destroy(Genode::env()->heap(), e);
-		}
-	}
-
 	typedef Genode::List<Aterm::Parser::String> String_list;
 
 	class Derivation {
@@ -47,19 +37,25 @@ namespace Nichts_store {
 				Parser::String hash;
 			};
 
-			struct Input : Genode::List<Input>::Element
+			class Input : public Genode::List<Input>::Element
 			{
-				Nichts_store::Path path;
-				String_list        ids;
+				private:
+					Genode::Allocator *_alloc;
 
-				~Input()
-				{
-					while (ids.first()) {
-						Parser::String *id = ids.first();
-						ids.remove(id);
-						destroy(Genode::env()->heap(), id);
+				public:
+					Nichts_store::Path  path;
+					String_list         ids;
+
+					Input(Genode::Allocator *alloc) : _alloc(alloc) { };
+
+					~Input()
+					{
+						while (ids.first()) {
+							Parser::String *id = ids.first();
+							ids.remove(id);
+							destroy(_alloc, id);
+						}
 					}
-				}
 			};
 
 			struct Env_pair : Genode::List<Env_pair>::Element
@@ -73,6 +69,7 @@ namespace Nichts_store {
 
 		private:
 
+			Genode::Allocator     *_alloc;
 			Genode::List<Output>   _outputs;
 			Genode::List<Input>    _inputs;
 			String_list            _sources;
@@ -84,9 +81,12 @@ namespace Nichts_store {
 
 		public:
 
+			Derivation(Genode::Allocator *alloc) : _alloc(alloc) {};
+
 			void load(char const *buf, int len)
 			{
-				_buf = new (Genode::env()->heap()) char[len];
+				if (_buf) throw Build_failure();
+				_buf = new (_alloc) char[len];
 
 				memcpy(_buf, buf, len);
 				Aterm::Parser parser(_buf, len);
@@ -97,7 +97,7 @@ namespace Nichts_store {
 					{
 						parser.tuple([&]
 						{
-							Output *o = new (Genode::env()->heap()) Output;
+							Output *o = new (_alloc) Output;
 
 							o->id   = parser.string();
 							o->path = parser.string();
@@ -112,11 +112,11 @@ namespace Nichts_store {
 					{
 						parser.tuple([&]
 						{
-							Input *i = new (Genode::env()->heap()) Input;
+							Input *i = new (_alloc) Input(_alloc);
 							Parser::String p = parser.string();
 							i->path = Path(p.start(), p.len());
 							parser.list([&] {
-								i->ids.insert(new (Genode::env()->heap())
+								i->ids.insert(new (_alloc)
 									Parser::String(parser.string()));
 							});
 							_inputs.insert(i);
@@ -125,7 +125,7 @@ namespace Nichts_store {
 
 					parser.list([&]
 					{
-						_sources.insert(new (Genode::env()->heap())
+						_sources.insert(new (_alloc)
 							Parser::String(parser.string()));
 					});
 
@@ -135,7 +135,7 @@ namespace Nichts_store {
 					String_list reverse;
 					parser.list([&]
 					{
-						Parser::String *arg = new (Genode::env()->heap())
+						Parser::String *arg = new (_alloc)
 							Parser::String(parser.string());
 
 						reverse.insert(arg);
@@ -149,13 +149,23 @@ namespace Nichts_store {
 					{
 						parser.tuple([&]
 						{
-							Env_pair *p = new (Genode::env()->heap())
+							Env_pair *p = new (_alloc)
 								Env_pair(parser.string(), parser.string());
 
 							_env.insert(p);
 						});
 					});
 				});
+			}
+
+			template <typename T>
+			void clear(Genode::List<T> list)
+			{
+				while (list.first()) {
+					T *e = list.first();
+					list.remove(e);
+					destroy(_alloc, e);
+				}
 			}
 
 			~Derivation()
@@ -166,14 +176,14 @@ namespace Nichts_store {
 					Input *i = _inputs.first();
 					clear<Parser::String>(i->ids);
 					_inputs.remove(i);
-					destroy(Genode::env()->heap(), i);
+					destroy(_alloc, i);
 				}
 
 				clear<Parser::String>(_sources);
 				clear<Parser::String>(_args);
 				clear<Env_pair>(_env);
 
-				destroy(Genode::env()->heap(), _buf);
+				destroy(_alloc, _buf);
 			}
 
 			/**

@@ -8,6 +8,7 @@
 #include <base/service.h>
 #include <root/component.h>
 #include <os/server.h>
+#include <util/arg_string.h>
 #include <cap_session/connection.h>
 #include <nichts_store_session/nichts_store_session.h>
 
@@ -43,7 +44,10 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 		 */
 		Worker *_create_session(const char *args, Affinity const &affinity) override
 		{
-			return new(md_alloc()) Worker(affinity, _ram, md_alloc(), &_cap, _parent_services);
+			unsigned long prio = Arg_string::find_arg(args, "priority").long_value(0);
+			size_t const ram_quota = Arg_string::find_arg(args, "ram_quota").ulong_value(0);
+
+			return new(md_alloc()) Worker(prio, affinity, md_alloc(), ram_quota, &_cap, _parent_services);
 		}		
 
 	public:
