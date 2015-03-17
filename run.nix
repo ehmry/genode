@@ -13,11 +13,13 @@
 with builtins;
 
 let
+
+  linuxRun = import ./repos/base-linux/tool/run { inherit tool pkgs; };
+  novaRun  = import ./repos/base-nova/tool/run  { inherit tool pkgs; };
+
   run =
-      if system == "i686-linux" then linuxRun else
-      if system == "x86_64-linux" then linuxRun else
-      if system == "i686-nova" then novaRun else
-      if system == "x86_64-nova" then novaRun else
+      if spec.isLinux then linuxRun else
+      if spec.isNOVA then novaRun else
       abort "no run environment for ${system}";
 
   # The new rutime tools.
