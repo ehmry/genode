@@ -146,46 +146,7 @@ Path addPermRoot(StoreAPI & store, const Path & _storePath,
 
 void Store::addTempRoot(const Path & path)
 {
-    /* Create the temporary roots file for this process. */
-    if (fdTempRoots == -1) {
-
-        while (1) {
-            fnTempRoots = "/nix/state/temproots";
-
-            AutoCloseFD fdGCLock = openGCLock(ltRead);
-
-            fdTempRoots = openLockFile(fnTempRoots, true);
-
-            fdGCLock.close();
-
-            debug(format("acquiring read lock on ‘%1%’") % fnTempRoots);
-            lockFile(fdTempRoots, ltRead, true);
-
-            /* Check whether the garbage collector didn't get in our
-               way. */
-            struct stat st;
-            if (fstat(fdTempRoots, &st) == -1)
-                throw SysError(format("statting ‘%1%’") % fnTempRoots);
-            if (st.st_size == 0) break;
-
-            /* The garbage collector deleted this file before we could
-               get a lock.  (It won't delete the file after we get a
-               lock.)  Try again. */
-        }
-
-    }
-
-    /* Upgrade the lock to a write lock.  This will cause us to block
-       if the garbage collector is holding our lock. */
-    debug(format("acquiring write lock on ‘%1%’") % fnTempRoots);
-    lockFile(fdTempRoots, ltWrite, true);
-
-    string s = path + '\0';
-    write_file(fdTempRoots, s);
-
-    /* Downgrade to a read lock. */
-    debug(format("downgrading to read lock on ‘%1%’") % fnTempRoots);
-    lockFile(fdTempRoots, ltRead, true);
+	PDBG("not implemented");
 }
 
 

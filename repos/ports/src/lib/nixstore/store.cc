@@ -4,8 +4,6 @@
 /* Genode includes */
 #include <base/printf.h>
 
-
-
 #include "store.hh"
 
 #include "config.h"
@@ -46,7 +44,7 @@
 #include <sqlite3.h>
 
 
-#define NOT_IMPLEMENTED PDBG("%s not implemted", __func__);
+#define NOT_IMP PDBG("%s not implemted", __func__);
 
 /**
  * Return base-name portion of null-terminated path string
@@ -334,105 +332,20 @@ bool Store::path_exists(const char *path)
 }
 
 
-Auto_close_file Store::open_file(Path &path); { return open_file(path.c_str(), bool create); }
-Auto_close_file Store::open_file(char const *path, bool create)
-{
-	using namespace File_system;
-
-	Dir_handle dir;
-	File_handle file;
-	try {
-		dir = dir_of(path, false);
-		file = _fs.file(dir, basename(path), READ_WRITE, create);
-	}
-	catch (Genode::Exception &e) {
-		_fs.close(dir)
-		_fs.close(file);
-		throw e;
-	}
-	_fs.close(dir)
-
-	return Auto_close_file(this, file);
-}
-
-
-void close_handle(File_system::Node_handle &node) { _fs.close(node); }
+void close_handle(File_system::Node_handle &node) { NOT_IMP; }
 
 
 std::string Store::read_file(std::string const &path) { return read_file(path.c_str()); }
 std::string Store::read_file(const char *path)
 {
-	using namespace File_system;
+	NOT_IMP;
 
-	std::string str;
-	File_handle file;
-	File_system::Session::Tx::Source &source = *_fs.tx();
-	File_system::Packet_descriptor packet_in, packet_out;
-
-	try {
-		Dir_handle dir = dir_of(path);
-		file = _fs.file(dir, basename(path), READ_ONLY, false);
-		_fs.close(dir);
-
-		Status st = _fs.status(file);
-
-		packet_in = File_system::Packet_descriptor(source.alloc_packet(st.size), 0, file,
-	                                  File_system::Packet_descriptor::READ, st.size, 0);
-
-		source.submit_packet(packet_in);
-
-		packet_out = source.get_acked_packet();
-
-		str.insert(0, source.packet_content(packet_out), packet_out.length());
-
-	}
-	catch (Genode::Exception &e) {
-		source.release_packet(packet_out);
-		source.release_packet(packet_in);
-		_fs.close(file);
-		throw e;
-	}
-	source.release_packet(packet_out);
-	source.release_packet(packet_in);
-	_fs.close(file);
-	return str;
+	return std::string();
 }
 
 
-std::string Store::write_file(std::string const &path, std::string str)
-{
-	return write_file(path.c_str(), str);
-}
-std::string Store::write_file(const char *path, std::string str)
-{
-	using namespace File_system;
-
-	File_handle file;
-	File_system::Session::Tx::Source &source = *_fs.tx();
-	File_system::Packet_descriptor packet;
-
-	try {
-		Dir_handle dir = dir_of(path);
-		file = _fs.file(dir, basename(path), WRITE_ONLY, false);
-		_fs.close(dir);
-
-		packet = File_system::Packet_descriptor(source.alloc_packet(str.size()), 0, file,
-	                                            File_system::Packet_descriptor::READ, str.size(), 0);
-
-		memcpy(source.packet_content(packet), str.c_str(), str.size());
-
-		source.submit_packet(packet);
-		source.get_acked_packet();
-	}
-	catch (Genode::Exception &e) {
-		source.release_packet(packet);
-		_fs.close(file);
-		throw e;
-	}
-
-	source.release_packet(packet);
-	_fs.close(file);
-}
+void Store::write_file(Path &path, std::string str) { NOT_IMP; }
+void Store::write_file(const char *path, std::string str) { NOT_IMP; }
 
 
 void Store::delete_path(std::string const &path) { return delete_path(path.c_str()); }
@@ -662,13 +575,13 @@ void Store::makeStoreWritable()
 
 void canonicaliseTimestampAndPermissions(const Path & path)
 {
-	NOT_IMPLEMENTED
+	NOT_IMP;
 }
 
 
 void canonicalisePathMetaData(const Path & path, uid_t fromUid)
 {
-	NOT_IMPLEMENTED
+	NOT_IMP;
 }
 
 
@@ -2058,17 +1971,6 @@ bool Store::isStorePath(const Path &path)
 	return isInStore(path)
 		&& path.find('/', sizeof("/nix/store") + 1) == Path::npos;
 }
-
-
-Auto_close_file::Auto_close_file(Store &store, File_system::File_handle, )
-	: _fh(fh), _store(store) { }
-
-
-Auto_close_file::~Auto_close_file()
-{
-	_store.close_handle(_fh);
-}
-
 
 LocalStore::LocalStore(bool)
 {

@@ -36,19 +36,6 @@ typedef std::map<Path, Path> Roots;
 struct Derivation;
 
 
-class Auto_close_file {
-
-	private:
-		File_system::File_handle  _fh;
-		Store                    &_store;
-
-	public:
-		Auto_close_file(File_system::File_handle);
-		~Auto_close_file();
-
-};
-
-
 struct OptimiseStats
 {
     unsigned long filesLinked;
@@ -156,8 +143,6 @@ private:
 		/**
 		 * Open and return a file handle that closes itself on destruction.
 		 */
-		Auto_close_file open_file(char const *path, bool create = false);
-		Auto_close_file open_file(Path &path, bool create = false);
 
 		void close_handle(File_system::Node_handle &);
 
