@@ -1,11 +1,11 @@
-{ linkStaticLibrary, compileLibc, addPrefix }:
+{ linkStaticLibrary, compileLibc, fromLibc, addPrefix }:
 
 linkStaticLibrary {
   name = "libc-net";
   externalObjects = compileLibc {
 
     # needed for name6.c, contains res_private.h
-    externalIncludes = [ "lib/libc/resolv" "sys/rpc" "sys" ];
+    externalIncludes = fromLibc [ "lib/libc/resolv" "sys/rpc" "sys" ];
 
     sources = addPrefix "lib/libc/net/"
       [ # needed for compiling getservbyname() and getservbyport()

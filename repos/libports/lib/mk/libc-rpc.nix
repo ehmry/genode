@@ -1,9 +1,9 @@
-{ linkStaticLibrary, compileLibc }:
+{ linkStaticLibrary, compileLibc, fromLibc }:
 
 linkStaticLibrary {
   name = "libc-rpc";
   externalObjects = compileLibc {
     sources = [ "lib/libc/rpc/bindresvport.c" ];
-    externalIncludes = [ "sys/rpc" "sys" ];
+    externalIncludes = fromLibc [ "sys/rpc" "sys" ];
   };
 }

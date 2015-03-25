@@ -10,9 +10,8 @@
 let
   includes =
     [ ./include
-      ../../../include/lwip
     ];
-  externalIncludes = [ lwipSrc.include ];
+  externalIncludes = [ lwipSrc.include ../../../include/lwip ];
 
   headers = addPrefix "${lwipSrc.include}/lwip/"
     [ "debug.h" "opt.h" "arch.h" "sys.h" ];
