@@ -13,7 +13,7 @@ preparePort {
   };
 
   patches =
-    [ ../patches/dde_ipxe.patch ../patches/i217lm.patch ];
+    [ ../patches/dde_ipxe.patch ../patches/add_devices.patch ];
 
   installPhase = "cp -r src $source";
 }
