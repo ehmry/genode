@@ -3,10 +3,10 @@
 linkComponent rec {
   name = "nic_drv";
   libs = [ dde_ipxe_nic ];
-  objects = [( compileCC {
-    src = ./main.cc;
+  objects = compileCC {
+    src = ../main.cc;
     inherit libs;
-    systemIncludes = [ ../../../include ];
-  } )];
+    includes = [ ../../../../include ../../../../include/dde_ipxe ];
+  };
 
 }
