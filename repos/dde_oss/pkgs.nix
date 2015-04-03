@@ -11,4 +11,4 @@ let
   );
 
 in
-{ driver.audio_out =  callComponent ports' (import ./src/drivers/audio_out); }
+{ drivers.audio_out =  callComponent ports' (import ./src/drivers/audio_out); }
