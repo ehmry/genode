@@ -1,0 +1,27 @@
+The '9p_fs' server provides 'File_system' sessions to a remote 9P file server
+over a TCP connection.
+
+Configuration
+~~~~~~~~~~~~~~~
+
+The connection to the server is configured using the attributes 'addr', 'port'
+and 'message_size'.
+! <config addr="10.0.2.2" port="564" message_size="8192"/>
+The former is required, but the later two default to standard values.
+
+The server maintains a single connection to the 9P server but can support
+multiple client policies. Policy can specify a optional user and file tree,
+though typically the remote server serves a single unamed tree. Client
+sessions are read only by default; the default user is "glenda".
+! <config addr="192.168.16.24">
+!   <policy label="test-libc_vfs" user="glen"/>
+!   <policy label="noux -> tmp"   user="glenda" access="tmp" writable="yes"/>
+! </config>
+
+Limitations
+-----------
+
+* Symbolic links are not included in the 9P2000 protocol. They are available
+  however in the later 9P2000.L protocol, which is not currently supported.
+* Move operations between directories is not implemented.
+* Authentication is not implemented.
