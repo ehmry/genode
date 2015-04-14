@@ -11,10 +11,15 @@ let
   includes =
     [ ./include
     ];
-  externalIncludes = [ lwipSrc.include ../../../include/lwip ];
+  externalIncludes =
+    [ lwipSrc.include
+      ../../../include/lwip
+    ];
 
-  headers = addPrefix "${lwipSrc.include}/lwip/"
-    [ "debug.h" "opt.h" "arch.h" "sys.h" ];
+  headers =
+    [ ../../../include/lwip/arch/cc.h ] ++
+    (addPrefix "${lwipSrc.include}/lwip/"
+      [ "debug.h" "opt.h" "arch.h" "sys.h" ]);
 in
 linkSharedLibrary rec {
   name = "lwip";

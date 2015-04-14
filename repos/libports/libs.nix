@@ -70,9 +70,7 @@ let
   f: attrs:
   f (attrs // {
     includes =
-     (attrs.includes or []) ++ libportsIncludes;
-    externalIncludes =
-     (attrs.externalIncludes or []) ++ osIncludes ++ baseIncludes;
+     (attrs.includes or []) ++ libportsIncludes ++ osIncludes ++ baseIncludes;
   });
 
  compileCC = addIncludes tool.compileCC;
