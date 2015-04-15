@@ -5,14 +5,8 @@
 /* Whether link() works on symlinks. */
 #define CAN_LINK_SYMLINK 1
 
-/* Whether to use the Boehm garbage collector. */
-#define HAVE_BOEHMGC 0
-
 /* Define to 1 if you have the <bzlib.h> header file. */
 #define HAVE_BZLIB_H 1
-
-/* Define to 1 if you have the `chroot' function. */
-#define HAVE_CHROOT 0
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
@@ -28,21 +22,6 @@
 
 /* Whether pubsetbuf is available. */
 #define HAVE_PUBSETBUF 1
-
-/* Define to 1 if you have the <sched.h> header file. */
-#define HAVE_SCHED_H 0
-
-/* Define to 1 if you have the `sched_setaffinity' function. */
-#define HAVE_SCHED_SETAFFINITY 0
-
-/* Define to 1 if you have the `setresuid' function. */
-#define HAVE_SETRESUID 1
-
-/* Define to 1 if you have the `setreuid' function. */
-#define HAVE_SETREUID 1
-
-/* Define to 1 if you have the `statvfs' function. */
-#define HAVE_STATVFS 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
