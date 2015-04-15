@@ -1,0 +1,66 @@
+diff --git a/src/libutil/util.cc b/src/libutil/util.cc
+index dcdb438..a4e588c 100644
+--- a/src/libutil/util.cc
++++ b/src/libutil/util.cc
+@@ -339,46 +339,6 @@ void deletePath(const Path & path, unsigned long long & bytesFreed)
+ }
+ 
+ 
+-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
+-    int & counter)
+-{
+-    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR", "/tmp") : tmpRoot, true);
+-    if (includePid)
+-        return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
+-    else
+-        return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
+-}
+-
+-
+-Path createTempDir(const Path & tmpRoot, const Path & prefix,
+-    bool includePid, bool useGlobalCounter, mode_t mode)
+-{
+-    static int globalCounter = 0;
+-    int localCounter = 0;
+-    int & counter(useGlobalCounter ? globalCounter : localCounter);
+-
+-    while (1) {
+-        checkInterrupt();
+-        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
+-        if (mkdir(tmpDir.c_str(), mode) == 0) {
+-            /* Explicitly set the group of the directory.  This is to
+-               work around around problems caused by BSD's group
+-               ownership semantics (directories inherit the group of
+-               the parent).  For instance, the group of /tmp on
+-               FreeBSD is "wheel", so all directories created in /tmp
+-               will be owned by "wheel"; but if the user is not in
+-               "wheel", then "tar" will fail to unpack archives that
+-               have the setgid bit set on directories. */
+-            if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
+-                throw SysError(format("setting group of directory ‘%1%’") % tmpDir);
+-            return tmpDir;
+-        }
+-        if (errno != EEXIST)
+-            throw SysError(format("creating directory ‘%1%’") % tmpDir);
+-    }
+-}
+-
+-
+ Paths createDirs(const Path & path)
+ {
+     Paths created;
+diff --git a/src/libutil/util.hh b/src/libutil/util.hh
+index 186ee71..dee4bdd 100644
+--- a/src/libutil/util.hh
++++ b/src/libutil/util.hh
+@@ -397,5 +397,10 @@ void ignoreException();
+    denote nesting etc.). */
+ string filterANSIEscapes(const string & s, bool nixOnly = false);
+ 
++/* Get the desired show stats setting from the environment. */
++bool showStats();
++
++/* Get CPU time usage information */
++float cpuTime();
+ 
+ }
