@@ -3,7 +3,7 @@ set qemu $env(qemu)/bin/qemu-system-x86_64
 
 file link $out/config $config
 
-set qemu_args "-kernel [glob $env(kernel)/*] -append \"$env(kernel_args)\" -initrd $env(core)/core,$env(init)/init,$out/config"
+set qemu_args "-kernel [glob $env(kernel)/*] -append serial -initrd $env(core)/core,$env(init)/init,$out/config"
 
 foreach component $env(components) {
 	if [file isdirectory $component] then {
