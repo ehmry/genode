@@ -30,6 +30,7 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 {
 	private:
 
+		Server::Entrypoint    &_ep;
 		Ram_session_capability _ram;
 		Cap_connection         _cap;
 		Service_registry       _parent_services;
@@ -45,9 +46,25 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 		Worker *_create_session(const char *args, Affinity const &affinity) override
 		{
 			unsigned long prio = Arg_string::find_arg(args, "priority").long_value(0);
-			size_t const ram_quota = Arg_string::find_arg(args, "ram_quota").ulong_value(0);
 
-			return new(md_alloc()) Worker(prio, affinity, md_alloc(), ram_quota, &_cap, _parent_services);
+			size_t const ram_quota =
+				Arg_string::find_arg(args, "ram_quota").ulong_value(0);
+
+			File_system::size_t tx_buf_size =
+				Arg_string::find_arg(args, "tx_buf_size").ulong_value(0);
+
+			/*
+			 * Check if donated ram quota suffices for session data,
+			 * and communication buffer.
+			 */
+			size_t session_size = sizeof(Worker) + tx_buf_size;
+			if (max((Genode::size_t)4096, session_size) > ram_quota) {
+				PERR("insufficient `ram_quota', got %ld, need %ld",
+				     ram_quota, session_size);
+				throw Root::Quota_exceeded();
+			}
+			return new(md_alloc())
+				Worker(tx_buf_size, _ep, prio, affinity, md_alloc(), ram_quota, &_cap, _parent_services);
 		}		
 
 	public:
@@ -60,6 +77,7 @@ class Nichts_store::Root_component : public Genode::Root_component<Worker>
 		               Ram_session_capability ram)
 		:
 			Genode::Root_component<Worker>(&ep.rpc_ep(), &md_alloc),
+			_ep(ep),
 			_ram(ram)
 		{
 			/*

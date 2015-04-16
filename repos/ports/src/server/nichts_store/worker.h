@@ -8,6 +8,7 @@
 #define _NICHTS_STORE__WORKER_H_
 
 /* Genode includes */
+#include <nichts_store_session/rpc_object.h>
 #include <base/snprintf.h>
 #include <base/affinity.h>
 #include <base/allocator_guard.h>
@@ -66,9 +67,12 @@ using namespace Genode;
 /**
  * Worker represents a build 'slot' at the server.
  */
-class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
+class Nichts_store::Worker : public Session_rpc_object
 {
 	private:
+
+		/* Packet receiver. */
+		Signal_rpc_member<Worker> _process_packet_dispatcher;
 
 		struct Label
 		{
@@ -126,18 +130,59 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 		/* Timer session for issuing timeouts. */
 		Timer::Connection _timer;
 
+		void _process_packet()
+		{
+			File_system::Packet_descriptor packet = tx_sink()->get_packet();
+
+			/* assume failure by default */
+			packet.succeeded(false);
+			PERR("not proccessing packet");
+			tx_sink()->acknowledge_packet(packet);
+		}
+
+		/**
+		 * Called by signal dispatcher, executed in the context of the main
+		 * thread (not serialized with the RPC functions)
+		 */
+		void _process_packets(unsigned)
+		{
+			while (tx_sink()->packet_avail()) {
+
+				/*
+				 * Make sure that the '_process_packet' function does not
+				 * block.
+				 *
+				 * If the acknowledgement queue is full, we defer packet
+				 * processing until the client processed pending
+				 * acknowledgements and thereby emitted a ready-to-ack
+				 * signal. Otherwise, the call of 'acknowledge_packet()'
+				 * in '_process_packet' would infinitely block the context
+				 * of the main thread. The main thread is however needed
+				 * for receiving any subsequent 'ready-to-ack' signals.
+				 */
+				if (!tx_sink()->ready_to_ack())
+					return;
+
+				_process_packet();
+			}
+		}
+
 	public:
 
 		/**
 		 * Constructor
 		 */
-		Worker(long                    priority,
+		Worker(Genode::size_t          tx_buf_size,
+		       Server::Entrypoint     &ep,
+		       long                    priority,
 		       Affinity const         &affinity,
 		       Allocator              *session_alloc,
 		       size_t                  ram_quota,
 		       Cap_session            *cap,
 		       Service_registry       &parent_services)
 		:
+			Session_rpc_object(env()->ram_session()->alloc(tx_buf_size), ep.rpc_ep()),
+			_process_packet_dispatcher(ep, *this, &Worker::_process_packets),
 			_label(affinity),
 			_resources(_label.buf, priority, affinity, ram_quota),
 			_session_alloc(session_alloc, ram_quota),
@@ -224,8 +269,8 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 				_fs.close(file);
 			}
 
-			catch (File_system::Exception) {
-				PERR("Failed to read file %s", path);
+			catch (File_system::Lookup_failed) {
+				PERR("%s not found in the store", path);
 				source.release_packet(packet_out);
 				source.release_packet(packet_in);
 				_fs.close(file);
@@ -293,18 +338,93 @@ class Nichts_store::Worker : public Rpc_object<Nichts_store::Session, Worker>
 
 	public:
 
-		/*********************************
-		 ** Nichts_store session interface **
-		 *********************************/
+		/***********************************
+		 ** File_system session interface **
+		 ***********************************/
 
-		void realise(Nichts_store::Path const  &drvPath, Nichts_store::Mode mode)
+		File_system::File_handle file(File_system::Dir_handle, const File_system::Name&, File_system::Mode, bool)
+		{
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		File_system::Symlink_handle symlink(File_system::Dir_handle, const File_system::Name&, bool) {
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		File_system::Dir_handle dir(const File_system::Path&, bool)
+		{
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		File_system::Node_handle node(const File_system::Path&)
+		{
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		void close(File_system::Node_handle)
+		{
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		File_system::Status status(File_system::Node_handle)
+		{
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		void control(File_system::Node_handle, File_system::Control)
+		{
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		void unlink(File_system::Dir_handle, const File_system::Name&)
+		{
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		void truncate(File_system::File_handle, File_system::file_size_t)
+		{
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		void move(File_system::Dir_handle, const File_system::Name&, File_system::Dir_handle, const File_system::Name&)
+		{
+			throw File_system::Permission_denied();
+		}
+
+		/*
+		 * This is interested, notify when built?
+		 */
+		void sigh(File_system::Node_handle, Genode::Signal_context_capability)
+		{
+			PDBG("not implemented");
+			throw File_system::Permission_denied();
+		}
+
+		/************************************
+		 ** Nichts_store session interface **
+		 ************************************/
+
+		Store_path hash(File_system::Node_handle node)
+		{
+			return Store_path("not implemented");
+		}
+
+		void realise(Nichts_store::Store_path const  &drvPath, Nichts_store::Mode mode)
 		{
 			PLOG("realise path \"%s\"", drvPath.string());
 			try {
 				_realise(drvPath.string(), mode);
 			}
-			catch (Nichts_store::Exception e) { throw e; }
-			catch (...) { throw Nichts_store::Exception(); }
+			catch (Nichts_store::Exception) { throw Nichts_store::Build_failure(); }
 		}
 
 };
