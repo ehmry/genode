@@ -24,7 +24,7 @@ namespace Nichts_store {
 
 	enum Mode { NORMAL, REPAIR, CHECK };
 
-	typedef Rpc_in_buffer<MAX_PATH_LEN> Path;
+	typedef String<MAX_PATH_LEN> Path;
 
 	struct Exception  : Genode::Exception { };
 	struct Invalid_derivation : Exception { };
@@ -33,11 +33,17 @@ namespace Nichts_store {
 
 	struct Session : public Genode::Session
 	{
-		typedef File_system::Session::Tx Tx;
-
 		static const char *service_name() { return "Nichts_store"; }
 
 		virtual ~Session() { }
+
+		/**
+		 * Hash a node opened with the store File_system
+		 * service and return the final store path. This
+		 * path will not be instantiated until the handle
+		 * is closed on the File_system session.
+		 */
+		Path hash(Node_handle) = 0;
 
 		/**
 		 * Realise the ouputs of a derivation file in the Nichts store
@@ -51,33 +57,11 @@ namespace Nichts_store {
 		 */
 		virtual void realise(Path const  &drvPath, Mode mode) = 0;
 
-		/**
-		 * Return a file handle that can be used to write a file to
-		 * the store. 
-		 */
-		virtual File_system::File_handle add_file(File_system::Name const &name) = 0;
-
-		/**
-		 * Close a file handle and return the hashed store path of the
-		 * result.
-		 *
-		 * (TODO: the return)
-		 */
-		virtual void close_file(File_system::File_handle) = 0;
-
-		/**
-		 * Request client-side packet-stream interface of tx channel
-		 * for importing files.
-		 */
-		virtual Tx::Source *tx() { return 0; }
-
 		/*********************
 		 ** RPC declaration **
 		 *********************/
 
-		GENODE_RPC(Rpc_tx_cap, Capability<Tx>, _tx_cap);
-		GENODE_RPC(Rpc_add_file, File_system::File_handle, add_file, File_system::Name const &);
-		GENODE_RPC(Rpc_close_file, void, close_file, File_system::File_handle);
+		GENODE_RPC(Rpc_hash, Path, hash, File_system::Node_handle);
 		GENODE_RPC_THROW(Rpc_realise, void, realise,
 		                 GENODE_TYPE_LIST(Invalid_derivation,
 		                                  Build_timeout, Build_failure),

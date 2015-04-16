@@ -6,8 +6,9 @@
 #include <packet_stream_tx/client.h>
 #include <file_system_session/file_system_session.h>
 
-
 namespace Nichts_store {
+
+	using namespace File_system;
 
 	class Session_client : public Genode::Rpc_client<Session>
 	{
@@ -35,21 +36,81 @@ namespace Nichts_store {
 			 ** Nichts store interface **
 			 ****************************/
 
+			Store_path hash(Node_handle node)
+			{
+				return call<Rpc_hash>(node);
+			}
+
+			void realise(Store_path const  &drv, Mode mode = NORMAL)
+			{
+				call<Rpc_realise>(drv, mode);
+			}
+
+			/***********************************
+			 ** File-system session interface **
+			 ***********************************/
+
 			Tx::Source *tx() { return _tx.source(); }
 
-			void realise(Path const  &drvPath, Mode mode = NORMAL)
+			File_handle file(Dir_handle dir, Name const &name, File_system::Mode mode, bool create)
 			{
-				call<Rpc_realise>(drvPath, mode);
+				return call<Rpc_file>(dir, name, mode, create);
 			}
 
-			File_system::File_handle add_file(File_system::Name const &name)
+			Symlink_handle symlink(Dir_handle dir, Name const &name, bool create)
 			{
-				return call<Rpc_add_file>(name);
+				return call<Rpc_symlink>(dir, name, create);
 			}
 
-			void close_file(File_system::File_handle handle)
+			Dir_handle dir(Path const &path, bool create)
 			{
-				call<Rpc_close_file>(handle);
+				return call<Rpc_dir>(path, create);
+			}
+
+			Node_handle node(Path const &path)
+			{
+				return call<Rpc_node>(path);
+			}
+
+			void close(Node_handle node)
+			{
+				call<Rpc_close>(node);
+			}
+
+			Status status(Node_handle node)
+			{
+				return call<Rpc_status>(node);
+			}
+
+			void control(Node_handle node, Control control)
+			{
+				call<Rpc_control>(node, control);
+			}
+
+			void unlink(Dir_handle dir, Name const &name)
+			{
+				call<Rpc_unlink>(dir, name);
+			}
+
+			void truncate(File_handle file, file_size_t size)
+			{
+				call<Rpc_truncate>(file, size);
+			}
+
+			void move(Dir_handle from_dir, Name const &from_name,
+			          Dir_handle to_dir,   Name const &to_name)
+			{
+				call<Rpc_move>(from_dir, from_name, to_dir, to_name);
+			}
+
+			void sigh(Node_handle node, Signal_context_capability sigh)
+			{
+				call<Rpc_sigh>(node, sigh);
+			}
+
+			void sync()
+			{
+				call<Rpc_sync>();
 			}
 	};
 
