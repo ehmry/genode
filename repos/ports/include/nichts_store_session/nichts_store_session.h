@@ -1,5 +1,5 @@
 /*
- * \brief Nichts_store session interface
+ * \brief  Nichts_store session interface
  * \author Emery Hemingway
  * \date   2015-03-07
  */
@@ -43,7 +43,7 @@ namespace Nichts_store {
 		 * path will not be instantiated until the handle
 		 * is closed on the File_system session.
 		 */
-		Path hash(Node_handle) = 0;
+		virtual Path hash(File_system::Node_handle) = 0;
 
 		/**
 		 * Realise the ouputs of a derivation file in the Nichts store
@@ -66,7 +66,7 @@ namespace Nichts_store {
 		                 GENODE_TYPE_LIST(Invalid_derivation,
 		                                  Build_timeout, Build_failure),
 		                 Path const&, Mode);
-		GENODE_RPC_INTERFACE(Rpc_tx_cap, Rpc_add_file, Rpc_close_file, Rpc_realise);
+		GENODE_RPC_INTERFACE(Rpc_hash, Rpc_realise);
 	};
 
 }

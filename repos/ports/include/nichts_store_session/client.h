@@ -1,117 +1,32 @@
+/*
+ * \brief  Client-side Nichts_store session interface
+ * \author Emery Hemingway
+ * \date   2015-03-07
+ */
+
 #ifndef _INCLUDE__NICHTS_STORE_SESSION__CLIENT_H_
 #define _INCLUDE__NICHTS_STORE_SESSION__CLIENT_H_
 
 #include <base/rpc_client.h>
-#include <nichts_store_session/capability.h>
-#include <packet_stream_tx/client.h>
-#include <file_system_session/file_system_session.h>
+#include <nichts_store_session/nichts_store_session.h>
+
 
 namespace Nichts_store {
 
-	using namespace File_system;
-
-	class Session_client : public Genode::Rpc_client<Session>
+	struct Session_client : Genode::Rpc_client<Session>
 	{
-		private:
+		Session_client(Genode::Capability<Session> cap)
+		: Genode::Rpc_client<Session>(cap) { }
 
-			Packet_stream_tx::Client<Tx> _tx;
+		Path hash(File_system::Node_handle node)
+		{
+			return call<Rpc_hash>(node);
+		}
 
-		public:
-
-			/**
-			 * Constructor
-			 *
-			 * \param session          session capability
-			 * \param tx_buffer_alloc  allocator used for managing the
-			 *                         transmission buffer
-			 */
-			Session_client(Session_capability  session,
-			               Range_allocator    &tx_buffer_alloc)
-			:
-				Rpc_client<Session>(session),
-				_tx(call<Rpc_tx_cap>(), &tx_buffer_alloc)
-			{ }
-
-			/****************************
-			 ** Nichts store interface **
-			 ****************************/
-
-			Store_path hash(Node_handle node)
-			{
-				return call<Rpc_hash>(node);
-			}
-
-			void realise(Store_path const  &drv, Mode mode = NORMAL)
-			{
-				call<Rpc_realise>(drv, mode);
-			}
-
-			/***********************************
-			 ** File-system session interface **
-			 ***********************************/
-
-			Tx::Source *tx() { return _tx.source(); }
-
-			File_handle file(Dir_handle dir, Name const &name, File_system::Mode mode, bool create)
-			{
-				return call<Rpc_file>(dir, name, mode, create);
-			}
-
-			Symlink_handle symlink(Dir_handle dir, Name const &name, bool create)
-			{
-				return call<Rpc_symlink>(dir, name, create);
-			}
-
-			Dir_handle dir(Path const &path, bool create)
-			{
-				return call<Rpc_dir>(path, create);
-			}
-
-			Node_handle node(Path const &path)
-			{
-				return call<Rpc_node>(path);
-			}
-
-			void close(Node_handle node)
-			{
-				call<Rpc_close>(node);
-			}
-
-			Status status(Node_handle node)
-			{
-				return call<Rpc_status>(node);
-			}
-
-			void control(Node_handle node, Control control)
-			{
-				call<Rpc_control>(node, control);
-			}
-
-			void unlink(Dir_handle dir, Name const &name)
-			{
-				call<Rpc_unlink>(dir, name);
-			}
-
-			void truncate(File_handle file, file_size_t size)
-			{
-				call<Rpc_truncate>(file, size);
-			}
-
-			void move(Dir_handle from_dir, Name const &from_name,
-			          Dir_handle to_dir,   Name const &to_name)
-			{
-				call<Rpc_move>(from_dir, from_name, to_dir, to_name);
-			}
-
-			void sigh(Node_handle node, Signal_context_capability sigh)
-			{
-				call<Rpc_sigh>(node, sigh);
-			}
-
-			void sync()
-			{
-				call<Rpc_sync>();
-			}
+		void realise(Path const  &drvPath, Mode mode = NORMAL)
+		{
+			call<Rpc_realise>(drvPath, mode);
+		}
 	};
 
 }
