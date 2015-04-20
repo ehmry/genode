@@ -301,10 +301,20 @@ class Nichts_store::Session_component : public Rpc_object<Nichts_store::Session,
 			return _fs;
 		}
 
-		Path hash(File_system::Node_handle node)
+		Path hash(File_system::Node_handle node_handle)
 		{
+			Node *node = _sub_fs.lookup(node_handle);
+			Node_lock_guard guard(*node);
+
+			/*
+			 * BLAKE and Skein have the highest software performance,
+			 * yet the lowest hardware perfomance of the NIST finalists.
+			 *
+			 * The hashing is documented in nix/src/libstore/store-api.cc
+			 */
+
 			PINF("%s received server side", __func__);
-			return Path("hash not implemented");
+			return node.hash();
 		}
 
 		void realise(Nichts_store::Path const  &drvPath, Nichts_store::Mode mode)

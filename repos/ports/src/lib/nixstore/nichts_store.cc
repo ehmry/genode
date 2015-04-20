@@ -188,7 +188,8 @@ Store_client::addToStore(const Path & srcPath,
                          bool recursive, HashType hashAlgo,
                          PathFilter & filter, bool repair)
 {
-	PDBG("%s", srcPath.c_str());
+	debug(format("adding ‘%1%’ to the store") % srcPath);
+
 	using namespace File_system;
 	Nichts_store::Path out_path;
 
