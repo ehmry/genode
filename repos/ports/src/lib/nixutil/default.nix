@@ -5,6 +5,7 @@ let
   sourceRoot = "${nixSrc}/src/libutil"; 
   includes = [ ../../../include/nix ];
   headers = [ "${sourceRoot}/types.hh" ];
+  externalIncludes = [ sourceRoot "${nixSrc}/src" ];
 in
 linkSharedLibrary rec {
   name = "nixutil";
@@ -12,16 +13,22 @@ linkSharedLibrary rec {
   libs = [ libc stdcxx ];
 
   objects = compileCC {
-    src = ./util-genode.cc;
-    inherit libs includes headers;
-    externalIncludes = [ "${nixSrc}/src" ];
+    src = ./util.cc;
+    inherit libs includes headers externalIncludes;
   };
 
   externalObjects =
     [ (compileCCRepo {
-        externalIncludes = [ sourceRoot "${nixSrc}/src" ];
-        inherit libs includes headers;
-        sources = "${sourceRoot}/*.cc";
+        inherit libs includes headers externalIncludes;
+        sources = fromDir
+          sourceRoot
+          [ "affinity.cc"
+            "archive.cc"
+            "hash.cc"
+            "regex.cc"
+            "serialise.cc"
+            "xml-writer.cc"
+          ];
       })
 
       # We are not providing an OpenSSL library.

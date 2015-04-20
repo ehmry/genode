@@ -1,14 +1,13 @@
 /*
- * \brief  Worker, the Nichts_store session component
+ * \brief  Nichts_store session component
  * \author Emery Hemingway
  * \date   2015-03-13
  */
 
-#ifndef _NICHTS_STORE__WORKER_H_
-#define _NICHTS_STORE__WORKER_H_
+#ifndef _NICHTS_STORE__STORE_SESSION_H_
+#define _NICHTS_STORE__STORE_SESSION_H_
 
 /* Genode includes */
-#include <nichts_store_session/rpc_object.h>
 #include <base/snprintf.h>
 #include <base/affinity.h>
 #include <base/allocator_guard.h>
@@ -32,7 +31,7 @@
 
 namespace Nichts_store {
 
-	class Worker;
+	class Session_component;
 
 	/**
 	 * Return base-name portion of null-terminated path string
@@ -64,15 +63,9 @@ namespace Nichts_store {
 using namespace Genode;
 
 
-/**
- * Worker represents a build 'slot' at the server.
- */
-class Nichts_store::Worker : public Session_rpc_object
+class Nichts_store::Session_component : public Rpc_object<Nichts_store::Session, Nichts_store::Session_component>
 {
 	private:
-
-		/* Packet receiver. */
-		Signal_rpc_member<Worker> _process_packet_dispatcher;
 
 		struct Label
 		{
@@ -102,7 +95,6 @@ class Nichts_store::Worker : public Session_rpc_object
 			Cpu_connection  cpu;
 			Rm_connection   rm;
 
-
 			Resources(char const *label, long priority,
 			          Affinity const &aff, size_t ram_quota)
 			:
@@ -111,13 +103,15 @@ class Nichts_store::Worker : public Session_rpc_object
 				cpu(label, priority, affinity)
 			{
 				ram.ref_account(Genode::env()->ram_session_cap());
-				Genode::env()->ram_session()->transfer_quota(ram.cap(), ram_quota);			}
-			
+				Genode::env()->ram_session()->transfer_quota(ram.cap(), ram_quota);
+			}
+
 			void sigh(Signal_context_capability sig_cap)
 			{
 				/* register default exception handler */
 				cpu.exception_handler(Thread_capability(), sig_cap);
 			}
+
 		} _resources;
 
 		Genode::Allocator_guard  _session_alloc;
@@ -130,59 +124,18 @@ class Nichts_store::Worker : public Session_rpc_object
 		/* Timer session for issuing timeouts. */
 		Timer::Connection _timer;
 
-		void _process_packet()
-		{
-			File_system::Packet_descriptor packet = tx_sink()->get_packet();
-
-			/* assume failure by default */
-			packet.succeeded(false);
-			PERR("not proccessing packet");
-			tx_sink()->acknowledge_packet(packet);
-		}
-
-		/**
-		 * Called by signal dispatcher, executed in the context of the main
-		 * thread (not serialized with the RPC functions)
-		 */
-		void _process_packets(unsigned)
-		{
-			while (tx_sink()->packet_avail()) {
-
-				/*
-				 * Make sure that the '_process_packet' function does not
-				 * block.
-				 *
-				 * If the acknowledgement queue is full, we defer packet
-				 * processing until the client processed pending
-				 * acknowledgements and thereby emitted a ready-to-ack
-				 * signal. Otherwise, the call of 'acknowledge_packet()'
-				 * in '_process_packet' would infinitely block the context
-				 * of the main thread. The main thread is however needed
-				 * for receiving any subsequent 'ready-to-ack' signals.
-				 */
-				if (!tx_sink()->ready_to_ack())
-					return;
-
-				_process_packet();
-			}
-		}
-
 	public:
 
 		/**
 		 * Constructor
 		 */
-		Worker(Genode::size_t          tx_buf_size,
-		       Server::Entrypoint     &ep,
-		       long                    priority,
-		       Affinity const         &affinity,
-		       Allocator              *session_alloc,
-		       size_t                  ram_quota,
-		       Cap_session            *cap,
-		       Service_registry       &parent_services)
+		Session_component(long              priority,
+		                  Affinity const   &affinity,
+		                  Allocator        *session_alloc,
+		                  size_t            ram_quota,
+		                  Cap_session      *cap,
+		                  Service_registry &parent_services)
 		:
-			Session_rpc_object(env()->ram_session()->alloc(tx_buf_size), ep.rpc_ep()),
-			_process_packet_dispatcher(ep, *this, &Worker::_process_packets),
 			_label(affinity),
 			_resources(_label.buf, priority, affinity, ram_quota),
 			_session_alloc(session_alloc, ram_quota),
@@ -269,8 +222,8 @@ class Nichts_store::Worker : public Session_rpc_object
 				_fs.close(file);
 			}
 
-			catch (File_system::Lookup_failed) {
-				PERR("%s not found in the store", path);
+			catch (File_system::Exception) {
+				PERR("Failed to read file %s", path);
 				source.release_packet(packet_out);
 				source.release_packet(packet_in);
 				_fs.close(file);
@@ -338,95 +291,32 @@ class Nichts_store::Worker : public Session_rpc_object
 
 	public:
 
-		/***********************************
-		 ** File_system session interface **
-		 ***********************************/
-
-		File_system::File_handle file(File_system::Dir_handle, const File_system::Name&, File_system::Mode, bool)
-		{
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
-		File_system::Symlink_handle symlink(File_system::Dir_handle, const File_system::Name&, bool) {
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
-		File_system::Dir_handle dir(const File_system::Path&, bool)
-		{
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
-		File_system::Node_handle node(const File_system::Path&)
-		{
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
-		void close(File_system::Node_handle)
-		{
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
-		File_system::Status status(File_system::Node_handle)
-		{
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
-		void control(File_system::Node_handle, File_system::Control)
-		{
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
-		void unlink(File_system::Dir_handle, const File_system::Name&)
-		{
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
-		void truncate(File_system::File_handle, File_system::file_size_t)
-		{
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
-		void move(File_system::Dir_handle, const File_system::Name&, File_system::Dir_handle, const File_system::Name&)
-		{
-			throw File_system::Permission_denied();
-		}
-
-		/*
-		 * This is interested, notify when built?
-		 */
-		void sigh(File_system::Node_handle, Genode::Signal_context_capability)
-		{
-			PDBG("not implemented");
-			throw File_system::Permission_denied();
-		}
-
 		/************************************
 		 ** Nichts_store session interface **
 		 ************************************/
 
-		Store_path hash(File_system::Node_handle node)
+		File_system::Session_capability file_system_session()
 		{
-			return Store_path("not implemented");
+			PINF("%s received server side", __func__);
+			return _fs;
 		}
 
-		void realise(Nichts_store::Store_path const  &drvPath, Nichts_store::Mode mode)
+		Path hash(File_system::Node_handle node)
+		{
+			PINF("%s received server side", __func__);
+			return Path("hash not implemented");
+		}
+
+		void realise(Nichts_store::Path const  &drvPath, Nichts_store::Mode mode)
 		{
 			PLOG("realise path \"%s\"", drvPath.string());
 			try {
 				_realise(drvPath.string(), mode);
 			}
 			catch (Nichts_store::Exception) { throw Nichts_store::Build_failure(); }
+			catch (...) { throw Nichts_store::Exception(); }
 		}
 
 };
 
-#endif /* _NICHTS_STORE__WORKER_H_ */
+#endif /* _NICHTS_STORE__STORE_SESSION_H_ */

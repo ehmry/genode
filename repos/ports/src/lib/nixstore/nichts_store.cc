@@ -4,10 +4,22 @@
  * \date
  */
 
+/* Upstream Nix includes. */
 #include "nichts_store.h"
+#include <libutil/util.hh>
 
-#include <base/lock.h>
+/* Libc includes. */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
+/* Genode includes. */
+#include <base/printf.h>
+
+#define NOT_IMP PERR("%s not implemented", __func__)
+
+/* Keep this a multiple of 512 for the sake of SHA256 server-side. */
+enum { BLOCK_SIZE = 4096 };
 
 bool
 nix::willBuildLocally(const Derivation & drv) { NOT_IMP; return true; }
@@ -15,8 +27,88 @@ nix::willBuildLocally(const Derivation & drv) { NOT_IMP; return true; }
 void
 nix::canonicaliseTimestampAndPermissions(std::string const&) { NOT_IMP; }
 
-using namespace nix;
 
+using namespace nix;
+using namespace Nichts;
+
+
+Store_client::Store_client()
+:
+	_tx_alloc(Genode::env()->heap()),
+	_fs      (_tx_alloc),
+	_store   (_tx_alloc)
+{
+	/* Open a handle to the root of the store file system. */
+	_store_dir = _store.file_system()->dir("/nix/store", false);
+};
+
+
+Store_client::~Store_client()
+{
+	_store.file_system()->close(_store_dir);
+};
+
+
+Nichts_store::Path
+Store_client::add_file(nix::Path const  &src_path)
+{
+	using namespace File_system;
+
+	/*
+	 * Access the file using libc to ensure
+	 * the VFS is used for path resolution.
+	 */
+    AutoCloseFD fd = open(src_path.c_str(), O_RDONLY);
+	if (fd == -1)
+		throw SysError(format("opening file ‘%1%’") % src_path);
+
+	struct stat st;
+	if (fstat(fd, &st))
+		throw SysError(format("getting size of file ‘%1%’") % src_path);
+	size_t size = st.st_size;
+
+	nix::Path name = src_path.substr(src_path.rfind("/")+1, src_path.size()-1);
+	File_handle dst_handle = _store.file_system()->file(_store_dir, name.c_str(),
+	                                                    WRITE_ONLY, true);
+	_store.file_system()->truncate(dst_handle, size);
+
+	size_t block_size = min(size, BLOCK_SIZE);
+	File_system::Session::Tx::Source &source = *_store.file_system()->tx();
+	File_system::Packet_descriptor packet = source.alloc_packet(block_size);
+
+	/* Prevent packets getting out of order. */
+	Genode::Lock::Guard guard(_packet_lock);
+	for (size_t offset = 0; size;) {
+		File_system::Packet_descriptor pck(
+			packet, 0, dst_handle,
+			File_system::Packet_descriptor::WRITE,
+			block_size, offset);
+
+		size_t n = ::read(fd, source.packet_content(pck), block_size);
+		if (n != block_size)
+			throw SysError(format("reading file ‘%1%’") % src_path);
+
+		source.submit_packet(pck);
+		pck = source.get_acked_packet();
+		if (!pck.succeeded() || pck.length() != n)
+				throw nix::Error(format("addPathToStore: writing `%1%' failed") % src_path);
+
+		size -= block_size;
+		offset += block_size;
+		block_size = min(size, BLOCK_SIZE);
+	}
+	source.release_packet(packet);
+
+	Nichts_store::Path store_path = _store.hash(dst_handle);
+	_store.file_system()->close(dst_handle);
+
+	return store_path;
+}
+
+
+/************************
+ ** StoreAPI interface **
+************************/
 
 /* Check whether a path is valid. */ 
 bool
@@ -26,7 +118,7 @@ Nichts::Store_client::isValidPath(const nix::Path & path) {
 
 /* Query which of the given paths is valid. */
 PathSet
-Nichts::Store_client::queryValidPaths(const PathSet & paths) {
+Store_client::queryValidPaths(const PathSet & paths) {
 			NOT_IMP; return PathSet(); };
 
 		/* Query the set of all valid paths. */
@@ -85,100 +177,78 @@ Nichts::Store_client::queryValidPaths(const PathSet & paths) {
 		void Nichts::Store_client::querySubstitutablePathInfos(const PathSet & paths,
 				SubstitutablePathInfos & infos) { NOT_IMP; };
 
-		/**
-		 * Copy the contents of a path to the store and register the
-		 * validity the resulting path.	The resulting path is returned.
-		 * The function object `filter' can be used to exclude files (see
-		 * libutil/archive.hh).
-		 */
-		Path Nichts::Store_client::addToStore(const Path & srcPath,
-				bool recursive, HashType hashAlgo,
-				PathFilter & filter, bool repair)
-		{
-			/* Protect from packets getting out of order. */
-			static Genode::Lock lock;
-			Genode::Lock_guard<Genode::Lock> guard(lock);
+/**
+ * Copy the contents of a path to the store and register the
+ * validity the resulting path.	The resulting path is returned.
+ * The function object `filter' can be used to exclude files (see
+ * libutil/archive.hh).
+ */
+Path
+Store_client::addToStore(const Path & srcPath,
+                         bool recursive, HashType hashAlgo,
+                         PathFilter & filter, bool repair)
+{
+	PDBG("%s", srcPath.c_str());
+	using namespace File_system;
+	Nichts_store::Path out_path;
 
-			using namespace File_system;
+	Node_handle node = _fs.node(srcPath.c_str());
+	Status src_st = _fs.status(node);
+	_fs.close(node);
+	if (src_st.mode == Status::MODE_FILE) {
+		out_path = add_file(srcPath);
+	} else
+		throw SysError(format("adding non-regular files not implemented, not adding %1%") % srcPath);
 
-			char const *src_path = srcPath.c_str();
-			// TODO: fix this
-			char const *bname = src_path;
-			for (int i = 0; src_path[i]; ++i)
-				if (src_path[i] == '/')
-					bname = src_path +i+1;
+	return nix::Path(out_path.string());
+}
 
-			char buf[1024];
-			strncpy(buf, src_path, bname - src_path);
-			PLOG("basename - %s, dirname - %s", bname, buf);
+/**
+ * Like addToStore, but the contents written to the output path is
+ * a regular file containing the given string.
+ */
+Path Nichts::Store_client::addTextToStore(const string & name, const string & text,
+	                                      const PathSet & references, bool repair)
+{
+	/* TODO: references? repair? */
 
-			/*****************
-			 ** Source file **
-			 *****************/
-			Dir_handle dir = _fs.dir(File_system::Path(src_path, bname - src_path), false);
-			File_handle src_handle = _fs.file(dir, bname,
-			                                  READ_ONLY, false);
-			_fs.close(dir);
-			File_system::Status st = _fs.status(src_handle);
+	using namespace File_system;
 
-			/* Keep this a multiple of 512 for the sake of SHA256 server-side. */
-			enum { BLOCK_SIZE = 4096 };
-			size_t block_size = max(st.size, BLOCK_SIZE);
+	/* Prevent packets getting out of order. */
+	Genode::Lock_guard<Genode::Lock> guard(_packet_lock);
 
-			/*************
-			 ** Packets **
-			 *************/
-			File_system::Session::Tx::Source &src_source = *_fs.tx();
-			File_system::Packet_descriptor src_packet = src_source.alloc_packet(block_size);
-			File_system::Session::Tx::Source &dst_source = *_store.tx();
-			File_system::Packet_descriptor dst_packet = dst_source.alloc_packet(block_size);
+	std::string::size_type n = text.size();
 
-			/********************
-			 ** Store desposit **
-			 ********************/
-			// TODO: get the root of the store
-			Dir_handle store_dir = _store.dir("/", false);
-			File_handle dst_handle = _store.file(store_dir, bname,
-			                                     File_system::WRITE_ONLY, true);
+	File_handle dst_handle = _store.file_system()->file(
+		_store_dir, name.c_str(), WRITE_ONLY, true);
 
-			/**************
-			 ** Exchange **
-			 **************/
-			for (size_t offset = 0; offset < st.size; offset += src_packet.length()) {
+	size_t block_size = min(n, BLOCK_SIZE);
 
-				File_system::Packet_descriptor sp(src_packet, 0, src_handle,
-				                                  File_system::Packet_descriptor::READ,
-				                                  block_size, offset);
-				File_system::Packet_descriptor dp(dst_packet, 0, dst_handle,
-				                                  File_system::Packet_descriptor::WRITE,
-				                                  block_size, offset);
+	/* Packets */
+	File_system::Session::Tx::Source &dst_source = *_store.file_system()->tx();
+	File_system::Packet_descriptor dst_packet = dst_source.alloc_packet(BLOCK_SIZE);
 
-				src_source.submit_packet(sp);
-				sp = src_source.get_acked_packet();
-				if (!sp.succeeded()) throw nix::Error("addPathToStore: reading failed");
-				memcpy(dst_source.packet_content(dp), src_source.packet_content(sp), sp.length());
-				dst_source.submit_packet(dp);
-				dp = dst_source.get_acked_packet();
-				if (!sp.succeeded()) throw nix::Error("addPathToStore: writing failed");
-			}
+	/* Exchange */
+	for (size_t offset = 0; offset < n; offset += dst_packet.length()) {
+		File_system::Packet_descriptor dst_pck(
+			dst_packet, 0, dst_handle,
+			File_system::Packet_descriptor::WRITE,
+			block_size, offset);
 
-			src_source.release_packet(src_packet);
-			dst_source.release_packet(dst_packet);
+		text.copy(dst_source.packet_content(dst_pck), text.size());
 
-			_fs.close(src_handle);
-			Nichts_store::Store_path store_path = _store.hash(dst_handle);
-			_store.close(dst_handle);
+		dst_source.submit_packet(dst_pck);
+		dst_pck = dst_source.get_acked_packet();
+		if (!dst_pck.succeeded())
+				throw nix::Error("addPathToStore: writing failed");
+	}
 
-			return nix::Path(store_path.string());
-		}
+	dst_source.release_packet(dst_packet);
+	Nichts_store::Path store_path = _store.hash(dst_handle);
+	_store.file_system()->close(dst_handle);
 
-		/**
-		 * Like addToStore, but the contents written to the output path is
-		 * a regular file containing the given string.
-		 */
-		Path Nichts::Store_client::addTextToStore(const string & name, const string & s,
-				const PathSet & references, bool repair) {
-			NOT_IMP; return Path(); };
+	return nix::Path(store_path.string());
+};
 
 		/* Export a store path, that is, create a NAR dump of the store
 			 path and append its references and its deriver.	Optionally, a
@@ -260,6 +330,9 @@ Nichts::Store_client::queryValidPaths(const PathSet & paths) {
 		string Nichts::Store_client::makeValidityRegistration(const PathSet & paths,
 				bool showDerivers, bool showHash) { NOT_IMP; return string(); }
 
-		/* Optimise the disk space usage of the Nix store by hard-linking files
-			 with the same contents. */
-		void Nichts::Store_client::optimiseStore() { NOT_IMP; };
+/**
+ * Optimise the disk space usage of the Nix store by hard-linking files
+ * with the same contents.
+  */
+void
+Nichts::Store_client::optimiseStore() { NOT_IMP; };

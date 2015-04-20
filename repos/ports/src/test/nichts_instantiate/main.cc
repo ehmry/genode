@@ -83,12 +83,9 @@ int main(int, char **)
 	}
 	catch (...) { }
 
-	PLOG("opening store");
 	store = openStore();
-	PLOG("store opened");
 
 	EvalState state(search_path_from_config());
-	PLOG("state loaded");
 
 	std::map<string, string> autoArgs_;
 
@@ -97,10 +94,7 @@ int main(int, char **)
 	PLOG("getting attrs");
 	Strings attrPaths = strings_from_config("attr");
 	if (attrPaths.empty()) attrPaths.push_back("");
-
-	PLOG("opening store");
-	store = openStore();
-	PLOG("store opened");
+	PLOG("push all the attrs back");
 
 	//Nichts_store::Connection srv;
 	char text[4096];

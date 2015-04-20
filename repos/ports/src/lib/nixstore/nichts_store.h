@@ -10,12 +10,10 @@
 #include <libstore/derivations.hh>
 #include <libstore/store-api.hh>
 #include <base/allocator_avl.h>
-
-#include <base/printf.h>
+#include <base/lock.h>
 #include <file_system_session/connection.h>
 #include <nichts_store_session/connection.h>
 
-#define NOT_IMP PERR("%s not implemented", __func__)
 
 namespace nix {
 	bool willBuildLocally(const Derivation & drv);
@@ -38,16 +36,19 @@ class Nichts::Store_client : public nix::StoreAPI
 		Genode::Allocator_avl    _tx_alloc;
 		File_system::Connection  _fs;
 		Nichts_store::Connection _store;
+		File_system::Dir_handle  _store_dir;
+		Genode::Lock             _packet_lock;
+
+		Nichts_store::Path add_file(const nix::Path &path);
 
 	public:
 
-		Store_client()
-		:
-			_tx_alloc(Genode::env()->heap()),
-			_fs   (_tx_alloc),
-			_store(_tx_alloc)
-		{};
-		~Store_client() {};
+		Store_client();
+		~Store_client();
+
+		/************************
+		 ** StoreAPI interface **
+		 ************************/
 
 		/* Check whether a path is valid. */ 
 		bool isValidPath(const nix::Path & path);

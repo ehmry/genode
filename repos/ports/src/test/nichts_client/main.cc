@@ -15,7 +15,7 @@
 int main(int, char **)
 {
 	Genode::Allocator_avl    tx_alloc(Genode::env()->heap());
-	Nichts_store::Connection store();
+	Nichts_store::Connection store;
 
 	Genode::config()->xml_node().for_each_sub_node("drv", [&] (Genode::Xml_node drv_node) {
 		char path[Nichts_store::MAX_PATH_LEN];

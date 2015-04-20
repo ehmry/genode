@@ -14,7 +14,8 @@
 #include <os/packet_stream.h>
 #include <packet_stream_tx/packet_stream_tx.h>
 
-#include <file_system_session/file_system_session.h>
+#include <file_system_session/capability.h>
+
 
 namespace Nichts_store {
 
@@ -36,6 +37,11 @@ namespace Nichts_store {
 		static const char *service_name() { return "Nichts_store"; }
 
 		virtual ~Session() { }
+
+		/**
+		 * Request a file system interface to the store.
+		 */
+		virtual File_system::Session_capability file_system_session() = 0;
 
 		/**
 		 * Hash a node opened with the store File_system
@@ -61,12 +67,13 @@ namespace Nichts_store {
 		 ** RPC declaration **
 		 *********************/
 
+		GENODE_RPC(Rpc_file_system_session, File_system::Session_capability, file_system_session);
 		GENODE_RPC(Rpc_hash, Path, hash, File_system::Node_handle);
 		GENODE_RPC_THROW(Rpc_realise, void, realise,
 		                 GENODE_TYPE_LIST(Invalid_derivation,
 		                                  Build_timeout, Build_failure),
 		                 Path const&, Mode);
-		GENODE_RPC_INTERFACE(Rpc_hash, Rpc_realise);
+		GENODE_RPC_INTERFACE(Rpc_file_system_session, Rpc_hash, Rpc_realise);
 	};
 
 }

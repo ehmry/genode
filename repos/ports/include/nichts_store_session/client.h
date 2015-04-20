@@ -18,6 +18,9 @@ namespace Nichts_store {
 		Session_client(Genode::Capability<Session> cap)
 		: Genode::Rpc_client<Session>(cap) { }
 
+		File_system::Session_capability file_system_session() {
+			return call<Rpc_file_system_session>(); }
+
 		Path hash(File_system::Node_handle node)
 		{
 			return call<Rpc_hash>(node);
