@@ -12,6 +12,8 @@
  */
 
 /* Genode includes */
+#include <file_system/node_handle_registry.h>
+#include <file_system/util.h>
 #include <file_system_session/rpc_object.h>
 #include <os/attached_rom_dataspace.h>
 #include <os/config.h>
@@ -25,9 +27,6 @@
 
 /* local includes */
 #include <directory.h>
-#include <node_handle_registry.h>
-#include <util.h>
-
 
 static bool const verbose = false;
 #define PDBGV(...) if (verbose) PDBG(__VA_ARGS__)

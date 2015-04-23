@@ -12,6 +12,7 @@
  */
 
 /* Genode includes */
+#include <file_system/node_handle_registry.h>
 #include <cap_session/connection.h>
 #include <file_system_session/rpc_object.h>
 #include <os/attached_rom_dataspace.h>
@@ -29,9 +30,7 @@
 #include <buffer.h>
 #include <directory.h>
 #include <followed_subject.h>
-#include <node_handle_registry.h>
 #include <trace_files.h>
-#include <util.h>
 
 
 static bool const verbose = false;
