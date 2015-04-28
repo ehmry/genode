@@ -75,6 +75,7 @@ in
               config = mkOption { type = types.path; };
               romModules = mkOption { };
               extraFiles = mkOption {
+                default = { };
                 type = types.attrsOf types.path;
               };
             };
