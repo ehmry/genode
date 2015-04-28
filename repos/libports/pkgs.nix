@@ -18,7 +18,7 @@ let
   );
 
   compileCC =
-    tool.addIncludes libportsIncludes (osIncludes ++ baseIncludes) tool.compileCC;
+    tool.addIncludes (libportsIncludes ++ osIncludes ++ baseIncludes) [] tool.compileCC;
 
   callComponent' = callComponent ({ inherit compileCC; } // ports);
 
