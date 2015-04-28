@@ -3,9 +3,10 @@
 with nixpkgs;
 
 let
-    rev = "2b4f2803218cf92e2982b47a370d60b18bb78a15";
-    shortRev = builtins.substring 0 7 rev;
+  rev = "2b4f2803218cf92e2982b47a370d60b18bb78a15";
+  shortRev = builtins.substring 0 7 rev;
   bits  = toString spec.bits;
+  image = "hypervisor-x86_"+bits;
 in
 stdenv.mkDerivation rec {
   name = "nova-${shortRev}";
@@ -26,9 +27,13 @@ stdenv.mkDerivation rec {
 
   preBuild = "substituteInPlace Makefile --replace '$(call gitrv)' ${shortRev}";
 
+  inherit image;
   installPhase =
-    if spec.is32Bit then "mkdir $out; cp hypervisor-x86_32 $out" else
-    "mkdir $out; objcopy -O elf32-i386 hypervisor-x86_64 $out/hypervisor-x86_64";
+    if spec.is32Bit then "mkdir $out; cp $image $out" else
+    "mkdir $out; objcopy -O elf32-i386 $image $out/$image";
 
-  passthru.args = [ "iommu" "serial" ];
+  passthru =
+    { args = [ "iommu" "serial" ];
+      inherit image;
+    };
 }
