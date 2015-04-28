@@ -3,6 +3,6 @@
 
 let
   callLibrary' = callLibrary
-    { compileCC = tool.addIncludes gemsIncludes (baseIncludes ++ osIncludes) tool.compileCC; };
+    { compileCC = tool.addIncludes (gemsIncludes ++ baseIncludes ++ osIncludes) [ ] tool.compileCC; };
 in
 tool.loadExpressions callLibrary' ./src/lib
