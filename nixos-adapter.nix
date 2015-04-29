@@ -25,9 +25,9 @@ let
           builder = builtins.toFile "boot-files-builder.sh"
             ''
               source $stdenv/setup
-              format="\"$prefix/%f\"=\"%p\";"
-              config="\"$prefix/config\"=\"$config\";"
-              echo {$config$(find $romModules -type f -printf $format)} > $out
+              format="//{\"$prefix/%f\"=\"%p\";}"
+              config="{\"$prefix/config\"=\"$config\";}"
+              echo $config$(find $romModules -type f -printf $format) > $out
             '';
           romModules = [ genodePkgs.init genodePkgs.libs.ld ] ++ romModules;
         }) // (builtins.listToAttrs (map
