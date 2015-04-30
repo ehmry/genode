@@ -6,19 +6,21 @@
  * In this file VFS refers to the SQLite VFS, not the Genode VFS.
  * See http://sqlite.org/vfs.html for more information.
  *
- * Filesystem calls wrap our libC, clock and timer calls use native
- * service sessions, and there is no file locking support.
- *
- * The filesystem interface is unoptimized and just simple
- * enough to meet the minimum requirements for a legacy VFS.
+ * This implementation of sqlite3_io_methods only meets the first
+ * version of that interface. Implementing the shared memory I/O
+ * methods of the second version should increase performance.
+ * https://www.sqlite.org/c3ref/io_methods.html
  */
 
 /* Genode includes */
+#include <base/env.h>
 #include <base/printf.h>
 #include <base/lock_guard.h>
-#include <file_system_session/file_system_session.h>
+#include <base/allocator_avl.h>
+#include <file_system_session/connection.h>
 #include <rtc_session/connection.h>
 #include <timer_session/connection.h>
+#include <util/string.h>
 
 /* jitterentropy includes */
 namespace Jitter {
@@ -27,22 +29,19 @@ extern "C" {
 }
 }
 
+
 namespace Sqlite {
+
+
+/* Use string operations without qualifier. */
+using namespace Genode;
+
 
 /* Sqlite includes */
 extern "C" {
 #include <sqlite3.h>
 }
 
-extern "C" {
-#include <string.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/file.h>
-#include <sys/param.h>
-#include <unistd.h>
-#include <errno.h>
-}
 
 /**
  * Convert an Rtc::Timestamp to a Julian Day Number.
@@ -65,11 +64,59 @@ unsigned julian_day(Rtc::Timestamp ts)
 	return ts.day + (153*m + 2)/5 + 365*y + y/4 - y/100 + y/400 - 32046;
 }
 
+
 #define NOT_IMPLEMENTED PWRN("Sqlite::%s not implemented", __func__);
 
-static Rtc::Connection _rtc;
 static Timer::Connection _timer;
 static Jitter::rand_data *_jitter;
+
+
+/**
+ * Return base-name portion of null-terminated path string
+ */
+static inline char const *basename(char const *path)
+{
+	char const *start = path;
+
+	for (; *path; path++)
+		if (*path == '/')
+			start = path + 1;
+
+	return start;
+}
+
+
+struct Fs_state
+{
+	Genode::Allocator_avl _tx_block_alloc;
+	File_system::Connection fs;
+
+	/**
+	 * Constructor
+	 */
+	Fs_state()
+	:
+		_tx_block_alloc(Genode::env()->heap()),
+		fs(_tx_block_alloc)
+	{ }
+
+	File_system::Dir_handle dir_of(const char *path, bool create = false)
+	{
+		int i;
+		for (i = strlen(path); i != 0; --i)
+			if (path[i] == '/')
+				break;
+
+		if (i) {
+			char s[++i];
+			memcpy(s, path, i-1);
+			s[i] = '\0';
+			return fs.dir(s, create);
+		}
+		return fs.dir("/", create);
+	}
+};
+
 
 /*
 ** When using this VFS, the sqlite3_file* handles that SQLite uses are
@@ -78,9 +125,11 @@ static Jitter::rand_data *_jitter;
 typedef struct Genode_file Genode_file;
 struct Genode_file {
 	sqlite3_file base;  /* Base class. Must be first. */
-	int fd;             /* File descriptor */
-	char *delete_path;  /* Delete this path on close */
+	Fs_state *st;
+	File_system::File_handle fh;
+	char delete_path[File_system::MAX_PATH_LEN];  /* Delete this path on close */
 };
+
 
 static int genode_randomness(sqlite3_vfs *pVfs, int len, char *buf)
 {
@@ -90,117 +139,151 @@ static int genode_randomness(sqlite3_vfs *pVfs, int len, char *buf)
 	return Jitter::jent_read_entropy(_jitter, buf, len);
 }
 
+
 static int genode_delete(sqlite3_vfs *pVfs, const char *pathname, int dirSync)
 {
-	int rc;
-
-	rc = unlink(pathname);
-	if (rc !=0 && errno==ENOENT)
-		 return SQLITE_OK;
-
-	if (rc == 0 && dirSync) {
-		int dfd;
-		int i;
-		char dir[File_system::MAX_PATH_LEN];
-
-		sqlite3_snprintf(File_system::MAX_PATH_LEN, dir, "%s", pathname);
-		dir[File_system::MAX_PATH_LEN-1] = '\0';
-		for (i = strlen(dir); i > 1 && dir[i] != '/'; i--)
-			dir[i] = '\0';
-
-		dfd = open(dir, O_RDONLY);
-	if (dfd < 0) {
-			rc = -1;
-		} else {
-			rc = fsync(dfd);
-			close(dfd);
-		}
+	Fs_state *st = (Fs_state*)pVfs->pAppData;
+	try {
+		File_system::Dir_handle dh = st->dir_of(pathname);
+		st->fs.unlink(dh, basename(pathname));
 	}
-
-	return rc ?
-		SQLITE_IOERR_DELETE : SQLITE_OK;
+	catch (File_system::Lookup_failed) {
+		return SQLITE_IOERR_DELETE_NOENT;
+	}
+	catch (...) {
+		return SQLITE_IOERR_DELETE;
+	}
+	return SQLITE_OK;
 }
+
 
 static int genode_close(sqlite3_file *pFile)
 {
-	int rc;
 	Genode_file *p = (Genode_file*)pFile;
 
-	rc = close(p->fd);
-	if (rc)
-		return SQLITE_IOERR_CLOSE;
+	try { p->st->fs.close(p->fh); }
+	catch (...) { return SQLITE_IOERR_CLOSE; }
 
-	if (p->delete_path) {
-		rc = genode_delete(NULL, p->delete_path, false);
-		if (rc == SQLITE_OK) {
-			sqlite3_free(p->delete_path);
-		} else {
-			return rc;
+	if (strlen(p->delete_path)) {
+		try {
+			File_system::Dir_handle dh = p->st->dir_of(&p->delete_path[0]);
+			p->st->fs.unlink(dh, basename(&p->delete_path[0]));
+		}
+		catch (File_system::Lookup_failed) { }
+		catch (...) {
+			return SQLITE_IOERR_DELETE;
 		}
 	}
 
 	return SQLITE_OK;
 }
 
+
+/*
+ * Reads and writes assume that SQLite will not operate
+ * over more than 4096 bytes at a time, and likely only 512.
+ * https://www.sqlite.org/atomiccommit.html#hardware
+ *
+ * These next two methods are not thread safe.
+ */
+
+
 static int genode_write(sqlite3_file *pFile, const void *buf, int count, sqlite_int64 offset)
 {
+	int rc = SQLITE_OK;
 	Genode_file *p = (Genode_file*)pFile;
 
-	if (lseek(p->fd, offset, SEEK_SET) != offset)
-		return SQLITE_IOERR_SEEK;
+	File_system::Session::Tx::Source &source = *p->st->fs.tx();
+	File_system::Packet_descriptor
+		packet(source.alloc_packet(count),
+		       0, p->fh,
+		       File_system::Packet_descriptor::WRITE,
+		       count, offset);
 
-	if (write(p->fd, buf, count) != count)
-		return SQLITE_IOERR_WRITE;
+	memcpy(source.packet_content(packet), buf, count);
 
-	return SQLITE_OK;
+	try {
+		source.submit_packet(packet);
+		source.get_acked_packet();
+	}
+	catch (...) { rc = SQLITE_IOERR_WRITE; }
+
+	source.release_packet(packet);
+	return rc;
 }
+
 
 static int genode_read(sqlite3_file *pFile, void *buf, int count, sqlite_int64 offset)
 {
+	int rc = SQLITE_OK;
 	Genode_file *p = (Genode_file*)pFile;
 
-	if (lseek(p->fd, offset, SEEK_SET) != offset) {
-		return SQLITE_IOERR_SEEK;
-	}
+	File_system::Session::Tx::Source &source = *p->st->fs.tx();
+	File_system::Packet_descriptor packet_in, packet_out;
 
-	int n = read(p->fd, buf, count);
-	if (n != count) {
-		/* Unread parts of the buffer must be zero-filled */
-		memset(&((char*)buf)[n], 0, count-n);
-		return SQLITE_IOERR_SHORT_READ;
-	}
+	packet_in = File_system::Packet_descriptor(source.alloc_packet(count), 0, p->fh,
+	                                           File_system::Packet_descriptor::READ,
+	                                           count, offset);
 
-	return SQLITE_OK;
-}
+	try {
+		source.submit_packet(packet_in);
+
+		packet_out = source.get_acked_packet();
+
+		int actual = packet_out.length();
+		memcpy(buf, source.packet_content(packet_out), actual);
+
+		if ((actual < count)) {
+			/* Unread parts of the buffer must be zero-filled */
+			memset(&((char*)buf)[actual], 0, count-actual);
+			rc = SQLITE_IOERR_SHORT_READ;
+		}
+	}
+	catch (...) { rc = SQLITE_IOERR_READ; }
+
+	source.release_packet(packet_out);
+	return rc;
+};
+
 
 static int genode_truncate(sqlite3_file *pFile, sqlite_int64 size)
 {
 	Genode_file *p = (Genode_file*)pFile;
 
-	return (ftruncate(p->fd, size)) ?
-		SQLITE_IOERR_FSYNC : SQLITE_OK;
+	try { p->st->fs.truncate(p->fh, size); }
+	catch (...) { return SQLITE_IOERR_TRUNCATE; }
+
+	return SQLITE_OK;
 }
+
 
 static int genode_sync(sqlite3_file *pFile, int flags)
 {
 	Genode_file *p = (Genode_file*)pFile;
 
-	return (fsync(p->fd)) ?
-		SQLITE_IOERR_FSYNC : SQLITE_OK;
+	/* Should sync at the file, but this is the best we can do for now. */
+	try { p->st->fs.sync(); }
+	catch (...) {
+		PERR("SQLite::%s failed", __func__);
+		return SQLITE_IOERR_FSYNC;
+	}
+	return SQLITE_OK;
 }
+
 
 static int genode_file_size(sqlite3_file *pFile, sqlite_int64 *pSize)
 {
 	Genode_file *p = (Genode_file*)pFile;
-	struct stat s;
 
-	if (fstat(p->fd, &s) != 0)
-		return SQLITE_IOERR_FSTAT;
-
-	*pSize = s.st_size;
+	try {
+		File_system::Status s = p->st->fs.status(p->fh);
+		*pSize = s.size;
+	}
+	catch (...) { return SQLITE_IOERR_FSTAT; }
 
 	return SQLITE_OK;
 }
+
 
 static int genode_lock(sqlite3_file *pFile, int eLock)
 {
@@ -219,6 +302,7 @@ static int genode_check_reserved_lock(sqlite3_file *pFile, int *pResOut)
 	return SQLITE_OK;
 }
 
+
 /*
  * No xFileControl() verbs are implemented by this VFS.
  * Without greater control over writing, there isn't utility in processing this.
@@ -226,22 +310,17 @@ static int genode_check_reserved_lock(sqlite3_file *pFile, int *pResOut)
 */
 static int genode_file_control(sqlite3_file *pFile, int op, void *pArg) { return SQLITE_OK; }
 
-/*
-** The xSectorSize() and xDeviceCharacteristics() methods. These two
-** may return special values allowing SQLite to optimize file-system
-** access to some extent. But it is also safe to simply return 0.
-*/
-static int genode_sector_size(sqlite3_file *pFile)
-{
-	NOT_IMPLEMENTED
-	return 0;
-}
 
-static int genode_device_characteristics(sqlite3_file *pFile)
-{
-	NOT_IMPLEMENTED
-	return 0;
-}
+/*
+ * The xSectorSize() and xDeviceCharacteristics() methods. These two
+ * may return special values allowing SQLite to optimize file-system
+ * access to some extent. But it is also safe to simply return 0.
+ */
+static int genode_sector_size(sqlite3_file *pFile) { return 0; }
+
+
+static int genode_device_characteristics(sqlite3_file *pFile) { return 0; }
+
 
 static int random_string(char *buf, int len)
 {
@@ -250,7 +329,7 @@ static int random_string(char *buf, int len)
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		"0123456789";
 
-	if (genode_randomness(NULL, len, buf)  != (len))
+	if (genode_randomness(0, len, buf)  != (len))
 		return -1;
 
 	for(int i=0; i <len; i++) {
@@ -258,6 +337,7 @@ static int random_string(char *buf, int len)
 	}
 	return 0;
 }
+
 
 static int genode_open(
 		sqlite3_vfs *pVfs,
@@ -285,79 +365,95 @@ static int genode_open(
 
 	Genode_file *p = (Genode_file*)pFile;
 	memset(p, 0, sizeof(Genode_file));
+	p->st = (Fs_state*)pVfs->pAppData;
+
+	File_system::Mode mode;
+	if(flags&SQLITE_OPEN_READONLY)
+		mode = File_system::READ_ONLY;
+	if (flags&SQLITE_OPEN_READWRITE)
+		mode = File_system::READ_WRITE;
+	bool create = flags&SQLITE_OPEN_CREATE;
 
 	if (!name) {
 		#define TEMP_PREFIX "sqlite_"
 		#define TEMP_LEN 24
 
-		char *temp = (char*)sqlite3_malloc(TEMP_LEN);
+		char *s = &p->delete_path[0];
+		strncpy(s, TEMP_PREFIX, sizeof(TEMP_PREFIX));
 
-		strcpy(temp, TEMP_PREFIX);
-		if (random_string(&temp[sizeof(TEMP_PREFIX)-1], TEMP_LEN-(sizeof(TEMP_PREFIX)))) {
-			sqlite3_free(temp);
+		if (random_string(s + sizeof(TEMP_PREFIX)-1, TEMP_LEN-(sizeof(TEMP_PREFIX))))
 			return SQLITE_ERROR;
-		}
-		temp[TEMP_LEN-1] = '\0';
 
-		name = temp;
-		p->delete_path = temp;
+		p->delete_path[TEMP_LEN-1] = '\0';
+
+		name = (const char*)s;
+		create = true;
+	} else if (flags&SQLITE_OPEN_DELETEONCLOSE)
+		strncpy(&p->delete_path[0], name, File_system::MAX_PATH_LEN);
+
+	try {
+		File_system::Dir_handle dh = p->st->dir_of(name, false);
+		p->fh = p->st->fs.file(dh, basename(name), mode, create);
 	}
+	catch (...) { return SQLITE_CANTOPEN; }
 
-	int oflags = 0;
-	if( flags&SQLITE_OPEN_EXCLUSIVE ) oflags |= O_EXCL;
-	if( flags&SQLITE_OPEN_CREATE )    oflags |= O_CREAT;
-	if( flags&SQLITE_OPEN_READONLY )  oflags |= O_RDONLY;
-	if( flags&SQLITE_OPEN_READWRITE ) oflags |= O_RDWR;
-
-	p->fd = open(name, oflags);
-	if (p->fd <0)
-		return SQLITE_CANTOPEN;
-
+	/* Ignore flags. */
 	if (pOutFlags)
-		*pOutFlags = flags;
+		*pOutFlags = flags
+			& (SQLITE_OPEN_DELETEONCLOSE |
+		       SQLITE_OPEN_READWRITE   |
+		       SQLITE_OPEN_READONLY  |
+		       SQLITE_OPEN_CREATE);
 
 	p->base.pMethods = &genodeio;
 	return SQLITE_OK;
 }
 
+
 static int genode_access(sqlite3_vfs *pVfs, const char *path, int flags, int *pResOut)
 {
-	int rc, mode;
-	
-	switch (flags) {
-	case SQLITE_ACCESS_EXISTS:
-		mode = F_OK;
-		break;
-	case SQLITE_ACCESS_READWRITE:
-		mode = R_OK|W_OK;
-		break;
-	case SQLITE_ACCESS_READ:
-		mode = R_OK;
-		break;
-	default:
-		return SQLITE_INTERNAL;
-	}
+	using namespace File_system;
+	Fs_state *st = (Fs_state*)pVfs->pAppData;
 
-	*pResOut = (access(path, mode) == 0);
+	File_system::Dir_handle dh;
+	File_system::File_handle fh;
+	File_system::Mode mode;
+	switch (flags) {
+	case SQLITE_ACCESS_EXISTS:    mode = STAT_ONLY;  break;
+	case SQLITE_ACCESS_READWRITE: mode = READ_WRITE; break;
+	case SQLITE_ACCESS_READ:      mode = READ_ONLY;  break;
+	}
+	try {
+		dh = st->dir_of(path);
+		fh = st->fs.file(dh, basename(path), mode, false);
+		*pResOut = true;
+	}
+	catch (...) {
+		st->fs.close(fh);
+		st->fs.close(dh);
+		*pResOut = false;
+	}
 	return SQLITE_OK;
 }
+
 
 static int genode_full_pathname(sqlite3_vfs *pVfs, const char *path_in, int out_len, char *path_out)
 {
-	char dir[File_system::MAX_PATH_LEN];
-	if (path_in[0]=='/') {
+	/*
+	 * No support for current working directory,
+	 * do as our libc does and work from /.
+	 */
+	if (path_in[0]=='/')
 		strncpy(path_out, path_in, out_len);
-	} else {
-		if (getcwd(dir, sizeof(dir)) == 0)
-			return SQLITE_IOERR;
-		if (strcmp(dir, "/") == 0)
-			sqlite3_snprintf(out_len, path_out, "/%s", path_in);
-		else
-			sqlite3_snprintf(out_len, path_out, "%s/%s", dir, path_in);
+	else {
+		path_out[0] = '/';
+		strncpy(path_out+1, path_in, out_len-1);
 	}
+
 	path_out[out_len-1] = '\0';
 	return SQLITE_OK;
 }
+
 
 /*
  * The following four VFS methods:
@@ -393,6 +489,7 @@ static void genode_dl_close(sqlite3_vfs *pVfs, void *pHandle)
 	return;
 }
 
+
 /*
  * Sleep for at least nMicro microseconds. Return the (approximate) number
  * of microseconds slept for.
@@ -408,9 +505,10 @@ static int genode_sleep(sqlite3_vfs *pVfs, int nMicro)
 	return (now - then) / 1000;
 }
 
+
 /*
  * Write into *pTime the current time and date as a Julian Day
- * number times 86400000. In other words, write into *piNow
+ * number times 86400000. In other words, write into *piTime
  * the number of milliseconds since the Julian epoch of noon in
  * Greenwich on November 24, 4714 B.C according to the proleptic
  * Gregorian calendar.
@@ -420,34 +518,44 @@ static int genode_sleep(sqlite3_vfs *pVfs, int nMicro)
  */
 static int genode_current_time(sqlite3_vfs *pVfs, double *pTime)
 {
-	Rtc::Timestamp ts = _rtc.current_time();
+	try {
+		Rtc::Connection rtc;
+		Rtc::Timestamp ts = rtc.current_time();
 
-	*pTime = (julian_day(ts)+0.5) * 86400000.0;
-	*pTime += ts.hour   * 360000.0;
-	*pTime += ts.minute *  60000.0;
-	*pTime += ts.second *   1000.0;
-	/* *pTime +=  ts.microsecond / 1000.0; */
-	/* Use the timer session for milisecond granularity. */
-	*pTime += _timer.elapsed_ms();
+		*pTime = julian_day(ts)  * 86400000.0;
+		*pTime += (ts.hour + 12) *   360000.0;
+		*pTime += ts.minute      *    60000.0;
+		*pTime += ts.second      *     1000.0;
+		*pTime += ts.microsecond /     1000.0;
+	} catch (...) {
+		PWRN("RTC not present, using dummy time");
+		*pTime = _timer.elapsed_ms();
+	}
 
 	return SQLITE_OK;
 }
+
 
 /* See above. */
 static int genode_current_time_int64(sqlite3_vfs *pVfs, sqlite3_int64 *pTime)
 {
-	Rtc::Timestamp ts = _rtc.current_time();
+	try {
+		Rtc::Connection rtc;
+		Rtc::Timestamp ts = rtc.current_time();
 
-	*pTime = julian_day(ts) * 86400000;
-	*pTime += (ts.hour + 12)   * 360000;
-	*pTime += ts.minute *  60000;
-	*pTime += ts.second *   1000;
-	/* *pTime += ts.microsecond / 1000; */
-	/* Use the timer session for milisecond granularity. */
-	*pTime += _timer.elapsed_ms();
+		*pTime = julian_day(ts)  * 86400000;
+		*pTime += (ts.hour + 12) *   360000;
+		*pTime += ts.minute      *    60000;
+		*pTime += ts.second      *     1000;
+		*pTime += ts.microsecond /     1000;
+	} catch (...) {
+		PWRN("RTC not present, using dummy time");
+		*pTime = _timer.elapsed_ms();
+	}
 
 	return SQLITE_OK;
 }
+
 
 /*****************************************
   ** Library initialization and cleanup **
@@ -469,13 +577,15 @@ int sqlite3_os_init(void)
 		return SQLITE_ERROR;
 	}
 
+	Fs_state *st = new (Genode::env()->heap()) Fs_state();
+
 	static sqlite3_vfs genode_vfs = {
 		2,                         /* iVersion */
 		sizeof(Genode_file),       /* szOsFile */
 		File_system::MAX_PATH_LEN, /* mxPathname */
-		NULL,                      /* pNext */
+		0,                      /* pNext */
 		VFS_NAME,                  /* zName */
-		NULL,                      /* pAppData */
+		st,                        /* pAppData */
 		genode_open,               /* xOpen */
 		genode_delete,             /* xDelete */
 		genode_access,             /* xAccess */
@@ -487,7 +597,7 @@ int sqlite3_os_init(void)
 		genode_randomness,         /* xRandomness */
 		genode_sleep,              /* xSleep */
 		genode_current_time,       /* xCurrentTime */
-		NULL,                      /* xGetLastError */
+		0,                      /* xGetLastError */
 		genode_current_time_int64, /* xCurrentTimeInt64 */
 	};
 
@@ -495,10 +605,12 @@ int sqlite3_os_init(void)
 	return SQLITE_OK;
 }
 
+
 int sqlite3_os_end(void)
 {
 	sqlite3_vfs *vfs = sqlite3_vfs_find(VFS_NAME);
 	sqlite3_vfs_unregister(vfs);
+	destroy(Genode::env()->heap(), (Fs_state*)vfs->pAppData);
 	Jitter::jent_entropy_collector_free(_jitter);
 
 	return SQLITE_OK;
