@@ -7,7 +7,7 @@ runtime.test rec {
   components = with pkgs;
     [ drivers.timer
       drivers.nic.dde_ipxe drivers.pci drivers.pci.device_pd
-      server.ninep_client
+      server.ninep_fs
       test.libc_vfs
     ];
 
@@ -46,7 +46,7 @@ runtime.test rec {
 		<provides> <service name="PCI"/> </provides>
 	</start>
 
-	<start name="9p_client">
+	<start name="9p_fs">
 		<resource name="RAM" quantum="8M"/>
 		<provides><service name="File_system"/></provides>
 		<config addr="10.0.2.2">
