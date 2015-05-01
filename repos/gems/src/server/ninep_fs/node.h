@@ -64,7 +64,7 @@ namespace File_system {
 				tx.fid = _fid;
 				tx.nstat = Plan9::NULL_STAT_LEN+str_len;
 				uint8_t buf[tx.nstat];
-				tx.stat = (char*)buf;
+				tx.stat = buf;
 
 				/* Zero off the extra space at the end. */
 				memset(&buf[Plan9::NULL_STAT_LEN], 0x00, str_len);

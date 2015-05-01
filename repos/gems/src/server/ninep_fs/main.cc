@@ -357,7 +357,7 @@ class File_system::Session_component : public Session_rpc_object
 
 		Status status(Node_handle node_handle)
 		{
-			char buf[1024];
+			uint8_t buf[1024];
 			Fcall tx, rx;
 			Status stat;
 
@@ -368,8 +368,11 @@ class File_system::Session_component : public Session_rpc_object
 			rx.stat = buf;
 			_attach.transact(Tstat, &tx, &rx);
 
+
 			int bi = 2+2+4+1+4;
-			get8(rx.stat, bi, stat.inode);
+			Genode::uint64_t qid_path;
+			get8(rx.stat, bi, qid_path);
+			stat.inode = qid_path;
 
 			/* The high bit of the qid type byte denotes a directory. */
 			if (rx.stat[2+2+4] & 0x80) {
@@ -379,7 +382,9 @@ class File_system::Session_component : public Session_rpc_object
 			} else {
 				stat.mode = Status::MODE_FILE;
 				bi = 2+2+4+13+4+4+4;
-				get8(rx.stat, bi, stat.size);
+				Genode::uint64_t length;
+				get4(rx.stat, bi, length);
+				stat.size = file_size_t(length);
 			}
 			return stat;
 		}
@@ -417,7 +422,7 @@ class File_system::Session_component : public Session_rpc_object
 
 			tx.fid = file->fid();
 			tx.nstat = NULL_STAT_LEN;
-			tx.stat = (char*)buf;
+			tx.stat = buf;
 
 			zero_stat(buf);
 			int bi = 2+2+4+13+4+4+4;

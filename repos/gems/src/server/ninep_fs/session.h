@@ -336,11 +336,9 @@ class Plan9::Socket
 
 			uint16_t i = 0; /* Buffer index. */
 			get4(_buf, i, size);
-			if (size != r || size < 7) {
-				PERR("read a %d byte message with a %d byte size", r, size);
-				close();
-				throw Temporary_failure();
-			}
+			while (r < size) /* Read the rest. */
+				r += read(&_buf[r], size-r);
+
 			get1(_buf, i, type);
 			get2(_buf, i, tag);
 
@@ -425,6 +423,10 @@ class Plan9::Attachment
 			transact(Plan9::Tattach, &tx, 0);
 		}
 
+		/**
+		 * Message size negotiated with server.
+		 */
+		Plan9::size_t message_size() { return _sock.message_size(); }
 		/**
 		 * Send a request, receive a response.
 		 */

@@ -36,6 +36,8 @@ namespace Plan9 {
 		MAXWELEM         = 15,   /* This should be 16, but u9fs can only do 15. */
 		DEFAULT_PORT     = 564,
 		MAX_MESSAGE_SIZE = 8192,
+		IOHDRSZ          = 24,   /* ample room for Twrite/Rread header (iounit) */
+
 
 		OREAD  = 0,
 		OWRITE = 1,
@@ -120,7 +122,7 @@ namespace Plan9 {
 			};
 			struct {
 				uint16_t  nstat;  /* Twstat, Rstat */
-				char     *stat;   /* Twstat, Rstat */
+				uint8_t   *stat;  /* Twstat, Rstat */
 			};
 		};
 	};
@@ -143,10 +145,10 @@ namespace Plan9 {
 		value |= buffer[index++] << 8; \
 		value |= buffer[index++] << 16; \
 		value |= buffer[index++] << 24; \
-		value |= buffer[index++] << 32; \
-		value |= buffer[index++] << 40; \
-		value |= buffer[index++] << 48; \
-		value |= buffer[index++] << 56; \
+		value |= Genode::uint64_t(buffer[index++]) << 32; \
+		value |= Genode::uint64_t(buffer[index++]) << 40; \
+		value |= Genode::uint64_t(buffer[index++]) << 48; \
+		value |= Genode::uint64_t(buffer[index++]) << 56; \
 
 	#define put1(buffer, index, value) \
 		buffer[index++] = value & 0xFF; \

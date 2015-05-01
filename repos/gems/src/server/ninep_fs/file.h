@@ -43,17 +43,18 @@ class File_system::File : public Node
 		size_t read(char *dst, size_t len, seek_off_t seek_offset)
 		{
 			File_system::size_t res = 0;
+			size_t chunk = attachment()->message_size() - Plan9::IOHDRSZ;
 			Plan9::Fcall tx, rx;
 
 			tx.fid = _io_fid;
 			while (len) {
-				tx.offset = seek_offset;
-				tx.count = rx.count = len;
+				tx.offset = seek_offset + res;
+				tx.count = rx.count = min(len, chunk);
 				rx.data = &dst[res];
 
 				attachment()->transact(Plan9::Tread, &tx, &rx);
 
-				if (rx.count == 0) break;
+				if (rx.count != tx.count) break;
 				res += rx.count;
 				len -= rx.count;
 			}
@@ -63,19 +64,20 @@ class File_system::File : public Node
 		size_t write(char const *src, size_t len, seek_off_t seek_offset)
 		{
 			File_system::size_t res = 0;
+			size_t chunk = attachment()->message_size() - Plan9::IOHDRSZ;
 			Plan9::Fcall tx, rx;
 
 			tx.fid = _io_fid;
 			while (len) {
-				tx.offset = seek_offset;
-				tx.count = rx.count = len;
+				tx.offset = seek_offset + res;
+				tx.count = rx.count = min(len, chunk);
 				tx.data = (char *)&src[res];
 
 				attachment()->transact(Plan9::Twrite, &tx, &rx);
 
-				if (rx.count == 0) break;
-				res += rx.count;
-				len -= rx.count;
+				if (rx.count != tx.count) break;
+				res         += rx.count;
+				len         -= rx.count;
 			}
 			return res;
 		}
