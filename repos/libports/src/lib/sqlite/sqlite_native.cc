@@ -22,6 +22,10 @@
 #include <timer_session/connection.h>
 #include <util/string.h>
 
+/* Local includes */
+#include "common.h"
+
+
 /* jitterentropy includes */
 namespace Jitter {
 extern "C" {
@@ -42,50 +46,6 @@ extern "C" {
 #include <sqlite3.h>
 }
 
-
-/**
- * Convert an Rtc::Timestamp to a Julian Day Number.
- *
- * \param   ts   Timestamp to convert.
- *
- * \return       Julian Day Number, rounded down.
- *
- * The Julian Day starts at noon and this function rounds down,
- * so the return value is effectively 12 hours behind.
- *
- * https://en.wikipedia.org/wiki/Julian_day#Calculation
- */
-unsigned julian_day(Rtc::Timestamp ts)
-{
-	unsigned a = (14 - ts.month) / 12;
-	unsigned y = ts.year + 4800 - a;
-	unsigned m = ts.month + 12*a - 3;
-
-	return ts.day + (153*m + 2)/5 + 365*y + y/4 - y/100 + y/400 - 32046;
-}
-
-
-#define NOT_IMPLEMENTED PWRN("Sqlite::%s not implemented", __func__);
-
-static Timer::Connection _timer;
-static Jitter::rand_data *_jitter;
-
-
-/**
- * Return base-name portion of null-terminated path string
- */
-static inline char const *basename(char const *path)
-{
-	char const *start = path;
-
-	for (; *path; path++)
-		if (*path == '/')
-			start = path + 1;
-
-	return start;
-}
-
-
 struct Fs_state
 {
 	Genode::Allocator_avl _tx_block_alloc;
@@ -97,7 +57,7 @@ struct Fs_state
 	Fs_state()
 	:
 		_tx_block_alloc(Genode::env()->heap()),
-		fs(_tx_block_alloc)
+		fs(_tx_block_alloc, 1024) /* SQLite likes the number 512. */
 	{ }
 
 	File_system::Dir_handle dir_of(const char *path, bool create = false)
@@ -190,6 +150,7 @@ static int genode_close(sqlite3_file *pFile)
 
 static int genode_write(sqlite3_file *pFile, const void *buf, int count, sqlite_int64 offset)
 {
+	// TODO: locking
 	int rc = SQLITE_OK;
 	Genode_file *p = (Genode_file*)pFile;
 
@@ -215,6 +176,7 @@ static int genode_write(sqlite3_file *pFile, const void *buf, int count, sqlite_
 
 static int genode_read(sqlite3_file *pFile, void *buf, int count, sqlite_int64 offset)
 {
+	// TODO: locking
 	int rc = SQLITE_OK;
 	Genode_file *p = (Genode_file*)pFile;
 
