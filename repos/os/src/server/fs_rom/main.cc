@@ -306,7 +306,9 @@ class Rom_session_component : public Genode::Rpc_object<Genode::Rom_session>
 						_file_ds = Ram_dataspace_capability();
 						_file_size = 0;
 					}
-				}
+				} else
+					PWRN("failed to open %s", _file_path.base());
+
 				_fs.close(file_handle);
 			}
 
