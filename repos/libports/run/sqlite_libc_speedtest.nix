@@ -9,11 +9,11 @@
 { runtime, pkgs, ... }:
 
 runtime.test {
-  name = "sqlite_speedtest";
+  name = "sqlite_libc_speedtest";
   automatic = false; # Shared libraries
 
   components = with pkgs;
-    [ test.sqlite_speedtest
+    [ test.sqlite_libc_speedtest
       drivers.timer
       server.ram_fs
     ];
@@ -49,7 +49,7 @@ runtime.test {
               <policy label="" root="/" writeable="yes" />
             </config>
           </start>
-        <start name="test-sqlite_speedtest">
+        <start name="test-sqlite_libc_speedtest">
           <resource name="RAM" quantum="16M"/>
             <config>
               <libc stdout="/dev/log">
@@ -65,6 +65,6 @@ runtime.test {
 
   testScript = ''
     append qemu_args " -nographic -m 256 "
-    run_genode_until {.*child "test-sqlite_speedtest" exited with exit value 0.*} 600
+    run_genode_until {.*child "test-sqlite_libc_speedtest" exited with exit value 0.*} 600
   '';
 }

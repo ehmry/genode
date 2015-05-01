@@ -4,8 +4,9 @@
 
 let
   objects = compileCC {
-    src = ./native_sqlite.cc;
+    src = ./libc_sqlite.cc;
     libs = [ libc jitterentropy ];
+    includes = [ ../sqlite ]; # common.h
     externalIncludes = [ sqliteSrc.include ];
   };
 in
