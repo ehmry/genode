@@ -2,24 +2,13 @@
 , libc, libm, libpng, sdl, sdl_net, stdcxx, zlib, libc_lwip_nic_dhcp
 , config_args }:
 
-linkComponent rec {
-  name = "dosbox";
-
-  libs =
-    [ libc libm libpng sdl sdl_net stdcxx
-      zlib libc_lwip_nic_dhcp config_args
-    ];
-
-  externalObjects = compileCCRepo {
-    inherit name libs;
+let
+  subCompile = { src, libs ? [] }:
+  compileCCRepo{ 
+    libs = libs ++ [ libc stdcxx sdl ];
     sourceRoot = dosboxSrc;
     filter = [ "opl.cpp" ];
-    sources = addPrefix "${dosboxSrc}/src/"
-      [ "dosbox.cpp"
-        "cpu/*.cpp" "debug/*.cpp" "dos/*.cpp" "fpu/*.cpp" "gui/*.cpp"
-        "hardware/*.cpp" "hardware/serialport/*.cpp" "ints/*.cpp"
-        "misc/*.cpp" "shell/*.cpp"
-      ];
+    sources = dosboxSrc+"/src/"+src;
 
     headers = [ "${dosboxSrc}/include/dosbox.h" ];
 
@@ -46,4 +35,27 @@ linkComponent rec {
     externalIncludes = [ "${dosboxSrc}/include" ];
   };
 
+in
+linkComponent rec {
+  name = "dosbox";
+
+  libs =
+    [ libc libm libpng sdl sdl_net stdcxx
+      zlib libc_lwip_nic_dhcp config_args
+    ];
+
+  externalObjects = map
+    subCompile
+    [ { src = "dosbox.cpp"; }
+      { src = "cpu/*.cpp"; }
+      { src = "debug/*.cpp"; }
+      { src = "dos/*.cpp"; }
+      { src = "fpu/*.cpp"; }
+      { src = "gui/*.cpp"; }
+      { src = "hardware/*.cpp"; libs = [ libpng sdl_net ]; }
+      { src = "hardware/serialport/*.cpp"; libs = [ sdl_net ]; }
+      { src = "ints/*.cpp"; }
+      { src = "misc/*.cpp"; }
+      { src = "shell/*.cpp"; }
+    ];
 }
