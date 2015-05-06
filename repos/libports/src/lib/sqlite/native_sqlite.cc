@@ -23,6 +23,7 @@
 #include <base/env.h>
 #include <base/allocator_avl.h>
 #include <file_system_session/connection.h>
+#include <file_system/util.h>
 
 /* Local includes */
 #include "common.h"
@@ -35,8 +36,9 @@ using namespace Genode;
 
 struct Fs_state
 {
-	Genode::Allocator_avl _tx_block_alloc;
-	File_system::Connection fs;
+	Genode::Allocator_avl   _tx_block_alloc;
+	File_system::Connection  fs;
+	Genode::Lock             lock;
 
 	/**
 	 * Constructor
@@ -129,61 +131,27 @@ static int genode_close(sqlite3_file *pFile)
 
 static int genode_write(sqlite3_file *pFile, const void *buf, int count, sqlite_int64 offset)
 {
-	// TODO: locking
-	int rc = SQLITE_OK;
 	Genode_file *p = (Genode_file*)pFile;
+	Genode::Lock::Guard guard(p->st->lock);
 
-	File_system::Session::Tx::Source &source = *p->st->fs.tx();
-	File_system::Packet_descriptor
-		packet(source.alloc_packet(count),
-		       0, p->fh,
-		       File_system::Packet_descriptor::WRITE,
-		       count, offset);
-
-	memcpy(source.packet_content(packet), buf, count);
-
-	try {
-		source.submit_packet(packet);
-		source.get_acked_packet();
-	}
-	catch (...) { rc = SQLITE_IOERR_WRITE; }
-
-	source.release_packet(packet);
-	return rc;
+	size_t n = File_system::write(p->st->fs, p->fh, buf, count, offset);
+	if (n == count)
+		return SQLITE_OK;
+	return SQLITE_IOERR_WRITE;
 }
 
 
 static int genode_read(sqlite3_file *pFile, void *buf, int count, sqlite_int64 offset)
 {
-	// TODO: locking
-	int rc = SQLITE_OK;
 	Genode_file *p = (Genode_file*)pFile;
+	Genode::Lock::Guard guard(p->st->lock);
 
-	File_system::Session::Tx::Source &source = *p->st->fs.tx();
-	File_system::Packet_descriptor packet_in, packet_out;
-
-	packet_in = File_system::Packet_descriptor(source.alloc_packet(count), 0, p->fh,
-	                                           File_system::Packet_descriptor::READ,
-	                                           count, offset);
-
-	try {
-		source.submit_packet(packet_in);
-
-		packet_out = source.get_acked_packet();
-
-		int actual = packet_out.length();
-		memcpy(buf, source.packet_content(packet_out), actual);
-
-		if ((actual < count)) {
-			/* Unread parts of the buffer must be zero-filled */
-			memset(&((char*)buf)[actual], 0, count-actual);
-			rc = SQLITE_IOERR_SHORT_READ;
-		}
-	}
-	catch (...) { rc = SQLITE_IOERR_READ; }
-
-	source.release_packet(packet_out);
-	return rc;
+	size_t n = File_system::read(p->st->fs, p->fh, buf, count, offset);
+	if (n == count)
+		return SQLITE_OK;
+	if (n < count)
+		return SQLITE_IOERR_SHORT_READ;
+	return SQLITE_IOERR_READ;
 };
 
 
