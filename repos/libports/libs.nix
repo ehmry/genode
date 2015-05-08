@@ -83,36 +83,11 @@ let
 
 in
 {
-  libbz2 = importLibrary ./lib/mk/libbz2.nix;
-  gmp-mpn = importLibrary ./src/lib/gmp/mpn.nix;
-  icu     = importLibrary ./lib/mk/icu.nix;
-  libc-compat  = importLibrary ./lib/mk/libc-compat.nix;
-  libc-gen     = importLibrary ./lib/mk/libc-gen.nix;
-  libc-gdtoa   = importLibrary ./lib/mk/libc-gdtoa.nix;
-  libc-inet    = importLibrary ./lib/mk/libc-inet.nix;
-  libc-isc     = importLibrary ./lib/mk/libc-isc.nix;
-  libc-locale  = importLibrary ./lib/mk/libc-locale.nix;
-  libc-nameser = importLibrary ./lib/mk/libc-nameser.nix;
-  libc-net     = importLibrary ./lib/mk/libc-net.nix;
-  libc-regex   = importLibrary ./lib/mk/libc-regex.nix;
-  libc-resolv  = importLibrary ./lib/mk/libc-resolv.nix;
-  libc-rpc     = importLibrary ./lib/mk/libc-rpc.nix;
-  libc-stdlib  = importLibrary ./lib/mk/libc-stdlib.nix;
-  libc-stdtime = importLibrary ./lib/mk/libc-stdtime.nix;
-  libc-setjmp  = importLibrary ./lib/mk/libc-setjmp.nix;
-  libc-string  = importLibrary ./lib/mk/libc-string.nix;
-  libc-stdio   = importLibrary ./lib/mk/libc-stdio.nix;
-  libm = importLibrary ./lib/mk/libm.nix;
-
   seoul_libc_support = importLibrary
     ./../ports/lib/mk/seoul_libc_support.nix;
-
-  stdcxx  = importLibrary ./lib/mk/stdcxx.nix;
-  zlib    = importLibrary ./lib/mk/zlib.nix;
 
   test-ldso_lib_1  = importLibrary ./src/test/ldso/lib_1.nix;
   test-ldso_lib_2  = importLibrary ./src/test/ldso/lib_2.nix;
   test-ldso_lib_dl = importLibrary ./src/test/ldso/lib_dl.nix;
-
-  x86emu = importLibrary ./lib/mk/x86emu.nix;
 } // (tool.loadExpressions callLibrary' ./src/lib)
+  // (tool.loadExpressions callLibrary' ./lib/mk)

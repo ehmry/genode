@@ -464,10 +464,21 @@ let tool = rec {
     in
     default // (builtins.listToAttrs (builtins.filter (x: x != {}) (map
       (name:
-        let more = loadExpressions func (path + "/${name}"); in
-        if builtins.getAttr name dirSet == "directory"
+        let
+          type = builtins.getAttr name dirSet;
+          more = loadExpressions func (path + "/${name}");
+        in
+        if type == "directory"
         then { inherit name; value = more; }
-        else {}
+        else
+        if
+          (type == "regular" || type == "symlink") &&
+          (hasSuffix ".nix" name)
+        then
+          { name = dropSuffix ".nix" name;
+            value = func (import (path+"/${name}"));
+          }
+        else { }
       )
       (builtins.attrNames dirSet)
     )));
