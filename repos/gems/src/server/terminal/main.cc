@@ -594,12 +594,15 @@ int main(int, char **)
 	 * Read keyboard layout from config file
 	 */
 	try {
-		if (config()->xml_node().sub_node("keyboard")
-		                        .attribute("layout").has_value("de")) {
-
+		Xml_node::Attribute layout_attr =
+			config()->xml_node().sub_node("keyboard").attribute("layout");
+		if (layout_attr.has_value("de")) {
 			keymap = Terminal::german_keymap;
 			shift  = Terminal::german_shift;
 			altgr  = Terminal::german_altgr;
+		} else if (layout_attr.has_value("dvorak")) {
+			keymap = Terminal::usdvorak_keymap;
+			shift  = Terminal::usenglish_shift;
 		}
 	} catch (...) { }
 
