@@ -73,8 +73,10 @@ let
      (attrs.includes or []) ++ libportsIncludes ++ osIncludes ++ baseIncludes;
   });
 
- compileCC = addIncludes tool.compileCC;
- compileCRepo = addIncludes tool.compileCRepo;
+  compileCC = tool.addIncludes
+    (libportsIncludes ++ osIncludes ++ baseIncludes ) [ ] tool.compileCC;
+  compileCRepo = tool.addIncludes
+    (libportsIncludes ++ osIncludes ++ baseIncludes ) [ ] tool.compileCRepo;
 
  callLibrary' = callLibrary
     ( { inherit fromLibc compileLibc libcIncludes libcExternalIncludes compileCC compileCRepo; } // ports );
