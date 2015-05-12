@@ -282,6 +282,8 @@ in
   , libs ? []
   , ... } @ args:
   let args' = propagateLibAttrs args; in
+  # Base cannot be linked in a dynamic component.
+  assert (builtins.filter (lib: lib.name == "base") libs) == [];
   shellDerivation (removeAttrs args' [ "propagate" "runtime" ] // {
     script = ./link-component.sh;
     inherit genodeEnv dynDl ldTextAddr ldScripts;
