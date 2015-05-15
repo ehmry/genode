@@ -7,6 +7,8 @@
 #ifndef _FILE_SYSTEM__UTIL_H_
 #define _FILE_SYSTEM__UTIL_H_
 
+#include <os/path.h>
+
 namespace File_system {
 
 	/**
@@ -60,6 +62,26 @@ namespace File_system {
 		if (str[0] == 0) return false;
 
 		return true;
+	}
+
+
+	/**
+	 * Open a directory, ensuring all parent directories exists.
+	 */
+	Dir_handle ensure_dir(Session &fs, char const *path)
+	{
+		try {
+			return fs.dir(path, false);
+		} catch (Lookup_failed) {
+			try {
+				return fs.dir(path, true);
+			} catch (Lookup_failed) {
+				Genode::Path<MAX_PATH_LEN> target(path);
+				target.strip_last_element();
+				fs.close(ensure_dir(fs, target.base()));
+			}
+		}
+		return fs.dir(path, true);
 	}
 
 
