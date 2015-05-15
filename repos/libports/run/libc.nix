@@ -1,16 +1,15 @@
-{ run, pkgs }:
+{ runtime, pkgs, ... }:
 
-with pkgs;
-
-run {
+runtime.test {
   name = "libc";
+  automatic = false;
 
-  contents = [
-    { target = "/"; source = test.libc; }
-    { target = "/"; source = libs.libc; }
-    { target = "/"; source = libs.libm; }
-    { target = "/config";
-      source = builtins.toFile "config" ''
+  components = with pkgs;
+    [ test.libc ];
+
+  config = builtins.toFile
+    "config.xml"
+    ''
         <config>
           <parent-provides>
             <service name="ROM"/>
@@ -37,8 +36,6 @@ run {
           </start>
         </config>
       '';
-    }
-  ];
 
   testScript = ''
     append qemu_args " -nographic -m 64 "
