@@ -1,9 +1,9 @@
 { linkComponent, compileCC
-, base, config, libc, libpng, zlib, blit, file }:
+, config, libc, libpng, zlib, blit, file }:
 
 linkComponent rec {
   name= "backdrop";
-  libs = [ base config libc libpng zlib blit file ];
+  libs = [ config libc libpng zlib blit file ];
   objects = compileCC {
     src = ./main.cc;
     inherit libs;
