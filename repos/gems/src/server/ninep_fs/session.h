@@ -81,7 +81,6 @@ class Plan9::Socket
 		{
 			Lock::Guard slots_guard(_slots_lock);
 			Lock::Guard buf_guard(_buf_lock);
-			PLOG("closing TCP connection to server");
 			::close(_fd); _fd = -1;
 
 			/* Clear all pending transations. */
@@ -453,7 +452,7 @@ class Plan9::Attachment
 				if (strcmp(slot.error, denied, sizeof(denied)) == 0)
 					throw File_system::Permission_denied();
 
-				PERR("%s", slot.error);
+				PERR("server replied '%s'", slot.error);
 				throw Exception();
 
 				if (rx && rx->type != ++type) {
@@ -501,7 +500,8 @@ class Plan9::Attachment
 		 */
 		File_system::size_t num_entries(Fid fid)
 		{
-			char buf[1024];
+			/* A potentially excessive buffer.*/
+			char buf[message_size() - Plan9::IOHDRSZ];
 			Fcall tx, rx;
 			File_system::size_t entries = 0;
 

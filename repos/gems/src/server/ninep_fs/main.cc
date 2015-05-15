@@ -434,7 +434,7 @@ class File_system::Session_component : public Session_rpc_object
 		void move(Dir_handle from_dir_handle, Name const &from_name,
 		          Dir_handle   to_dir_handle, Name const   &to_name)
 		{
-			if (_writeable)
+			if (!_writeable)
 				throw Permission_denied();
 
 			if (!valid_name(from_name.string()))
@@ -496,14 +496,10 @@ class File_system::Root : public Root_component<Session_component>
 			char  root[MAX_NAME_LEN];
 			root[0] = '\0';
 
+			Session_label label(args);
 			try {
-				Session_label label(args);
 				Session_policy policy(label);
 
-				/*
-				 * Determine the directory that is used as the root directory of
-				 * the session.
-				 */
 				try {
 					policy.attribute("user").value(uname, sizeof(uname));
 				} catch (Xml_node::Nonexistent_attribute) {
@@ -559,6 +555,12 @@ class File_system::Root : public Root_component<Session_component>
 				     ram_quota, session_size);
 				throw Root::Quota_exceeded();
 			}
+
+			if (!tx_buf_size) {
+				PERR("%s requested a session with a zero length transmission buffer", label.string());
+				throw Root::Invalid_args();
+			}
+
 			return new (md_alloc())
 				Session_component(tx_buf_size, _ep,
 				                  _sock,      *md_alloc(),
@@ -636,6 +638,6 @@ struct File_system::Main
  ** Server framework **
  **********************/
 
-char const *   Server::name()                            { return "9p_client_ep"; }
+char const *   Server::name()                            { return "9p_fs_ep"; }
 Genode::size_t Server::stack_size()                      { return 2048 * sizeof(long); }
 void           Server::construct(Server::Entrypoint &ep) { static File_system::Main inst(ep); }
