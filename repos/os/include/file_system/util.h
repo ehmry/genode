@@ -105,13 +105,14 @@ namespace File_system {
 	static inline size_t read(Session &fs, File_handle const &file_handle,
 	                          void *dst, size_t count, off_t seek_offset = 0)
 	{
+		bool success = true;
 		Session::Tx::Source &source = *fs.tx();
 
 		size_t const max_packet_size = source.bulk_buffer_size() / 2;
 
 		size_t remaining_count = count;
 
-		while (remaining_count) {
+		while (remaining_count && success) {
 
 			collect_acknowledgements(source);
 
@@ -129,6 +130,7 @@ namespace File_system {
 			source.submit_packet(packet);
 
 			packet = source.get_acked_packet();
+			success = packet.succeeded();
 
 			size_t const read_num_bytes = min(packet.length(), curr_packet_size);
 
@@ -160,13 +162,14 @@ namespace File_system {
 	static inline size_t write(Session &fs, File_handle const &file_handle,
 	                          void const *src, size_t count, off_t seek_offset = 0)
 	{
+		bool success = true;
 		Session::Tx::Source &source = *fs.tx();
 
 		size_t const max_packet_size = source.bulk_buffer_size() / 2;
 
 		size_t remaining_count = count;
 
-		while (remaining_count) {
+		while (remaining_count && success) {
 
 			collect_acknowledgements(source);
 
@@ -187,7 +190,7 @@ namespace File_system {
 			source.submit_packet(packet);
 
 			packet = source.get_acked_packet();;
-
+			success = packet.succeeded();
 			source.release_packet(packet);
 
 			/* prepare next iteration */
