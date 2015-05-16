@@ -17,6 +17,7 @@
 /* Genode includes */
 #include <session/session.h>
 #include <base/rpc.h>
+#include <base/signal.h>
 #include <dataspace/capability.h>
 
 namespace Terminal {
