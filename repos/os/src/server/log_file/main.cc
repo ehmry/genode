@@ -1,7 +1,8 @@
 /*
- * \brief  Standalone service that writes log messages to a file system.
+ * \brief  Server that writes log messages to a file system.
  * \author Emery Hemingway
  * \date   2015-05-13
+ *
  */
 
 /*
@@ -12,15 +13,13 @@
  */
 
 /* Genode includes. */
+#include <os/log_file_session.h>
 #include <file_system_session/connection.h>
 #include <file_system/util.h>
 #include <root/component.h>
 #include <os/server.h>
 #include <os/session_policy.h>
 #include <base/printf.h>
-
-/* Local includes. */
-#include "session_component.h"
 
 namespace Log_file {
 
