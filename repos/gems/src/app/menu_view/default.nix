@@ -1,9 +1,9 @@
 { linkComponent, compileCC, nixpkgs
-, base, config, libc, libpng, zlib, blit, file }:
+, libc, libpng, zlib, blit, file }:
 
 linkComponent rec {
   name = "menu_view";
-  libs = [ base config libc libpng zlib blit file ];
+  libs = [ libc libpng zlib blit file ];
   objects = compileCC {
     src = ./main.cc;
     inherit libs;
