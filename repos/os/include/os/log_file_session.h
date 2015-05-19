@@ -11,8 +11,8 @@
  * under the terms of the GNU General Public License version 2.
  */
 
-#ifndef _OS__LOG_FILE_SESSION__H_
-#define _OS__LOG_FILE_SESSION__H_
+#ifndef _OS__LOG_FILE_SESSION_H_
+#define _OS__LOG_FILE_SESSION_H_
 
 /* Genode includes. */
 #include <log_session/log_session.h>
@@ -37,7 +37,7 @@ namespace Log_file {
  * session with this and other clients; packets are stripped
  * from the acknowledgement buffer without being processed.
  */
-class Log_file::Session : public Rpc_object<Log_session>
+class Log_file::Session_component : public Rpc_object<Log_session, Session_component>
 {
 	private:
 
@@ -55,11 +55,6 @@ class Log_file::Session : public Rpc_object<Log_session>
 		                  File_system::File_handle fh,
 		                  File_system::seek_off_t  offset)
 		: _fs(fs), _file_handle(fh), _offset(offset) { }
-
-		~Session_component()
-		{
-			_fs.close(_file_handle);
-		}
 
 		/*****************
 		 ** Log session **
@@ -86,6 +81,9 @@ class Log_file::Session : public Rpc_object<Log_session>
 			    (msg[msg_len-1] != '\n'))
 				++write_len;
 
+			while (source.ack_avail())
+				source.release_packet(source.get_acked_packet());
+
 			/* Protect the offset. */
 			_offset_lock.lock();
 			File_system::Packet_descriptor
@@ -104,7 +102,6 @@ class Log_file::Session : public Rpc_object<Log_session>
 			if (msg_len != write_len)
 				buf[msg_len] = '\n';
 
-			collect_acknowledgements(source);
 			source.submit_packet(packet);
 			return msg_len;
 		}

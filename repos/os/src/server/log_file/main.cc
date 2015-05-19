@@ -28,6 +28,8 @@ namespace Log_file {
 	class  Log_root_component;
 	struct Main;
 
+	enum { BLOCK_SIZE = 256 };
+
 }
 
 class Log_file::Log_root_component : public Genode::Root_component<Log_file::Session_component>
@@ -57,33 +59,33 @@ class Log_file::Log_root_component : public Genode::Root_component<Log_file::Ses
 			 * TODO:
 			 * A client registry for opened file handles.
 			 * Without this two clients could write over each other
-			 * when the offsets get out of sync.
+			 * as the offsets get out of sync.
 			 */
 
-			Genode::Path<MAX_PATH_LEN-MAX_NAME_LEN> path;
+			char path[MAX_PATH_LEN];
+			path[0] = '/';
 			char name[MAX_NAME_LEN];
-			name[0] = 0;
-
-			Session_label session_label(args);
-			char const *label = session_label.string();
 
 			Dir_handle   dir_handle;
 			File_handle file_handle;
 			bool truncate = false;
 
-			size_t len = strlen(label);
-			size_t start = 0;
+			Session_label session_label(args);
+			strncpy(path+1, session_label.string(), sizeof(path)-1);
+
+			size_t len = strlen(path);
+			size_t start = 1;
 			for (size_t i = 1; i < len;) {
-				if (strcmp(" -> ", label+i, 4) == 0) {
-					strncpy(name, label+start, min((i-start)+1, sizeof(name)));
-					path.append(name);
-					i += 4;
+				if (strcmp(" -> ", path+i, 4) == 0) {
+					path[i++] = '/';
+					strncpy(path+i, path+i+3, sizeof(path)-i);
 					start = i;
+					i += 3;
 				} else ++i;
 			}
-			strncpy(name, label+start, min((len-start)+1, sizeof(name)));
-			strncpy(name+(len-start), ".log",
-			        min(size_t(sizeof(".log")), size_t(sizeof(name))-(len-start)));
+
+			snprintf(name, sizeof(name), "%s.log", path+start);
+			path[(start == 1) ? start : start-1] = '\0';
 
 			try {
 				Session_policy policy(session_label);
@@ -109,7 +111,7 @@ class Log_file::Log_root_component : public Genode::Root_component<Log_file::Ses
 			} catch (Session_policy::No_policy_defined) { }
 
 			if (!dir_handle.valid())
-				dir_handle = ensure_dir(_fs, path.base());
+				dir_handle = ensure_dir(_fs, path);
 			Handle_guard dir_guard(_fs, dir_handle);
 
 			if (!file_handle.valid())
@@ -137,9 +139,13 @@ class Log_file::Log_root_component : public Genode::Root_component<Log_file::Ses
 		Log_root_component(Server::Entrypoint &ep, Allocator &alloc)
 		:
 			Genode::Root_component<Session_component>(&ep.rpc_ep(), &alloc),
-			_write_alloc(&alloc),
-			_fs(_write_alloc, Log_session::String::MAX_SIZE * 8)
-		{ }
+			_write_alloc(env()->heap()),
+			_fs(_write_alloc, (env()->ram_session()->avail()
+			                   - ((env()->ram_session()->avail() / BLOCK_SIZE) * _write_alloc.overhead(BLOCK_SIZE))))
+		{
+			PLOG("buffering up to %lu messages",
+			     _fs.tx()->bulk_buffer_size() / BLOCK_SIZE);
+		}
 
 };
 
@@ -167,7 +173,7 @@ namespace Server {
 
 	char const* name() { return "log_file_ep"; }
 
-	size_t stack_size() { return 4*1024*sizeof(long); }
+	size_t stack_size() { return 2*1024*sizeof(long); }
 
 	void construct(Entrypoint &ep) { static Log_file::Main inst(ep); }
 
