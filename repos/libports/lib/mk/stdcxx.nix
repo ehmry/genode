@@ -4,9 +4,9 @@ let
   internalInclude = ../../include/stdcxx;
   externalInclude = stdcxxSrc.include + "/stdcxx";
 
-  includes = [ internalInclude (internalInclude + "/bits") ];
   externalIncludes =
-    [ externalInclude
+    [ internalInclude (internalInclude + "/bits")
+      externalInclude
       "${externalInclude}/bits"
       "${externalInclude}/std"
       "${externalInclude}/c_std"
@@ -29,7 +29,7 @@ linkSharedLibrary rec {
   libs = [ libc libm ];
 
   externalObjects = compileCCRepo rec {
-    inherit headers libs includes externalIncludes;
+    inherit headers libs externalIncludes;
     filter = [ "hash-long-double-tr1-aux.cc" "strstream.cc" ];
     sources = fromDir stdcxxSrc (
       [ # libstdc++ sources
@@ -71,6 +71,6 @@ linkSharedLibrary rec {
       ];
   };
 
-  propagate = { inherit headers includes externalIncludes; };
+  propagate = { inherit headers externalIncludes; };
 
 }
