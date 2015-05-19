@@ -99,7 +99,7 @@ class Wm::Decorator_slave
 		Genode::size_t   const _ep_stack_size = 4*1024*sizeof(Genode::addr_t);
 		Genode::Rpc_entrypoint _ep;
 		Policy                 _policy;
-		Genode::size_t   const _quota = 4*1024*1024;
+		Genode::size_t   const _quota = 9*1024*1024;
 		Genode::Slave          _slave;
 
 	public:
