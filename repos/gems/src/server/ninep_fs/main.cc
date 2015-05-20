@@ -639,5 +639,5 @@ struct File_system::Main
  **********************/
 
 char const *   Server::name()                            { return "9p_fs_ep"; }
-Genode::size_t Server::stack_size()                      { return 2048 * sizeof(long); }
+Genode::size_t Server::stack_size()                      { return 4096 * sizeof(long); }
 void           Server::construct(Server::Entrypoint &ep) { static File_system::Main inst(ep); }
