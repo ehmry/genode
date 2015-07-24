@@ -128,6 +128,9 @@ class Vfs::Dir_file_system : public File_system
 			if (_is_root())
 				return path;
 
+			if (strcmp("/", path, 2) == 0)
+				return path;
+
 			/* skip heading slash in path if present */
 			if (path[0] == '/')
 				path++;
@@ -142,10 +145,12 @@ class Vfs::Dir_file_system : public File_system
 			 * the current directory name. Let's check if the length of the
 			 * first path element matches the name length.
 			 */
-			if (*path != 0 && *path != '/')
-				return 0;
+			if (*path == '\0')
+				return "/";
+			if (*path == '/')
+				return path;
 
-			return path;
+			return 0;
 		}
 
 		/**
@@ -237,7 +242,7 @@ class Vfs::Dir_file_system : public File_system
 
 				char type_name[64];
 				sub_node.type_name(type_name, sizeof(type_name));
-				PWRN("unknown fstab node type <%s>", type_name);
+				PWRN("unknown VFS node type <%s>", type_name);
 			}
 		}
 
@@ -249,7 +254,7 @@ class Vfs::Dir_file_system : public File_system
 		Dataspace_capability dataspace(char const *path) override
 		{
 			path = _sub_path(path);
-			if (!path)
+			if (!path || strcmp("/", path, 2) == 0)
 				return Dataspace_capability();
 
 			/*
@@ -269,7 +274,7 @@ class Vfs::Dir_file_system : public File_system
 		void release(char const *path, Dataspace_capability ds_cap) override
 		{
 			path = _sub_path(path);
-			if (!path)
+			if (!path || strcmp("/", path, 2) == 0)
 				return;
 
 			for (File_system *fs = _first_file_system; fs; fs = fs->next)
@@ -279,20 +284,17 @@ class Vfs::Dir_file_system : public File_system
 		Stat_result stat(char const *path, Stat &out) override
 		{
 			path = _sub_path(path);
-
-			/* path does not match directory name */
 			if (!path)
 				return STAT_ERR_NO_ENTRY;
 
 			/*
-			 * If path equals directory name, return information about the
-			 * current directory.
+			 * If path matched this directory name, return
+			 * information about this directory.
 			 */
-			if (strlen(path) == 0 || (strcmp(path, "/") == 0)) {
-				out.size = 0;
+			if (strcmp("/", path, 2) == 0) {
+				memset(&out, 0x00, sizeof(Stat));
+				out.size = _sum_dirents_of_file_systems(path);
 				out.mode = STAT_MODE_DIRECTORY | 0755;
-				out.uid  = 0;
-				out.gid  = 0;
 				return STAT_OK;
 			}
 
@@ -320,12 +322,11 @@ class Vfs::Dir_file_system : public File_system
 			if (_is_root())
 				return _dirent_of_file_systems(path, index, out);
 
-			if (strcmp(path, "/") == 0) {
+			/* in this context, that is this directory */
+			if (strcmp("/", path, 2) == 0) {
 				_dirent_of_this_dir_node(index, out);
 				return DIRENT_OK;
 			}
-
-			/* path contains at least one element */
 
 			/* remove current element from path */
 			path = _sub_path(path);
@@ -334,33 +335,29 @@ class Vfs::Dir_file_system : public File_system
 			if (!path)
 				return DIRENT_ERR_INVALID_PATH;
 
+			/* path contains at least one element */
 			return _dirent_of_file_systems(path, index, out);
 		}
 
 		file_size num_dirent(char const *path) override
 		{
-			if (_is_root()) {
+			if (_is_root())
 				return _sum_dirents_of_file_systems(path);
 
-			} else {
+			/* path matched this directory name */
+			if (strcmp("/", path, 2) == 0)
+				return 1;
 
-				if (strcmp(path, "/") == 0)
-					return 1;
+			path = _sub_path(path);
+			if (!path)
+				return 0;
 
-				/*
-				 * The path contains at least one element. Remove current
-				 * element from path.
-				 */
-				path = _sub_path(path);
-
-				/*
-				 * If the resulting 'path' is non-null, the path lies
-				 * within our tree. In this case, determine the sum of
-				 * matching dirents of all our file systems. Otherwise,
-				 * the specified path lies outside our directory node.
-				 */
-				return path ? _sum_dirents_of_file_systems(path) : 0;
-			}
+			/*
+			 * If the resulting 'path' is non-null, the path lies
+			 * within our tree. In this case, determine the sum of
+			 * matching dirents of all our file systems.
+			 */
+			return _sum_dirents_of_file_systems(path);
 		}
 
 		bool is_directory(char const *path) override
@@ -368,8 +365,7 @@ class Vfs::Dir_file_system : public File_system
 			path = _sub_path(path);
 			if (!path)
 				return false;
-
-			if (strlen(path) == 0)
+			if (strcmp("/", path, 2) == 0)
 				return true;
 
 			for (File_system *fs = _first_file_system; fs; fs = fs->next)
@@ -384,8 +380,7 @@ class Vfs::Dir_file_system : public File_system
 			path = _sub_path(path);
 			if (!path)
 				return 0;
-
-			if (strlen(path) == 0)
+			if (strcmp("/", path, 2) == 0)
 				return path;
 
 			for (File_system *fs = _first_file_system; fs; fs = fs->next) {
@@ -399,11 +394,22 @@ class Vfs::Dir_file_system : public File_system
 
 		Open_result open(char const *path, unsigned mode, Vfs_handle **out_handle) override
 		{
+			path = _sub_path(path);
+			if (!path)
+				return OPEN_ERR_UNACCESSIBLE;
+
 			/*
 			 * If 'path' is a directory, we create a 'Vfs_handle'
 			 * for the root directory so that subsequent 'dirent' calls
 			 * are subjected to the stacked file-system layout.
 			 */
+
+			/* path matched this directory name */
+			if (strcmp("/", path, 2) == 0) {
+				*out_handle = new (env()->heap()) Vfs_handle(*this, *this, 0);
+				return OPEN_OK;
+			}
+
 			if (is_directory(path)) {
 				*out_handle = new (env()->heap()) Vfs_handle(*this, *this, 0);
 				return OPEN_OK;
@@ -414,18 +420,6 @@ class Vfs::Dir_file_system : public File_system
 			 * 'Vfs_handle' local to the file system that provides the
 			 * file.
 			 */
-
-			path = _sub_path(path);
-
-			/* check if path does not match directory name */
-			if (!path)
-				return OPEN_ERR_UNACCESSIBLE;
-
-			/* path equals directory name */
-			if (strlen(path) == 0) {
-				*out_handle = new (env()->heap()) Vfs_handle(*this, *this, 0);
-				return OPEN_OK;
-			}
 
 			/* path refers to any of our sub file systems */
 			for (File_system *fs = _first_file_system; fs; fs = fs->next) {
@@ -514,10 +508,22 @@ class Vfs::Dir_file_system : public File_system
 		/**
 		 * Synchronize all file systems
 		 */
-		void sync() override
+		void sync(char const *path) override
 		{
+			if (strcmp("/", path, 2) == 0) {
+				for (File_system *fs = _first_file_system; fs; fs = fs->next)
+					fs->sync("/");
+				return;
+			}
+
+			path = _sub_path(path);
+
+			if (!(path && strlen(path) > 0))
+				return;
+
 			for (File_system *fs = _first_file_system; fs; fs = fs->next)
-				fs->sync();
+				if (fs->leaf_path(path))
+					fs->sync(path);
 		}
 
 
