@@ -32,11 +32,13 @@ struct File_system::Connection : Genode::Connection<Session>, Session_client
 	 */
 	Connection(Range_allocator &tx_block_alloc,
 	           size_t           tx_buf_size = 128*1024,
-	           const char      *label = "")
+	           const char      *label = "",
+	           const char      *root  = "/",
+	           bool             writeable = true)
 	:
 		Genode::Connection<Session>(
-			session("ram_quota=%zd, tx_buf_size=%zd, label=\"%s\"",
-			        4*1024*sizeof(long) + tx_buf_size, tx_buf_size, label)),
+			session("ram_quota=%zd, tx_buf_size=%zd, label=\"%s\", root=\"%s\", writeable=%d",
+			        4*1024*sizeof(long) + tx_buf_size, tx_buf_size, label, root, writeable)),
 		Session_client(cap(), tx_block_alloc) { }
 };
 

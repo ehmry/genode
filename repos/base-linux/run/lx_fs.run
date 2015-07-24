@@ -37,14 +37,14 @@ install_config {
 	<start name="lx_fs">
 		<resource name="RAM" quantum="4M"/>
 		<provides> <service name="File_system"/> </provides>
-		<config> <policy label="" root="/libc_vfs" writeable="yes" /> </config>
+		<config> <policy label="" root="/lx_fs_test" writeable="yes" /> </config>
 	</start>
 	<start name="test-libc_vfs">
 		<resource name="RAM" quantum="2M"/>
 		<config>
 			<libc stdout="/dev/log">
 				<vfs>
-					<fs />
+					<fs root="/newroot"/>
 					<dir name="dev"> <log/> </dir>
 				</vfs>
 			</libc>
@@ -57,7 +57,7 @@ install_config {
 # Create test-directory structure
 #
 
-exec mkdir -p bin/libc_vfs
+exec mkdir -p var/run/lx_fs/genode/lx_fs_test/newroot
 
 #
 # Boot modules
@@ -80,6 +80,6 @@ puts "\nTest succeeded\n"
 # Cleanup test-directory structure
 #
 
-exec rm -r bin/libc_vfs
+exec rm -r var/run/lx_fs/genode/lx_fs_test/newroot
 
 # vi: set ft=tcl :

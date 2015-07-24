@@ -34,7 +34,10 @@ install_config {
 	<start name="ram_fs">
 		<resource name="RAM" quantum="4M"/>
 		<provides> <service name="File_system"/> </provides>
-		<config> <policy label="" root="/" writeable="yes" /> </config>
+		<config>
+			<content> <dir name="newroot"/> </content>
+			<policy label="" root="/" writeable="yes" />
+		</config>
 	</start>
 	<start name="test-libc_vfs">
 		<resource name="RAM" quantum="2M"/>
@@ -43,7 +46,7 @@ install_config {
 			<libc stdout="/dev/log" cwd="/tmp" >
 				<vfs>
 					<dir name="tmp" >
-						<fs/>
+						<fs root="/newroot"/>
 					</dir>
 					<dir name="dev"> <log/> </dir>
 				</vfs>

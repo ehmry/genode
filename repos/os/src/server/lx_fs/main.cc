@@ -1,11 +1,11 @@
 /*
- * \brief  RAM file system
+ * \brief  Linux host file system
  * \author Norman Feske
  * \date   2012-04-11
  */
 
 /*
- * Copyright (C) 2012-2013 Genode Labs GmbH
+ * Copyright (C) 2012-2015 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -14,6 +14,7 @@
 /* Genode includes */
 #include <file_system/node_handle_registry.h>
 #include <file_system_session/rpc_object.h>
+#include <file_system/root.h>
 #include <root/component.h>
 #include <os/attached_rom_dataspace.h>
 #include <os/config.h>
@@ -284,6 +285,7 @@ class File_system::Session_component : public Session_rpc_object
 		void unlink(Dir_handle, Name const &)
 		{
 			PERR("%s not implemented", __func__);
+			throw Permission_denied();
 		}
 
 		void truncate(File_handle file_handle, file_size_t size)
@@ -335,71 +337,29 @@ class File_system::Root : public Root_component<Session_component>
 
 			enum { ROOT_MAX_LEN = 256 };
 			char root[ROOT_MAX_LEN];
-			root[0] = 0;
 
 			Session_label  label(args);
 			try {
 				Session_policy policy(label);
 
-				/*
-				 * Determine directory that is used as root directory of
-				 * the session.
-				 */
-				try {
-					policy.attribute("root").value(root, sizeof(root));
-
-					/*
-					 * Make sure the root path is specified with a
-					 * leading path delimiter. For performing the
-					 * lookup, we remove all leading slashes.
-					 */
-					if (root[0] != '/') {
-						PERR("Root directory must start with / but is \"%s\"", root);
-						throw Root::Unavailable();
-					}
-
-					for (root_dir = root; *root_dir == '/'; ++root_dir) ;
-
-					/* sanitize possibly empty root_dir to current directory */
-					if (*root_dir == 0)
-						root_dir = ".";
-				} catch (Xml_node::Nonexistent_attribute) {
-					PERR("Missing \"root\" attribute in policy definition");
-					throw Root::Unavailable();
-				}
+				session_root_path(root, sizeof(root), policy, args);
+				writeable = session_writeable(policy, args);
 
 				/*
-				 * Determine if write access is permitted for the session.
+				 * For performing the lookup, we remove all leading slashes.
 				 */
-				try {
-					writeable = policy.attribute("writeable").has_value("yes");
-				} catch (Xml_node::Nonexistent_attribute) { }
+				for (root_dir = root; *root_dir == '/'; ++root_dir)
+
+				/* sanitize possibly empty root_dir to current directory */
+				if (*root_dir == 0)
+					root_dir = ".";
 
 			} catch (Session_policy::No_policy_defined) {
 				PERR("Invalid session request, no matching policy");
 				throw Root::Unavailable();
 			}
 
-			size_t ram_quota =
-				Arg_string::find_arg(args, "ram_quota"  ).ulong_value(0);
-			size_t tx_buf_size =
-				Arg_string::find_arg(args, "tx_buf_size").ulong_value(0);
-
-			if (!tx_buf_size) {
-				PERR("%s requested a session with a zero length transmission buffer", label.string());
-				throw Root::Invalid_args();
-			}
-
-			/*
-			 * Check if donated ram quota suffices for session data,
-			 * and communication buffer.
-			 */
-			size_t session_size = sizeof(Session_component) + tx_buf_size;
-			if (max((size_t)4096, session_size) > ram_quota) {
-				PERR("insufficient 'ram_quota', got %zd, need %zd",
-				     ram_quota, session_size);
-				throw Root::Quota_exceeded();
-			}
+			size_t tx_buf_size = session_tx_buf_size(sizeof(Session_component), args);
 
 			try {
 				return new (md_alloc())

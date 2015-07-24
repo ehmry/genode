@@ -48,7 +48,7 @@ set config {
 		<provides> <service name="File_system"/> </provides>
 		<config>
 			<archive name="libc_fs_tar_fs.tar" />
-			<policy label="" root="/testdir" />
+			<policy label="" root="/newroot" />
 		</config>
 	</start>
 	<start name="test-libc_fs_tar_fs">
@@ -57,7 +57,7 @@ set config {
 			<libc stdout="/dev/log">
 				<vfs>
 					<dir name="dev"> <log/> </dir>
-					<fs/>
+					<fs root="/testdir"/>
 				</vfs>
 			</libc>
 		</config>
@@ -74,13 +74,13 @@ install_config $config
 # Create tar archive
 #
 
-exec mkdir -p bin/libc_fs_tar_fs/testdir/testdir
-exec echo -n "a single line of text" > bin/libc_fs_tar_fs/testdir/testdir/test.tst
-exec mkdir -p bin/libc_fs_tar_fs/testdir/a
-exec mkdir -p bin/libc_fs_tar_fs/testdir/c
-exec ln -sf /a bin/libc_fs_tar_fs/testdir/c/d
-exec ln -sf /c bin/libc_fs_tar_fs/testdir/e
-exec echo -n "a single line of text" > bin/libc_fs_tar_fs/testdir/a/b
+exec mkdir -p bin/libc_fs_tar_fs/newroot/testdir/testdir
+exec echo -n "a single line of text" > bin/libc_fs_tar_fs/newroot/testdir/testdir/test.tst
+exec mkdir -p bin/libc_fs_tar_fs/newroot/testdir/a
+exec mkdir -p bin/libc_fs_tar_fs/newroot/testdir/c
+exec ln -sf /a bin/libc_fs_tar_fs/newroot/testdir/c/d
+exec ln -sf /c bin/libc_fs_tar_fs/newroot/testdir/e
+exec echo -n "a single line of text" > bin/libc_fs_tar_fs/newroot/testdir/a/b
 exec tar cfv bin/libc_fs_tar_fs.tar -C bin/libc_fs_tar_fs .
 
 #

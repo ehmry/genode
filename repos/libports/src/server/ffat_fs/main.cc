@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2012-2013 Genode Labs GmbH
+ * Copyright (C) 2012-2015 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -14,6 +14,7 @@
 /* Genode includes */
 #include <file_system/node_handle_registry.h>
 #include <file_system_session/rpc_object.h>
+#include <file_system/root.h>
 #include <root/component.h>
 #include <cap_session/connection.h>
 #include <os/attached_rom_dataspace.h>
@@ -879,7 +880,6 @@ namespace File_system {
 
 				enum { ROOT_MAX_LEN = 256 };
 				char root[ROOT_MAX_LEN];
-				root[0] = 0;
 
 				Session_label  label(args);
 				try {
@@ -889,96 +889,60 @@ namespace File_system {
 					 * Determine directory that is used as root directory of
 					 * the session.
 					 */
-					try {
-						policy.attribute("root").value(root, sizeof(root));
-						if (is_root(root)) {
-							session_root_dir = &_root_dir;
-						} else {
-							/*
-							 * Make sure the root path is specified with a
-							 * leading path delimiter. For performing the
-							 * lookup, we skip the first character.
-							 */
-							if (root[0] != '/')
+					session_root_path(root, sizeof(root), policy, args);
+					if (is_root(root)) {
+						session_root_dir = &_root_dir;
+					} else {
+						/* Check if the root path exists */
+
+						using namespace Ffat;
+
+						FRESULT res = f_chdir(root);
+
+						switch(res) {
+							case FR_OK:
+								break;
+							case FR_NO_PATH:
 								throw Lookup_failed();
-
-							/* Check if the root path exists */
-
-							using namespace Ffat;
-
-							FRESULT res = f_chdir(root);
-
-							switch(res) {
-								case FR_OK:
-									break;
-								case FR_NO_PATH:
-									throw Lookup_failed();
-								case FR_INVALID_NAME:
-								case FR_INVALID_DRIVE:
-									throw Lookup_failed();
-								case FR_NOT_READY:
-									PERR("f_chdir() failed with error code FR_NOT_READY");
-									throw Root::Unavailable();
-								case FR_DISK_ERR:
-									PERR("f_chdir() failed with error code FR_DISK_ERR");
-									throw Root::Unavailable();
-								case FR_INT_ERR:
-									PERR("f_chdir() failed with error code FR_INT_ERR");
-									throw Root::Unavailable();
-								case FR_NOT_ENABLED:
-									PERR("f_chdir() failed with error code FR_NOT_ENABLED");
-									throw Root::Unavailable();
-								case FR_NO_FILESYSTEM:
-									PERR("f_chdir() failed with error code FR_NO_FILESYSTEM");
-									throw Root::Unavailable();
-								default:
-									/* not supposed to occur according to the libffat documentation */
-									PERR("f_chdir() returned an unexpected error code");
-									throw Root::Unavailable();
-							}
-
-							session_root_dir = new (env()->heap()) Directory(root);
+							case FR_INVALID_NAME:
+							case FR_INVALID_DRIVE:
+								throw Lookup_failed();
+							case FR_NOT_READY:
+								PERR("f_chdir() failed with error code FR_NOT_READY");
+								throw Root::Unavailable();
+							case FR_DISK_ERR:
+								PERR("f_chdir() failed with error code FR_DISK_ERR");
+								throw Root::Unavailable();
+							case FR_INT_ERR:
+								PERR("f_chdir() failed with error code FR_INT_ERR");
+								throw Root::Unavailable();
+							case FR_NOT_ENABLED:
+								PERR("f_chdir() failed with error code FR_NOT_ENABLED");
+								throw Root::Unavailable();
+							case FR_NO_FILESYSTEM:
+								PERR("f_chdir() failed with error code FR_NO_FILESYSTEM");
+								throw Root::Unavailable();
+							default:
+								/* not supposed to occur according to the libffat documentation */
+								PERR("f_chdir() returned an unexpected error code");
+								throw Root::Unavailable();
 						}
-					} catch (Xml_node::Nonexistent_attribute) {
-						PERR("Missing \"root\" attribute in policy definition");
-						throw Root::Unavailable();
-					} catch (Lookup_failed) {
-						PERR("Session root directory \"%s\" does not exist", root);
-						throw Root::Unavailable();
 					}
 
-					/*
-					 * Determine if write access is permitted for the session.
-					 */
-					try {
-						writeable = policy.attribute("writeable").has_value("yes");
-					} catch (Xml_node::Nonexistent_attribute) { }
+					session_root_dir = new (env()->heap()) Directory(root);
 
+					writeable = session_writeable(policy, args);
+
+				} catch (Lookup_failed) {
+					PERR("Session root directory \"%s\" does not exist", root);
+					throw Root::Unavailable();
 				} catch (Session_policy::No_policy_defined) {
 					PERR("Invalid session request, no matching policy");
 					throw Root::Unavailable();
 				}
 
-				size_t ram_quota =
-					Arg_string::find_arg(args, "ram_quota"  ).ulong_value(0);
-				size_t tx_buf_size =
-					Arg_string::find_arg(args, "tx_buf_size").ulong_value(0);
+				size_t tx_buf_size = session_tx_buf_size(sizeof(Session_component), args);
 
-				if (!tx_buf_size) {
-					PERR("%s requested a session with a zero length transmission buffer", label.string());
-					throw Root::Invalid_args();
-				}
-
-				/*
-				 * Check if donated ram quota suffices for session data,
-				 * and communication buffer.
-				 */
-				size_t session_size = sizeof(Session_component) + tx_buf_size;
-				if (max((size_t)4096, session_size) > ram_quota) {
-					PERR("insufficient 'ram_quota', got %zd, need %zd",
-					     ram_quota, session_size);
-					throw Root::Quota_exceeded();
-				}
 				return new (md_alloc())
 					Session_component(tx_buf_size, _channel_ep, _sig_rec,
 					                  *session_root_dir, writeable);

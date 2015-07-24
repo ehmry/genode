@@ -230,11 +230,15 @@ struct File_system::Session : public Genode::Session
 	 * \throw Invalid_name         file name contains invalid characters
 	 * \throw Lookup_failed        the name refers to a node other than a
 	 *                             file
+	 * \throw No_space
 	 */
 	virtual File_handle file(Dir_handle, Name const &name, Mode, bool create) = 0;
 
 	/**
 	 * Open or create symlink
+	 *
+	 * \throw No_space
+	 *
 	 */
 	virtual Symlink_handle symlink(Dir_handle, Name const &name, bool create) = 0;
 
@@ -313,11 +317,12 @@ struct File_system::Session : public Genode::Session
 	GENODE_RPC_THROW(Rpc_file, File_handle, file,
 	                 GENODE_TYPE_LIST(Invalid_handle, Node_already_exists,
 	                                  Invalid_name, Lookup_failed,
-	                                  Permission_denied),
+	                                  Permission_denied, No_space),
 	                 Dir_handle, Name const &, Mode, bool);
 	GENODE_RPC_THROW(Rpc_symlink, Symlink_handle, symlink,
 	                 GENODE_TYPE_LIST(Invalid_handle, Node_already_exists,
-	                                  Invalid_name, Lookup_failed, Permission_denied),
+	                                  Invalid_name, Lookup_failed,
+	                                  Permission_denied, No_space),
 	                 Dir_handle, Name const &, bool);
 	GENODE_RPC_THROW(Rpc_dir, Dir_handle, dir,
 	                 GENODE_TYPE_LIST(Permission_denied, Node_already_exists,

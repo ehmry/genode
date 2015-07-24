@@ -51,6 +51,30 @@ class Vfs::Fs_file_system : public File_system
 			}
 		} _label;
 
+		struct Root
+		{
+			enum { ROOT_MAX_LEN = 128 };
+			char string[ROOT_MAX_LEN];
+
+			Root(Xml_node config)
+			{
+				string[0] = '/';
+				try { config.attribute("root").value(string, sizeof(string)); }
+				catch (...) { }
+			}
+		} _root;
+
+		struct Writeable
+		{
+			bool value;
+
+			Writeable(Xml_node config)
+			{
+				try { value = config.attribute("writeable").has_value("yes"); }
+				catch (...) { value = true; }
+			}
+		} _writeable;
+
 		::File_system::Connection _fs;
 
 		class Fs_vfs_handle : public Vfs_handle
@@ -168,7 +192,9 @@ class Vfs::Fs_file_system : public File_system
 		:
 			_fs_packet_alloc(env()->heap()),
 			_label(config),
-			_fs(_fs_packet_alloc, 128*1024, _label.string)
+			_root(config),
+			_writeable(config),
+			_fs(_fs_packet_alloc, 128*1024, _label.string, _root.string, _writeable.value)
 		{ }
 
 
