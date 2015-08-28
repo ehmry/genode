@@ -4,5 +4,7 @@
 # \date   2015-06-02
 #
 
+REQUIRES = x86_64
+
 # add library dependencies
 LIBS += core-muen_off
