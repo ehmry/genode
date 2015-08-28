@@ -16,6 +16,7 @@
 
 #include <util/token.h>
 #include <base/exception.h>
+#include <util/string.h>
 
 namespace Genode {
 
@@ -143,6 +144,12 @@ class Genode::Xml_attribute
 		bool has_value(const char *value) const {
 			return strlen(value) == (_value.len() - 2) &&
 			       !strcmp(value, _value.start() + 1, _value.len() - 2); }
+
+		/**
+		 * Parse the attribute to a boolean value
+		 */
+		bool bool_value(bool default_value = false) const {
+			return ascii_to_bool(_value.start()+1, _value.len()-2, default_value); }
 
 		/**
 		 * Return attribute value as typed value
@@ -779,6 +786,13 @@ class Genode::Xml_node
 			try { attribute(type); return true; } catch (...) { }
 			return false;
 		}
+
+		/**
+		 * Shortcut to retrieve a boolean attribute
+		 */
+		bool bool_attribute(char const *type, bool default_value = false) const {
+			return has_attribute(type) ?
+				attribute(type).bool_value(default_value) : default_value; }
 
 		/**
 		 * Return true if sub node of specified type exists
