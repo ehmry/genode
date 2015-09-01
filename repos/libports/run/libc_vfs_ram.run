@@ -1,10 +1,7 @@
 #
-# \brief  Test for using the vfs local ram_fs
+# \brief  Test for using the libc_vfs plugin
 # \author Norman Feske
 # \date   2014-04-10
-#
-# \author Emery Hemingway
-# \date   2015-07-21
 #
 
 #
@@ -29,18 +26,19 @@ install_config {
 		<service name="RM"/>
 		<service name="CPU"/>
 		<service name="LOG"/>
+		<service name="SIGNAL"/>
 	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
 	<start name="test-libc_vfs">
 		<resource name="RAM" quantum="2M"/>
-		<route>
-			<any-service> <parent/> </any-service>
-		</route>
 		<config>
 			<iterations value="1"/>
 			<libc stdout="/dev/log" cwd="/tmp" >
 				<vfs>
 					<dir name="tmp" >
-						<ram/>
+						<ram quota="1M"/>
 					</dir>
 					<dir name="dev"> <log/> </dir>
 				</vfs>
