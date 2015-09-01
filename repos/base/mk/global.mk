@@ -22,6 +22,7 @@ CUSTOM_OBJCOPY ?= $(CROSS_DEV_PREFIX)objcopy
 CUSTOM_RANLIB  ?= $(CROSS_DEV_PREFIX)ranlib
 CUSTOM_STRIP   ?= $(CROSS_DEV_PREFIX)strip
 CUSTOM_HOST_CC ?= gcc
+NIM            ?= nim
 
 #
 # GNU utilities

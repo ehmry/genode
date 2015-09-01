@@ -7,7 +7,7 @@
 # Collect object files and avoid duplicates (by using 'sort')
 #
 SRC_O  += $(addprefix binary_,$(addsuffix .o,$(notdir $(SRC_BIN))))
-SRC     = $(sort $(SRC_C) $(SRC_CC) $(SRC_ADA) $(SRC_RS) $(SRC_S) $(SRC_O))
+SRC     = $(sort $(SRC_C) $(SRC_CC) $(SRC_ADA) $(SRC_RS) $(SRC_NIM) $(SRC_S) $(SRC_O))
 OBJECTS = $(addsuffix .o,$(basename $(SRC)))
 
 #
@@ -77,6 +77,23 @@ endif
 %.o: %.rs
 	$(MSG_COMP)$@
 	$(VERBOSE)rustc $(CC_RUSTC_OPT) -o $@ $<
+
+#
+# Compiling Nim source code
+#
+%.o: %.nim
+	$(MSG_COMP)$@
+	$(VERBOSE)$(NIM) compileToCpp \
+		--os:genode \
+		--threads:off \
+		--app:staticlib \
+		--nimcache:. \
+		--compileOnly \
+		--tlsEmulation:on \
+		--out:$(basename $@).cpp \
+			$<
+	$(CXX) $(CXX_DEF) $(CC_CXX_OPT) $(INCLUDES) \
+		-x c++ -c $(basename $@).cpp -o $@
 
 #
 # Assembler files that must be preprocessed are fed to the C compiler.
