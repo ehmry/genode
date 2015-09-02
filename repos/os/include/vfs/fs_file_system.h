@@ -64,17 +64,6 @@ class Vfs::Fs_file_system : public File_system
 			}
 		} _root;
 
-		struct Writeable
-		{
-			bool value;
-
-			Writeable(Xml_node config)
-			{
-				try { value = config.attribute("writeable").has_value("yes"); }
-				catch (...) { value = true; }
-			}
-		} _writeable;
-
 		::File_system::Connection _fs;
 
 		class Fs_vfs_handle : public Vfs_handle
@@ -193,8 +182,11 @@ class Vfs::Fs_file_system : public File_system
 			_fs_packet_alloc(env()->heap()),
 			_label(config),
 			_root(config),
-			_writeable(config),
-			_fs(_fs_packet_alloc, 128*1024, _label.string, _root.string, _writeable.value)
+			_fs(_fs_packet_alloc,
+			    config.attribute_value("buffer_size", Genode::size_t(::File_system::DEFAULT_TX_BUF_SIZE)),
+			    _label.string,
+			    _root.string,
+			    config.bool_attribute("writeable", true))
 		{ }
 
 
@@ -286,9 +278,12 @@ class Vfs::Fs_file_system : public File_system
 				::File_system::Node_handle node = _fs.node(path);
 				Fs_handle_guard node_guard(_fs, node);
 				status = _fs.status(node);
-			} catch (...) {
+			} catch (::File_system::Lookup_failed) {
 				if (verbose)
 					PDBG("stat failed for path '%s'", path);
+				return STAT_ERR_NO_ENTRY;
+			} catch (::File_system::Out_of_node_handles) {
+				PERR("%s: server out of node handles", __func__);
 				return STAT_ERR_NO_ENTRY;
 			}
 
@@ -455,7 +450,7 @@ class Vfs::Fs_file_system : public File_system
 			Absolute_path abs_path(path);
 
 			try {
-				_fs.dir(abs_path.base(), true);
+				_fs.close(_fs.dir(abs_path.base(), true));
 				return MKDIR_OK;
 			}
 			catch (::File_system::Permission_denied)   { return MKDIR_ERR_NO_PERM; }
@@ -463,6 +458,10 @@ class Vfs::Fs_file_system : public File_system
 			catch (::File_system::Lookup_failed)       { return MKDIR_ERR_NO_ENTRY; }
 			catch (::File_system::Name_too_long)       { return MKDIR_ERR_NAME_TOO_LONG; }
 			catch (::File_system::No_space)            { return MKDIR_ERR_NO_SPACE; }
+			catch (::File_system::Out_of_node_handles) {
+				PERR("%s: server out of node handles", __func__);
+				return MKDIR_ERR_NO_SPACE;
+			}
 
 			return MKDIR_ERR_NO_PERM;
 		}
@@ -500,6 +499,11 @@ class Vfs::Fs_file_system : public File_system
 			catch (::File_system::Invalid_name)        { return SYMLINK_ERR_NAME_TOO_LONG; }
 			catch (::File_system::Lookup_failed)       { return SYMLINK_ERR_NO_ENTRY; }
 			catch (::File_system::Permission_denied)   { return SYMLINK_ERR_NO_PERM; }
+			catch (::File_system::No_space)            { return SYMLINK_ERR_NO_SPACE; }
+			catch (::File_system::Out_of_node_handles) {
+				PERR("%s: server out of node handles", __func__);
+				return SYMLINK_ERR_NO_SPACE;
+			}
 
 			return SYMLINK_ERR_NO_ENTRY;
 		}
@@ -587,6 +591,12 @@ class Vfs::Fs_file_system : public File_system
 			catch (::File_system::Invalid_handle)      { return OPEN_ERR_NO_PERM; }
 			catch (::File_system::Lookup_failed)       { return OPEN_ERR_UNACCESSIBLE; }
 			catch (::File_system::Node_already_exists) { return OPEN_ERR_EXISTS; }
+			catch (::File_system::Invalid_name)        { return OPEN_ERR_NAME_TOO_LONG; }
+			catch (::File_system::No_space)            { return OPEN_ERR_NO_SPACE; }
+			catch (::File_system::Out_of_node_handles) {
+				PERR("%s: server out of node handles", __func__);
+				return OPEN_ERR_NO_SPACE;
+			}
 
 			return OPEN_ERR_UNACCESSIBLE;
 		}
@@ -600,7 +610,9 @@ class Vfs::Fs_file_system : public File_system
 
 		void sync() override
 		{
-			_fs.sync();
+			::File_system::Dir_handle root_handle = _fs.dir("/", false);
+			_fs.sync(root_handle);
+			_fs.close(root_handle);
 		}
 
 
@@ -646,9 +658,10 @@ class Vfs::Fs_file_system : public File_system
 
 			try {
 				_fs.truncate(handle->file_handle(), len);
-			} 
+			}
 			catch (::File_system::Invalid_handle)    { return FTRUNCATE_ERR_NO_PERM; }
 			catch (::File_system::Permission_denied) { return FTRUNCATE_ERR_NO_PERM; }
+			catch (::File_system::No_space)          { return FTRUNCATE_ERR_NO_SPACE; }
 
 			return FTRUNCATE_OK;
 		}

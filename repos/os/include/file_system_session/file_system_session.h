@@ -230,6 +230,7 @@ struct File_system::Session : public Genode::Session
 	 * \throw Invalid_name         file name contains invalid characters
 	 * \throw Lookup_failed        the name refers to a node other than a
 	 *                             file
+	 * \throw Out_of_node_handles  server cannot allocate metadata
 	 * \throw No_space
 	 */
 	virtual File_handle file(Dir_handle, Name const &name, Mode, bool create) = 0;
@@ -237,6 +238,9 @@ struct File_system::Session : public Genode::Session
 	/**
 	 * Open or create symlink
 	 *
+	 * \throw Invalid_handle       directory handle is invalid
+	 * \throw Invalid_name         file name contains invalid characters
+	 * \throw Out_of_node_handles  server cannot allocate metadata
 	 * \throw No_space
 	 *
 	 */
@@ -251,6 +255,7 @@ struct File_system::Session : public Genode::Session
 	 * \throw Lookup_failed        path lookup failed because one element
 	 *                             of 'path' does not exist
 	 * \throw Name_too_long
+	 * \throw Out_of_node_handles  server cannot allocate metadata
 	 * \throw No_space
 	 */
 	virtual Dir_handle dir(Path const &path, bool create) = 0;
@@ -260,6 +265,10 @@ struct File_system::Session : public Genode::Session
 	 *
 	 * The returned node handle can be used merely as argument for
 	 * 'status'.
+	 *
+	 * \throw Lookup_failed        path lookup failed because one element
+	 *                             of 'path' does not exist
+	 * \throw Out_of_node_handles  server cannot allocate metadata
 	 */
 	virtual Node_handle node(Path const &path) = 0;
 
@@ -285,6 +294,10 @@ struct File_system::Session : public Genode::Session
 
 	/**
 	 * Truncate or grow file to specified size
+	 *
+	 * \throw Permission_denied  node modification not allowed
+	 * \throw Invalid_handle     node handle is invalid
+	 * \throw No_space           new size exceeds free space
 	 */
 	virtual void truncate(File_handle, file_size_t size) = 0;
 
@@ -306,7 +319,7 @@ struct File_system::Session : public Genode::Session
 	 * cache, which needs to be flushed on certain occasions. Therefore,
 	 * the default implementation just serves as a reminder.
 	 */
-	virtual void sync() { PWRN("sync() not implemented!"); }
+	virtual void sync(Node_handle) { PWRN("sync() not implemented!"); }
 
 
 	/*******************
@@ -317,19 +330,22 @@ struct File_system::Session : public Genode::Session
 	GENODE_RPC_THROW(Rpc_file, File_handle, file,
 	                 GENODE_TYPE_LIST(Invalid_handle, Node_already_exists,
 	                                  Invalid_name, Lookup_failed,
-	                                  Permission_denied, No_space),
+	                                  Permission_denied, No_space,
+	                                  Out_of_node_handles),
 	                 Dir_handle, Name const &, Mode, bool);
 	GENODE_RPC_THROW(Rpc_symlink, Symlink_handle, symlink,
 	                 GENODE_TYPE_LIST(Invalid_handle, Node_already_exists,
 	                                  Invalid_name, Lookup_failed,
-	                                  Permission_denied, No_space),
+	                                  Permission_denied, No_space,
+	                                  Out_of_node_handles),
 	                 Dir_handle, Name const &, bool);
 	GENODE_RPC_THROW(Rpc_dir, Dir_handle, dir,
 	                 GENODE_TYPE_LIST(Permission_denied, Node_already_exists,
-	                                  Lookup_failed, Name_too_long, No_space),
+	                                  Lookup_failed, Name_too_long,
+	                                  No_space, Out_of_node_handles),
 	                 Path const &, bool);
 	GENODE_RPC_THROW(Rpc_node, Node_handle, node,
-	                 GENODE_TYPE_LIST(Lookup_failed),
+	                 GENODE_TYPE_LIST(Lookup_failed, Out_of_node_handles),
 	                 Path const &);
 	GENODE_RPC(Rpc_close, void, close, Node_handle);
 	GENODE_RPC(Rpc_status, Status, status, Node_handle);
@@ -338,7 +354,7 @@ struct File_system::Session : public Genode::Session
 	                 GENODE_TYPE_LIST(Permission_denied, Invalid_name, Lookup_failed),
 	                 Dir_handle, Name const &);
 	GENODE_RPC_THROW(Rpc_truncate, void, truncate,
-	                 GENODE_TYPE_LIST(Permission_denied, Invalid_handle),
+	                 GENODE_TYPE_LIST(Permission_denied, Invalid_handle, No_space),
 	                 File_handle, file_size_t);
 	GENODE_RPC_THROW(Rpc_move, void, move,
 	                 GENODE_TYPE_LIST(Permission_denied, Invalid_name, Lookup_failed),
@@ -346,7 +362,7 @@ struct File_system::Session : public Genode::Session
 	GENODE_RPC_THROW(Rpc_sigh, void, sigh,
 	                 GENODE_TYPE_LIST(Invalid_handle),
 	                 Node_handle, Signal_context_capability);
-	GENODE_RPC(Rpc_sync, void, sync);
+	GENODE_RPC(Rpc_sync, void, sync, Node_handle);
 
 	/*
 	 * Manual type-list definition, needed because the RPC interface
