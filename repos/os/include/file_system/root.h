@@ -83,10 +83,8 @@ namespace File_system {
 	 */
 	bool session_writeable(Session_policy policy, char const *args)
 	{
-		try {
-			if (!policy.attribute("writeable").has_value("yes"))
-				return false;
-		} catch (Xml_node::Nonexistent_attribute) { return false; }
+		if (!policy.bool_attribute("writeable"))
+			return false;
 
 		/* policy allows, do the args? */
 
