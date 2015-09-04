@@ -166,7 +166,12 @@ class Vfs::Fs_file_system : public File_system
 		:
 			_fs_packet_alloc(env()->heap()),
 			_label(config),
-			_fs(_fs_packet_alloc, 128*1024, _label.string)
+			_root(config),
+			_fs(_fs_packet_alloc,
+			    config.attribute_value("buffer_size", Genode::size_t(::File_system::DEFAULT_TX_BUF_SIZE)),
+			    _label.string,
+			    _root.string,
+			    config.attribute_value("writeable", true))
 		{ }
 
 

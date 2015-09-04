@@ -10,6 +10,7 @@ noux_net_netcat
 libc_ffat
 libc_vfs
 libc_vfs_ram
+libc_vfs_fs
 timed_semaphore
 signal
 sub_rm
