@@ -1,0 +1,21 @@
+log_trap is an extremely simple component that monitors the log
+output of a child process and exits when it encounters a specific string.
+
+This is useful when multiple children must be started in a scenario but the
+entire scenario should exit when a single child meets a specific condition.
+
+
+Configuration
+-------------
+
+! <start name="log_trap">
+! 	<resource name="RAM" quantum="1G"/>
+! 	<config pattern="--- test successful ---">
+! 		<start name="init">
+! 			<config>
+! 				<parent-provides>
+! 				...
+! 			</config>
+!		</start>
+! 	</config>
+! <start>

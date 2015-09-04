@@ -99,7 +99,7 @@ struct Genode::Child_policy
 	 */
 	virtual void exit(int exit_value)
 	{
-		PDBG("child \"%s\" exited with exit value %d", name(), exit_value);
+		PLOG("child \"%s\" exited with exit value %d", name(), exit_value);
 	}
 
 	/**

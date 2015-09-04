@@ -1,0 +1,75 @@
+#
+# \brief  Test for native log watching utility
+# \author Emery Hemingway
+# \date   2015-08-26
+#
+
+# Build program images
+build { core init util/log_trap drivers/timer test/signal }
+
+# Create directory where boot files are written to
+create_boot_directory
+
+#
+# Disable syntax check for config file
+#
+# Our parser eats \", but libxml2 does not.
+#
+proc check_xml_syntax {xml_file} { }
+
+install_config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="RAM"/>
+		<service name="CAP"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+		<service name="SIGNAL"/>
+	</parent-provides>
+	<default-route>
+		<any-service><parent/><any-child/></any-service>
+	</default-route>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="log_trap">
+		<resource name="RAM" quantum="8M"/>
+		<config pattern="child \"test-signal\" exited with exit value 0">
+			<start name="init">
+				<config verbose="yes">
+					<parent-provides>
+						<service name="ROM"/>
+						<service name="RAM"/>
+						<service name="CAP"/>
+						<service name="PD"/>
+						<service name="RM"/>
+						<service name="CPU"/>
+						<service name="LOG"/>
+						<service name="SIGNAL"/>
+						<service name="Timer"/>
+					</parent-provides>
+					<default-route>
+						<any-service><parent/><any-child/></any-service>
+					</default-route>
+					<start name="test-signal">
+						<resource name="RAM" quantum="4M"/>
+					</start>
+				</config>
+			</start>
+		</config>
+	</start>
+</config>
+}
+
+# Build boot files from source binaries
+build_boot_image { core init ld.lib.so timer log_trap test-signal }
+
+# Configure Qemu
+append qemu_args " -m 64 -nographic"
+
+# Execute test in Qemu
+run_genode_until {.*child "log_trap" exited with exit value 0.*} 60
