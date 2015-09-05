@@ -1,8 +1,10 @@
 #
-# \brief  Test for using the libc_vfs plugin with the Linux file system
+# \brief  Test for using the libc_vfs plugin with the Linux plugin
 # \author Norman Feske
 # \author Christian Helmuth
+# \athor  Emery Hemingway
 # \date   2013-11-07
+# \date   2015-09-05
 #
 
 assert_spec linux
@@ -11,7 +13,7 @@ assert_spec linux
 # Build
 #
 
-build { core init server/lx_fs test/libc_vfs }
+build { core init lib/vfs/linux test/libc_vfs }
 
 create_boot_directory
 
@@ -34,17 +36,12 @@ install_config {
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
 	</default-route>
-	<start name="lx_fs">
-		<resource name="RAM" quantum="4M"/>
-		<provides> <service name="File_system"/> </provides>
-		<config> <policy label="" root="/lx_fs_test" writeable="yes" /> </config>
-	</start>
 	<start name="test-libc_vfs">
-		<resource name="RAM" quantum="2M"/>
+		<resource name="RAM" quantum="8M"/>
 		<config>
 			<libc stdout="/dev/log">
 				<vfs>
-					<fs root="/newroot"/>
+					<linux/>
 					<dir name="dev"> <log/> </dir>
 				</vfs>
 			</libc>
@@ -57,14 +54,14 @@ install_config {
 # Create test-directory structure
 #
 
-exec mkdir -p var/run/lx_fs/genode/lx_fs_test/newroot
+exec mkdir -p var/run/lx_fs/genode/lx_fs_test
 
 #
 # Boot modules
 #
 
 build_boot_image {
-	core init ld.lib.so libc.lib.so lx_fs test-libc_vfs
+	core init ld.lib.so libc.lib.so vfs_linux.lib.so test-libc_vfs
 	libc_vfs
 }
 
@@ -80,6 +77,6 @@ puts "\nTest succeeded\n"
 # Cleanup test-directory structure
 #
 
-exec rm -r var/run/lx_fs/genode/lx_fs_test/newroot
+exec rm -r var/run/lx_fs/genode/lx_fs_test
 
 # vi: set ft=tcl :
