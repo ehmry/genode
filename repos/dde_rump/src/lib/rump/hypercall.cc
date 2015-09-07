@@ -228,14 +228,11 @@ static Rump_alloc* allocator()
 
 int rumpuser_malloc(size_t len, int alignment, void **memp)
 {
-	Genode::Lock::Guard guard(_alloc_lock);
-
 	int align = alignment ? Genode::log2(alignment) : 0;
 	*memp     = allocator()->alloc(len, align);
 
 	if (verbose)
 		PWRN("ALLOC: p: %p, s: %zx, a: %d %d", *memp, len, align, alignment);
-
 
 	return *memp ? 0 : -1;
 }
@@ -243,8 +240,6 @@ int rumpuser_malloc(size_t len, int alignment, void **memp)
 
 void rumpuser_free(void *mem, size_t len)
 {
-	Genode::Lock::Guard guard(_alloc_lock);
-
 	allocator()->free(mem, len);
 
 	if (verbose)

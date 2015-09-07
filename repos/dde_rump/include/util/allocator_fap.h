@@ -192,6 +192,8 @@ namespace Allocator {
 
 			Backend_alloc  _back_allocator;
 
+			Genode::Lock _lock;
+
 		public:
 
 			Fap(bool cached)
@@ -199,11 +201,13 @@ namespace Allocator {
 
 			void *alloc(size_t size, int align = 0)
 			{
+				Genode::Lock::Guard guard(_lock);
 				return _back_allocator.alloc_aligned(size, align);
 			}
 
 			void free(void *addr, size_t size)
 			{
+				Genode::Lock::Guard guard(_lock);
 				_back_allocator.free(addr, size);
 			}
 
