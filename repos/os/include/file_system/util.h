@@ -135,7 +135,7 @@ namespace File_system {
 			size_t const read_num_bytes = min(packet.length(), curr_packet_size);
 
 			/* copy-out payload into destination buffer */
-			memcpy(dst, source.packet_content(packet), read_num_bytes);
+			Genode::memcpy(dst, source.packet_content(packet), read_num_bytes);
 
 			source.release_packet(packet);
 
@@ -183,7 +183,7 @@ namespace File_system {
 				       seek_offset);
 
 			/* copy-out source buffer into payload */
-			memcpy(source.packet_content(packet), src, curr_packet_size);
+			Genode::memcpy(source.packet_content(packet), src, curr_packet_size);
 
 			/* pass packet to server side */
 			source.submit_packet(packet);

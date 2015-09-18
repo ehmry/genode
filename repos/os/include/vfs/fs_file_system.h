@@ -43,6 +43,8 @@ class Vfs::Fs_file_system : public File_system
 			enum { LABEL_MAX_LEN = 64 };
 			char string[LABEL_MAX_LEN];
 
+			Label() { }
+
 			Label(Xml_node config)
 			{
 				string[0] = 0;
@@ -50,6 +52,21 @@ class Vfs::Fs_file_system : public File_system
 				catch (...) { }
 			}
 		} _label;
+
+		struct Root
+		{
+			enum { ROOT_MAX_LEN = 128 };
+			char string[ROOT_MAX_LEN];
+
+			Root() { }
+
+			Root(Xml_node config)
+			{
+				string[0] = '/';
+				try { config.attribute("root").value(string, sizeof(string)); }
+				catch (...) { }
+			}
+		} _root;
 
 		::File_system::Connection _fs;
 
@@ -159,8 +176,8 @@ class Vfs::Fs_file_system : public File_system
 
 	public:
 
-		/*
-		 * XXX read label from config
+		/**
+		 * Constructor
 		 */
 		Fs_file_system(Xml_node config)
 		:
@@ -172,6 +189,24 @@ class Vfs::Fs_file_system : public File_system
 			    _label.string,
 			    _root.string,
 			    config.attribute_value("writeable", true))
+		{ }
+
+		/**
+		 * Constructor
+		 *
+		 * A constructor for programmatic instantiation.
+		 */
+		Fs_file_system(Genode::size_t  tx_buf_size,
+		               char     const *label,
+		               char     const *root,
+		               bool            writeable)
+		:
+			_fs_packet_alloc(env()->heap()),
+			_fs(_fs_packet_alloc,
+			    tx_buf_size,
+			    label,
+			    root,
+			    writeable)
 		{ }
 
 

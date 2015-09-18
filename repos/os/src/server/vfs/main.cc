@@ -433,18 +433,18 @@ class File_system::Root : public Root_component<Session_component>
 
 		Session_component *_create_session(const char *args) override
 		{
-			char root[MAX_PATH_LEN] = { '\0' };
+			char session_root[MAX_PATH_LEN] = { '\0' };
 			bool writable = false;
 
 			Session_label  label(args);
 			try {
 				Session_policy policy(label);
 
-				session_root_path(root, sizeof(root), policy, args);
+				session_root_path(session_root, sizeof(session_root), policy, args);
 				writable = session_writeable(policy, args);
 
 			} catch (Session_policy::No_policy_defined) {
-				PERR("rejecting session request, no matching policy for %s", label.string());
+				PERR("rejecting session request, no matching policy for '%s'", label.string());
 				throw Root::Unavailable();
 			}
 
@@ -468,9 +468,13 @@ class File_system::Root : public Root_component<Session_component>
 				throw Root::Quota_exceeded();
 			}
 
+			/* finally, check the root is valid */
+			if (!root()->is_directory(session_root))
+				throw Root::Unavailable();
+
 			Session_component *session = new(md_alloc())
-				Session_component(_ep, _cache, tx_buf_size, root, writable);
-			PLOG("session opened for '%s' at '%s'", label.string(), root);
+				Session_component(_ep, _cache, tx_buf_size, session_root, writable);
+			PLOG("session opened for '%s' at '%s'", label.string(), session_root);
 			return session;
 		}
 

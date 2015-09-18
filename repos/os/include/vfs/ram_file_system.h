@@ -170,24 +170,24 @@ class Ram_fs::Symlink : public Node
 {
 	private:
 
-		char _target[MAX_PATH_LEN];
-		size_t const _len;
+		char   _target[MAX_PATH_LEN];
+		size_t _len;
 
 	public:
 
 		Symlink(char const *link_name, char const *target)
-		: _len(strlen(target)+1)
 		{
 			name(link_name);
 			strncpy(_target, target, sizeof(_target));
+			_len = strlen(_target);
 		}
 
-		size_t length() { return _len; }
+		size_t length() const { return _len; }
 
-		size_t read(char *buf, file_size buf_size)
+		size_t read(char *buf, file_size buf_size) const
 		{
 			size_t out = min(buf_size, _len);
-			strncpy(buf, _target, out);
+			memcpy(buf, _target, out);
 			return out;
 		}
 };
@@ -269,10 +269,8 @@ class Ram_fs::Directory : public Vfs::File_system, public Node
 		 */
 		inline Directory *walk_path(char const *path)
 		{
-			if (*path != '/') {
-				PERR("bad path %s", path);
-				return nullptr;
-			}
+			if (*path != '/')
+				return this;
 			++path;
 
 			Directory *dir = this;

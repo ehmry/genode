@@ -240,6 +240,11 @@ struct File_system::Symlink : Node
 
 	size_t write(char const *src, size_t len, seek_off_t seek_offset)
 	{
+		/* check for the presence of a null byte in the buffer */
+		for (size_t i = len-1; src[i]; --len)
+			if (i == 0)
+				return 0;
+
 		root()->unlink(path());
 		size_t n = (root()->symlink(src, path()) == Directory_service::SYMLINK_OK)
 			? len : 0;
