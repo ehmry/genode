@@ -98,6 +98,13 @@ namespace File_system {
 				}
 			}
 
+			~Node_handle_registry()
+			{
+				for (unsigned i = 0; i < MAX_NODE_HANDLES; i++)
+					if (_nodes[i])
+						_cache.free(_nodes[i]);
+			}
+
 			template <typename NODE_TYPE>
 			typename Handle_type<NODE_TYPE>::Type alloc(NODE_TYPE *node, Mode mode)
 			{
