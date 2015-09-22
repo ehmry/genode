@@ -151,12 +151,12 @@ class Default_file_system_factory : public Vfs::Global_file_system_factory
 				return *query_fn();
 
 			} catch (Genode::Shared_object::Invalid_rom_module) {
-				PWRN("could not open '%s'", lib_name.string());
+				Genode::warning("could not open '%s'", lib_name.string());
 				throw Factory_not_available();
 
 			} catch (Genode::Shared_object::Invalid_symbol) {
-				PWRN("could not find symbol '%s' in '%s'",
-				     _factory_symbol(), lib_name.string());
+				Genode::warning("could not find symbol '%s' in '%s'",
+				                _factory_symbol(), lib_name.string());
 
 				Genode::destroy(alloc, shared_object);
 				throw Factory_not_available();

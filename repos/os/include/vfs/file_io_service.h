@@ -1,11 +1,13 @@
 /*
  * \brief  Interface for operations provided by file I/O service
  * \author Norman Feske
+ * \author Emery Hemingway
+ * \author Christian Helmuth
  * \date   2011-02-17
  */
 
 /*
- * Copyright (C) 2011-2014 Genode Labs GmbH
+ * Copyright (C) 2011-2017 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -119,6 +121,32 @@ struct Vfs::File_io_service
 	virtual void register_read_ready_sigh(Vfs_handle *vfs_handle,
 	                                      Signal_context_capability sigh)
 	{ }
+
+	/****************
+	 ** Read_ready **
+	 ****************/
+
+	/**
+	 * Register or replace a signal handler to be notified when
+	 * any handle registered for notification is ready
+	 */
+	virtual void read_ready_sigh(Genode::Signal_context_capability) { }
+
+	/**
+	 * Register an interest in notification signals for a handle
+	 */
+	virtual void notify_read_ready(Vfs_handle*) { }
+
+	/**
+	 * Return true if an unblocking condition of the file is satisfied
+	 */
+	virtual bool read_ready(Vfs_handle*) { return true; }
+
+	virtual bool queue_read(Vfs_handle *, file_size) { return false; }
+	virtual bool complete_read(Vfs_handle *, char *, file_size,
+	                           Read_result &, file_size &) { return false; }
+	virtual bool queue_write(Vfs_handle *, char const *, file_size,
+	                         Write_result &, file_size &) { return false; }
 };
 
 #endif /* _INCLUDE__VFS__FILE_IO_SERVICE_H_ */

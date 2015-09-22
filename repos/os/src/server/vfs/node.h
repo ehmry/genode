@@ -1,11 +1,12 @@
 /*
  * \brief  Internal nodes of VFS server
  * \author Emery Hemingway
+ * \author Christian Helmuth
  * \date   2016-03-29
  */
 
 /*
- * Copyright (C) 2016 Genode Labs GmbH
+ * Copyright (C) 2016-2017 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -19,6 +20,7 @@
 #include <vfs/file_system.h>
 #include <os/path.h>
 #include <base/id_space.h>
+#include <util/list.h>
 
 /* Local includes */
 #include "assert.h"
@@ -34,6 +36,7 @@ namespace Vfs_server {
 	struct Symlink;
 
 	typedef Genode::Id_space<Node> Node_space;
+	typedef Genode::List<File>     File_list;
 
 	/* Vfs::MAX_PATH is shorter than File_system::MAX_PATH */
 	enum { MAX_PATH_LEN = Vfs::MAX_PATH_LEN };
@@ -72,6 +75,8 @@ namespace Vfs_server {
 
 struct Vfs_server::Node : File_system::Node_base, Node_space::Element
 {
+	struct Operation_would_block { }; /* exception */
+
 	Path const _path;
 	Mode const  mode;
 
@@ -130,12 +135,13 @@ struct Vfs_server::Symlink : Node
 };
 
 
-class Vfs_server::File : public Node
+class Vfs_server::File : public Node, public File_list::Element
 {
 	private:
 
 		Vfs::Vfs_handle *_handle;
 		char const      *_leaf_path; /* offset pointer to Node::_path */
+		bool             _notifying = false;
 
 	public:
 
@@ -162,6 +168,16 @@ class Vfs_server::File : public Node
 			mark_as_updated();
 		}
 
+		bool read_ready() {
+			return _handle->fs().read_ready(_handle); }
+
+		bool notifying() const { return _notifying; }
+
+		void notify_read_ready()
+		{
+			_handle->fs().notify_read_ready(_handle);
+			_notifying = true;
+		}
 
 		/********************
 		 ** Node interface **
@@ -181,7 +197,9 @@ class Vfs_server::File : public Node
 			}
 
 			_handle->seek(seek_offset);
-			_handle->fs().read(_handle, dst, len, res);
+			int const ret =_handle->fs().read(_handle, dst, len, res);
+			if (ret == File_io_service::WRITE_ERR_WOULD_BLOCK)
+				throw Operation_would_block();
 			return res;
 		}
 
@@ -199,7 +217,9 @@ class Vfs_server::File : public Node
 			}
 
 			_handle->seek(seek_offset);
-			_handle->fs().write(_handle, src, len, res);
+			int const ret = _handle->fs().write(_handle, src, len, res);
+			if (ret == File_io_service::WRITE_ERR_WOULD_BLOCK)
+				throw Operation_would_block();
 			if (res)
 				mark_as_updated();
 			return res;

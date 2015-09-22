@@ -117,7 +117,7 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 {
 	public:
 
-		enum Opcode { READ, WRITE };
+		enum Opcode { INVALID, READ, WRITE, READ_READY };
 
 	private:
 
@@ -136,7 +136,7 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 		                  Genode::size_t buf_size   = 0)
 		:
 			Genode::Packet_descriptor(buf_offset, buf_size), _handle(-1),
-			_op(READ), _position(0), _length(0), _success(false) { }
+			_op(INVALID), _position(0), _length(0), _success(false) { }
 
 		/**
 		 * Constructor

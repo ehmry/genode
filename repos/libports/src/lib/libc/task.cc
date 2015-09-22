@@ -44,6 +44,10 @@ namespace Libc {
 }
 
 
+/* function to notify libc about select() events */
+extern void (*libc_select_notify)();
+
+
 struct Libc::Timer
 {
 	::Timer::Connection _timer_connection;
@@ -135,7 +139,8 @@ struct Libc::Pthreads
 		Pthread(Timer &timer, unsigned long timeout_ms)
 		: _timeout(timer, *this)
 		{
-			_timeout.start(timeout_ms);
+			if (timeout_ms > 0)
+				_timeout.start(timeout_ms);
 		}
 
 		void handle_timeout()
@@ -181,7 +186,7 @@ struct Libc::Pthreads
 			}
 		}
 
-		return myself._timeout.duration_left();
+		return timeout_ms > 0 ? myself._timeout.duration_left() : 0;
 	}
 };
 
@@ -211,7 +216,7 @@ struct Libc::Kernel
 
 		Genode::Heap _heap { &_env.ram(), &_env.rm() };
 
-		Vfs_plugin vfs { _env, _heap };
+		Vfs_plugin _vfs { _env, _heap };
 
 		jmp_buf _kernel_context;
 		jmp_buf _user_context;
@@ -224,6 +229,9 @@ struct Libc::Kernel
 
 		Genode::Reconstructible<Genode::Signal_handler<Kernel>> _resume_main_handler {
 			_env.ep(), *this, &Kernel::_resume_main };
+
+		Genode::Reconstructible<Genode::Signal_handler<Kernel>> _vfs_read_ready_handler {
+			_env.ep(), *this, &Kernel::_vfs_read_ready };
 
 		void (*_original_suspended_callback)() = nullptr;
 
@@ -319,17 +327,28 @@ struct Libc::Kernel
 
 		unsigned long _suspend_main(unsigned long timeout_ms)
 		{
-			_main_timeout.timeout(timeout_ms, *_resume_main_handler);
+			if (timeout_ms > 0)
+				_main_timeout.timeout(timeout_ms, *_resume_main_handler);
 
 			if (!_setjmp(_user_context))
 				_switch_to_kernel();
 
-			return _main_timeout._timeout.duration_left();
+			return timeout_ms > 0 ? _main_timeout._timeout.duration_left() : 0;
+		}
+
+		void _vfs_read_ready()
+		{
+			if (libc_select_notify)
+				libc_select_notify();
+			resume_all(); /* FIXME already in libc_select_notify() ? */
 		}
 
 	public:
 
-		Kernel(Genode::Env &env) : _env(env) { }
+		Kernel(Genode::Env &env) : _env(env)
+		{
+			_vfs.read_ready_sigh(*_vfs_read_ready_handler);
+		}
 
 		~Kernel() { Genode::error(__PRETTY_FUNCTION__, " should not be executed!"); }
 
@@ -412,6 +431,7 @@ struct Libc::Kernel
 		void entrypoint_suspended()
 		{
 			_resume_main_handler.destruct();
+			_vfs_read_ready_handler.destruct();
 
 			_original_suspended_callback();
 		}
@@ -422,6 +442,8 @@ struct Libc::Kernel
 		void entrypoint_resumed()
 		{
 			_resume_main_handler.construct(_env.ep(), *this, &Kernel::_resume_main);
+			_vfs_read_ready_handler.construct(_env.ep(), *this, &Kernel::_vfs_read_ready);
+			_vfs.read_ready_sigh(*_vfs_read_ready_handler);
 
 			Genode::Signal_transmitter(*_resume_main_handler).submit();
 		}

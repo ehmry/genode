@@ -1,5 +1,3 @@
-SHARED_LIB = yes
-
 LIB_DIR     = $(REP_DIR)/src/lib/lxip
 LIB_INC_DIR = $(LIB_DIR)/include
 
@@ -26,8 +24,7 @@ CC_C_OPT  += -Wno-unused-but-set-variable -Wno-pointer-sign
 CC_C_OPT  += -include $(LIB_INC_DIR)/lx_emul.h
 CC_CXX_OPT = -fpermissive
 
-SRC_CC = dummies.cc lxcc_emul.cc nic_handler.cc socket_handler.cc \
-         timer_handler.cc random.cc
+SRC_CC = dummies.cc lxcc_emul.cc nic_handler.cc timer_handler.cc random.cc
 
 SRC_CC += malloc.cc printf.cc
 

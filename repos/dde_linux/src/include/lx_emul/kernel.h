@@ -107,11 +107,8 @@ static inline size_t min(size_t a, size_t b) {
  *
  * XXX check how this function is used (argument types)
  */
-#define max(x, y) ({                      \
-        typeof(x) _max1 = (x);                  \
-        typeof(y) _max2 = (y);                  \
-        (void) (&_max1 == &_max2);              \
-        _max1 > _max2 ? _max1 : _max2; })
+static inline size_t max(size_t a, size_t b) {
+        return a > b ? a : b; }
 
 #define min_t(type, x, y) ({ \
         type __min1 = (x); \

@@ -2,11 +2,12 @@
  * \brief  Lxip: Linux TCP/IP as a library
  * \author Christian Helmuth
  * \author Sebastian Sumpf
+ * \author Emery Hemingway
  * \date   2013-09-04
  */
 
 /*
- * Copyright (C) 2012-2013 Genode Labs GmbH
+ * Copyright (C) 2012-2017 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -18,28 +19,6 @@
 #include <base/stdint.h>
 
 namespace Lxip {
-
-	struct Handle
-	{
-		void *socket;
-		bool non_block;
-
-		Handle() : socket(0), non_block(false) { }
-	};
-
-	enum Type { TYPE_STREAM, TYPE_DGRAM };
-
-	class Socketcall;
-
-	/**
-	 * Init backend
-	 *
-	 * \param  address_config  for dynamic configuration use "dhcp", for static
-	 *                         configuration use "<ip>::<gw-ip>:<netmask>:::off"
-	 *
-	 * \return Reference to Socketcall object
-	 */
-	Socketcall & init(char const *address_config);
 
 	typedef Genode::uint8_t  uint8_t;
 	typedef Genode::uint16_t uint16_t;
@@ -72,34 +51,19 @@ namespace Lxip {
 	};
 
 	enum Ioctl_cmd {
-		LINUX_FIONREAD = 0x541b /* == SIOCINQ */
+		LINUX_FIONREAD = 0x541b, /* == SIOCINQ */
+		LINUX_IFADDR   = 0x8915, /* == SIOCGIFADDR */
+	};
+
+	/*
+	 * Must match errno values from lx_emul.h
+	 */
+	enum Io_result {
+		LINUX_EAGAIN      = -35,
+		LINUX_EINPROGRESS = -36,
+		LINUX_EALREADY    = -37,
+		LINUX_EISCONN     = -56,
 	};
 }
-
-
-class Lxip::Socketcall
-{
-	public:
-
-		virtual Handle  accept(Handle h, void *addr, uint32_t *len) = 0;
-		virtual int     bind(Handle h, uint16_t family, void *addr) = 0;
-		virtual void    close(Handle h) = 0;
-		virtual int     connect(Handle h, uint16_t family, void *addr) = 0;
-		virtual int     getpeername(Handle h, void *addr, uint32_t *len) = 0;
-		virtual int     getsockname(Handle h, void *addr, uint32_t *len) = 0;
-		virtual int     getsockopt(Handle h, int level, int optname,
-		                           void *optval, int *optlen) = 0;
-		virtual int     ioctl(Handle h, int request, char *arg) = 0;
-		virtual int     listen(Handle h, int backlog) = 0;
-		virtual int     poll(Handle h, bool block) = 0;
-		virtual ssize_t recv(Handle h, void *buf, size_t len, int flags,
-		                     uint16_t family, void *addr, uint32_t *addr_len) = 0;
-		virtual ssize_t send(Handle h, const void *buf, size_t len, int flags,
-		                     uint16_t family, void *addr) = 0;
-		virtual int     setsockopt(Handle h, int level, int optname,
-		                           const void *optval, uint32_t optlen) = 0;
-		virtual int     shutdown(Handle h, int how) = 0;
-		virtual Handle  socket(Type) = 0;
-};
 
 #endif /* _INCLUDE_LXIP_LXIP_H_ */

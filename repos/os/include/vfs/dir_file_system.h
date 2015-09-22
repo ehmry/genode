@@ -600,6 +600,26 @@ class Vfs::Dir_file_system : public File_system
 		{
 			return FTRUNCATE_ERR_NO_PERM;
 		}
+
+		void read_ready_sigh(Genode::Signal_context_capability sigh) override
+		{
+			for (File_system *fs = _first_file_system; fs; fs = fs->next)
+				fs->read_ready_sigh(sigh);
+		}
+
+		void notify_read_ready(Vfs_handle *handle)
+		{
+			if (&handle->fs() != this)
+				handle->fs().read_ready(handle);
+		}
+
+		bool read_ready(Vfs_handle *handle) override
+		{
+			if (&handle->fs() == this)
+				return true;
+
+			return handle->fs().read_ready(handle);
+		}
 };
 
 #endif /* _INCLUDE__VFS__DIR_FILE_SYSTEM_H_ */

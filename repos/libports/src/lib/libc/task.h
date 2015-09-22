@@ -47,7 +47,7 @@ namespace Libc {
 	 * or as separate pthread. This function returns after the libc kernel
 	 * resumed the user context execution.
 	 */
-	unsigned long suspend(unsigned long timeout_ms);
+	unsigned long suspend(unsigned long timeout_ms = 0);
 
 	/**
 	 * Suspend main user context and the component entrypoint
@@ -55,7 +55,6 @@ namespace Libc {
 	 * This interface is solely used by the implementation of fork().
 	 */
 	void schedule_suspend(void (*suspended) ());
-
 }
 
 #endif /* _LIBC__TASK_H_ */

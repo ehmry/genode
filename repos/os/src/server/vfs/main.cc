@@ -1,11 +1,12 @@
 /*
  * \brief  VFS File_system server
  * \author Emery Hemingway
+ * \author Christian Helmuth
  * \date   2015-08-16
  */
 
 /*
- * Copyright (C) 2015-2016 Genode Labs GmbH
+ * Copyright (C) 2015-2017 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -59,11 +60,26 @@ class Vfs_server::Session_component :
 		Genode::Heap            _alloc;
 
 		Genode::Signal_handler<Session_component> _process_packet_handler;
+		Genode::Signal_handler<Session_component> _read_ready_handler;
 
 		Vfs::Dir_file_system   &_vfs;
-		Directory              &_root;
+		Directory              *_root;
 		bool                    _writable;
 
+		/* list of files waiting for READ_READY */
+		File_list _notify_list;
+
+		void _ack_ready()
+		{
+			for (File *f = _notify_list.first(); f; f = f->next())
+				if (f->read_ready()) {
+					::File_system::Packet_descriptor pkt(
+						Packet_descriptor(), f->id().value,
+						Packet_descriptor::READ_READY, 0, 0);
+
+					tx_sink()->acknowledge_packet(pkt);
+				}
+		}
 
 		/****************************
 		 ** Handle to node mapping **
@@ -110,8 +126,10 @@ class Vfs_server::Session_component :
 		/**
 		 * Perform packet operation, return true if op completed
 		 */
-		void _process_packet_op(Packet_descriptor &packet)
+		bool _process_packet_op(Packet_descriptor &packet)
 		{
+			bool ack = true;
+
 			void     * const content = tx_sink()->packet_content(packet);
 			size_t     const length  = packet.length();
 			seek_off_t const seek    = packet.position();
@@ -119,9 +137,10 @@ class Vfs_server::Session_component :
 			/* assume failure by default */
 			packet.succeeded(false);
 
-			if ((!(content && length)) || (packet.length() > packet.size())) {
-				return;
-			}
+/* FIXME repair the packet sanity check */
+//			if ((!(content && length)) || (packet.length() > packet.size())) {
+//				return true;
+//			}
 
 			/* resulting length */
 			size_t res_length = 0;
@@ -141,10 +160,34 @@ class Vfs_server::Session_component :
 						res_length = node.write(_vfs, (char const *)content, length, seek);
 				}); } catch (...) { }
 				break;
+
+			case Packet_descriptor::READ_READY: try {
+				_apply((File_handle)packet.handle().value, [&] (File &file) {
+					if (file.read_ready())
+						return;
+					ack = false;
+
+					/*
+					 * register the file for notifications
+					 * and acknowledge later
+					 */
+					if (!file.notifying()) {
+						if (!_notify_list.first())
+							_vfs.read_ready_sigh(_read_ready_handler);
+
+						_notify_list.insert(&file);
+						file.notify_read_ready();
+					}
+				});
+				} catch (...) { }
+				break;
+
+			case Packet_descriptor::INVALID: break;
 			}
 
 			packet.length(res_length);
 			packet.succeeded(!!res_length);
+			return ack;
 		}
 
 		void _process_packet()
@@ -156,8 +199,8 @@ class Vfs_server::Session_component :
 			 * The 'acknowledge_packet' function cannot block because we
 			 * checked for 'ready_to_ack' in '_process_packets'.
 			 */
-			_process_packet_op(packet);
-			tx_sink()->acknowledge_packet(packet);
+			if (_process_packet_op(packet))
+				tx_sink()->acknowledge_packet(packet);
 		}
 
 		/**
@@ -206,9 +249,11 @@ class Vfs_server::Session_component :
 
 		void _close(Node &node)
 		{
-			if (File *file = dynamic_cast<File*>(&node))
+			if (File *file = dynamic_cast<File*>(&node)) {
+				if (file->notifying())
+					_notify_list.remove(file);
 				destroy(_alloc, file);
-			else if (Directory *dir = dynamic_cast<Directory*>(&node))
+			} else if (Directory *dir = dynamic_cast<Directory*>(&node))
 				destroy(_alloc, dir);
 			else if (Symlink *link = dynamic_cast<Symlink*>(&node))
 				destroy(_alloc, link);
@@ -232,14 +277,14 @@ class Vfs_server::Session_component :
 		                  size_t               ram_quota,
 		                  size_t               tx_buf_size,
 		                  Vfs::Dir_file_system &vfs,
-		                  char           const *root_path,
+		                  Path           const &root_path,
 		                  bool                  writable)
 		:
 			Session_rpc_object(env.ram().alloc(tx_buf_size), env.ep().rpc_ep()),
 			_label(label), _ram(env), _alloc(_ram, env.rm()),
 			_process_packet_handler(env.ep(), *this, &Session_component::_process_packets),
+			_read_ready_handler(env.ep(), *this, &Session_component::_ack_ready),
 			_vfs(vfs),
-			_root(*new (_alloc) Directory(_node_space, vfs, root_path, false)),
 			_writable(writable)
 		{
 			/*
@@ -251,6 +296,9 @@ class Vfs_server::Session_component :
 
 			_ram.ref_account(env.ram_session_cap());
 			env.ram().transfer_quota(_ram.cap(), ram_quota);
+
+			_root = new (_alloc)
+				Directory(_node_space, vfs, root_path.base(), false);
 		}
 
 		/**
@@ -287,7 +335,7 @@ class Vfs_server::Session_component :
 			}
 
 			_assert_valid_path(path_str);
-			Vfs_server::Path fullpath(_root.path());
+			Vfs_server::Path fullpath(_root->path());
 			fullpath.append(path_str);
 			path_str = fullpath.base();
 
@@ -346,7 +394,7 @@ class Vfs_server::Session_component :
 			_assert_valid_path(path_str);
 
 			/* re-root the path */
-			Path sub_path(path_str+1, _root.path());
+			Path sub_path(path_str+1, _root->path());
 			path_str = sub_path.base();
 			if (!_vfs.leaf_path(path_str))
 				throw Lookup_failed();
@@ -363,7 +411,7 @@ class Vfs_server::Session_component :
 		{
 			_apply(handle, [&] (Node &node) {
 				/* root directory should not be freed */
-				if (!(node.id() == _root.id()))
+				if (!(node.id() == _root->id()))
 					_close(node);
 			});
 		}
@@ -553,7 +601,7 @@ class Vfs_server::Root :
 				                  ram_quota,
 				                  tx_buf_size,
 				                  _vfs,
-				                  session_root.base(),
+				                  session_root,
 				                  writeable);
 
 			Genode::log("session opened for '", label, "' at '", session_root, "'");

@@ -28,6 +28,8 @@
 #include <libc-plugin/plugin.h>
 #include <libc-plugin/fd_alloc.h>
 
+#include <timer_session/connection.h>
+
 namespace Libc {
 
 	Genode::Xml_node config();
@@ -89,9 +91,6 @@ class Libc::Vfs_plugin : public Libc::Plugin
 
 	public:
 
-		/**
-		 * Constructor
-		 */
 		Vfs_plugin(Genode::Env &env, Genode::Allocator &alloc)
 		:
 			_alloc(alloc),
@@ -109,6 +108,11 @@ class Libc::Vfs_plugin : public Libc::Plugin
 
 		~Vfs_plugin() { }
 
+		void read_ready_sigh(Signal_context_capability sigh)
+		{
+			_root_dir.read_ready_sigh(sigh);
+		}
+
 		bool supports_access(const char *, int)                override { return true; }
 		bool supports_mkdir(const char *, mode_t)              override { return true; }
 		bool supports_open(const char *, int)                  override { return true; }
@@ -119,6 +123,9 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		bool supports_symlink(const char *, const char *)      override { return true; }
 		bool supports_unlink(const char *)                     override { return true; }
 		bool supports_mmap()                                   override { return true; }
+
+		bool supports_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+		                     struct timeval *timeout) override;
 
 		Libc::File_descriptor *open(const char *, int, int libc_fd);
 
@@ -149,6 +156,7 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		ssize_t write(Libc::File_descriptor *, const void *, ::size_t ) override;
 		void   *mmap(void *, ::size_t, int, int, Libc::File_descriptor *, ::off_t) override;
 		int     munmap(void *, ::size_t) override;
+		int     select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout) override;
 };
 
 #endif

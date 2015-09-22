@@ -99,6 +99,20 @@ class Vfs::Terminal_file_system : public Single_file_system
 		{
 			_terminal.read_avail_sigh(sigh);
 		}
+
+
+		/****************
+		 ** Read_ready **
+		 ****************/
+
+		void read_ready_sigh(Genode::Signal_context_capability sigh) override {
+			_terminal.read_avail_sigh(sigh); }
+
+		void notify_read_ready(Vfs_handle *vfs_handle) override { }
+
+		bool read_ready(Vfs_handle *vfs_handle) override {
+			return _terminal.avail(); }
+
 };
 
 #endif /* _INCLUDE__VFS__TERMINAL_FILE_SYSTEM_H_ */
