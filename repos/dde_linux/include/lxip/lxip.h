@@ -72,7 +72,18 @@ namespace Lxip {
 	};
 
 	enum Ioctl_cmd {
-		LINUX_FIONREAD = 0x541b /* == SIOCINQ */
+		LINUX_FIONREAD = 0x541b, /* == SIOCINQ */
+		LINUX_IFADDR   = 0x8915, /* == SIOCGIFADDR */
+	};
+
+	/*
+	 * Must match errno values from lx_emul.h
+	 */
+	enum Io_result {
+		LINUX_EAGAIN      = -35,
+		LINUX_EINPROGRESS = -36,
+		LINUX_EALREADY    = -37,
+		LINUX_EISCONN     = -56,
 	};
 }
 
@@ -100,6 +111,14 @@ class Lxip::Socketcall
 		                           const void *optval, uint32_t optlen) = 0;
 		virtual int     shutdown(Handle h, int how) = 0;
 		virtual Handle  socket(Type) = 0;
+
+		/* new interface */
+		virtual void register_ticker(void(*tick)()) = 0;
+		virtual int bind_tcp_port(Handle h, char const *host) = 0;
+		virtual int dial(Handle h, char const *host) = 0;
+		virtual int ifaddr(Handle h, char *dst, size_t len) = 0;
+		virtual int local(Handle h, char *dst, size_t len) = 0;
+		virtual int remote(Handle h, char *dst, size_t len) = 0;
 };
 
 #endif /* _INCLUDE_LXIP_LXIP_H_ */

@@ -148,6 +148,13 @@ namespace Libc {
 		static Config_attr rtc("rtc", "");
 		return rtc.string();
 	}
+
+	char const *config_socket() __attribute__((weak));
+	char const *config_socket()
+	{
+		static Config_attr socket("socket", "");
+		return socket.string();
+	}
 }
 
 int Libc::Vfs_plugin::access(const char *path, int amode)

@@ -216,8 +216,14 @@ extern "C" int chdir(const char *path)
 }
 
 
-extern "C" int _close(int libc_fd) {
-	FD_FUNC_WRAPPER(close, libc_fd); }
+extern "C" int _close(int libc_fd)
+{
+	int result = 0;
+	if (socket_close(libc_fd, result))
+		return result;
+
+	FD_FUNC_WRAPPER(close, libc_fd);
+}
 
 
 extern "C" int close(int libc_fd) { return _close(libc_fd); }
@@ -538,8 +544,14 @@ extern "C" int pipe(int pipefd[2])
 }
 
 
-extern "C" ssize_t _read(int libc_fd, void *buf, ::size_t count) {
-	FD_FUNC_WRAPPER(read, libc_fd, buf, count); }
+extern "C" ssize_t _read(int libc_fd, void *buf, ::size_t count)
+{
+	ssize_t result = 0;
+	if (socket_read(libc_fd, buf, count, result))
+		return result;
+
+	FD_FUNC_WRAPPER(read, libc_fd, buf, count);
+}
 
 
 extern "C" ssize_t read(int libc_fd, void *buf, ::size_t count)
@@ -623,6 +635,10 @@ extern "C" int unlink(const char *path)
 
 extern "C" ssize_t _write(int libc_fd, const void *buf, ::size_t count)
 {
+	ssize_t result = 0;
+	if (socket_write(libc_fd, buf, count, result))
+		return result;
+
 	int flags = fcntl(libc_fd, F_GETFL);
 
 	if ((flags != -1) && (flags & O_APPEND))

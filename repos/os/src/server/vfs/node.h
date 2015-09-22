@@ -69,6 +69,8 @@ namespace Vfs_server {
 
 struct Vfs_server::Node : File_system::Node_base
 {
+	struct Operation_would_block { }; /* exception */
+
 	Path const _path;
 	Mode const  mode;
 
@@ -173,7 +175,9 @@ class Vfs_server::File : public Node
 			}
 
 			_handle->seek(seek_offset);
-			_handle->fs().read(_handle, dst, len, res);
+			int const ret =_handle->fs().read(_handle, dst, len, res);
+			if (ret == File_io_service::WRITE_ERR_WOULD_BLOCK)
+				throw Operation_would_block();
 			return res;
 		}
 
@@ -191,7 +195,9 @@ class Vfs_server::File : public Node
 			}
 
 			_handle->seek(seek_offset);
-			_handle->fs().write(_handle, src, len, res);
+			int const ret = _handle->fs().write(_handle, src, len, res);
+			if (ret == File_io_service::WRITE_ERR_WOULD_BLOCK)
+				throw Operation_would_block();
 			if (res)
 				mark_as_updated();
 			return res;

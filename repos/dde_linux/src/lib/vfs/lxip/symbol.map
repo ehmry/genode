@@ -1,0 +1,10 @@
+{
+	global:
+
+		vfs_ticker;
+		vfs_file_system_factory;
+
+	local:
+
+		*;
+};

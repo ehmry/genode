@@ -1,0 +1,15 @@
+/*
+ * Symbols exported by lxip.lib.so
+ */
+
+{
+	global:
+
+		extern "C++" {
+			Lxip::*
+		};
+
+	local:
+
+		*;
+};

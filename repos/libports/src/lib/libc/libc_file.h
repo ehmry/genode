@@ -73,4 +73,15 @@ static inline Libc::File_descriptor *libc_fd_to_fd(int libc_fd, const char *func
 	FNAME_FUNC_WRAPPER_GENERIC(return, func_name, path, ##__VA_ARGS__ )
 
 
+namespace Libc {
+
+	/*
+	 * File operations allowed on sockets return false if 'fd' is not a
+	 * socket descriptor.
+	 */
+	bool socket_close(int libc_fd, int &result);
+	bool socket_read(int libc_fd, void *buf, ::size_t count, ::ssize_t &result);
+	bool socket_write(int libc_fd, void const *buf, ::size_t count, ::ssize_t &result);
+}
+
 #endif /* _LIBC_FILE_H_ */

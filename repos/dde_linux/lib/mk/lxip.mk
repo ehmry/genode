@@ -26,6 +26,8 @@ CC_C_OPT  += -Wno-unused-but-set-variable -Wno-pointer-sign
 CC_C_OPT  += -include $(LIB_INC_DIR)/lx_emul.h
 CC_CXX_OPT = -fpermissive
 
+LD_OPT  += --version-script=$(LIB_DIR)/symbol.map
+
 SRC_CC = dummies.cc lxcc_emul.cc nic_handler.cc socket_handler.cc \
          timer_handler.cc random.cc
 

@@ -287,6 +287,8 @@ struct Timeout : Genode::Signal_dispatcher<Timeout>
 };
 
 
+extern "C" void TICK();
+
 static void wait_for_timeout(signed long timeout)
 {
 	static Timer::Connection timer;
@@ -295,6 +297,9 @@ static void wait_for_timeout(signed long timeout)
 	/* dispatch signal */
 	Genode::Signal s = _sig_rec->wait_for_signal();
 	static_cast<Genode::Signal_dispatcher_base *>(s.context())->dispatch(s.num());
+
+	/* TODO do we need the tick here? */
+	TICK();
 }
 
 

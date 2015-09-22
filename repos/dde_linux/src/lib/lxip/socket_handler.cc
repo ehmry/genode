@@ -32,6 +32,7 @@ namespace Linux {
 		#include <lx_emul/extern_c_begin.h>
 		#include <linux/socket.h>
 		#include <uapi/linux/in.h>
+		#include <uapi/linux/if.h>
 		extern int sock_setsockopt(struct socket *sock, int level,
 		                           int op, char __user *optval,
 		                           unsigned int optlen);
@@ -42,8 +43,52 @@ namespace Linux {
 		#include <lx_emul/extern_c_end.h>
 }
 
+
+namespace {
+
+long ascii_to_long(char const *cp)
+{
+	unsigned long result = 0;
+	Genode::size_t ret = Genode::ascii_to_unsigned(cp, result, 10);
+	return result;
+}
+
+
+char const *get_port(char const *s)
+{
+	char const *p = s;
+	while (*++p) {
+		if (*p == ':')
+			return ++p;
+	}
+	return nullptr;
+}
+
+
+unsigned get_addr(char const *s)
+{
+	unsigned char to[4];
+
+	char const *p = s;
+	for (int i = 0; *p && i < 4; i++) {
+		unsigned long result;
+
+		p += Genode::ascii_to_unsigned(p, result, 10);
+
+		if (*p == '.') p++;
+
+		to[i] = result;
+	};
+
+	return (to[0]<<0)|(to[1]<<8)|(to[2]<<16)|(to[3]<<24);
+}
+
+} /* anonymous helper foo */
+
+
 namespace Net
 {
+	struct Ticker;
 		class Socketcall;
 
 		enum Opcode { OP_SOCKET   = 0,  OP_CLOSE  = 1, OP_BIND     = 2,  OP_LISTEN  = 3,
@@ -111,6 +156,30 @@ namespace Net
 };
 
 
+struct Net::Ticker
+{
+	void (*_tick)()      = nullptr;
+	bool _skip_next_tick = false;
+
+	void tick_function(void (*tick)()) { _tick = tick; }
+
+	void skip_next_tick() { _skip_next_tick = true; }
+
+	void tick()
+	{
+		if (!_skip_next_tick && _tick)
+			_tick();
+
+		_skip_next_tick = false;
+	}
+};
+
+
+static Net::Ticker *TICKER = nullptr;
+
+extern "C" void TICK() { if (TICKER) TICKER->tick(); }
+
+
 class Net::Socketcall : public Genode::Signal_dispatcher_base,
                         public Genode::Signal_context_capability,
                         public Lxip::Socketcall,
@@ -125,6 +194,8 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 		Genode::Signal_receiver    &_sig_rec;
 		Genode::Signal_transmitter  _signal;
 		Genode::Semaphore           _block;
+
+		Ticker _ticker;
 
 		void _submit_and_block()
 		{
@@ -183,7 +254,11 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			new_sock->type = sock->type;
 			new_sock->ops  = sock->ops;
 
-			if ((sock->ops->accept(sock, new_sock, 0)) < 0) {
+			int flags = 0;
+			if (_call.handle.non_block) flags |= Linux::O_NONBLOCK;
+
+			if (int err = sock->ops->accept(sock, new_sock, flags)) {
+				if (err == -EAGAIN) _handle.socket = (void*)0x1;
 				kfree(new_sock);
 				return;
 			}
@@ -406,6 +481,8 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			while (true) {
 				Genode::Signal s = _sig_rec.wait_for_signal();
 				static_cast<Genode::Signal_dispatcher_base *>(s.context())->dispatch(s.num());
+
+				_ticker.tick();
 			}
 		}
 
@@ -437,6 +514,9 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 					_handle.socket = 0;
 					Genode::warning("unkown opcode: ", (int)_call.opcode);
 			}
+
+			/* XXX socketcall operations do not tick */
+			_ticker.skip_next_tick();
 
 			_unblock();
 		}
@@ -628,6 +708,132 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			_submit_and_block();
 
 			return _handle;
+		}
+
+
+		/*******************
+		 ** new interface **
+		 *******************/
+
+		void register_ticker(void(*tick)()) { _ticker.tick_function(tick); }
+
+		int bind_tcp_port(Lxip::Handle h, char const *addr)
+		{
+			using namespace Linux; /* XXX fix Linux::__be16 in sockaddr_in */
+
+			sockaddr_in in_addr;
+			Genode::memset(&in_addr, 0, sizeof(in_addr));
+
+			char const *port = get_port(addr);
+			if (!port) return -1;
+			unsigned s_addr = get_addr(addr);
+			if (s_addr == INADDR_NONE) return -1;
+
+			in_addr.sin_port        = htons(ascii_to_long(port));
+			in_addr.sin_addr.s_addr = s_addr;
+
+			_call.opcode   = OP_BIND;
+			_call.handle   = h;
+			_call.addr_len = _family_handler(AF_INET, (void*)&in_addr);
+
+			_submit_and_block();
+
+			return _result.err;
+		}
+
+		int dial(Lxip::Handle h, char const *addr)
+		{
+			using namespace Linux; /* XXX fix Linux::__be16 in sockaddr_in */
+
+			sockaddr_in in_addr;
+			Genode::memset(&in_addr, 0, sizeof(in_addr));
+
+			char const *port = get_port(addr);
+			if (!port) return -1;
+			unsigned s_addr = get_addr(addr);
+			if (s_addr == INADDR_NONE) return -1;
+
+			in_addr.sin_port        = htons(ascii_to_long(port));
+			in_addr.sin_addr.s_addr = s_addr;
+
+			_call.opcode   = OP_CONNECT;
+			_call.handle   = h;
+			_call.addr_len = _family_handler(AF_INET, (void*)&in_addr);
+
+			_submit_and_block();
+
+			return _result.err;
+		}
+
+		int ifaddr(Lxip::Handle h, char *dst, Lxip::size_t len)
+		{
+			enum { MAX_IP_LEN = 15 + 1 };
+			if (len > MAX_IP_LEN) return -1;
+
+			using namespace Linux;
+
+			ifreq ifr;
+			Genode::memset(&ifr, 0, sizeof(ifr));
+
+			Genode::strncpy(ifr.ifr_name, "eth0", IFNAMSIZ-1);
+			ifr.ifr_addr.sa_family = AF_INET;
+
+			_call.opcode        = OP_IOCTL;
+			_call.handle        = h;
+			_call.ioctl.request = Lxip::Ioctl_cmd::LINUX_IFADDR;
+			_call.ioctl.arg     = (unsigned long)&ifr;
+
+			_submit_and_block();
+
+			if (_result.err < 0) return _result.err;
+
+			in_addr const     addr = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr;
+			unsigned char const *p = (unsigned char*)&addr.s_addr;
+			Genode::snprintf(dst, len, "%d.%d.%d.%d", p[0], p[1], p[2], p[3]);
+
+			return 0;
+		}
+
+		int local(Lxip::Handle h, char *dst, Lxip::size_t len)
+		{
+			using namespace Linux;
+
+			sockaddr_in s_addr;
+			Genode::memset(&s_addr, 0, sizeof(s_addr));
+			Lxip::uint32_t s_addr_len = sizeof(s_addr);
+
+			int res = getsockname(h, &s_addr, &s_addr_len);
+			if (res < 0) return res;
+
+			in_addr const   i_addr = s_addr.sin_addr;
+			unsigned char const *a = (unsigned char*)&i_addr.s_addr;
+			unsigned char const *p = (unsigned char*)&s_addr.sin_port;
+			Genode::snprintf(dst, len, "%d.%d.%d.%d:%u",
+			                 a[0], a[1], a[2], a[3],
+			                 (p[0]<<8)|(p[1]<<0));
+
+			return 0;
+		}
+
+		int remote(Lxip::Handle h, char *dst, Lxip::size_t len)
+		{
+			using namespace Linux;
+
+			sockaddr_in s_addr;
+			Genode::memset(&s_addr, 0, sizeof(s_addr));
+			Lxip::uint32_t s_addr_len = sizeof(s_addr);
+
+			int res = getpeername(h, &s_addr, &s_addr_len);
+			if (res < 0) return res;
+
+			in_addr const   i_addr = s_addr.sin_addr;
+			unsigned char const *a = (unsigned char*)&i_addr.s_addr;
+			unsigned char const *p = (unsigned char*)&s_addr.sin_port;
+			Genode::snprintf(dst, len, "%d.%d.%d.%d:%u",
+			                 a[0], a[1], a[2], a[3],
+			                 (p[0]<<8)|(p[1]<<0));
+
+			return 0;
 		}
 };
 
