@@ -157,11 +157,12 @@ class Vfs::Rump_file_system : public File_system
 			PLOG("%s file system mounted", fs_type);
 		}
 
+
 		/***************************
 		 ** File_system interface **
 		 ***************************/
 
-		static char const *name() { return "rump"; }
+		void sync(char const *path) override { rump_sys_sync(); }
 
 
 		/*********************************
