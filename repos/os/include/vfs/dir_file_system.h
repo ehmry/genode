@@ -220,8 +220,15 @@ class Vfs::Dir_file_system : public File_system
 			/* remember directory name */
 			if (node.has_type("fstab") || node.has_type("vfs"))
 				_name[0] = 0;
-			else
+			else {
 				node.attribute("name").value(_name, sizeof(_name));
+				char const *p = &_name[0];
+				while (*p)
+					if (*p++ == '/') {
+						PERR("invalid directory name '%s'", _name);
+						throw Genode::Exception();
+					}
+			}
 
 			for (unsigned i = 0; i < node.num_sub_nodes(); i++) {
 
