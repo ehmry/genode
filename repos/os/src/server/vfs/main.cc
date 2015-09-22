@@ -469,8 +469,11 @@ class File_system::Root : public Root_component<Session_component>
 			}
 
 			/* finally, check the root is valid */
-			if (!root()->is_directory(session_root))
+			if (!root()->is_directory(session_root)) {
+				PERR("'%s' request root '%s', which is not a directory",
+				     label.string(), session_root);
 				throw Root::Unavailable();
+			}
 
 			Session_component *session = new(md_alloc())
 				Session_component(_ep, _cache, tx_buf_size, session_root, writable);
