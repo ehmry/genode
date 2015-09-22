@@ -120,7 +120,7 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 		/**
 		 * Constructor
 		 */
-		Packet_descriptor(off_t offset = 0, size_t size = 0)
+		Packet_descriptor(seek_off_t offset = 0, size_t size = 0)
 		:
 			Genode::Packet_descriptor(offset, size), _handle(-1),
 			_op(READ), _position(0), _length(0), _success(false) { }
