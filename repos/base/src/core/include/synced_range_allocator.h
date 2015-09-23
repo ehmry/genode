@@ -40,7 +40,7 @@ class Genode::Synced_range_allocator : public Range_allocator
 		friend class Mapped_mem_allocator;
 
 		Lock                          _default_lock;
-		Lock                         *_lock;
+		Lock                         &_lock;
 		ALLOC                         _alloc;
 		Synced_interface<ALLOC, Lock> _synced_object;
 
@@ -49,13 +49,13 @@ class Genode::Synced_range_allocator : public Range_allocator
 		using Guard = typename Synced_interface<ALLOC, Lock>::Guard;
 
 		template <typename... ARGS>
-		Synced_range_allocator(Lock *lock, ARGS &&... args)
-		: _lock(lock), _alloc(args...), _synced_object(*_lock, &_alloc) { }
+		Synced_range_allocator(Lock &lock, ARGS &&... args)
+		: _lock(lock), _alloc(args...), _synced_object(_lock, &_alloc) { }
 
 		template <typename... ARGS>
 		Synced_range_allocator(ARGS &&... args)
-		: _lock(&_default_lock), _alloc(args...),
-		_synced_object(*_lock, &_alloc) { }
+		: _lock(_default_lock), _alloc(args...),
+		_synced_object(_lock, &_alloc) { }
 
 		Guard operator () ()       { return _synced_object(); }
 		Guard operator () () const { return _synced_object(); }

@@ -238,8 +238,8 @@ class Genode::Core_mem_allocator : public Genode::Core_mem_translator
 		 * Constructor
 		 */
 		Core_mem_allocator()
-		: _phys_alloc(&_lock, &_mem_alloc),
-		  _virt_alloc(&_lock, &_mem_alloc),
+		: _phys_alloc(_lock, &_mem_alloc),
+		  _virt_alloc(_lock, &_mem_alloc),
 		  _mem_alloc(_phys_alloc, _virt_alloc) { }
 
 		/**
