@@ -227,7 +227,7 @@ struct File_system::Symlink : Node
 			Vfs::Directory_service::Stat s;
 			assert_stat(root()->stat(path, s));
 			if (!(s.mode & Vfs::Directory_service::STAT_MODE_SYMLINK))
-				throw Node_already_exists();
+				throw Invalid_handle();
 		}
 	}
 

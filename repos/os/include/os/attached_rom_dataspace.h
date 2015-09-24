@@ -66,8 +66,8 @@ class Genode::Attached_rom_dataspace
 		 * \throw Rom_connection::Rom_connection_failed
 		 * \throw Rm_session::Attach_failed
 		 */
-		Attached_rom_dataspace(char const *name)
-		: _rom(name) { _try_attach(); }
+		Attached_rom_dataspace(char const *name, char const *label = 0)
+		: _rom(name, label) { _try_attach(); }
 
 		template <typename T> T *local_addr() { return _ds->local_addr<T>(); }
 

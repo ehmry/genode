@@ -15,6 +15,7 @@
 #define _INCLUDE__VFS__ROM_FILE_SYSTEM_H_
 
 #include <os/attached_rom_dataspace.h>
+#include <vfs/single_file_system.h>
 #include <vfs/file_system.h>
 
 namespace Vfs { class Rom_file_system; }
@@ -28,6 +29,8 @@ class Vfs::Rom_file_system : public Single_file_system
 		{
 			enum { LABEL_MAX_LEN = 64 };
 			char string[LABEL_MAX_LEN];
+
+			Label() { string[0] = 0; }
 
 			Label(Xml_node config)
 			{
@@ -48,11 +51,25 @@ class Vfs::Rom_file_system : public Single_file_system
 
 	public:
 
+		/**
+		 * File_system_factory constructor
+		 */
 		Rom_file_system(Xml_node config)
 		:
 			Single_file_system(NODE_TYPE_FILE, name(), config),
 			_label(config),
 			_rom(_label.string)
+		{ }
+
+		/**
+		 * Programmatic constructor
+		 */
+		Rom_file_system(char const *file_name,
+		                char const *rom_name,
+		                char const *session_label)
+		:
+			Single_file_system(NODE_TYPE_FILE, file_name),
+			_rom(rom_name, session_label)
 		{ }
 
 		static char const *name() { return "rom"; }

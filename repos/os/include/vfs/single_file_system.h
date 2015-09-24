@@ -56,6 +56,13 @@ class Vfs::Single_file_system : public File_system
 			catch (...) { }
 		}
 
+		Single_file_system(Node_type node_type, char const *filename)
+		:
+			_node_type(node_type)
+		{
+			strncpy(_filename, filename, sizeof(_filename));
+		}
+
 
 		/*********************************
 		 ** Directory-service interface **
