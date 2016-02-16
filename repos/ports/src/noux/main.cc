@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2011-2013 Genode Labs GmbH
+ * Copyright (C) 2011-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -30,6 +30,7 @@
 #include <destruct_queue.h>
 #include <kill_broadcaster.h>
 #include <vfs/dir_file_system.h>
+#include <syscall_reporter.h>
 
 /* supported file systems */
 #include <vfs/tar_file_system.h>
@@ -51,6 +52,8 @@ namespace Noux {
 
 	static Noux::Child *init_child;
 	static int exit_value = ~0;
+
+	static Syscall_reporter *syscall_reporter = nullptr;
 
 	bool is_init_process(Child *child) { return child == init_child; }
 	void init_process_exited(int exit) { init_child = 0; exit_value = exit; }
@@ -156,6 +159,8 @@ bool Noux::Child::syscall(Noux::Session::Syscall sc)
 	if (trace_syscalls)
 		Genode::printf("PID %d -> SYSCALL %s\n",
 		               pid(), Noux::Session::syscall_name(sc));
+	if (syscall_reporter)
+		syscall_reporter->start(sc);
 
 	bool result = false;
 
@@ -905,6 +910,9 @@ bool Noux::Child::syscall(Noux::Session::Syscall sc)
 		_sysio->pending_signals.add(_pending_signals.get());
 	}
 
+	if (syscall_reporter)
+		syscall_reporter->end();
+
 	return result;
 }
 
@@ -1061,7 +1069,7 @@ static Noux::Io_channel *connect_stdio(Vfs::Dir_file_system            &root,
 		}
 
 		return new (Genode::env()->heap())
-			Vfs_io_channel("", path, &root, vfs_handle, sig_rec);
+			Vfs_io_channel(path, root.leaf_path(path), &root, vfs_handle, sig_rec);
 
 	} catch (Genode::Xml_node::Nonexistent_attribute) {
 		PWRN("%s VFS path not defined, connecting to Terminal session", stdio_name);
@@ -1146,12 +1154,11 @@ int main(int argc, char **argv)
 	static Genode::Cap_connection cap;
 
 	/* obtain global configuration */
-	try {
-		trace_syscalls = config()->xml_node().attribute("trace_syscalls").has_value("yes");
-	} catch (Xml_node::Nonexistent_attribute) { }
-	try {
-		verbose = config()->xml_node().attribute("verbose").has_value("yes");
-	} catch (Xml_node::Nonexistent_attribute) { }
+	trace_syscalls = config()->xml_node().attribute_value("trace_syscalls", trace_syscalls);
+	verbose = config()->xml_node().attribute_value("verbose", verbose);
+
+	if (config()->xml_node().attribute_value("profile", false))
+		syscall_reporter = new (Genode::env()->heap()) Syscall_reporter();
 
 	/* register additional file systems to the VFS */
 	Vfs::Global_file_system_factory &fs_factory = Vfs::global_file_system_factory();
@@ -1258,5 +1265,14 @@ int main(int argc, char **argv)
 	}
 
 	PINF("--- exiting noux ---");
+
+	root_dir.sync("/");
+
+	if (syscall_reporter) {
+		try { syscall_reporter->submit(); }
+		catch (...) { PERR("failed to submit profiling report"); }
+		destroy(Genode::env()->heap(), syscall_reporter);
+	}
+
 	return exit_value;
 }

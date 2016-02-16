@@ -1,0 +1,76 @@
+build {
+	core init
+	drivers/timer
+	lib/libc_noux
+	noux-pkg/coreutils
+	noux/minimal
+	server/report_rom
+}
+
+# strip coreutils binaries and create tar archive
+exec sh -c "[cross_dev_prefix]strip bin/coreutils/bin/*"
+exec tar cfv bin/coreutils.tar -h -C bin/coreutils .
+
+create_boot_directory
+
+install_config {
+	<config verbose="yes">
+		<parent-provides>
+			<service name="ROM"/>
+			<service name="LOG"/>
+			<service name="CAP"/>
+			<service name="RAM"/>
+			<service name="RM"/>
+			<service name="CPU"/>
+			<service name="PD"/>
+			<service name="SIGNAL"/>
+		</parent-provides>
+		<default-route>
+			<any-service> <any-child/> <parent/> </any-service>
+		</default-route>
+		<start name="timer">
+			<resource name="RAM" quantum="1M"/>
+			<provides><service name="Timer"/></provides>
+		</start>
+		<start name="report_rom">
+			<resource name="RAM" quantum="4M"/>
+			<provides> <service name="Report"/> </provides>
+			<config verbose="true"/>
+		</start>
+		<start name="noux">
+			<resource name="RAM" quantum="1G"/>
+			<config verbose="yes" profile="yes"
+			        stdin="/dev/null" stdout="/dev/log" stderr="/dev/log">
+				<fstab>
+					<tar name="coreutils.tar"/>
+					<dir name="dev">
+						<log/> <null/>
+					</dir>
+				</fstab>
+				<start name="/bin/ls"> <arg value="-Rla"/> </start>
+			</config>
+		</start>
+	</config>
+}
+
+build_boot_image {
+	core init ld.lib.so
+	coreutils.tar
+	libc.lib.so
+	libc_noux.lib.so
+	libm.lib.so
+	noux
+	report_rom
+	timer
+}
+
+append qemu_args " -nographic -serial mon:stdio "
+
+if {[have_spec x86_64]} {
+	# coreutils.tar is really huge when built for x86_64
+	append qemu_args " -m 300 "
+}
+
+run_genode_until {child "noux" exited with exit value 0.*\n} 30
+
+exec rm bin/coreutils.tar

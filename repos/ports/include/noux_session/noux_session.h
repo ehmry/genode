@@ -89,7 +89,9 @@ namespace Noux {
 			SYSCALL_INVALID = -1
 		};
 
-		static char const *syscall_name(Syscall sc)
+		enum { NUM_SYSCALLS = SYSCALL_GETDTABLESIZE+1 };
+
+		static char const *syscall_name(int sc)
 		{
 			switch (sc) {
 			NOUX_DECL_SYSCALL_NAME(WRITE)
