@@ -23,7 +23,7 @@ CONFIGURE_ARGS += --disable-ip6 \
 
 INSTALL_TARGET  = install
 
-LIBS += libcrypto libssl zlib libc_resolv
+LIBS += libcrypto libssl zlib
 
 built.tag: Makefile Makefile_patch
 

@@ -2,7 +2,8 @@
 # C Library including string, locale
 #
 LIBS   = libc-string libc-locale libc-stdlib libc-stdio libc-gen libc-gdtoa \
-         libc-inet libc-stdtime libc-regex libc-compat libc-setjmp
+         libc-inet libc-stdtime libc-regex libc-compat libc-setjmp \
+         libc-resolv libc-isc libc-nameser libc-net libc-rpc
 
 LIBS  += base config vfs
 

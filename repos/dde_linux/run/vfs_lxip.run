@@ -92,7 +92,7 @@ set boot_modules {
 	core init timer
 	nic_drv
 	ld.lib.so libc.lib.so libc_lock_pipe.lib.so
-	vfs_lxip.lib.so lxip.lib.so libc_resolv.lib.so
+	vfs_lxip.lib.so lxip.lib.so
 	tcp_terminal
 	test-terminal_echo
 	test-vfs_lxip
