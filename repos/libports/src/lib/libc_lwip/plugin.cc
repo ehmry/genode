@@ -346,23 +346,23 @@ int Plugin::fcntl(Libc::File_descriptor *sockfdo, int cmd, long val)
 }
 
 
-extern "C" void libc_freeaddrinfo(struct ::addrinfo *);
+extern "C" void freeaddrinfo(struct ::addrinfo *);
 
 void Plugin::freeaddrinfo(struct ::addrinfo *res)
 {
-	return ::libc_freeaddrinfo(res);
+	return ::freeaddrinfo(res);
 }
 
 
-extern "C" int libc_getaddrinfo(const char *, const char *,
-                                const struct ::addrinfo *,
-                                struct ::addrinfo **);
+extern "C" int getaddrinfo(const char *, const char *,
+                           const struct ::addrinfo *,
+                           struct ::addrinfo **);
 
 int Plugin::getaddrinfo(const char *node, const char *service,
                              const struct ::addrinfo *hints,
                              struct ::addrinfo **res)
 {
-	return ::libc_getaddrinfo(node, service, hints, res);
+	return ::getaddrinfo(node, service, hints, res);
 }
 
 
