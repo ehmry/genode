@@ -1,0 +1,49 @@
+#
+# \brief  Test of the VFS File_system read ahead.
+# \author Emery Hemingway
+# \date   2016-04-05
+#
+
+build "core init drivers/timer server/vfs test/vfs_short_read"
+
+create_boot_directory
+
+install_config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="RAM"/>
+		<service name="CAP"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+		<service name="SIGNAL"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="vfs_short_read">
+		<resource name="RAM" quantum="8M"/>
+		<config> <vfs> <fs/> </vfs> </config>
+	</start>
+	<start name="vfs">
+		<resource name="RAM" quantum="8M"/>
+		<provides><service name="File_system"/></provides>
+		<config>
+			<policy label="vfs_short_read" writeable="yes"/>
+			<vfs> <ram/> </vfs>
+		</config>
+	</start>
+</config>
+}
+
+build_boot_image "core init ld.lib.so timer vfs vfs_short_read"
+
+append qemu_args "-nographic"
+
+run_genode_until {child "vfs_short_read" exited with exit value 0} 180

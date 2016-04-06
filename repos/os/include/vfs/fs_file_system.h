@@ -18,7 +18,10 @@
 #include <base/allocator_avl.h>
 #include <file_system_session/connection.h>
 
-namespace Vfs { class Fs_file_system; }
+namespace Vfs {
+	class Fs_file_system;
+	using Genode::size_t;
+}
 
 
 class Vfs::Fs_file_system : public File_system
@@ -46,26 +49,43 @@ class Vfs::Fs_file_system : public File_system
 
 		::File_system::Connection _fs;
 
-		class Fs_vfs_handle : public Vfs_handle
+		enum { PACKET_COUNT = ::File_system::Session::TX_QUEUE_SIZE };
+
+		::File_system::Packet_descriptor _packets[PACKET_COUNT];
+		size_t                     const _packet_size;
+		int                              _packet_index = 0;
+
+		size_t get_buffer_size(Xml_node const node)
 		{
-			private:
+			return node.attribute_value(
+				"buffer", size_t(::File_system::DEFAULT_TX_BUF_SIZE));
+		}
 
-				::File_system::File_handle const _handle;
+		inline ::File_system::Packet_descriptor _next_packet()
+		{
+			if (++_packet_index == PACKET_COUNT)
+				_packet_index = 0;
+			return ::File_system::Packet_descriptor(
+				_packets[_packet_index].offset(), _packet_size);
+		}
 
-			public:
+		struct Fs_vfs_handle : Vfs_handle
+		{
+			/* a cached packet descriptor */
+			::File_system::Packet_descriptor packet;
 
-				Fs_vfs_handle(File_system &fs, int status_flags,
-				              ::File_system::File_handle handle)
-				: Vfs_handle(fs, fs, status_flags), _handle(handle)
-				{ }
+			::File_system::File_handle const handle;
 
-				~Fs_vfs_handle()
-				{
-					Fs_file_system &fs = static_cast<Fs_file_system &>(ds());
-					fs._fs.close(_handle);
-				}
+			Fs_vfs_handle(File_system &fs, int status_flags,
+			              ::File_system::File_handle file_handle)
+			: Vfs_handle(fs, fs, status_flags), handle(file_handle)
+			{ }
 
-				::File_system::File_handle file_handle() const { return _handle; }
+			~Fs_vfs_handle()
+			{
+				Fs_file_system &fs = static_cast<Fs_file_system &>(ds());
+				fs._fs.close(_handle);
+			}
 		};
 
 		/**
@@ -83,73 +103,6 @@ class Vfs::Fs_file_system : public File_system
 			~Fs_handle_guard() { _fs.close(_handle); }
 		};
 
-		file_size _read(::File_system::Node_handle node_handle, void *buf,
-		                file_size const count, file_size const seek_offset)
-		{
-			::File_system::Session::Tx::Source &source = *_fs.tx();
-
-			file_size const max_packet_size = source.bulk_buffer_size() / 2;
-			file_size const clipped_count = min(max_packet_size, count);
-
-			::File_system::Packet_descriptor const
-				packet_in(source.alloc_packet(clipped_count),
-				          node_handle,
-				          ::File_system::Packet_descriptor::READ,
-				          clipped_count,
-				          seek_offset);
-
-			/* pass packet to server side */
-			source.submit_packet(packet_in);
-
-			/* obtain result packet descriptor with updated status info */
-			::File_system::Packet_descriptor const
-				packet_out = source.get_acked_packet();
-
-			file_size const read_num_bytes = min(packet_out.length(), count);
-
-			memcpy(buf, source.packet_content(packet_out), read_num_bytes);
-
-			/*
-			 * XXX check if acked packet belongs to request,
-			 *     needed for thread safety
-			 */
-
-			source.release_packet(packet_out);
-
-			return read_num_bytes;
-		}
-
-		file_size _write(::File_system::Node_handle node_handle,
-		                 const char *buf, file_size count, file_size seek_offset)
-		{
-			::File_system::Session::Tx::Source &source = *_fs.tx();
-
-			file_size const max_packet_size = source.bulk_buffer_size() / 2;
-			count = min(max_packet_size, count);
-
-			::File_system::Packet_descriptor
-				packet(source.alloc_packet(count),
-				       node_handle,
-				       ::File_system::Packet_descriptor::WRITE,
-				       count,
-				       seek_offset);
-
-			memcpy(source.packet_content(packet), buf, count);
-
-			/* pass packet to server side */
-			source.submit_packet(packet);
-			source.get_acked_packet();
-
-			/*
-			 * XXX check if acked packet belongs to request,
-			 *     needed for thread safety
-			 */
-
-			source.release_packet(packet);
-
-			return count;
-		}
-
 	public:
 
 		Fs_file_system(Xml_node config)
@@ -158,10 +111,16 @@ class Vfs::Fs_file_system : public File_system
 			_label(config.attribute_value("label", Label_string())),
 			_root( config.attribute_value("root",  Root_string())),
 			_fs(_fs_packet_alloc,
-			    ::File_system::DEFAULT_TX_BUF_SIZE,
+			    get_buffer_size(config),
 			    _label.string(), _root.string(),
-			    config.attribute_value("writeable", true))
-		{ }
+			    config.attribute_value("writeable", true)),
+			_packet_size(_fs.tx()->bulk_buffer_size() / PACKET_COUNT)
+		{
+			PLOG("packet size is %zd", _packet_size);
+			for (int i = 0; i < PACKET_COUNT; ++i) {
+				_packets[i] = _fs.tx()->alloc_packet(_packet_size);
+			}
+		}
 
 
 		/*********************************
@@ -200,16 +159,15 @@ class Vfs::Fs_file_system : public File_system
 				local_addr = env()->rm_session()->attach(ds_cap);
 
 				::File_system::Session::Tx::Source &source = *_fs.tx();
-				file_size const max_packet_size = source.bulk_buffer_size() / 2;
 
 				for (file_size seek_offset = 0; seek_offset < status.size;
-				     seek_offset += max_packet_size) {
+				     seek_offset += _packet_size) {
 
-					file_size const count = min(max_packet_size, status.size -
+					file_size const count = min(_packet_size, status.size -
 					                                             seek_offset);
 
 					::File_system::Packet_descriptor
-						packet(source.alloc_packet(count),
+						packet(_next_packet(),
 							   file,
 							   ::File_system::Packet_descriptor::READ,
 							   count,
@@ -221,12 +179,6 @@ class Vfs::Fs_file_system : public File_system
 
 					memcpy(local_addr + seek_offset, source.packet_content(packet), count);
 
-					/*
-					 * XXX check if acked packet belongs to request,
-					 *     needed for thread safety
-					 */
-
-					source.release_packet(packet);
 				}
 
 				env()->rm_session()->detach(local_addr);
@@ -290,7 +242,7 @@ class Vfs::Fs_file_system : public File_system
 			enum { DIRENT_SIZE = sizeof(::File_system::Directory_entry) };
 
 			::File_system::Packet_descriptor
-				packet(source.alloc_packet(DIRENT_SIZE),
+				packet(_next_packet(),
 				       dir_handle,
 				       ::File_system::Packet_descriptor::READ,
 				       DIRENT_SIZE,
@@ -298,12 +250,8 @@ class Vfs::Fs_file_system : public File_system
 
 			/* pass packet to server side */
 			source.submit_packet(packet);
+			/* lock prevents other packets from entering the queue */
 			source.get_acked_packet();
-
-			/*
-			 * XXX check if acked packet belongs to request,
-			 *     needed for thread safety
-			 */
 
 			typedef ::File_system::Directory_entry Directory_entry;
 
@@ -328,8 +276,6 @@ class Vfs::Fs_file_system : public File_system
 			out.fileno = index + 1;
 
 			strncpy(out.name, entry->name, sizeof(out.name));
-
-			source.release_packet(packet);
 
 			return DIRENT_OK;
 		}
@@ -359,6 +305,8 @@ class Vfs::Fs_file_system : public File_system
 		Readlink_result readlink(char const *path, char *buf, file_size buf_size,
 		                         file_size &out_len) override
 		{
+			Lock::Guard guard(_lock);
+
 			/*
 			 * Canonicalize path (i.e., path must start with '/')
 			 */
@@ -377,8 +325,26 @@ class Vfs::Fs_file_system : public File_system
 				    _fs.symlink(dir_handle, symlink_name.base() + 1, false);
 				Fs_handle_guard symlink_guard(_fs, symlink_handle);
 
-				out_len = _read(symlink_handle, buf, buf_size, 0);
+				::File_system::Session::Tx::Source &source = *_fs.tx();
+				size_t remain = buf_size;
+				while (remain) {
+					size_t len = min(_packet_size, remain);
 
+					::File_system::Packet_descriptor packet(
+						_next_packet(), symlink_handle,
+						::File_system::Packet_descriptor::READ,
+						len, 0);
+
+					/* exchange packet */
+					source.submit_packet(packet);
+					packet = source.get_acked_packet();
+					strncpy(buf, source.packet_content(packet), packet.length()+1);
+					remain -= packet.length();
+					if (packet.length() < len) break;
+					len = packet.length();
+					buf += len;
+				}
+				out_len = (buf_size - remain)+1;
 				return READLINK_OK;
 			} catch (...) { }
 
@@ -465,7 +431,32 @@ class Vfs::Fs_file_system : public File_system
 				    _fs.symlink(dir_handle, symlink_name.base() + 1, true);
 				Fs_handle_guard symlink_guard(_fs, symlink_handle);
 
-				_write(symlink_handle, from, strlen(from) + 1, 0);
+				::File_system::Session::Tx::Source &source = *_fs.tx();
+
+				size_t remain = strlen(from)+1;
+				size_t position = 0;
+				while (remain) {
+					size_t len = min(_packet_size, remain);
+
+					::File_system::Packet_descriptor packet(
+						_next_packet(), symlink_handle,
+						::File_system::Packet_descriptor::WRITE,
+						len, position);
+
+					memcpy(source.packet_content(packet), from, len);
+
+					/* exchange packet */
+					source.submit_packet(packet);
+					packet = source.get_acked_packet();
+					if (!packet.succeeded())
+						return SYMLINK_ERR_NAME_TOO_LONG;
+					if (packet.length() < len)
+						break;
+
+					remain -= packet.length();
+					position += packet.length();
+					from += packet.length();
+				}
 			}
 			catch (::File_system::Invalid_handle)      { return SYMLINK_ERR_NO_ENTRY; }
 			catch (::File_system::Node_already_exists) { return SYMLINK_ERR_EXISTS;   }
@@ -581,6 +572,12 @@ class Vfs::Fs_file_system : public File_system
 				Fs_handle_guard node_guard(_fs, node);
 				_fs.sync(node);
 			} catch (...) { }
+
+			/* zero node references on cached packets */
+			for (int i = 0; i < PACKET_COUNT; ++i) {
+				_packets[i] = ::File_system::Packet_descriptor(
+					_packets[i].offset(), _packet_size);
+			}
 		}
 
 
@@ -588,35 +585,109 @@ class Vfs::Fs_file_system : public File_system
 		 ** File I/O service interface **
 		 ********************************/
 
-		Write_result write(Vfs_handle *vfs_handle, char const *buf,
-		                   file_size buf_size, file_size &out_count) override
+		Write_result write(Vfs_handle *vfs_handle, char const *src,
+		                   file_size const count, file_size &out_count) override
 		{
 			Lock::Guard guard(_lock);
+			out_count = 0;
 
-			Fs_vfs_handle const *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
+			Fs_vfs_handle *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
+			if (!handle)
+				return WRITE_ERR_INVALID;
 
-			out_count = _write(handle->file_handle(), buf, buf_size, handle->seek());
+			::File_system::Session::Tx::Source &source = *_fs.tx();
+			::File_system::Packet_descriptor &packet = handle->packet;
+			file_size remain = count;
+			file_offset position = handle->seek();
 
+			if (packet.handle() != handle->handle)
+				packet = _next_packet();
+
+			/* XXX: send multiple packets before retrieving acks */
+			while (remain) {
+				size_t len = min(_packet_size, remain);
+
+				packet = ::File_system::Packet_descriptor(packet,
+					handle->handle, ::File_system::Packet_descriptor::WRITE,
+					len, position);
+
+				memcpy(source.packet_content(packet), src, len);
+
+				/* exchange packet */
+				source.submit_packet(packet);
+				/* lock prevents other packets from entering the queue */
+				packet = source.get_acked_packet();
+				if (!packet.succeeded()) {
+					out_count = count - remain;
+					return WRITE_ERR_IO;
+				}
+
+				len = packet.length();
+				remain -= len;
+				src += len;
+				position += len;
+			}
+
+			out_count = count - remain;
 			return WRITE_OK;
 		}
 
-		Read_result read(Vfs_handle *vfs_handle, char *dst, file_size count,
-		                 file_size &out_count) override
+		Read_result read(Vfs_handle *vfs_handle, char *dst,
+		                 file_size const count, file_size &out_count) override
 		{
 			Lock::Guard guard(_lock);
+			out_count = 0;
 
-			Fs_vfs_handle const *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
+			Fs_vfs_handle *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
+			if (!handle)
+				return READ_ERR_INVALID;
 
-			::File_system::Status status = _fs.status(handle->file_handle());
-			file_size const size_of_file = status.size;
+			::File_system::Session::Tx::Source &source = *_fs.tx();
+			::File_system::Packet_descriptor &packet = handle->packet;
+			file_size remain = count;
+			file_offset position = handle->seek();
 
-			file_size const file_bytes_left = size_of_file >= handle->seek()
-			                                ? size_of_file  - handle->seek() : 0;
+			if (packet.handle() != handle->handle) {
+				packet = _next_packet();
 
-			count = min(count, file_bytes_left);
+			} else {
 
-			out_count = _read(handle->file_handle(), dst, count, handle->seek());
+				file_offset packet_start = packet.position();
+				file_offset packet_end   = packet_start+packet.length();
+				if ((packet_start <= position) && (packet_end > position)) {
+					size_t buf_off = position - packet_start;
+					size_t len = min((packet.length() - buf_off), remain);
+					memcpy(dst, source.packet_content(packet)+buf_off, len);
+					remain -= len;
+					position += len;
+					dst += len;
+				}
+			}
 
+			/* XXX: send multiple packets before retrieving acks */
+			while (remain) {
+				packet = ::File_system::Packet_descriptor(packet,
+					handle->handle, ::File_system::Packet_descriptor::READ,
+					_packet_size, position);
+
+				/* exchange packet */
+				source.submit_packet(packet);
+				/* lock prevents other packets from entering the queue */
+				packet = source.get_acked_packet();
+
+				if (!packet.succeeded()) {
+					out_count = count - remain;
+					return READ_ERR_IO;
+				}
+
+				size_t len = min(packet.length(), remain);
+				memcpy(dst, source.packet_content(packet), len);
+				remain -= len;
+				if (len < _packet_size) break;
+				dst += len;
+				position += len;
+			}
+			out_count = count - remain;
 			return READ_OK;
 		}
 
@@ -625,7 +696,7 @@ class Vfs::Fs_file_system : public File_system
 			Fs_vfs_handle const *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
 
 			try {
-				_fs.truncate(handle->file_handle(), len);
+				_fs.truncate(handle->handle, len);
 			}
 			catch (::File_system::Invalid_handle)    { return FTRUNCATE_ERR_NO_PERM; }
 			catch (::File_system::Permission_denied) { return FTRUNCATE_ERR_NO_PERM; }
