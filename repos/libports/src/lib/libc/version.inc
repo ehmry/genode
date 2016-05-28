@@ -1,25 +1,30 @@
 #
 # Provide version information to sysctl
 #
-GENODE_ROOT_DIR = $(REP_DIR)/../..
 
-GENODE_OSRELEASE := $(shell cat $(GENODE_ROOT_DIR)/VERSION)
+#GENODE_ROOT_DIR = $(REP_DIR)/../..
+#
+#GENODE_OSRELEASE := $(shell cat $(GENODE_ROOT_DIR)/VERSION)
+#
+#GENODE_OSREV := $(shell which git > /dev/null && git rev-list --count HEAD)
+#
+#GENODE_VERSION := $(shell \
+#		which git > /dev/null \
+#		&& git -C $(GENODE_ROOT_DIR) describe 2> /dev/null \
+#		&& exit 0 \
+#	|| \
+#		test -r $(GENODE_ROOT_DIR)/VERSION \
+#		&& cat $(GENODE_ROOT_DIR)/VERSION \
+#		&& exit 0 \
+#	|| \
+#		echo "<unknown version>")
 
-GENODE_OSREV := $(shell which git > /dev/null && git rev-list --count HEAD)
-
-GENODE_VERSION := $(shell \
-		which git > /dev/null \
-		&& git -C $(GENODE_ROOT_DIR) describe 2> /dev/null \
-		&& exit 0 \
-	|| \
-		test -r $(GENODE_ROOT_DIR)/VERSION \
-		&& cat $(GENODE_ROOT_DIR)/VERSION \
-		&& exit 0 \
-	|| \
-		echo "<unknown version>")
+GENODE_OSRELEASE := unknown
+GENODE_OSREV     := unknown
+GENODE_VERSION   := unknown
 
 CC_OPT += -DGENODE_OSRELEASE="\"$(GENODE_OSRELEASE)\""
-CC_OPT += -DGENODE_OSREV="$(GENODE_OSREV)"
+CC_OPT += -DGENODE_OSREV=\"$(GENODE_OSREV)\"
 CC_OPT += -DGENODE_VERSION="\"$(GENODE_VERSION)\""
 
 ifeq ($(findstring arm, $(SPECS)), arm)
