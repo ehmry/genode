@@ -82,6 +82,13 @@ struct Vfs::Directory_service
 		STAT_MODE_DIRECTORY = 0040000,
 		STAT_MODE_CHARDEV   = 0020000,
 		STAT_MODE_BLOCKDEV  = 0060000,
+
+		STAT_TYPE_MASK
+			= STAT_MODE_SYMLINK
+			| STAT_MODE_FILE
+			| STAT_MODE_DIRECTORY
+			| STAT_MODE_CHARDEV
+			| STAT_MODE_BLOCKDEV
 	};
 
 	struct Stat
@@ -92,6 +99,17 @@ struct Vfs::Directory_service
 		unsigned      gid;
 		unsigned long inode;
 		unsigned long device;
+
+		bool symlink() const {
+			return (mode&STAT_TYPE_MASK)==STAT_MODE_SYMLINK; }
+		bool directory() const {
+			return (mode&STAT_TYPE_MASK)==STAT_MODE_DIRECTORY; }
+		bool regular() const {
+			return (mode&STAT_TYPE_MASK)==STAT_MODE_FILE; }
+		bool chardev() const {
+			return (mode&STAT_TYPE_MASK)==STAT_MODE_CHARDEV; }
+		bool blockdev() const {
+			return (mode&STAT_TYPE_MASK)==STAT_MODE_BLOCKDEV; }
 	};
 
 	enum Stat_result { STAT_ERR_NO_ENTRY = NUM_GENERAL_ERRORS,
