@@ -21,6 +21,7 @@
 
 /* Local includes */
 #include "assert.h"
+#include "types.h"
 
 namespace Vfs_server {
 
@@ -34,8 +35,6 @@ namespace Vfs_server {
 
 	/* Vfs::MAX_PATH is shorter than File_system::MAX_PATH */
 	enum { MAX_PATH_LEN = Vfs::MAX_PATH_LEN };
-
-	typedef Genode::Path<MAX_PATH_LEN> Path;
 
 	typedef Genode::Allocator::Out_of_memory Out_of_memory;
 
@@ -67,7 +66,7 @@ namespace Vfs_server {
 }
 
 
-struct Vfs_server::Node : File_system::Node_base
+struct Vfs_server::Node
 {
 	Path const _path;
 	Mode const  mode;
@@ -113,12 +112,8 @@ struct Vfs_server::Symlink : Node
 		/* ensure symlink gets something null-terminated */
 		Genode::String<MAX_PATH_LEN> target(src, len);
 
-		if (vfs.symlink(target.string(), path()) == Directory_service::SYMLINK_OK)
-			return 0;
-
-		mark_as_updated();
-		notify_listeners();
-		return target.length();
+		return (vfs.symlink(target.string(), path()) == Directory_service::SYMLINK_OK)
+			? target.length()-1 : 0;
 	}
 };
 
@@ -127,11 +122,10 @@ class Vfs_server::File : public Node
 {
 	private:
 
-		Vfs::Vfs_handle *_handle;
-		char const      *_leaf_path; /* offset pointer to Node::_path */
+		Vfs::Vfs_handle  *_handle;
+		char const       *_leaf_path; /* offset pointer to Node::_path */
 
 	public:
-
 		File(Vfs::File_system  &vfs,
 		     Genode::Allocator &alloc,
 		     char       const  *file_path,
@@ -151,7 +145,6 @@ class Vfs_server::File : public Node
 		void truncate(file_size_t size)
 		{
 			assert_truncate(_handle->fs().ftruncate(_handle, size));
-			mark_as_updated();
 		}
 
 
@@ -192,8 +185,6 @@ class Vfs_server::File : public Node
 
 			_handle->seek(seek_offset);
 			_handle->fs().write(_handle, src, len, res);
-			if (res)
-				mark_as_updated();
 			return res;
 		}
 };
@@ -220,8 +211,6 @@ struct Vfs_server::Directory : Node
 		File *file;
 		try { file = new (alloc) File(vfs, alloc, path_str, mode, create); }
 		catch (Out_of_memory) { throw Out_of_metadata(); }
-		if (create)
-			mark_as_updated();
 		return file;
 	}
 
@@ -242,8 +231,6 @@ struct Vfs_server::Directory : Node
 		Symlink *link;
 		try { link = new (alloc) Symlink(vfs, path_str, mode, create); }
 		catch (Out_of_memory) { throw Out_of_metadata(); }
-		if (create)
-			mark_as_updated();
 		return link;
 	}
 
@@ -262,6 +249,7 @@ struct Vfs_server::Directory : Node
 		size_t remains = len;
 
 		while (remains >= blocksize) {
+			memset(&vfs_dirent, 0x00, sizeof(vfs_dirent));
 			if (vfs.dirent(path(), index++, vfs_dirent)
 				!= Vfs::Directory_service::DIRENT_OK)
 				return len - remains;
@@ -289,4 +277,5 @@ struct Vfs_server::Directory : Node
 	}
 };
 
-#endif /* _VFS__NODE_H_ */
+
+#endif
