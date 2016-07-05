@@ -11,6 +11,9 @@ HOST_INC_DIR += /usr/include/$(shell gcc -dumpmachine)
 HOST_INC_DIR += /usr/include/i386-linux-gnu
 HOST_INC_DIR += /usr/include/x86_64-linux-gnu
 
+# NixOS
+HOST_INC_DIR += $(foreach NP,$(NIX_PROFILES),$(NP)/include)
+
 #
 # Some header files installed on GNU/Linux test for the GNU compiler. For
 # example, 'stdio.h' might complain with the following error otherwise:
