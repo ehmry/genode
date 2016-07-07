@@ -20,11 +20,10 @@
 #include <util/string.h>
 #include <file_system_session/file_system_session.h>
 
-namespace File_system {
-
-	using namespace Genode;
+namespace Ram_fs {
 
 	using Genode::Noncopyable;
+	using Genode::size_t;
 
 	class Chunk_base;
 
@@ -36,9 +35,12 @@ namespace File_system {
 /**
  * Common base class of both 'Chunk' and 'Chunk_index'
  */
-class File_system::Chunk_base : Noncopyable
+class Ram_fs::Chunk_base : Noncopyable
 {
 	public:
+
+		typedef Genode::uint64_t seek_off_t;
+		typedef Genode::uint64_t file_size_t;
 
 		class Index_out_of_range { };
 
@@ -98,7 +100,7 @@ class File_system::Chunk_base : Noncopyable
  * Chunk of bytes used as leaf in hierarchy of chunk indices
  */
 template <unsigned CHUNK_SIZE>
-class File_system::Chunk : public Chunk_base
+class Ram_fs::Chunk : public Chunk_base
 {
 	private:
 
@@ -117,11 +119,11 @@ class File_system::Chunk : public Chunk_base
 		 * signature of the constructor compatible to the constructor
 		 * of 'Chunk_index'.
 		 */
-		Chunk(Allocator &, seek_off_t base_offset)
+		Chunk(Genode::Allocator &, seek_off_t base_offset)
 		:
 			Chunk_base(base_offset)
 		{
-			memset(_data, 0, CHUNK_SIZE);
+			Genode::memset(_data, 0, CHUNK_SIZE);
 		}
 
 		/**
@@ -138,23 +140,28 @@ class File_system::Chunk : public Chunk_base
 		 */
 		file_size_t used_size() const { return _num_entries; }
 
-		void write(char const *src, size_t len, seek_off_t seek_offset)
+		template <typename FUNC>
+		void write(FUNC const &func, size_t len, seek_off_t seek_offset)
 		{
 			assert_valid_range(seek_offset, len, SIZE);
 
 			/* offset relative to this chunk */
 			seek_off_t const local_offset = seek_offset - base_offset();
 
-			memcpy(&_data[local_offset], src, len);
+			func(&_data[local_offset], len);
 
-			_num_entries = max(_num_entries, local_offset + len);
+			_num_entries = Genode::max(_num_entries, local_offset + len);
 		}
 
-		void read(char *dst, size_t len, seek_off_t seek_offset) const
+		template <typename FUNC>
+		void read(FUNC const &func, size_t len, seek_off_t seek_offset) const
 		{
 			assert_valid_range(seek_offset, len, SIZE);
 
-			memcpy(dst, &_data[seek_offset - base_offset()], len);
+			/* offset relative to this chunk */
+			seek_off_t const local_offset = seek_offset - base_offset();
+
+			func(&_data[local_offset], len);
 		}
 
 		void truncate(file_size_t size)
@@ -170,7 +177,7 @@ class File_system::Chunk : public Chunk_base
 			if (local_offset >= _num_entries)
 				return;
 
-			memset(&_data[local_offset], 0, _num_entries - local_offset);
+			Genode::memset(&_data[local_offset], 0, _num_entries - local_offset);
 
 			_num_entries = local_offset;
 		}
@@ -178,7 +185,7 @@ class File_system::Chunk : public Chunk_base
 
 
 template <unsigned NUM_ENTRIES, typename ENTRY_TYPE>
-class File_system::Chunk_index : public Chunk_base
+class Ram_fs::Chunk_index : public Chunk_base
 {
 	public:
 
@@ -189,7 +196,7 @@ class File_system::Chunk_index : public Chunk_base
 
 	private:
 
-		Allocator &_alloc;
+		Genode::Allocator &_alloc;
 
 		Entry * _entries[NUM_ENTRIES];
 
@@ -221,7 +228,8 @@ class File_system::Chunk_index : public Chunk_base
 
 			_entries[index] = new (&_alloc) Entry(_alloc, entry_offset);
 
-			_num_entries = max(_num_entries, index + 1);
+			if (index >= _num_entries)
+				_num_entries = index+1;
 
 			return *_entries[index];
 		}
@@ -257,17 +265,17 @@ class File_system::Chunk_index : public Chunk_base
 		/**
 		 * Apply operation 'func' to a range of entries
 		 */
-		template <typename THIS, typename DATA, typename FUNC>
-		static void _range_op(THIS &obj, DATA *data, size_t len,
-		                      seek_off_t seek_offset, FUNC const &func)
+		template <typename THIS, typename FUNC, typename OP_FUNC>
+		static void _range_op(THIS &obj, FUNC const &func, size_t len,
+		                      seek_off_t seek_offset, OP_FUNC const &op_func)
 		{
 			/*
 			 * Depending on whether this function is called for reading
 			 * (const function) or writing (non-const function), the
 			 * operand type is const or non-const Entry. The correct type
-			 * is embedded as a trait in the 'FUNC' functor type.
+			 * is embedded as a trait in the 'OP_FUNC' functor type.
 			 */
-			typedef typename FUNC::Entry Const_qualified_entry;
+			typedef typename OP_FUNC::Entry Const_qualified_entry;
 
 			obj.assert_valid_range(seek_offset, len, SIZE);
 
@@ -275,7 +283,7 @@ class File_system::Chunk_index : public Chunk_base
 
 				unsigned const index = obj._index_by_offset(seek_offset);
 
-				Const_qualified_entry &entry = FUNC::lookup(obj, index);
+				Const_qualified_entry &entry = OP_FUNC::lookup(obj, index);
 
 				/*
 				 * Calculate byte offset relative to the chunk
@@ -290,14 +298,13 @@ class File_system::Chunk_index : public Chunk_base
 
 				/* available capacity at 'entry' starting at seek offset */
 				seek_off_t const capacity = ENTRY_SIZE - local_seek_offset;
-				seek_off_t const curr_len = min(len, capacity);
+				seek_off_t const curr_len = len < capacity ? len : capacity;
 
 				/* apply functor (read or write) to entry */
-				func(entry, data, curr_len, seek_offset);
+				op_func(entry, func, curr_len, seek_offset);
 
 				/* advance to next entry */
 				len         -= curr_len;
-				data        += curr_len;
 				seek_offset += curr_len;
 			}
 		}
@@ -309,10 +316,11 @@ class File_system::Chunk_index : public Chunk_base
 			static Entry &lookup(Chunk_index &chunk, unsigned i) {
 				return chunk._entry_for_writing(i); }
 
-			void operator () (Entry &entry, char const *src, size_t len,
-			                  seek_off_t seek_offset) const
+			template <typename FUNC>
+			void operator () (Entry &entry, FUNC const &func,
+			                  size_t len, seek_off_t seek_offset) const
 			{
-				entry.write(src, len, seek_offset);
+				entry.write(func, len, seek_offset);
 			}
 		};
 
@@ -323,13 +331,14 @@ class File_system::Chunk_index : public Chunk_base
 			static Entry &lookup(Chunk_index const &chunk, unsigned i) {
 				return chunk._entry_for_reading(i); }
 
-			void operator () (Entry &entry, char *dst, size_t len,
-			                  seek_off_t seek_offset) const
+			template <typename FUNC>
+			void operator () (Entry &entry, FUNC const &func,
+			                  size_t len, seek_off_t seek_offset) const
 			{
-				if (entry.zero())
-					memset(dst, 0, len);
-				else
-					entry.read(dst, len, seek_offset);
+				if (!entry.zero())
+					entry.read(func, len, seek_offset);
+				else /* the caller must produce their own zeros */
+					func(nullptr, len);
 			}
 		};
 
@@ -356,13 +365,13 @@ class File_system::Chunk_index : public Chunk_base
 		 *                     indices and chunks
 		 * \param base_offset  absolute offset of the chunk in bytes
 		 */
-		Chunk_index(Allocator &alloc, seek_off_t base_offset)
+		Chunk_index(Genode::Allocator &alloc, seek_off_t base_offset)
 		: Chunk_base(base_offset), _alloc(alloc) { _init_entries(); }
 
 		/**
 		 * Construct zero chunk
 		 */
-		Chunk_index() : _alloc(*(Allocator *)0) { }
+		Chunk_index() : _alloc(*(Genode::Allocator *)0) { }
 
 		/**
 		 * Destructor
@@ -397,17 +406,19 @@ class File_system::Chunk_index : public Chunk_base
 		/**
 		 * Write data to chunk
 		 */
-		void write(char const *src, size_t len, seek_off_t seek_offset)
+		template <typename FUNC>
+		void write(FUNC const &func, size_t len, seek_off_t seek_offset)
 		{
-			_range_op(*this, src, len, seek_offset, Write_func());
+			_range_op(*this, func, len, seek_offset, Write_func());
 		}
 
 		/**
 		 * Read data from chunk
 		 */
-		void read(char *dst, size_t len, seek_off_t seek_offset) const
+		template <typename FUNC>
+		void read(FUNC const &func, size_t len, seek_off_t seek_offset) const
 		{
-			_range_op(*this, dst, len, seek_offset, Read_func());
+			_range_op(*this, func, len, seek_offset, Read_func());
 		}
 
 		/**

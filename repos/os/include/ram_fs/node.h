@@ -19,23 +19,16 @@
 #include <file_system/node.h>
 #include <util/list.h>
 
-namespace File_system {
-	using namespace Genode;
-	class Node;
-}
+namespace File_system { class Node; }
 
 
-class File_system::Node : public Node_base, public List<Node>::Element
+class File_system::Node : public Node_base, public Genode::List<Node>::Element
 {
 	public:
 
-		typedef char Name[128];
+		typedef Genode::String<128> Name;
 
 	private:
-
-		int                 _ref_count;
-		Name                _name;
-		unsigned long const _inode;
 
 		/**
 		 * Generate unique inode number
@@ -46,19 +39,19 @@ class File_system::Node : public Node_base, public List<Node>::Element
 			return ++inode_count;
 		}
 
+		Name                _name;
+		unsigned long const _inode = _unique_inode();
+		int                 _ref_count = 0;
+
 	public:
 
-		Node()
-		: _ref_count(0), _inode(_unique_inode())
-		{ _name[0] = 0; }
-
 		unsigned long inode() const { return _inode; }
-		char   const *name()  const { return _name; }
+		char   const *name()  const { return _name.string(); }
 
 		/**
 		 * Assign name
 		 */
-		void name(char const *name) { strncpy(_name, name, sizeof(_name)); }
+		void name(char const *name) { _name = name; }
 
 		virtual size_t read(char *dst, size_t len, seek_off_t) = 0;
 		virtual size_t write(char const *src, size_t len, seek_off_t) = 0;

@@ -33,7 +33,7 @@ class File_system::Symlink : public Node
 
 		size_t read(char *dst, size_t len, seek_off_t seek_offset)
 		{
-			size_t count = min(len, _len-seek_offset);
+			size_t count = Genode::min(len, _len-seek_offset);
 			Genode::memcpy(dst, _link_to+seek_offset, count);
 			return count;
 		}
@@ -43,7 +43,7 @@ class File_system::Symlink : public Node
 			/* Ideal symlink operations are atomic. */
 			if (seek_offset) return 0;
 
-			_len = min(len, sizeof(_link_to));
+			_len = Genode::min(len, sizeof(_link_to));
 			Genode::memcpy(_link_to, src, _len);
 			return _len;
 		}

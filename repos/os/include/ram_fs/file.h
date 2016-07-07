@@ -22,7 +22,10 @@
 #include <ram_fs/node.h>
 #include <ram_fs/chunk.h>
 
-namespace File_system { class File; }
+namespace File_system {
+	using namespace Ram_fs;
+	class File;
+}
 
 
 class File_system::File : public Node
@@ -40,7 +43,7 @@ class File_system::File : public Node
 
 	public:
 
-		File(Allocator &alloc, char const *name)
+		File(Genode::Allocator &alloc, char const *name)
 		: _chunk(alloc, 0), _length(0) { Node::name(name); }
 
 		size_t read(char *dst, size_t len, seek_off_t seek_offset)
@@ -70,13 +73,27 @@ class File_system::File : public Node
 					read_len = 0;
 			}
 
-			_chunk.read(dst, read_len, seek_offset);
+			size_t count = 0;
 
-			/* add zero padding if needed */
-			if (read_len < len)
-				memset(dst + read_len, 0, len - read_len);
+			auto read_fn = [&] (char const *src, size_t src_len)
+			{
+				using namespace Genode;
 
-			return len;
+				size_t n = min(len, src_len); // XXX: is this check required?
+
+				if (src)
+					memcpy(dst, src, n);
+				else /* a zero read */
+					memset(dst, 0x00, n);
+
+				len -= n;
+				dst += n;
+				count += n;
+			};
+
+			_chunk.read(read_fn, read_len, seek_offset);
+
+			return count;
 		}
 
 		size_t write(char const *src, size_t len, seek_off_t seek_offset)
@@ -89,14 +106,25 @@ class File_system::File : public Node
 				Genode::error(name(), ": size limit ", (long)Chunk_level_0::SIZE, " reached");
 			}
 
-			_chunk.write(src, len, (size_t)seek_offset);
+			size_t remain = len;
+
+			auto write_fn = [&] (char *dst, size_t dst_len) {
+				size_t n = Genode::min(remain, dst_len);
+				Genode::memcpy(dst, src, n);
+				remain -= n;
+				src += n;
+			};
+
+			_chunk.write(write_fn, len, (size_t)seek_offset);
+
+			len -= remain;
 
 			/*
 			 * Keep track of file length. We cannot use 'chunk.used_size()'
 			 * as file length because trailing zeros may by represented
 			 * by zero chunks, which do not contribute to 'used_size()'.
 			 */
-			_length = max(_length, seek_offset + len);
+			_length = Genode::max(_length, seek_offset + len);
 
 			mark_as_updated();
 			return len;

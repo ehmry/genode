@@ -29,8 +29,8 @@ class File_system::Directory : public Node
 {
 	private:
 
-		List<Node> _entries;
-		size_t     _num_entries;
+		Genode::List<Node> _entries;
+		Genode::size_t     _num_entries;
 
 	public:
 
@@ -47,7 +47,7 @@ class File_system::Directory : public Node
 		{
 			Node const *sub_node = _entries.first();
 			for (; sub_node; sub_node = sub_node->next())
-				if (strcmp(sub_node->name(), name) == 0)
+				if (Genode::strcmp(sub_node->name(), name) == 0)
 					return true;
 
 			return false;
@@ -74,6 +74,8 @@ class File_system::Directory : public Node
 
 		Node *lookup_and_lock(char const *path, bool return_parent = false)
 		{
+			using namespace Genode;
+
 			if (strcmp(path, "") == 0) {
 				lock();
 				return this;
@@ -213,7 +215,7 @@ class File_system::Directory : public Node
 			if (dynamic_cast<Directory *>(node)) e->type = Directory_entry::TYPE_DIRECTORY;
 			if (dynamic_cast<Symlink   *>(node)) e->type = Directory_entry::TYPE_SYMLINK;
 
-			strncpy(e->name, node->name(), sizeof(e->name));
+			Genode::strncpy(e->name, node->name(), sizeof(e->name));
 
 			return sizeof(Directory_entry);
 		}

@@ -136,10 +136,10 @@ class Vfs_ram::File : public Vfs_ram::Node
 {
 	private:
 
-		typedef ::File_system::Chunk<4096>      Chunk_level_3;
-		typedef ::File_system::Chunk_index<128, Chunk_level_3> Chunk_level_2;
-		typedef ::File_system::Chunk_index<64,  Chunk_level_2> Chunk_level_1;
-		typedef ::File_system::Chunk_index<64,  Chunk_level_1> Chunk_level_0;
+		typedef Ram_fs::Chunk<4096>      Chunk_level_3;
+		typedef Ram_fs::Chunk_index<128, Chunk_level_3> Chunk_level_2;
+		typedef Ram_fs::Chunk_index<64,  Chunk_level_2> Chunk_level_1;
+		typedef Ram_fs::Chunk_index<64,  Chunk_level_1> Chunk_level_0;
 
 		Chunk_level_0 _chunk;
 		file_size     _length = 0;
@@ -164,12 +164,13 @@ class Vfs_ram::File : public Vfs_ram::Node
 			return true;
 		}
 
-		size_t read(char *dst, size_t len, file_size seek_offset)
+		template <typename FUNC>
+		void read(FUNC const &func, file_size len, file_size seek_offset)
 		{
 			file_size const chunk_used_size = _chunk.used_size();
 
 			if (seek_offset >= _length)
-				return 0;
+				return;
 
 			/*
 			 * Constrain read transaction to available chunk data
@@ -189,16 +190,11 @@ class Vfs_ram::File : public Vfs_ram::Node
 					read_len = 0;
 			}
 
-			_chunk.read(dst, read_len, seek_offset);
-
-			/* add zero padding if needed */
-			if (read_len < len)
-				memset(dst + read_len, 0, len - read_len);
-
-			return len;
+			_chunk.read(func, read_len, seek_offset);
 		}
 
-		size_t write(char const *src, size_t len, file_size seek_offset)
+		template <typename FUNC>
+		void write(FUNC const &func, file_size len, file_size seek_offset)
 		{
 			if (seek_offset == (file_size)(~0))
 				seek_offset = _chunk.used_size();
@@ -206,17 +202,30 @@ class Vfs_ram::File : public Vfs_ram::Node
 			if (seek_offset + len >= Chunk_level_0::SIZE)
 				len = Chunk_level_0::SIZE - (seek_offset + len);
 
-			try { _chunk.write(src, len, (size_t)seek_offset); }
-			catch (Out_of_memory) { return 0; }
+			try {
+				if (seek_offset+len > _length) {
+					/* lambda the lambda to keep track of the new write length */
+					file_size remain = len;
+					auto wrapped_func = [&] (char *dst, size_t dst_len) {
+						size_t n = min(remain, dst_len);
+						func(dst, n);
+						remain -= n;
+					};
+					_chunk.write(wrapped_func, len, (size_t)seek_offset);
+					len -= remain;
+					_length = max(_length, seek_offset + len);
+				} else
+					_chunk.write(func, len, (size_t)seek_offset);
+
+			} catch (Out_of_memory) { }
 
 			/*
 			 * Keep track of file length. We cannot use 'chunk.used_size()'
 			 * as file length because trailing zeros may by represented
 			 * by zero chunks, which do not contribute to 'used_size()'.
 			 */
-			_length = max(_length, seek_offset + len);
 
-			return len;
+			/* XXX: this is probably broken */
 		}
 
 		file_size length() { return _length; }
@@ -711,7 +720,15 @@ class Vfs::Ram_file_system : public Vfs::File_system
 				ds_cap = _env.ram().alloc(len);
 
 				local_addr = _env.rm().attach(ds_cap);
-				file->read(local_addr, file->length(), 0);
+
+				auto read_fn = [&] (char const *src, size_t src_len) {
+					size_t n = min(len, src_len);
+					memcpy(local_addr, src, n);
+					len -= n;
+					local_addr += n;
+				};
+
+				file->read(read_fn, file->length(), 0);
 				_env.rm().detach(local_addr);
 
 			} catch(...) {
@@ -732,7 +749,7 @@ class Vfs::Ram_file_system : public Vfs::File_system
 		 ************************/
 
 		Write_result write(Vfs_handle *vfs_handle,
-		                   char const *buf, file_size len,
+		                   char const *src, file_size len,
 		                   Vfs::file_size &out) override
 		{
 			if ((vfs_handle->status_flags() & OPEN_MODE_ACCMODE) ==  OPEN_MODE_RDONLY)
@@ -740,15 +757,30 @@ class Vfs::Ram_file_system : public Vfs::File_system
 
 			Ram_vfs_handle const *handle =
 				static_cast<Ram_vfs_handle *>(vfs_handle);
+			if (handle) {
+				Vfs_ram::Node::Guard guard(&handle->file);
+				out = 0;
 
-			Vfs_ram::Node::Guard guard(&handle->file);
-			out = handle->file.write(buf, len, handle->seek());
+				auto write_fn = [&] (char *dst, Genode::size_t dst_len) {
+					Genode::size_t n = min(len, dst_len);
+					if (src)
+						memcpy(dst, src, n);
+					else /* a zero read */
+						memset(dst, 0x00, n);
+					len -= n;
+					dst += n;
+					out += n;
+				};
+				handle->file.write(write_fn, len, handle->seek());
+				/* XXX: out of space condition? */
+				return WRITE_OK;
+			};
 
-			return WRITE_OK;
+			return WRITE_ERR_INVALID;
 		}
 
 		Read_result read(Vfs_handle *vfs_handle,
-		                 char *buf, file_size len,
+		                 char *dst, file_size len,
 		                 file_size &out) override
 		{
 			if ((vfs_handle->status_flags() & OPEN_MODE_ACCMODE) == OPEN_MODE_WRONLY)
@@ -756,11 +788,25 @@ class Vfs::Ram_file_system : public Vfs::File_system
 
 			Ram_vfs_handle const *handle =
 				static_cast<Ram_vfs_handle *>(vfs_handle);
+			if (handle) {
+				Vfs_ram::Node::Guard guard(&handle->file);
+				out = 0;
 
-			Vfs_ram::Node::Guard guard(&handle->file);
-
-			out = handle->file.read(buf, len, handle->seek());
-			return READ_OK;
+				auto read_fn = [&] (char const *src, Genode::size_t src_len) {
+					Genode::size_t n = min(len, src_len);
+					if (src)
+						memcpy(dst, src, n);
+					else /* a zero read */
+						memset(dst, 0x00, n);
+					len -= n;
+					dst += n;
+					out += n;
+				};
+				
+				handle->file.read(read_fn, len, handle->seek());
+				return READ_OK;
+			}
+			return READ_ERR_INVALID;
 		}
 
 		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size len) override

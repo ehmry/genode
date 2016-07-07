@@ -9,7 +9,7 @@
 #include <base/log.h>
 #include <ram_fs/chunk.h>
 
-namespace File_system {
+namespace Ram_fs {
 	typedef Chunk<2>                      Chunk_level_3;
 	typedef Chunk_index<3, Chunk_level_3> Chunk_level_2;
 	typedef Chunk_index<4, Chunk_level_2> Chunk_level_1;
@@ -43,52 +43,65 @@ namespace Genode {
 		size_t overhead(size_t size) const override { return _wrapped.overhead(size); }
 		bool    need_size_for_free() const override { return _wrapped.need_size_for_free(); }
 	};
-};
-
-
-namespace Genode {
 
 	/**
 	 * Helper for the formatted output of a chunk state
 	 */
-	static inline void print(Output &out, File_system::Chunk_level_0 const &chunk)
+	static inline void print(Output &out, Ram_fs::Chunk_level_0 const &chunk)
 	{
-		using namespace File_system;
-	
-		static char read_buf[Chunk_level_0::SIZE];
-	
+		using namespace Ram_fs;
+
 		size_t used_size = chunk.used_size();
-	
+
 		struct File_size_out_of_bounds { };
 		if (used_size > Chunk_level_0::SIZE)
 			throw File_size_out_of_bounds();
-	
-		chunk.read(read_buf, used_size, 0);
-	
+
 		Genode::print(out, "content (size=", used_size, "): ");
 
-		Genode::print(out, "\"");
-		for (unsigned i = 0; i < used_size; i++) {
-			char const c = read_buf[i];
-			if (c)
-				Genode::print(out, Genode::Char(c));
+		auto print_fn = [&] (char const *src, size_t src_len) {
+			if (src)
+				for (unsigned i = 0; i < src_len; ++i) {
+					char const c = src[i];
+					if (c)
+						Genode::print(out, Genode::Char(c));
+					else
+						Genode::print(out, ".");
+				}
 			else
-				Genode::print(out, ".");
-		}
+				for (unsigned i = 0; i < src_len; ++i)
+					Genode::print(out, ".");
+		};
+
+		Genode::print(out, "\"");
+		chunk.read(print_fn, used_size, 0);
 		Genode::print(out, "\"");
 	}
-}
+
+};
 
 
-static void write(File_system::Chunk_level_0 &chunk,
+static void write(Ram_fs::Chunk_level_0 &chunk,
                   char const *str, Genode::off_t seek_offset)
 {
-	chunk.write(str, Genode::strlen(str), seek_offset);
-	Genode::log("write \"", str, "\" at offset ", seek_offset, " -> ", chunk);
+	using namespace Genode;
+
+	char const *src = str;
+	size_t len = strlen(src);
+
+	auto write_fn = [&] (char *dst, size_t dst_len) {
+		size_t n = min(len, dst_len);
+		memcpy(dst, src, n);
+		len -= n;
+		src += n;
+	};
+
+	chunk.write(write_fn, len, seek_offset);
+	log("write \"", str, "\" at offset ", seek_offset, " -> ", chunk);
 }
 
 
-static void truncate(File_system::Chunk_level_0 &chunk,
+static void truncate(Ram_fs::Chunk_level_0 &chunk,
                      File_system::file_size_t size)
 {
 	chunk.truncate(size);
@@ -99,6 +112,7 @@ static void truncate(File_system::Chunk_level_0 &chunk,
 int main(int, char **)
 {
 	using namespace File_system;
+	using namespace Ram_fs;
 	using namespace Genode;
 
 	log("--- ram_fs_chunk test ---");

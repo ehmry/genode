@@ -30,7 +30,9 @@
  ** File-system service **
  *************************/
 
-namespace File_system {
+namespace Ram_fs {
+
+	using namespace File_system;
 
 	class Session_component : public Session_rpc_object
 	{
@@ -41,7 +43,7 @@ namespace File_system {
 			Node_handle_registry  _handle_registry;
 			bool                  _writable;
 
-			Signal_rpc_member<Session_component> _process_packet_dispatcher;
+			Genode::Signal_rpc_member<Session_component> _process_packet_dispatcher;
 
 
 			/******************************
@@ -53,7 +55,7 @@ namespace File_system {
 			 *
 			 * \return true on success, false on failure
 			 */
-			void _process_packet_op(Packet_descriptor &packet, Node &node)
+			void _process_packet_op(File_system::Packet_descriptor &packet, Node &node)
 			{
 				void     * const content = tx_sink()->packet_content(packet);
 				size_t     const length  = packet.length();
@@ -150,7 +152,7 @@ namespace File_system {
 			Session_component(size_t tx_buf_size, Server::Entrypoint &ep,
 			                  Directory &root, bool writable)
 			:
-				Session_rpc_object(env()->ram_session()->alloc(tx_buf_size), ep.rpc_ep()),
+				Session_rpc_object(Genode::env()->ram_session()->alloc(tx_buf_size), ep.rpc_ep()),
 				_ep(ep),
 				_root(root),
 				_writable(writable),
@@ -169,6 +171,7 @@ namespace File_system {
 			 */
 			~Session_component()
 			{
+				using namespace Genode;
 				Dataspace_capability ds = tx_sink()->dataspace();
 				env()->ram_session()->free(static_cap_cast<Ram_dataspace>(ds));
 			}
@@ -181,6 +184,8 @@ namespace File_system {
 			File_handle file(Dir_handle dir_handle, Name const &name,
 			                 Mode mode, bool create)
 			{
+				using namespace Genode;
+
 				if (!valid_name(name.string()))
 					throw Invalid_name();
 
@@ -215,6 +220,8 @@ namespace File_system {
 
 			Symlink_handle symlink(Dir_handle dir_handle, Name const &name, bool create)
 			{
+				using namespace Genode;
+
 				if (!valid_name(name.string()))
 					throw Invalid_name();
 
@@ -243,8 +250,10 @@ namespace File_system {
 				return _handle_registry.alloc(symlink);
 			}
 
-			Dir_handle dir(Path const &path, bool create)
+			Dir_handle dir(File_system::Path const &path, bool create)
 			{
+				using namespace Genode;
+
 				char const *path_str = path.string();
 
 				_assert_valid_path(path_str);
@@ -348,7 +357,7 @@ namespace File_system {
 				//     is still referenced by a node handle
 
 				node->unlock();
-				destroy(env()->heap(), node);
+				destroy(Genode::env()->heap(), node);
 			}
 
 			void truncate(File_handle file_handle, file_size_t size)
@@ -404,14 +413,14 @@ namespace File_system {
 				node->notify_listeners();
 			}
 
-			void sigh(Node_handle node_handle, Signal_context_capability sigh)
+			void sigh(Node_handle node_handle, Genode::Signal_context_capability sigh)
 			{
 				_handle_registry.sigh(node_handle, sigh);
 			}
 	};
 
 
-	class Root : public Root_component<Session_component>
+	class Root : public Genode::Root_component<Session_component>
 	{
 		private:
 
@@ -422,6 +431,8 @@ namespace File_system {
 
 			Session_component *_create_session(const char *args)
 			{
+				using namespace Genode;
+
 				/*
 				 * Determine client-specific policy defined implicitly by
 				 * the client's label.
@@ -511,7 +522,7 @@ namespace File_system {
 			 * \param md_alloc  meta-data allocator
 			 * \param root_dir  root-directory handle (anchor for fs)
 			 */
-			Root(Server::Entrypoint &ep, Allocator &md_alloc, Directory &root_dir)
+			Root(Server::Entrypoint &ep, Genode::Allocator &md_alloc, Directory &root_dir)
 			:
 				Root_component<Session_component>(&ep.rpc_ep(), &md_alloc),
 				_ep(ep),
@@ -567,6 +578,7 @@ static void preload_content(Genode::Allocator      &alloc,
                             Genode::Xml_node        node,
                             File_system::Directory &dir)
 {
+	using namespace Genode;
 	using namespace File_system;
 
 	for (unsigned i = 0; i < node.num_sub_nodes(); i++) {
@@ -634,12 +646,15 @@ struct File_system::Main
 	/*
 	 * Initialize root interface
 	 */
-	Sliced_heap sliced_heap = { env()->ram_session(), env()->rm_session() };
+	Genode::Sliced_heap sliced_heap
+		{ Genode::env()->ram_session(), Genode::env()->rm_session() };
 
 	Root fs_root = { ep, sliced_heap, root_dir };
 
 	Main(Server::Entrypoint &ep) : ep(ep)
 	{
+		using namespace Genode;
+
 		/* preload RAM file system with content as declared in the config */
 		try {
 			Xml_node content = config()->xml_node().sub_node("content");
