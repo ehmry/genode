@@ -13,13 +13,10 @@
  */
 
 /* Genode */
-#include <base/env.h>
-#include <base/sleep.h>
-#include <base/printf.h>
-#include <cap_session/connection.h>
 #include <nic/component.h>
 #include <nic/root.h>
-#include <os/server.h>
+#include <base/component.h>
+#include <base/log.h>
 
 #include <dde_ipxe/nic.h>
 
@@ -100,20 +97,18 @@ class Ipxe_session_component  : public Nic::Session_component
 		Ipxe_session_component(Genode::size_t const tx_buf_size,
 		                       Genode::size_t const rx_buf_size,
 		                       Genode::Allocator   &rx_block_md_alloc,
-		                       Genode::Ram_session &ram_session,
-		                       Server::Entrypoint  &ep)
-		: Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram_session, ep)
+		                       Genode::Ram_session &ram,
+		                       Genode::Region_map  &rm,
+		                       Genode::Entrypoint  &ep)
+		: Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram, rm, ep)
 		{
 			instance = this;
 
-			PINF("--- init callbacks");
+			Genode::log("--- init callbacks");
 			dde_ipxe_nic_register_callbacks(_rx_callback, _link_callback);
 
 			dde_ipxe_nic_get_mac_addr(1, _mac_addr.addr);
-			PINF("--- get MAC address %02x:%02x:%02x:%02x:%02x:%02x",
-			     _mac_addr.addr[0] & 0xff, _mac_addr.addr[1] & 0xff,
-			     _mac_addr.addr[2] & 0xff, _mac_addr.addr[3] & 0xff,
-			     _mac_addr.addr[4] & 0xff, _mac_addr.addr[5] & 0xff);
+			Genode::log("--- get MAC address ", _mac_addr);
 		}
 
 		~Ipxe_session_component()
@@ -140,29 +135,28 @@ Ipxe_session_component *Ipxe_session_component::instance;
 
 struct Main
 {
-	Server::Entrypoint &ep;
+	Genode::Heap heap;
 
-	Nic::Root<Ipxe_session_component> root {ep, *Genode::env()->heap() };
+	Nic::Root<Ipxe_session_component> root;
 
-	Main(Server::Entrypoint &ep) : ep(ep)
+	Main(Genode::Env &env)
+	: heap(env.ram(), env.rm()), root(env, heap, heap)
 	{
-		PINF("--- iPXE NIC driver started ---\n");
+		Genode::log("--- iPXE NIC driver started ---\n");
 
-		PINF("--- init iPXE NIC");
-		int cnt = dde_ipxe_nic_init(&ep);
-		PINF("    number of devices: %d", cnt);
+		Genode::log("--- init iPXE NIC");
+		int cnt = dde_ipxe_nic_init(&env.ep());
+		Genode::log("    number of devices: ", cnt);
 
-		Genode::env()->parent()->announce(ep.manage(root));
+		env.parent().announce(env.ep().manage(root));
 	}
 };
 
 
-/************
- ** Server **
- ************/
+/***************
+ ** Component **
+ ***************/
 
-namespace Server {
-	char const *name()             { return "nic_drv_ep";        }
-	size_t      stack_size()       { return 2*1024*sizeof(long); }
-	void construct(Entrypoint &ep) { static Main server(ep);     }
-}
+Genode::size_t      Component::stack_size() { return 2*1024*sizeof(long); }
+
+void Component::construct(Genode::Env &env) { static Main inst(env);      }

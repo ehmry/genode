@@ -13,14 +13,12 @@
  * under the terms of the GNU General Public License version 2.
  */
 
-#include <base/env.h>
-#include <base/sleep.h>
-#include <os/server.h>
 #include <root/component.h>
 #include <util/arg_string.h>
 #include <util/misc_math.h>
 #include <nic/component.h>
 #include <nic/packet_allocator.h>
+#include <base/component.h>
 
 namespace Nic {
 
@@ -29,7 +27,7 @@ namespace Nic {
 }
 
 
-namespace Server { struct Main; }
+namespace Component { struct Main; }
 
 
 class Nic::Loopback_component : public Nic::Session_component
@@ -50,10 +48,11 @@ class Nic::Loopback_component : public Nic::Session_component
 		Loopback_component(Genode::size_t const tx_buf_size,
 		                   Genode::size_t const rx_buf_size,
 		                   Genode::Allocator   &rx_block_md_alloc,
-		                   Genode::Ram_session &ram_session,
-		                   Server::Entrypoint  &ep)
+		                   Genode::Ram_session &ram,
+		                   Genode::Region_map  &rm,
+		                   Genode::Entrypoint  &ep)
 		: Session_component(tx_buf_size, rx_buf_size,
-		                    rx_block_md_alloc, ram_session, ep)
+		                    rx_block_md_alloc, ram, rm, ep)
 		{ }
 
 		Mac_address mac_address() override
@@ -147,7 +146,8 @@ class Nic::Root : public Genode::Root_component<Loopback_component>
 {
 	private:
 
-		Server::Entrypoint &_ep;
+		Genode::Env       &_env;
+		Genode::Allocator &_alloc;
 
 	protected:
 
@@ -175,43 +175,36 @@ class Nic::Root : public Genode::Root_component<Loopback_component>
 				throw Root::Quota_exceeded();
 			}
 
-			return new (md_alloc()) Loopback_component(tx_buf_size, rx_buf_size,
-			                                          *env()->heap(),
-			                                          *env()->ram_session(),
-			                                          _ep);
+			return new (md_alloc()) Loopback_component(tx_buf_size, rx_buf_size, _alloc,
+			                                          _env.ram(), _env.rm(), _env.ep());
 		}
 
 	public:
 
-		Root(Server::Entrypoint &ep, Genode::Allocator &md_alloc)
+		Root(Genode::Env &env, Genode::Allocator &alloc)
 		:
-			Genode::Root_component<Loopback_component>(&ep.rpc_ep(), &md_alloc),
-			_ep(ep)
+			Genode::Root_component<Loopback_component>(env.ep(), alloc),
+			_env(env), _alloc(alloc)
 		{ }
 };
 
 
-struct Server::Main
+struct Component::Main
 {
-	Entrypoint &ep;
+	Genode::Heap heap;
 
-	Nic::Root nic_root { ep, *Genode::env()->heap() };
+	Nic::Root nic_root;
 
-	Main(Entrypoint &ep) : ep(ep)
+	Main(Genode::Env &env)
+	: heap(env.ram(), env.rm()), nic_root(env, heap)
 	{
-		Genode::env()->parent()->announce(ep.manage(nic_root));
+		env.parent().announce(env.ep().manage(nic_root));
 	}
 };
 
 
-namespace Server {
 
-	char const *name() { return "nicloop_ep"; }
+Genode::size_t Component::stack_size() { return 2*1024*sizeof(long); }
 
-	size_t stack_size() { return 2*1024*sizeof(long); }
+void Component::construct(Genode::Env &env) { static Main main(env); }
 
-	void construct(Entrypoint &ep)
-	{
-		static Main main(ep);
-	}
-}

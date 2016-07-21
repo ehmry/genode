@@ -1,5 +1,5 @@
 /*
- * \brief  Server::Entrypoint based NIC session component
+ * \brief  Genode::Entrypoint based NIC session component
  * \author Norman Feske
  * \author Sebastian Sumpf
  * \date   2015-06-22
@@ -49,7 +49,7 @@ class Nic::Session_component : Communication_buffers, public Session_rpc_object
 {
 	protected:
 
-		Server::Entrypoint               &_ep;
+		Genode::Entrypoint               &_ep;
 		Genode::Signal_context_capability _link_state_sigh;
 
 
@@ -68,10 +68,8 @@ class Nic::Session_component : Communication_buffers, public Session_rpc_object
 		 */
 		virtual void _handle_packet_stream() = 0;
 
-		void _dispatch(unsigned) { _handle_packet_stream(); }
-
-		Genode::Signal_rpc_member<Session_component> _packet_stream_dispatcher {
-			_ep, *this, &Session_component::_dispatch };
+		Genode::Signal_handler<Session_component> _packet_stream_dispatcher {
+			_ep, *this, &Session_component::_handle_packet_stream };
 
 	public:
 
@@ -90,13 +88,13 @@ class Nic::Session_component : Communication_buffers, public Session_rpc_object
 		                  Genode::size_t const rx_buf_size,
 		                  Genode::Allocator   &rx_block_md_alloc,
 		                  Genode::Ram_session &ram_session,
-		                  Server::Entrypoint  &ep)
+		                  Genode::Region_map  &rm,
+		                  Genode::Entrypoint  &ep)
 		:
 			Communication_buffers(rx_block_md_alloc, ram_session,
 			                      tx_buf_size, rx_buf_size),
-			Session_rpc_object(_tx_ds.cap(),
-			                   _rx_ds.cap(),
-			                  &_rx_packet_alloc, ep.rpc_ep()),
+			Session_rpc_object(_tx_ds.cap(), _rx_ds.cap(), rm,
+			                   _rx_packet_alloc, ep.rpc_ep()),
 			_ep(ep)
 		{
 			/* install data-flow signal handlers for both packet streams */
