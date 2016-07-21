@@ -29,7 +29,8 @@ class Nic::Root : public Genode::Root_component<SESSION_COMPONENT,
 {
 	private:
 
-		Server::Entrypoint &_ep;
+		Genode::Env       &_env;
+		Genode::Allocator &_rx_alloc;
 
 	protected:
 
@@ -58,17 +59,15 @@ class Nic::Root : public Genode::Root_component<SESSION_COMPONENT,
 			}
 
 			return new (Root::md_alloc())
-			            SESSION_COMPONENT(tx_buf_size, rx_buf_size,
-			                             *env()->heap(),
-			                             *env()->ram_session(),
-			                             _ep);
+			            SESSION_COMPONENT(tx_buf_size, rx_buf_size, _rx_alloc,
+			                             _env.ram(), _env.rm(), _env.ep());
 		}
 
 	public:
 
-		Root(Server::Entrypoint &ep, Genode::Allocator &md_alloc)
-		: Genode::Root_component<SESSION_COMPONENT, Genode::Single_client>(&ep.rpc_ep(), &md_alloc),
-			_ep(ep)
+		Root(Genode::Env &env, Genode::Allocator &md_alloc, Genode::Allocator &rx_alloc)
+		: Genode::Root_component<SESSION_COMPONENT, Genode::Single_client>(env.ep(), md_alloc),
+			_env(env), _rx_alloc(rx_alloc)
 		{ }
 };
 

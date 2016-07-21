@@ -20,6 +20,7 @@
 #include <session/session.h>
 #include <packet_stream_tx/packet_stream_tx.h>
 #include <packet_stream_rx/packet_stream_rx.h>
+#include <base/output.h>
 
 namespace Nic {
 
@@ -33,7 +34,22 @@ namespace Nic {
 }
 
 
-struct Nic::Mac_address { char addr[6]; };
+struct Nic::Mac_address
+{
+	char addr[6];
+
+	void print(Genode::Output &out) const
+	{
+		using namespace Genode;
+
+		Genode::print(out, Hex(uint8_t(addr[0]), Hex::OMIT_PREFIX, Hex::PAD)); out.out_char(':');
+		Genode::print(out, Hex(uint8_t(addr[1]), Hex::OMIT_PREFIX, Hex::PAD)); out.out_char(':');
+		Genode::print(out, Hex(uint8_t(addr[2]), Hex::OMIT_PREFIX, Hex::PAD)); out.out_char(':');
+		Genode::print(out, Hex(uint8_t(addr[3]), Hex::OMIT_PREFIX, Hex::PAD)); out.out_char(':');
+		Genode::print(out, Hex(uint8_t(addr[4]), Hex::OMIT_PREFIX, Hex::PAD)); out.out_char(':');
+		Genode::print(out, Hex(uint8_t(addr[5]), Hex::OMIT_PREFIX, Hex::PAD));
+	}
+};
 
 
 /*

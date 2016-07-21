@@ -408,12 +408,13 @@ namespace Genode
 			Cadence_gem(Genode::size_t const tx_buf_size,
 			            Genode::size_t const rx_buf_size,
 			            Genode::Allocator   &rx_block_md_alloc,
-			            Genode::Ram_session &ram_session,
-			            Server::Entrypoint  &ep,
+			            Genode::Ram_session &ram,
+			            Genode::Region_map  &rm,
+			            Genode::Entrypoint  &ep,
 			            addr_t const base, size_t const size, const int irq)
 			:
 				Genode::Attached_mmio(base, size),
-				Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram_session, ep),
+				Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram, rm, ep),
 				_irq_activation(irq, *this, IRQ_STACK_SIZE),
 				_phy(*this)
 			{

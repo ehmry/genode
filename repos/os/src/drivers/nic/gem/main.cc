@@ -12,12 +12,10 @@
  */
 
 /* Genode includes */
-#include <base/sleep.h>
-#include <cap_session/connection.h>
 #include <drivers/board_base.h>
-#include <os/server.h>
 #include <nic/xml_node.h>
 #include <nic/root.h>
+#include <base/component.h>
 
 #include <os/config.h>
 
@@ -31,10 +29,11 @@ class Gem_session_component
 		Gem_session_component(Genode::size_t const tx_buf_size,
 		                      Genode::size_t const rx_buf_size,
 		                      Genode::Allocator   &rx_block_md_alloc,
-		                      Genode::Ram_session &ram_session,
-		                      Server::Entrypoint  &ep)
+		                      Genode::Ram_session &ram,
+		                      Genode::Region_map  &rm,
+		                      Genode::Entrypoint  &ep)
 		:
-			Cadence_gem(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram_session, ep,
+			Cadence_gem(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram, rm, ep,
 			            Board_base::EMAC_0_MMIO_BASE,
 			            Board_base::EMAC_0_MMIO_SIZE,
 			            Board_base::EMAC_0_IRQ)
@@ -45,13 +44,7 @@ class Gem_session_component
 			try {
 				Genode::Xml_node nic_config = Genode::config()->xml_node().sub_node("nic");
 				nic_config.attribute("mac").value(&mac_addr);
-				PINF("Using configured MAC address \"%02x:%02x:%02x:%02x:%02x:%02x\"",
-						mac_addr.addr[0],
-						mac_addr.addr[1],
-						mac_addr.addr[2],
-						mac_addr.addr[3],
-						mac_addr.addr[4],
-						mac_addr.addr[5]	);
+				Genode::log("Using configured MAC address ", mac_addr);
 			} catch (...) {
 				/* fall back to fake MAC address (unicast, locally managed) */
 				mac_addr.addr[0] = 0x02;
@@ -67,20 +60,20 @@ class Gem_session_component
 		}
 };
 
-namespace Server { struct Main; }
+namespace Component { struct Main; }
 
-struct Server::Main
+struct Component::Main
 {
-	Entrypoint &ep;
-	Nic::Root<Gem_session_component> nic_root{ ep, *Genode::env()->heap() };
+	Genode::Heap heap;
+	Nic::Root<Gem_session_component> nic_root;
 
-	Main(Entrypoint &ep) : ep(ep)
+	Main(Genode::Env &env)
+	: heap(env.ram(), env.rm()), nic_root(env, heap, heap)
 	{
-		Genode::env()->parent()->announce(ep.manage(nic_root));
+		env.parent().announce(env.ep().manage(nic_root));
 	}
 };
 
 
-char const * Server::name()            { return "nic_ep"; }
-size_t Server::stack_size()            { return 2*1024*sizeof(long); }
-void Server::construct(Entrypoint &ep) { static Main main(ep); }
+Genode::size_t Component::stack_size()      { return 2*1024*sizeof(long); }
+void Component::construct(Genode::Env &env) { static Main main(env);      }
