@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2009-2013 Genode Labs GmbH
+ * Copyright (C) 2009-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -20,6 +20,7 @@
 #include <session/session.h>
 #include <packet_stream_tx/packet_stream_tx.h>
 #include <packet_stream_rx/packet_stream_rx.h>
+#include <rom_session/capability.h>
 #include <base/output.h>
 
 namespace Nic {
@@ -88,11 +89,6 @@ struct Nic::Session : Genode::Session
 	virtual ~Session() { }
 
 	/**
-	 * Request MAC address of network adapter
-	 */
-	virtual Mac_address mac_address() = 0;
-
-	/**
 	 * Request packet-transmission channel
 	 */
 	virtual Tx *tx_channel() { return 0; }
@@ -113,28 +109,34 @@ struct Nic::Session : Genode::Session
 	virtual Rx::Sink *rx() { return 0; }
 
 	/**
-	 * Request current link state of network adapter (true means link detected)
+	 * Request interface state ROM sub-session
+	 *
+	 * The ROM should contain an XML structure with at least
+	 * these elements:
+	 *
+	 * <nic link_state="true" mac_addr="00:01:02:03:04:05"/>
+	 *
+	 * For security and stability reasons clients should
+	 * trust any out-of-band configuration in this ROM
+	 * over in-band configuration from the session stream
+	 * (DHCP, NDP). This is to avoid erronous or malicous
+	 * addressing and routing.
+	 *
+	 * Servers are expected to implement the 'update'
+	 * method of the ROM interface rather than serve
+	 * successive dataspaces.
 	 */
-	virtual bool link_state() = 0;
-
-	/**
-	 * Register signal handler for link state changes
-	 */
-	virtual void link_state_sigh(Genode::Signal_context_capability sigh) = 0;
+	virtual Genode::Rom_session_capability state_rom() = 0;
 
 	/*******************
 	 ** RPC interface **
 	 *******************/
 
-	GENODE_RPC(Rpc_mac_address, Mac_address, mac_address);
 	GENODE_RPC(Rpc_tx_cap, Genode::Capability<Tx>, _tx_cap);
 	GENODE_RPC(Rpc_rx_cap, Genode::Capability<Rx>, _rx_cap);
-	GENODE_RPC(Rpc_link_state, bool, link_state);
-	GENODE_RPC(Rpc_link_state_sigh, void, link_state_sigh,
-	           Genode::Signal_context_capability);
+	GENODE_RPC(Rpc_state_rom, Genode::Rom_session_capability, state_rom);
 
-	GENODE_RPC_INTERFACE(Rpc_mac_address, Rpc_link_state,
-	                     Rpc_link_state_sigh, Rpc_tx_cap, Rpc_rx_cap);
+	GENODE_RPC_INTERFACE(Rpc_tx_cap, Rpc_rx_cap, Rpc_state_rom);
 };
 
 #endif /* _INCLUDE__NIC_SESSION__NIC_SESSION_H_ */

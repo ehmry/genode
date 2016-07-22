@@ -192,7 +192,7 @@ class Nic_device : public Usb_nic::Device
 			_has_link = link;
 
 			if (_session)
-				_session->link_state_changed();
+				_session->link_state(link);
 		}
 
 

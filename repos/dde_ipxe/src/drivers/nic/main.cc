@@ -29,7 +29,8 @@ class Ipxe_session_component  : public Nic::Session_component
 
 	private:
 
-		Nic::Mac_address _mac_addr;
+		Nic::State_component           _state_rom;
+		Genode::Rom_session_capability _state_cap;
 
 		static void _rx_callback(unsigned    if_index,
 		                         const char *packet,
@@ -41,8 +42,10 @@ class Ipxe_session_component  : public Nic::Session_component
 
 		static void _link_callback()
 		{
-			if (instance)
-				instance->_link_state_changed();
+			if (instance) {
+				instance->_state_rom.link_state(dde_ipxe_nic_link_state(1));
+				instance->_state_rom.submit_signal();
+			}
 		}
 
 		bool _send()
@@ -57,12 +60,12 @@ class Ipxe_session_component  : public Nic::Session_component
 
 			Packet_descriptor packet = _tx.sink()->get_packet();
 			if (!packet.size()) {
-				PWRN("Invalid tx packet");
+				Genode::warning("Invalid tx packet");
 				return true;
 			}
 
 			if (dde_ipxe_nic_tx(1, _tx.sink()->packet_content(packet), packet.size()))
-				PWRN("Sending packet failed!");
+				Genode::warning("Sending packet failed!");
 
 			_tx.sink()->acknowledge_packet(packet);
 			return true;
@@ -80,7 +83,7 @@ class Ipxe_session_component  : public Nic::Session_component
 				Genode::memcpy(_rx.source()->packet_content(p), packet, packet_len);
 				_rx.source()->submit_packet(p);
 			} catch (...) {
-				PDBG("failed to process received packet");
+				Genode::warning("failed to process received packet");
 			}
 		}
 
@@ -100,15 +103,21 @@ class Ipxe_session_component  : public Nic::Session_component
 		                       Genode::Ram_session &ram,
 		                       Genode::Region_map  &rm,
 		                       Genode::Entrypoint  &ep)
-		: Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram, rm, ep)
+		:
+			Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram, rm, ep),
+			_state_rom(ram, rm),
+			_state_cap(ep.manage(_state_rom))
 		{
 			instance = this;
 
 			Genode::log("--- init callbacks");
 			dde_ipxe_nic_register_callbacks(_rx_callback, _link_callback);
 
-			dde_ipxe_nic_get_mac_addr(1, _mac_addr.addr);
-			Genode::log("--- get MAC address ", _mac_addr);
+			Nic::Mac_address mac;
+			dde_ipxe_nic_get_mac_addr(1, mac.addr);
+			_state_rom.mac_addr(mac);
+			_state_rom.link_state(dde_ipxe_nic_link_state(1));
+			Genode::log("--- get MAC address ", mac);
 		}
 
 		~Ipxe_session_component()
@@ -117,16 +126,13 @@ class Ipxe_session_component  : public Nic::Session_component
 			dde_ipxe_nic_unregister_callbacks();
 		}
 
-		/**************************************
-		 ** Nic::Session_component interface **
-		 **************************************/
 
-		Nic::Mac_address mac_address() override { return _mac_addr; }
+		/***************************
+		 ** Nic session interface **
+		 ***************************/
 
-		bool link_state() override
-		{
-			return dde_ipxe_nic_link_state(1);
-		}
+		Genode::Rom_session_capability state_rom() override {
+			return _state_cap; }
 };
 
 

@@ -274,6 +274,8 @@ namespace Genode
 
 			Marvel_phy _phy;
 
+			Nic::State_component           _state_rom;
+			Genode::Rom_session_capability _state_cap;
 
 			void _init()
 			{
@@ -416,10 +418,14 @@ namespace Genode
 				Genode::Attached_mmio(base, size),
 				Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram, rm, ep),
 				_irq_activation(irq, *this, IRQ_STACK_SIZE),
-				_phy(*this)
+				_phy(*this),
+				_state_rom(ram, rm), _state_cap(ep.manage(_state_rom))
 			{
 				_deinit();
 				_init();
+
+				/* XXX always true for now */
+				_state_rom.link_state(true);
 			}
 
 			~Cadence_gem()
@@ -450,6 +456,8 @@ namespace Genode
 
 				write<Mac_addr_1::Low_addr>(*low_addr_pointer);
 				write<Mac_addr_1::High_addr>(*high_addr_pointer);
+
+				_state_rom.mac_addr(mac);
 			}
 
 
@@ -477,27 +485,17 @@ namespace Genode
 			}
 
 
+			/***************************
+			 ** Nic session interface **
+			 ***************************/
+
+			Genode::Rom_session_capability state_rom() override {
+				return _state_cap; }
+
+
 			/**************************************
 			 ** Nic::Session_component interface **
 			 **************************************/
-
-			virtual Nic::Mac_address mac_address()
-			{
-				Nic::Mac_address mac;
-				uint32_t* const low_addr_pointer = reinterpret_cast<uint32_t*>(&mac.addr[0]);
-				uint16_t* const high_addr_pointer = reinterpret_cast<uint16_t*>(&mac.addr[4]);
-
-				*low_addr_pointer = read<Mac_addr_1::Low_addr>();
-				*high_addr_pointer = read<Mac_addr_1::High_addr>();
-
-				return mac;
-			}
-
-			virtual bool link_state()
-			{
-				/* XXX return always true for now */
-				return true;
-			}
 
 			void _handle_packet_stream() override
 			{

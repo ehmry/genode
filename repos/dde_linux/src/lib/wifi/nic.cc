@@ -46,6 +46,10 @@ class Wifi_session_component : public Nic::Session_component
 	private:
 
 		net_device *_ndev;
+
+		Nic::State_component           _state_rom;
+		Genode::Rom_session_capability _state_cap;
+
 		bool        _has_link = !(_ndev->state & 1UL << __LINK_STATE_NOCARRIER);
 
 	protected:
@@ -90,12 +94,17 @@ class Wifi_session_component : public Nic::Session_component
 		Wifi_session_component(Genode::size_t const tx_buf_size,
 		                       Genode::size_t const rx_buf_size,
 		                       Genode::Allocator   &rx_block_md_alloc,
-		                       Genode::Ram_session &ram_session,
-		                       Server::Entrypoint  &ep, net_device *ndev)
-		: Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram_session, ep),
-		  _ndev(ndev)
+		                       Genode::Ram_session &ram,
+		                       Genode::Region_map  &rm,
+		                       Genode::Entrypoint  &ep, net_device *ndev)
+		: Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram, rm, ep),
+		  _ndev(ndev), _state_rom(ram, rm), _state_cap(ep.manage(_state_rom))
 		{
 			_ndev->lx_nic_device = this;
+
+			Nic::Mac_address m;
+			Genode::memcpy(&m, _ndev->perm_addr, ETH_ALEN);
+			_state_rom.mac_addr(m);
 		}
 
 		~Wifi_session_component()
@@ -113,7 +122,8 @@ class Wifi_session_component : public Nic::Session_component
 				return;
 
 			_has_link = link;
-			_link_state_changed();
+			_state_rom.link_state(link);
+			_state_rom.submit_signal();
 		}
 
 		void receive(struct sk_buff *skb)
@@ -146,14 +156,8 @@ class Wifi_session_component : public Nic::Session_component
 		 ** NIC-component interface **
 		 *****************************/
 
-		Nic::Mac_address mac_address() override
-		{
-			Nic::Mac_address m;
-			Genode::memcpy(&m, _ndev->perm_addr, ETH_ALEN);
-			return m;
-		}
-
-		bool link_state() override { return _has_link; }
+		Genode::Rom_session_capability state_rom() override {
+			return _state_cap; }
 };
 
 
@@ -196,7 +200,7 @@ class Root : public Genode::Root_component<Wifi_session_component,
 			session = new (md_alloc())
 			          Wifi_session_component(tx_buf_size, rx_buf_size,
 			                                *md_alloc(),
-			                                _env.ram(),
+			                                _env.ram(), _env.rm(),
 			                                _env.ep(), device);
 			return session;
 		}

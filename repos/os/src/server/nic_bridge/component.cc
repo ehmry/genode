@@ -96,9 +96,6 @@ void Session_component::_unset_ipv4_node()
 }
 
 
-bool Session_component::link_state() { return _nic.link_state(); }
-
-
 void Session_component::set_ipv4_address(Ipv4_packet::Ipv4_address ip_addr)
 {
 	_unset_ipv4_node();
@@ -124,6 +121,7 @@ Session_component::Session_component(Genode::Ram_session        &ram,
                      *Stream_allocator::range_allocator(),
                      ep.rpc_ep()),
   Packet_handler(ep, nic.vlan()),
+  _state_rom(ram, rm), _state_cap(ep.manage(_state_rom)),
   _mac_node(*this, vmac),
   _ipv4_node(*this),
   _nic(nic)
@@ -147,6 +145,9 @@ Session_component::Session_component(Genode::Ram_session        &ram,
 	_tx.sigh_packet_avail(_sink_submit);
 	_rx.sigh_ack_avail(_source_ack);
 	_rx.sigh_ready_to_submit(_source_submit);
+
+	_state_rom.mac_addr(mac_address());
+	_state_rom.link_state(_nic.link_state());
 }
 
 
