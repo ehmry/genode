@@ -90,6 +90,9 @@ class Usb_nic::Session_component : public Nic::Session_component
 
 		Device *_device;    /* device this session is using */
 
+		Nic::State_component           _state_rom;
+		Genode::Rom_session_capability _state_cap;
+
 	protected:
 
 		void _send_burst()
@@ -182,14 +185,24 @@ class Usb_nic::Session_component : public Nic::Session_component
 		                  Genode::Region_map  &rm,
 		                  Genode::Entrypoint  &ep,
 		                  Device *device)
-		: Nic::Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram, rm, ep),
-			_device(device)
-			{ _device->session(this); }
+		:
+			Nic::Session_component(tx_buf_size, rx_buf_size, rx_block_md_alloc, ram, rm, ep),
+			_device(device), _state_rom(ram, rm), _state_cap(ep.manage(_state_rom))
+		{
+			_device->session(this);
 
+			_state_rom.mac_addr  (_device->mac_address());
+			_state_rom.link_state(_device->link_state());
+		}
 
-		Nic::Mac_address mac_address() override { return _device->mac_address(); }
-		bool link_state()              override { return _device->link_state(); }
-		void link_state_changed()               { _link_state_changed(); }
+		/**
+		 * Update link state (called from driver)
+		 */
+		void link_state(bool link)
+		{
+			_state_rom.link_state(link);
+			_state_rom.submit_signal();
+		}
 
 		/**
 		 * Send packet to client (called from driver)
@@ -210,6 +223,14 @@ class Usb_nic::Session_component : public Nic::Session_component
 				return;
 			}
 		}
+
+
+		/***************************
+		 ** Nic session interface **
+		 ***************************/
+
+		Genode::Rom_session_capability state_rom() override {
+			return _state_cap; }
 };
 
 /*

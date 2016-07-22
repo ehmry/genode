@@ -32,6 +32,11 @@ namespace Component { struct Main; }
 
 class Nic::Loopback_component : public Nic::Session_component
 {
+	private:
+
+		Nic::State_component           _state_rom;
+		Genode::Rom_session_capability _state_cap;
+
 	public:
 
 		/**
@@ -51,23 +56,20 @@ class Nic::Loopback_component : public Nic::Session_component
 		                   Genode::Ram_session &ram,
 		                   Genode::Region_map  &rm,
 		                   Genode::Entrypoint  &ep)
-		: Session_component(tx_buf_size, rx_buf_size,
-		                    rx_block_md_alloc, ram, rm, ep)
-		{ }
-
-		Mac_address mac_address() override
+		:
+			Session_component(tx_buf_size, rx_buf_size,
+			                  rx_block_md_alloc, ram, rm, ep),
+			_state_rom(ram, rm), _state_cap(ep.manage(_state_rom))
 		{
-			Mac_address result = {{1,2,3,4,5,6}};
-			return result;
-		}
-
-		bool link_state() override
-		{
-			/* XXX always return true, for now */
-			return true;
+			Mac_address mac = {{0,2,0,0,0,1}};
+			_state_rom.link_state(true);
+			_state_rom.mac_addr(mac);
 		}
 
 		void _handle_packet_stream() override;
+
+		Genode::Rom_session_capability state_rom() override {
+			return _state_cap; }
 };
 
 

@@ -17,6 +17,7 @@
 /* Genode */
 #include <base/log.h>
 #include <base/heap.h>
+#include <nic/component.h>
 #include <nic/packet_allocator.h>
 #include <nic_session/rpc_object.h>
 #include <nic_session/connection.h>
@@ -100,6 +101,9 @@ class Net::Session_component : public  Net::Stream_allocator,
 {
 	private:
 
+		::Nic::State_component         _state_rom;
+		Genode::Rom_session_capability _state_cap;
+
 		Mac_address_node                  _mac_node;
 		Ipv4_address_node                 _ipv4_node;
 		Net::Nic                         &_nic;
@@ -142,21 +146,19 @@ class Net::Session_component : public  Net::Stream_allocator,
 
 		void link_state_changed()
 		{
-			if (_link_state_sigh.valid())
-				Genode::Signal_transmitter(_link_state_sigh).submit();
+			_state_rom.link_state(_nic.link_state());
+			_state_rom.submit_signal();
 		}
 
 		void set_ipv4_address(Ipv4_packet::Ipv4_address ip_addr);
 
 
-		/****************************************
-		 ** Nic::Driver notification interface **
-		 ****************************************/
+		/***************************
+		 ** Nic session interface **
+		 ***************************/
 
-		bool link_state();
-
-		void link_state_sigh(Genode::Signal_context_capability sigh) {
-			_link_state_sigh = sigh; }
+		Genode::Rom_session_capability state_rom() override {
+			return _state_cap; }
 
 
 		/******************************
