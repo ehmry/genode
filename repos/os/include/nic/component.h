@@ -19,6 +19,7 @@
 #include <nic/packet_allocator.h>
 #include <nic_session/rpc_object.h>
 #include <util/xml_generator.h>
+#include <base/log.h>
 
 namespace Nic {
 
@@ -49,11 +50,21 @@ class Nic::Communication_buffers
 
 class Nic::State_component : public Genode::Rpc_object<Genode::Rom_session>
 {
+	public:
+
+		enum { MAX_IP_ADDR_LENGTH  = 16 };
+		typedef Genode::String<MAX_IP_ADDR_LENGTH> Ipv4_addr;
+
 	private:
+
+		Ipv4_addr                         _addr,
+		                                  _netmask,
+		                                  _gateway;
 
 		Genode::Attached_ram_dataspace    _ram_ds;
 		Genode::Signal_context_capability _update_sigh;
 		Mac_address                       _mac_addr;
+		unsigned                          _mtu = 0;
 		bool                              _link_state = false;
 		bool                              _ready      = false;
 
@@ -67,13 +78,24 @@ class Nic::State_component : public Genode::Rpc_object<Genode::Rom_session>
 
 		Mac_address mac_addr()                  const { return _mac_addr; }
 		void        mac_addr(Mac_address const &addr)
-		{ _mac_addr = addr;
+		{
 			_mac_addr = addr;
 			_ready    = true;
 		}
 
 		bool link_state()     const { return  _link_state; }
 		void link_state(bool state) { _link_state = state; }
+
+		void ipv4_addr   (Ipv4_addr const &a) { _addr = a; }
+		void ipv4_netmask(Ipv4_addr const &a) { _netmask = a; }
+		void ipv4_gateway(Ipv4_addr const &a) { _gateway = a; }
+
+		Ipv4_addr ipv4_addr   () const { return _addr;    }
+		Ipv4_addr ipv4_netmask() const { return _netmask; }
+		Ipv4_addr ipv4_gateway() const { return _gateway; }
+
+		unsigned mtu() const { return _mtu; }
+		void mtu(unsigned max_tx) { _mtu = max_tx; }
 
 		void submit_signal()
 		{
@@ -115,8 +137,17 @@ class Nic::State_component : public Genode::Rpc_object<Genode::Rom_session>
 
 					gen.attribute("link_state", _link_state);
 					gen.attribute("mac_addr", mac_str);
-				});
+					if (_mtu) gen.attribute("mtu", _mtu);
 
+					if ((_addr != "") || (_netmask != "")) gen.node("ipv4", [&] () {
+						if (_addr != "")
+							gen.attribute("addr", _addr);
+						if (_netmask != "")
+							gen.attribute("netmask", _netmask);
+						if (_gateway != "")
+							gen.attribute("gateway", _gateway);
+					});
+				});
 				return true;
 			}
 		}

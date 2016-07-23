@@ -51,7 +51,8 @@ class Net::Ipv4_packet
 	public:
 
 		enum Size {
-			ADDR_LEN = 4, /* Ip address length in bytes */
+			ADDR_LEN = 4,         /* Ip address length in bytes */
+			ADDR_STR_MAX_LEN = 16 /* Maxium length of dotted-decimal representation */
 		};
 
 		struct Ipv4_address : Network_address<ADDR_LEN>
@@ -67,10 +68,13 @@ class Net::Ipv4_packet
 			}
 		};
 
+		typedef Genode::String<ADDR_STR_MAX_LEN> Ipv4_string;
+
 		static const Ipv4_address CURRENT;    /* current network   */
 		static const Ipv4_address BROADCAST;  /* broadcast address */
 
-		static Ipv4_address ip_from_string(const char *ip);
+		static Ipv4_address ip_from_string(Ipv4_string const &ip);
+		static Ipv4_string  string_from_ip(Ipv4_address ip);
 
 		static Genode::uint16_t calculate_checksum(Ipv4_packet const &packet);
 

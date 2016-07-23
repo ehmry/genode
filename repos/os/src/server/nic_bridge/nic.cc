@@ -121,10 +121,10 @@ bool Net::Nic::handle_ip(Ethernet_frame *eth, Genode::size_t size) {
 }
 
 
-Net::Nic::Nic(Genode::Entrypoint &ep, Genode::Heap &heap, Net::Vlan &vlan)
+Net::Nic::Nic(Genode::Env &env, Genode::Entrypoint &ep, Genode::Heap &heap, Net::Vlan &vlan)
 : Packet_handler(ep, vlan),
   _tx_block_alloc(&heap),
-  _nic(&_tx_block_alloc, BUF_SIZE, BUF_SIZE),
+  _nic(env, &_tx_block_alloc, BUF_SIZE, BUF_SIZE),
   _mac(_nic.mac_address().addr)
 {
 	_nic.rx_channel()->sigh_ready_to_ack(_sink_ack);

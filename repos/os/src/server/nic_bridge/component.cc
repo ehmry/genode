@@ -101,18 +101,23 @@ void Session_component::set_ipv4_address(Ipv4_packet::Ipv4_address ip_addr)
 	_unset_ipv4_node();
 	_ipv4_node.addr(ip_addr);
 	vlan().ip_tree.insert(&_ipv4_node);
+
+	Ipv4_packet::Ipv4_string ip_str =
+		Ipv4_packet::string_from_ip(ip_addr);
+
+	_state_rom.ipv4_addr(ip_str);
 }
 
 
-Session_component::Session_component(Genode::Ram_session        &ram,
-                                     Genode::Region_map         &rm,
-                                     Genode::Entrypoint         &ep,
-                                     Genode::size_t              amount,
-                                     Genode::size_t              tx_buf_size,
-                                     Genode::size_t              rx_buf_size,
-                                     Ethernet_frame::Mac_address vmac,
-                                     Net::Nic                   &nic,
-                                     char                       *ip_addr)
+Session_component::Session_component(Genode::Ram_session            &ram,
+                                     Genode::Region_map             &rm,
+                                     Genode::Entrypoint             &ep,
+                                     Genode::size_t                  amount,
+                                     Genode::size_t                  tx_buf_size,
+                                     Genode::size_t                  rx_buf_size,
+                                     Ethernet_frame::Mac_address     vmac,
+                                     Net::Nic                       &nic,
+                                     Ipv4_packet::Ipv4_string const &ip_addr)
 : Stream_allocator(ram, rm, amount),
   Stream_dataspaces(ram, tx_buf_size, rx_buf_size),
   Session_rpc_object(Stream_dataspaces::tx_ds,
@@ -130,7 +135,7 @@ Session_component::Session_component(Genode::Ram_session        &ram,
 	vlan().mac_list.insert(&_mac_node);
 
 	/* static ip parsing */
-	if (ip_addr != 0 && Genode::strlen(ip_addr)) {
+	if (ip_addr != "") {
 		Ipv4_packet::Ipv4_address ip = Ipv4_packet::ip_from_string(ip_addr);
 
 		if (ip == Ipv4_packet::Ipv4_address()) {

@@ -13,6 +13,7 @@
 
 #include <util/token.h>
 #include <util/string.h>
+#include <base/snprintf.h>
 
 #include <net/ipv4.h>
 
@@ -27,10 +28,10 @@ struct Scanner_policy_number
 typedef ::Genode::Token<Scanner_policy_number> Token;
 
 
-Ipv4_packet::Ipv4_address Ipv4_packet::ip_from_string(const char *ip)
+Ipv4_packet::Ipv4_address Ipv4_packet::ip_from_string(Ipv4_packet::Ipv4_string const &ip)
 {
 	Ipv4_address  ip_addr;
-	Token         t(ip);
+	Token         t(ip.string());
 	char          tmpstr[4];
 	int           cnt = 0;
 	unsigned char ipb[4] = {0};
@@ -61,6 +62,16 @@ Ipv4_packet::Ipv4_address Ipv4_packet::ip_from_string(const char *ip)
 
 	return ip_addr;
 }
+
+
+Ipv4_packet::Ipv4_string Ipv4_packet::string_from_ip(Ipv4_address ip)
+{
+	char str[ADDR_STR_MAX_LEN];
+	Genode::snprintf(str, sizeof(str), "%d.%d.%d.%d",
+	                 ip.addr[0], ip.addr[1], ip.addr[2], ip.addr[3]);
+	return str;
+}
+
 
 Genode::uint16_t Ipv4_packet::calculate_checksum(Ipv4_packet const &packet)
 {
