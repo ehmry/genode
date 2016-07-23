@@ -124,15 +124,15 @@ class Net::Session_component : public  Net::Stream_allocator,
 		 * \param rx_buf_size  buffer size for rx channel
 		 * \param vmac         virtual mac address
 		 */
-		Session_component(Genode::Ram_session        &ram,
-		                  Genode::Region_map         &rm,
-		                  Genode::Entrypoint         &ep,
-		                  Genode::size_t              amount,
-		                  Genode::size_t              tx_buf_size,
-		                  Genode::size_t              rx_buf_size,
-		                  Ethernet_frame::Mac_address vmac,
-		                  Net::Nic                   &nic,
-		                  char                       *ip_addr = 0);
+		Session_component(Genode::Ram_session            &ram,
+		                  Genode::Region_map             &rm,
+		                  Genode::Entrypoint             &ep,
+		                  Genode::size_t                  amount,
+		                  Genode::size_t                  tx_buf_size,
+		                  Genode::size_t                  rx_buf_size,
+		                  Ethernet_frame::Mac_address     vmac,
+		                  Net::Nic                       &nic,
+		                  Ipv4_packet::Ipv4_string const &ip_addr);
 
 		~Session_component();
 
@@ -195,14 +195,12 @@ class Net::Root : public Genode::Root_component<Net::Session_component>
 		{
 			using namespace Genode;
 
-			enum { MAX_IP_ADDR_LENGTH  = 16, };
-			char ip_addr[MAX_IP_ADDR_LENGTH];
-			memset(ip_addr, 0, MAX_IP_ADDR_LENGTH);
+			Ipv4_packet::Ipv4_string ip_addr;
 
+			Session_label const label = label_from_args(args);
 			 try {
-				Session_label const label = label_from_args(args);
 				Session_policy policy(label, _config);
-				policy.attribute("ip_addr").value(ip_addr, sizeof(ip_addr));
+				policy.attribute("ip_addr").value(&ip_addr);
 			} catch (Xml_node::Nonexistent_attribute) {
 				Genode::log("Missing \"ip_addr\" attribute in policy definition");
 			} catch (Session_policy::No_policy_defined) { }

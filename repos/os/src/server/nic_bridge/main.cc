@@ -32,7 +32,7 @@ struct Main
 	Genode::Heap                    heap   { env.ram(), env.rm() };
 	Genode::Attached_rom_dataspace  config { env, "config" };
 	Net::Vlan                       vlan;
-	Net::Nic                        nic    { ep, heap, vlan };
+	Net::Nic                        nic    { env, ep, heap, vlan };
 	Net::Root                       root   { env, nic, heap, config.xml() };
 
 	void handle_config()

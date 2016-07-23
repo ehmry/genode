@@ -37,7 +37,7 @@ class Net::Nic : public Net::Packet_handler
 
 	public:
 
-		Nic(Genode::Entrypoint&, Genode::Heap&, Vlan&);
+		Nic(Genode::Env&, Genode::Entrypoint&, Genode::Heap&, Vlan&);
 
 		::Nic::Connection          *nic() { return &_nic; }
 		Ethernet_frame::Mac_address mac() { return _mac; }
