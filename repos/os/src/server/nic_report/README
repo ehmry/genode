@@ -1,0 +1,19 @@
+Nic_report is a shim server that fowards a Nic session while
+producing reports from the ROM sub-session. It can be used
+to communicate the state of a Nic session to other components.
+For example, a virtual machine instance may use the exported
+Nic session as a backend for its virtual network device, but
+the complexity required for the virtual machine monitor to
+communicate the high-level session configuration directly to
+the guest operating system cannot be justified. Using this
+server, a script or utility native to the guest OS can perform
+the interface configuration after parsing a report exported
+to the guest over a common file system.
+
+This server only introduces overhead when Nic sessions are
+opened, in all other cases the client is addressing the backing
+server directly by capability.
+
+
+An example script to configure a Linux interface with a Nic
+ROM is included at apply_nic_report.sh
