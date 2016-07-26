@@ -12,13 +12,16 @@
  */
 
 /* Genode includes */
-#include <base/printf.h>
+#include <base/log.h>
 #include <base/env.h>
 #include <base/lock.h>
 #include <parent/parent.h>
 #include <os/timed_semaphore.h>
 
 /* LwIP includes */
+extern "C" {
+#include <lwip/api.h>
+}
 #include <lwip/genode.h>
 #include <timer.h>
 #include <ring_buffer.h>
@@ -124,6 +127,9 @@ extern "C" {
 	 */
 	static void link_callback(struct netif *netif)
 	{
+		Genode::log(netif_is_link_up(netif)
+			? "lwIP link is down"
+			: "lwIP link is up");
 		/*
 		 * We call the status callback at this point to print
 		 * the IP address because we may have got a new one,
@@ -184,16 +190,16 @@ extern "C" {
 			if (ret != ERR_OK)
 				throw Nic_not_availble();
 
+			/* Register callback functions. */
+			netif.status_callback = status_callback;
+			netif.link_callback = link_callback;
+
 			/* Set Genode's nic as the default nic */
 			netifapi_netif_set_default(&netif);
 
 			/* If no static ip was set, we do dhcp */
-			if (!ip_addr) {
+			if (netif.ip_addr.addr == 0) {
 #if LWIP_DHCP
-				/* Register callback functions. */
-				netif.status_callback = status_callback;
-				netif.link_callback = link_callback;
-
 				netifapi_dhcp_start(&netif);
 #else
 				/* no IP address - no networking */
@@ -201,21 +207,13 @@ extern "C" {
 #endif /* LWIP_DHCP */
 			} else {
 				netifapi_netif_set_up(&netif);
+				status_callback(&netif);
 			}
 		} catch (Nic_not_availble) {
-			PWRN("NIC not available, loopback is used as default");
+			Genode::warning("NIC not available, loopback is used as default");
 			return 2;
 		}
 		return 0;
-	}
-
-
-	void lwip_nic_link_state_changed(int state)
-	{
-		if (state)
-			netifapi_netif_set_link_up(&netif);
-		else
-			netifapi_netif_set_link_down(&netif);
 	}
 
 
@@ -237,10 +235,10 @@ extern "C" {
 			sem->ptr = _sem;
 			return ERR_OK;
 		} catch (Genode::Allocator::Out_of_memory) {
-			PWRN("Out of memory");
+			Genode::warning("Out of memory");
 			return ERR_MEM;
 		} catch (...) {
-			PERR("Unknown Exception occured!");
+			Genode::error("Unknown Exception occured!");
 			/* we just use a arbitrary value that is
 			 * not defined in err.h */
 			return -32;
