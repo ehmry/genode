@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2009-2013 Genode Labs GmbH
+ * Copyright (C) 2009-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -13,13 +13,16 @@
 
 /* LwIP includes */
 extern "C" {
-#include <lwip/opt.h>
+#include <lwip/api.h>
 #include <lwip/def.h>
+#include <lwip/dhcp.h>
 #include <lwip/mem.h>
+#include <lwip/opt.h>
 #include <lwip/pbuf.h>
-#include <lwip/sys.h>
-#include <lwip/stats.h>
 #include <lwip/snmp.h>
+#include <lwip/sockets.h>
+#include <lwip/stats.h>
+#include <lwip/sys.h>
 #include <netif/etharp.h>
 #include <netif/ppp_oe.h>
 #include <nic.h>
@@ -31,12 +34,13 @@ extern "C" {
 #include <base/printf.h>
 #include <nic/packet_allocator.h>
 #include <nic_session/connection.h>
+#include <nic/xml_node.h>
+#include <base/log.h>
 
 extern "C" {
 
 	static void  genode_netif_input(struct netif *netif);
 
-	void lwip_nic_link_state_changed(int state);
 }
 
 
@@ -49,65 +53,121 @@ class Nic_receiver_thread : public Genode::Thread_deprecated<8192>
 
 		typedef Nic::Packet_descriptor Packet_descriptor;
 
-		Nic::Connection  *_nic;       /* nic-session */
+		Nic::Connection  &_nic;       /* nic-session */
 		Packet_descriptor _rx_packet; /* actual packet received */
 		struct netif     *_netif;     /* LwIP network interface structure */
 
 		Genode::Signal_receiver  _sig_rec;
 
-		Genode::Signal_dispatcher<Nic_receiver_thread> _link_state_dispatcher;
+		Genode::Signal_dispatcher<Nic_receiver_thread> _state_update_dispatcher;
 		Genode::Signal_dispatcher<Nic_receiver_thread> _rx_packet_avail_dispatcher;
 		Genode::Signal_dispatcher<Nic_receiver_thread> _rx_ready_to_ack_dispatcher;
 
+		void _load_nic_state()
+		{
+			Genode::Xml_node const nic_node = _nic.xml();
+
+			_netif->mtu =
+				nic_node.attribute_value("mtu", (unsigned)_netif->mtu);
+
+			bool const link_state =
+				nic_node.attribute_value("link_state", false);
+
+			if (netif_is_link_up(_netif) != link_state) {
+				if (link_state)
+					netif_set_link_up(_netif);
+				else
+					netif_set_link_down(_netif);
+			}
+
+			try { /* set the IP address if configured */
+				typedef Genode::String<16> Ipv4_string;
+				Ipv4_string addr, netmask, gateway;
+
+				Genode::Xml_node ip_node = nic_node.sub_node("ipv4");
+
+				Ipv4_string    addr_str = ip_node.attribute_value(   "addr", Ipv4_string());
+				Ipv4_string netmask_str = ip_node.attribute_value("netmask", Ipv4_string());
+				Ipv4_string gateway_str = ip_node.attribute_value("gateway", Ipv4_string());
+
+				if (addr_str != "") {
+					struct ip_addr addr, netmask, gateway;
+					addr.addr = inet_addr(addr_str.string());
+
+					netmask.addr = (netmask_str != "") ?
+						inet_addr(netmask_str.string()) : 0;
+					gateway.addr = (gateway_str != "") ?
+						inet_addr(gateway_str.string()) : 0;
+
+					if (addr.addr != _netif->ip_addr.addr) {
+						/* bring the interface down to change IP config */
+						if (netif_is_up(_netif)) {
+							netif_set_down(_netif);
+							dhcp_stop(_netif);
+						}
+
+						netif_set_addr(_netif, &addr, &netmask, &gateway);
+						netif_set_up(_netif);
+					}
+				}
+			}
+			catch (Genode::Xml_node::Nonexistent_attribute) { }
+			catch (Genode::Xml_node::Nonexistent_sub_node ) { }
+		}
+
+		void _handle_state_update(unsigned)
+		{
+			_nic.rom().update();
+			_load_nic_state();
+		}
+
 		void _handle_rx_packet_avail(unsigned)
 		{
-			while (_nic->rx()->packet_avail() && _nic->rx()->ready_to_ack()) {
-				_rx_packet = _nic->rx()->get_packet();
+			while (_nic.rx()->packet_avail() && _nic.rx()->ready_to_ack()) {
+				_rx_packet = _nic.rx()->get_packet();
 				genode_netif_input(_netif);
-				_nic->rx()->acknowledge_packet(_rx_packet);
+				_nic.rx()->acknowledge_packet(_rx_packet);
 			}
 		}
 
 		void _handle_rx_read_to_ack(unsigned) { _handle_rx_packet_avail(0); }
 
-		void _handle_link_state(unsigned)
-		{
-			lwip_nic_link_state_changed(_nic->link_state());
-		}
-
 		void _tx_ack(bool block = false)
 		{
 			/* check for acknowledgements */
-			while (nic()->tx()->ack_avail() || block) {
-				Packet_descriptor acked_packet = nic()->tx()->get_acked_packet();
-				nic()->tx()->release_packet(acked_packet);
+			while (_nic.tx()->ack_avail() || block) {
+				Packet_descriptor acked_packet = _nic.tx()->get_acked_packet();
+				_nic.tx()->release_packet(acked_packet);
 				block = false;
 			}
 		}
 
 	public:
 
-		Nic_receiver_thread(Nic::Connection *nic, struct netif *netif)
+		Nic_receiver_thread(Nic::Connection &nic, struct netif *netif)
 		:
 			Genode::Thread_deprecated<8192>("nic-recv"), _nic(nic), _netif(netif),
-			_link_state_dispatcher(_sig_rec, *this, &Nic_receiver_thread::_handle_link_state),
+			_state_update_dispatcher(_sig_rec, *this, &Nic_receiver_thread::_handle_state_update),
 			_rx_packet_avail_dispatcher(_sig_rec, *this, &Nic_receiver_thread::_handle_rx_packet_avail),
 			_rx_ready_to_ack_dispatcher(_sig_rec, *this, &Nic_receiver_thread::_handle_rx_read_to_ack)
 		{
-			_nic->link_state_sigh(_link_state_dispatcher);
-			_nic->rx_channel()->sigh_packet_avail(_rx_packet_avail_dispatcher);
-			_nic->rx_channel()->sigh_ready_to_ack(_rx_ready_to_ack_dispatcher);
+			_nic.rom().sigh(_state_update_dispatcher);
+			_nic.rx_channel()->sigh_packet_avail(_rx_packet_avail_dispatcher);
+			_nic.rx_channel()->sigh_ready_to_ack(_rx_ready_to_ack_dispatcher);
+
+			/* set link status and maybe IP addressing */
+			_load_nic_state();
 		}
 
 		void entry();
-		Nic::Connection  *nic() { return _nic; };
+		Nic::Connection  &nic() { return _nic; };
 		Packet_descriptor rx_packet() { return _rx_packet; };
 
 		Packet_descriptor alloc_tx_packet(Genode::size_t size)
 		{
 			while (true) {
 				try {
-					Packet_descriptor packet = nic()->tx()->alloc_packet(size);
+					Packet_descriptor packet = _nic.tx()->alloc_packet(size);
 					return packet;
 				} catch(Nic::Session::Tx::Source::Packet_alloc_failed) {
 					/* packet allocator exhausted, wait for acknowledgements */
@@ -118,13 +178,13 @@ class Nic_receiver_thread : public Genode::Thread_deprecated<8192>
 
 		void submit_tx_packet(Packet_descriptor packet)
 		{
-			nic()->tx()->submit_packet(packet);
+			_nic.tx()->submit_packet(packet);
 			/* check for acknowledgements */
 			_tx_ack();
 		}
 
 		char *content(Packet_descriptor packet) {
-			return nic()->tx()->packet_content(packet); }
+			return _nic.tx()->packet_content(packet); }
 };
 
 
@@ -192,9 +252,9 @@ extern "C" {
 	low_level_input(struct netif *netif)
 	{
 		Nic_receiver_thread   *th         = reinterpret_cast<Nic_receiver_thread*>(netif->state);
-		Nic::Connection       *nic        = th->nic();
+		Nic::Connection       &nic        = th->nic();
 		Nic::Packet_descriptor rx_packet  = th->rx_packet();
-		char                  *rx_content = nic->rx()->packet_content(rx_packet);
+		char                  *rx_content = nic.rx()->packet_content(rx_packet);
 		u16_t                  len        = rx_packet.size();
 
 #if ETH_PAD_SIZE
@@ -295,7 +355,7 @@ extern "C" {
 
 		/* Setup receiver thread */
 		Nic_receiver_thread *th = new (env()->heap())
-			Nic_receiver_thread(nic, netif);
+			Nic_receiver_thread(*nic, netif);
 
 		/* Store receiver thread address in user-defined netif struct part */
 		netif->state      = (void*) th;
@@ -306,16 +366,21 @@ extern "C" {
 		netif->name[1]    = 'n';
 		netif->output     = etharp_output;
 		netif->linkoutput = low_level_output;
-		netif->mtu        = 1500;
+		netif->mtu        = nic->xml().attribute_value("mtu", 1500U);
 		netif->hwaddr_len = ETHARP_HWADDR_LEN;
 		netif->flags      = NETIF_FLAG_BROADCAST |
 		                    NETIF_FLAG_ETHARP    |
 		                    NETIF_FLAG_LINK_UP;
 
-		/* Get MAC address from nic-session and set it accordingly */
-		Nic::Mac_address _mac = nic->mac_address();
+		/*
+		 * Get MAC address from nic-session and set it accordingly.
+		 *
+		 * Once the MAC is set, it cannot be changed, so the Nic
+		 * session is expected to block until an address is ready.
+		 */
+		Nic::Mac_address mac = nic->mac_address();
 		for(int i=0; i<6; ++i)
-			netif->hwaddr[i] = _mac.addr[i];
+			netif->hwaddr[i] = mac.addr[i];
 
 		th->start();
 
