@@ -367,6 +367,11 @@ class Genode::Path : public Path_base {
 			return *this;
 		}
 
+		/**
+		 * Print path to output stream
+		 */
+		void print(Genode::Output &output) const {
+			output.out_string(base()); }
 };
 
 #endif /* _INCLUDE__OS__PATH_H_ */
