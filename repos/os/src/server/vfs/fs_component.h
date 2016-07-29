@@ -548,7 +548,7 @@ class Vfs_server::Fs_root :
 				             session_root.base(),
 				             writeable);
 
-			Genode::log("session opened for '", label.string(), "' at '", session_root.base(), "'");
+			Genode::log("session opened for '", label, "' at '", session_root, "'");
 			return session;
 		}
 

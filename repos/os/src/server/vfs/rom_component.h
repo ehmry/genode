@@ -39,8 +39,7 @@ class Vfs_server::Rom_component :
 	private:
 
 		Path                          _root_path;
-		Genode::Dataspace_capability  _back_cap;
-		Genode::Dataspace_capability  _front_cap;
+		Genode::Dataspace_capability  _ds_cap;
 		char const                   *_path;
 		Vfs::Directory_service       *_vfs;
 		Genode::Env                  &_env;
@@ -50,6 +49,7 @@ class Vfs_server::Rom_component :
 		bool _open_handle()
 		{
 			if (_handle) return true;
+
 			try {
 				unsigned const mode = Vfs::Directory_service::OPEN_MODE_RDONLY;
 				if (Vfs::Directory_service::Open_result::OPEN_OK ==
@@ -64,36 +64,12 @@ class Vfs_server::Rom_component :
 			return false;
 		}
 
-		void _dataspace()
+		void _release()
 		{
-			_front_cap = _vfs->dataspace(_path);
-
-			/*
-			 * Take this opportunity to make an asynchronous resource request so
-			 * the next client might not be blocked by a synchronous upgrade.
-			 */
-			if (_front_cap.valid()) {
-				Genode::size_t ds_size = Genode::Dataspace_client(_front_cap).size();
-				/*
-				 * Try to keep at least as much free quota as
-				 * the largest dataspace we have allocated.
-				 */
-				if (_env.ram().avail() < ds_size) {
-					char arg_buf[32];
-					Genode::snprintf(arg_buf, sizeof(arg_buf),
-					                 "ram_quota=%ld", ds_size);
-					_env.parent().resource_request(arg_buf);
-				}
+			if (_ds_cap.valid()) {
+				_vfs->release(_path, _ds_cap);
+				_ds_cap = Genode::Dataspace_capability();
 			}
-			if (!_front_cap.valid())
-				Genode::error("failed to aquire dataspace for ", _path);
-		}
-
-		void _release(Genode::Dataspace_capability &cap)
-		{
-			if (cap.valid())
-				_vfs->release(_path, cap);
-			cap = Genode::Dataspace_capability();
 		}
 
 	public:
@@ -114,8 +90,7 @@ class Vfs_server::Rom_component :
 
 		~Rom_component()
 		{
-			_release(_back_cap);
-			_release(_front_cap);
+			_release();
 
 			if (_handle)
 				_handle->ds().close(_handle);
@@ -128,21 +103,36 @@ class Vfs_server::Rom_component :
 
 		Genode::Rom_dataspace_capability dataspace() override
 		{
-			/*
-			 * If there is an open handle then assume the client has a
-			 * signal registered and is trying to get a new dataspace.
-			 */
-			if (_handle) {
-				_release(_back_cap);
-				_back_cap = _front_cap;
-				_dataspace();
-			} else if (!_front_cap.valid()) {
-				_dataspace();
-			}
+			using namespace Genode;
 
-			return _front_cap.valid()
-				? Genode::static_cap_cast<Genode::Rom_dataspace>(_front_cap)
-				: Genode::Rom_dataspace_capability();
+			if (!_open_handle())
+				return Rom_dataspace_capability();
+
+			_release();
+			_ds_cap = _vfs->dataspace(_path);
+
+			/*
+			 * Take this opportunity to make an asynchronous resource request so
+			 * the next client might not be blocked by a synchronous upgrade.
+			 */
+			if (_ds_cap.valid()) {
+				size_t ds_size = Dataspace_client(_ds_cap).size();
+				/*
+				 * Try to keep at least as much free quota as
+				 * the largest dataspace we have allocated.
+				 */
+				if (_env.ram().avail() < ds_size) {
+					char arg_buf[32];
+					snprintf(arg_buf, sizeof(arg_buf),
+					         "ram_quota=%ld", ds_size);
+					_env.parent().resource_request(arg_buf);
+				}
+
+				return static_cap_cast<Rom_dataspace>(_ds_cap);
+			} else {
+				log("failed to aquire dataspace for ", _path);
+				return Rom_dataspace_capability();
+			}
 		}
 
 		void sigh(Signal_context_capability sigh) override { }
@@ -189,8 +179,7 @@ class Vfs_server::Rom_root :
 
 			Rom_component *session = new (md_alloc())
 				Rom_component(_vfs, _env, _heap, session_root.base());
-			log("ROM '", (char const *)session_root.base(),
-			    "' served to '", label, "'");
+			log("ROM '", session_root, "' served to '", label, "'");
 			return session;
 		}
 

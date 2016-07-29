@@ -211,10 +211,8 @@ class Vfs_server::Report_root :
 
 			session_path.append(label_path.base());
 
-			Report_component *session = new (md_alloc())
+			return new (md_alloc())
 				Report_component(_vfs, _env, _heap, buffer_size, session_path.base());
-			log("'", label, "' logging to '", (char const *)session_path.base(), "'");
-			return session;
 		}
 
 	public:
