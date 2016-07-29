@@ -392,6 +392,12 @@ class Genode::Path : public Path_base {
 			Genode::strncpy(_buf, other._buf, MAX_LEN);
 			return *this;
 		}
+
+		/**
+		 * Print path to output stream
+		 */
+		void print(Genode::Output &output) const {
+			output.out_string(base()); }
 };
 
 namespace Genode {
