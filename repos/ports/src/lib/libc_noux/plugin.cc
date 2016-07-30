@@ -1885,11 +1885,11 @@ namespace {
 		sysio()->accept_in.fd = noux_fd(fd->context);
 
 		if (addr != NULL) {
-			Genode::memcpy(&sysio()->accept_in.addr, addr, sizeof (struct sockaddr));
+			Genode::memcpy(&sysio()->accept_in.addr, addr, sizeof (Noux::Sysio::sockaddr));
 			sysio()->accept_in.addrlen = *addrlen;
 		}
 		else {
-			Genode::memset(&sysio()->accept_in.addr, 0, sizeof (struct sockaddr));
+			Genode::memset(&sysio()->accept_in.addr, 0, sizeof (Noux::Sysio::sockaddr));
 			sysio()->accept_in.addrlen = 0;
 		}
 
@@ -1920,7 +1920,7 @@ namespace {
 	{
 		sysio()->bind_in.fd = noux_fd(fd->context);
 
-		Genode::memcpy(&sysio()->bind_in.addr, addr, sizeof (struct sockaddr));
+		Genode::memcpy(&sysio()->bind_in.addr, addr, sizeof (Noux::Sysio::sockaddr));
 		sysio()->bind_in.addrlen = addrlen;
 
 		if (!noux_syscall(Noux::Session::SYSCALL_BIND)) {
@@ -1943,7 +1943,7 @@ namespace {
 	{
 		sysio()->connect_in.fd = noux_fd(fd->context);
 
-		Genode::memcpy(&sysio()->connect_in.addr, addr, sizeof (struct sockaddr));
+		Genode::memcpy(&sysio()->connect_in.addr, addr, sizeof (Noux::Sysio::sockaddr));
 		sysio()->connect_in.addrlen = addrlen;
 
 		if (!noux_syscall(Noux::Session::SYSCALL_CONNECT)) {
@@ -1977,7 +1977,7 @@ namespace {
 		}
 
 		Genode::memcpy(addr, &sysio()->getpeername_in.addr,
-		               sizeof (struct sockaddr));
+		               sizeof (Noux::Sysio::sockaddr));
 		*addrlen = sysio()->getpeername_in.addrlen;
 
 		return 0;
@@ -2158,7 +2158,7 @@ namespace {
 
 			if (addrlen == 0) {
 				sysio()->sendto_in.addrlen = 0;
-				Genode::memset(&sysio()->sendto_in.dest_addr, 0, sizeof (struct sockaddr));
+				Genode::memset(&sysio()->sendto_in.dest_addr, 0, sizeof (Noux::Sysio::sockaddr));
 			}
 			else {
 				sysio()->sendto_in.addrlen = addrlen;

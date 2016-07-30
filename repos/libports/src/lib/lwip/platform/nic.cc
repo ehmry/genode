@@ -24,7 +24,6 @@ extern "C" {
 #include <lwip/stats.h>
 #include <lwip/sys.h>
 #include <netif/etharp.h>
-#include <netif/ppp_oe.h>
 #include <nic.h>
 #include <verbose.h>
 }

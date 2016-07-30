@@ -41,9 +41,9 @@ void lwip_tcpip_init(void);
  * This function initializes Genode's nic_drv and does optionally send DHCP
  * requests.
  */
-int lwip_nic_init(genode_int32_t ip_addr,
-                  genode_int32_t netmask,
-                  genode_int32_t gateway,
+int lwip_nic_init(genode_uint32_t ip_addr,
+                  genode_uint32_t netmask,
+                  genode_uint32_t gateway,
                   __SIZE_TYPE__  tx_buf_size,
                   __SIZE_TYPE__  rx_buf_size);
 

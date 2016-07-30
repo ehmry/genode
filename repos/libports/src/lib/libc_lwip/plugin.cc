@@ -13,7 +13,7 @@
  */
 
 #include <base/env.h>
-#include <base/printf.h>
+#include <base/log.h>
 
 #define LWIP_COMPAT_SOCKETS 0
 
@@ -211,6 +211,7 @@ struct Plugin : Libc::Plugin
 	ssize_t recv(Libc::File_descriptor *, void *buf, ::size_t len, int flags);
 	ssize_t recvfrom(Libc::File_descriptor *, void *buf, ::size_t len, int flags,
 	                 struct sockaddr *src_addr, socklen_t *addrlen);
+	ssize_t recvmsg(Libc::File_descriptor *, struct msghdr *msg, int flags);
 	int setsockopt(Libc::File_descriptor *sockfdo, int level,
 	               int optname, const void *optval,
 	               socklen_t optlen);
@@ -535,6 +536,14 @@ ssize_t Plugin::recvfrom(Libc::File_descriptor *sockfdo, void *buf, ::size_t len
 {
 	return lwip_recvfrom(get_lwip_fd(sockfdo), buf, len, flags,
 	                     (struct lwip_sockaddr *)src_addr, addrlen);
+}
+
+
+ssize_t Plugin::recvmsg(Libc::File_descriptor *sockfdo, struct msghdr *msg, int flags)
+{
+	Genode::warning(__func__, " not implemented");
+	errno = ENOSYS;
+	return -1;
 }
 
 
