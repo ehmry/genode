@@ -197,7 +197,7 @@ class Fs_log::Root_component :
 
 namespace Component {
 
-	Genode::size_t stack_size() { return 3*512*sizeof(long); }
+	Genode::size_t stack_size() { return 8*1024*sizeof(long); }
 
 	void construct(Genode::Env &env)
 	{

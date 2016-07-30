@@ -278,7 +278,7 @@ class Rom_session_component : public Genode::Rpc_object<Genode::Rom_session>
 			_file_handle(_open_file(_fs, _file_path))
 		{
 			if (!_file_handle.valid())
-				_register_for_compound_dir_changes();
+				throw Root::Unavailable();
 		}
 
 		/**
