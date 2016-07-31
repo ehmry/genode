@@ -22,7 +22,9 @@ CUSTOM_OBJCOPY ?= $(CROSS_DEV_PREFIX)objcopy
 CUSTOM_RANLIB  ?= $(CROSS_DEV_PREFIX)ranlib
 CUSTOM_STRIP   ?= $(CROSS_DEV_PREFIX)strip
 CUSTOM_HOST_CC ?= gcc
-NIM            ?= nim
+
+NIM_DIR        ?= /home/emery/repo/nim
+NIM            ?= $(NIM_DIR)/bin/nim
 
 #
 # GNU utilities
@@ -97,7 +99,7 @@ CC_WARN   ?= -Wall
 #
 # Aggregate compiler options that are common for C and C++
 #
-CC_OPT += $(CC_OPT_NOSTDINC) -g $(CC_MARCH) $(CC_OLEVEL) $(CC_OPT_DEP) $(CC_WARN)
+CC_OPT += $(CC_OPT_NOSTDINC) -g $(CC_MARCH) $(CC_OLEVEL) $(CC_WARN)
 
 #
 # Incorporate source-file-specific compiler options
@@ -183,6 +185,8 @@ ALL_INC_DIR += $(foreach DIR,$(REP_INC_DIR), $(foreach REP,$(REPOSITORIES),$(REP
 ALL_INC_DIR += $(foreach REP,$(REPOSITORIES),$(REP)/include)
 ALL_INC_DIR += $(LIBGCC_INC_DIR)
 ALL_INC_DIR += $(HOST_INC_DIR)
+ALL_INC_DIR += $(NIM_DIR)/lib
+
 
 INSTALL_DIR ?=
 

@@ -7,7 +7,8 @@
 # Collect object files and avoid duplicates (by using 'sort')
 #
 SRC_O  += $(addprefix binary_,$(addsuffix .o,$(notdir $(SRC_BIN))))
-SRC     = $(sort $(SRC_C) $(SRC_CC) $(SRC_ADA) $(SRC_RS) $(SRC_NIM) $(SRC_S) $(SRC_O))
+# Nim comes first because it compiles to C or C++
+SRC     =$(sort $(SRC_C) $(SRC_CC) $(SRC_ADA) $(SRC_RS) $(SRC_NIM) $(SRC_S) $(SRC_O))
 OBJECTS = $(addsuffix .o,$(basename $(SRC)))
 
 #
@@ -50,19 +51,19 @@ endif
 
 %.o: %.c
 	$(MSG_COMP)$@
-	$(VERBOSE)$(CC) $(CC_DEF) $(CC_C_OPT) $(INCLUDES) -c $< -o $@
+	$(VERBOSE)$(CC) $(CC_DEF) $(CC_C_OPT) $(CC_OPT_DEP) $(INCLUDES) -c $< -o $@
 
 %.o: %.cc
 	$(MSG_COMP)$@
-	$(VERBOSE)$(CXX) $(CXX_DEF) $(CC_CXX_OPT) $(INCLUDES) -c $< -o $@
+	$(VERBOSE)$(CXX) $(CXX_DEF) $(CC_CXX_OPT) $(CC_OPT_DEP) $(INCLUDES) -c $< -o $@
 
 %.o: %.cpp
 	$(MSG_COMP)$@
-	$(VERBOSE)$(CXX) $(CXX_DEF) $(CC_CXX_OPT) $(INCLUDES) -c $< -o $@
+	$(VERBOSE)$(CXX) $(CXX_DEF) $(CC_CXX_OPT) $(CC_OPT_DEP) $(INCLUDES) -c $< -o $@
 
 %.o: %.s
 	$(MSG_ASSEM)$@
-	$(VERBOSE)$(CC) $(CC_DEF) $(CC_C_OPT) $(INCLUDES) -c $< -o $@
+	$(VERBOSE)$(CC) $(CC_DEF) $(CC_C_OPT) $(CC_OPT_DEP) $(INCLUDES) -c $< -o $@
 
 #
 # Compiling Ada source codes
@@ -84,16 +85,13 @@ endif
 %.o: %.nim
 	$(MSG_COMP)$@
 	$(VERBOSE)$(NIM) compileToCpp \
-		--os:genode \
-		--threads:off \
-		--app:staticlib \
 		--nimcache:. \
-		--compileOnly \
-		--tlsEmulation:on \
-		--out:$(basename $@).cpp \
+		--os:genode \
+		$(NIM_OPT) \
+		$(foreach D,$(CXX_DEF),--passC:$(D)) \
+		$(foreach O,$(CC_CXX_OPT),--passC:$(O)) \
+		$(foreach I,$(ALL_INC_DIR),--cincludes:$(I)) \
 			$<
-	$(CXX) $(CXX_DEF) $(CC_CXX_OPT) $(INCLUDES) \
-		-x c++ -c $(basename $@).cpp -o $@
 
 #
 # Assembler files that must be preprocessed are fed to the C compiler.
