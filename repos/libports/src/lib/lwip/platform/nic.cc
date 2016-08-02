@@ -23,6 +23,7 @@ extern "C" {
 #include <lwip/sockets.h>
 #include <lwip/stats.h>
 #include <lwip/sys.h>
+#include <lwip/ip6_addr.h>
 #include <netif/etharp.h>
 #include <nic.h>
 #include <verbose.h>
@@ -80,25 +81,28 @@ class Nic_receiver_thread : public Genode::Thread_deprecated<8192>
 			}
 
 			try { /* set the IP address if configured */
-				typedef Genode::String<16> Ipv4_string;
+				typedef Genode::String<IP4ADDR_STRLEN_MAX> Ipv4_string;
 				Ipv4_string addr, netmask, gateway;
 
-				Genode::Xml_node ip_node = nic_node.sub_node("ipv4");
+				Genode::Xml_node const ip_node = nic_node.sub_node("ipv4");
 
 				Ipv4_string    addr_str = ip_node.attribute_value(   "addr", Ipv4_string());
 				Ipv4_string netmask_str = ip_node.attribute_value("netmask", Ipv4_string());
 				Ipv4_string gateway_str = ip_node.attribute_value("gateway", Ipv4_string());
 
 				if (addr_str != "") {
-					struct ip_addr addr, netmask, gateway;
-					addr.addr = inet_addr(addr_str.string());
+					ip4_addr_t addr, netmask, gateway;
+					ip4_addr_set_zero(&addr);
+					ip4_addr_set_zero(&netmask);
+					ip4_addr_set_zero(&gateway);
 
-					netmask.addr = (netmask_str != "") ?
-						inet_addr(netmask_str.string()) : 0;
-					gateway.addr = (gateway_str != "") ?
-						inet_addr(gateway_str.string()) : 0;
+					/* XXX: ip4addr_aton returns an error */
 
-					if (addr.addr != _netif->ip_addr.addr) {
+					ip4addr_aton(   addr_str.string(), &addr);
+					ip4addr_aton(netmask_str.string(), &netmask);
+					ip4addr_aton(gateway_str.string(), &gateway);
+
+					if (!ip4_addr_cmp(&addr, netif_ip4_addr(_netif))) {
 						/* bring the interface down to change IP config */
 						if (netif_is_up(_netif)) {
 							netif_set_down(_netif);
@@ -112,6 +116,42 @@ class Nic_receiver_thread : public Genode::Thread_deprecated<8192>
 			}
 			catch (Genode::Xml_node::Nonexistent_attribute) { }
 			catch (Genode::Xml_node::Nonexistent_sub_node ) { }
+
+			/*
+			try {
+				typedef Genode::String<IP6ADDR_STRLEN_MAX> Ipv6_string;
+				Ipv6_string addr, netmask, gateway;
+
+				Genode::Xml_node const ip_node = nic_node.sub_node("ipv6");
+
+				Ipv6_string    addr_str = ip_node.attribute_value(   "addr", Ipv6_string());
+				Ipv6_string netmask_str = ip_node.attribute_value("netmask", Ipv6_string());
+				Ipv6_string gateway_str = ip_node.attribute_value("gateway", Ipv6_string());
+
+				if (addr_str != "") {
+					ip6_addr_t addr, netmask, gateway;
+					ip6_addr_set_zero(&addr);
+					ip6_addr_set_zero(&netmask);
+					ip6_addr_set_zero(&gateway);
+
+					ip6addr_aton(   addr_str.string(), &addr);
+					ip6addr_aton(netmask_str.string(), &netmask);
+					ip6addr_aton(gateway_str.string(), &gateway);
+
+					if (!netif_get_ip6_addr_match(&_netif, &addr)) {
+						if (netif_is_up(_netif)) {
+							netif_set_down(_netif);
+							dhcp_stop(_netif);
+						}
+
+						netif_set_addr(_netif, &addr, &netmask, &gateway);
+						netif_set_up(_netif);
+					}
+				}
+			}
+			catch (Genode::Xml_node::Nonexistent_attribute) { }
+			catch (Genode::Xml_node::Nonexistent_sub_node ) { }
+			 */
 		}
 
 		void _handle_state_update(unsigned)
