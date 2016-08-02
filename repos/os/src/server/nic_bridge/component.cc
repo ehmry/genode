@@ -126,7 +126,8 @@ Session_component::Session_component(Genode::Ram_session            &ram,
                      *Stream_allocator::range_allocator(),
                      ep.rpc_ep()),
   Packet_handler(ep, nic.vlan()),
-  _state_rom(ram, rm), _state_cap(ep.manage(_state_rom)),
+  _ep(ep),
+  _state_rom(ram, rm),
   _mac_node(*this, vmac),
   _ipv4_node(*this),
   _nic(nic)
@@ -156,8 +157,10 @@ Session_component::Session_component(Genode::Ram_session            &ram,
 }
 
 
-Session_component::~Session_component() {
+Session_component::~Session_component()
+{
 	vlan().mac_tree.remove(&_mac_node);
 	vlan().mac_list.remove(&_mac_node);
 	_unset_ipv4_node();
+	_ep.dissolve(_state_rom);
 }

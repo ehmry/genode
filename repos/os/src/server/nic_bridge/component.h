@@ -101,8 +101,9 @@ class Net::Session_component : public  Net::Stream_allocator,
 {
 	private:
 
+		Genode::Entrypoint            &_ep;
 		::Nic::State_component         _state_rom;
-		Genode::Rom_session_capability _state_cap;
+		Genode::Rom_session_capability _state_cap { _ep.manage(_state_rom) };
 
 		Mac_address_node                  _mac_node;
 		Ipv4_address_node                 _ipv4_node;
@@ -191,7 +192,7 @@ class Net::Root : public Genode::Root_component<Net::Session_component>
 
 	protected:
 
-		Session_component *_create_session(const char *args)
+		Session_component *_create_session(const char *args) override
 		{
 			using namespace Genode;
 
