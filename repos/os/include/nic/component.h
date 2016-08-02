@@ -67,6 +67,7 @@ class Nic::State_component : public Genode::Rpc_object<Genode::Rom_session>
 		unsigned                          _mtu = 0;
 		bool                              _link_state = false;
 		bool                              _ready      = false;
+		bool                              _pending    = true;
 
 	public:
 
@@ -84,22 +85,52 @@ class Nic::State_component : public Genode::Rpc_object<Genode::Rom_session>
 		}
 
 		bool link_state()     const { return  _link_state; }
-		void link_state(bool state) { _link_state = state; }
+		void link_state(bool state)
+		{
+			if (_link_state != state) {
+				_link_state = state;
+				_pending = true;
+			}
+		}
 
-		void ipv4_addr   (Ipv4_addr const &a) { _addr = a; }
-		void ipv4_netmask(Ipv4_addr const &a) { _netmask = a; }
-		void ipv4_gateway(Ipv4_addr const &a) { _gateway = a; }
+		void ipv4_addr   (Ipv4_addr const &a)
+		{
+			if (_addr != a) {
+				_addr = a;
+				_pending = true;
+			}
+		}
+		void ipv4_netmask(Ipv4_addr const &a)
+		{
+			if (_netmask != a) {
+				_netmask = a;
+				_pending = true;
+			}
+		}
+		void ipv4_gateway(Ipv4_addr const &a)
+		{
+			if (_gateway != a) {
+				_gateway = a;
+				_pending = true;
+			}
+		}
 
 		Ipv4_addr ipv4_addr   () const { return _addr;    }
 		Ipv4_addr ipv4_netmask() const { return _netmask; }
 		Ipv4_addr ipv4_gateway() const { return _gateway; }
 
 		unsigned mtu() const { return _mtu; }
-		void mtu(unsigned max_tx) { _mtu = max_tx; }
+		void mtu(unsigned m)
+		{
+			if (_mtu != m) {
+				_mtu = m;
+				_pending = true;
+			}
+		}
 
 		void submit_signal()
 		{
-			if (_update_sigh.valid())
+			if (_pending && _update_sigh.valid())
 				Genode::Signal_transmitter(_update_sigh).submit();
 		}
 
@@ -122,7 +153,7 @@ class Nic::State_component : public Genode::Rpc_object<Genode::Rom_session>
 		{
 			/* TODO: no need to update when nothing changes */
 
-			if (!_ready) {
+			if (!(_ready && _pending)) {
 				return false;
 			} else {
 				char mac_str[18];
