@@ -19,7 +19,7 @@
 #include <base/log.h>
 #include <block_session/client.h>
 
-#include "driver.h"
+#include "backend.h"
 
 namespace Block {
 	struct Partition;
@@ -43,16 +43,16 @@ struct Block::Partition_table
 		{
 			private:
 
-				Session_client    &_session;
+				Backend           &_session;
 				Packet_descriptor  _p;
 
 			public:
 
-				Sector(Driver       &driver,
+				Sector(Backend      &driver,
 				       unsigned long blk_nr,
 				       unsigned long count,
 				       bool          write = false)
-				: _session(driver.session()),
+				: _session(driver),
 				  _p(_session.dma_alloc_packet(driver.blk_size() * count),
 				     write ? Packet_descriptor::WRITE : Packet_descriptor::READ,
 				     blk_nr, count)
@@ -71,9 +71,9 @@ struct Block::Partition_table
 		};
 
 		Genode::Heap & heap;
-		Driver       & driver;
+		Backend      & driver;
 
-		Partition_table(Genode::Heap & h, Driver & d)
+		Partition_table(Genode::Heap & h, Backend & d)
 		: heap(h), driver(d) {}
 
 		virtual Partition *partition(int num) = 0;

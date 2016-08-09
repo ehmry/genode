@@ -18,8 +18,8 @@
 #include <base/log.h>
 #include <block_session/client.h>
 
-#include "driver.h"
 #include "partition_table.h"
+#include "backend.h"
 
 namespace {
 
@@ -129,7 +129,7 @@ class Gpt : public Block::Partition_table
 				log(" gpe crc: ", Hex(_gpe_crc, Hex::OMIT_PREFIX));
 			}
 
-			bool valid(Block::Driver &driver, bool check_primary = true)
+			bool valid(Block::Backend &driver, bool check_primary = true)
 			{
 				dump_hdr(check_primary);
 

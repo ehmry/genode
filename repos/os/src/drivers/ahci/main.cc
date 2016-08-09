@@ -52,9 +52,13 @@ class Session_component : public Block::Session_component
 {
 	public:
 
-		Session_component(Block::Driver_factory     &driver_factory,
-		                  Server::Entrypoint       &ep, Genode::size_t buf_size)
-		: Block::Session_component(driver_factory, ep, buf_size) { }
+		Session_component(Block::Driver_factory &driver_factory,
+		                  Genode::Entrypoint &ep, Genode::size_t buf_size,
+		                  Block::Policy const &policy,
+		                  Genode::Session_label const &label)
+		: Block::Session_component(driver_factory, ep, buf_size,
+		                           policy, label)
+		{ }
 
 		Block::Driver_factory &factory() { return _driver_factory; }
 };
@@ -69,13 +73,11 @@ class Block::Root_multiple_clients : public Root_component< ::Session_component>
 		Genode::Allocator &_alloc;
 		Genode::Xml_node   _config;
 
-		long _device_num(Session_label const &label, char *model, char *sn, size_t bufs_len)
+		long _device_num(Session_policy const &policy, char *model, char *sn, size_t bufs_len)
 		{
 			long num = -1;
 
 			try {
-				Session_policy policy(label, _config);
-
 				/* try read device port number attribute */
 				try { policy.attribute("device").value(&num); }
 				catch (...) { }
@@ -94,7 +96,40 @@ class Block::Root_multiple_clients : public Root_component< ::Session_component>
 
 		::Session_component *_create_session(const char *args)
 		{
+			char model_buf[64], sn_buf[64];
+			long num;
+			Block::Policy block_policy;
+
 			Session_label const label = label_from_args(args);
+			try {
+				Session_policy policy(label, _config);
+
+				/* Search for configured device */
+				num = _device_num(policy, model_buf, sn_buf, sizeof(model_buf));
+
+				/* the Block::Session_component base class will validate these */
+				block_policy = Block::Policy(policy, args);
+
+			} catch (Session_policy::No_policy_defined) {
+				error("rejecting session request, no matching policy for '", label, "'");
+				throw Root::Unavailable();
+			}
+
+			/* prefer model/serial routing */
+			if ((model_buf[0] != 0) && (sn_buf[0] != 0))
+				num = Ahci_driver::device_number(model_buf, sn_buf);
+
+			if (num < 0) {
+				error("rejecting session request, no matching policy for '", label, "'",
+				      model_buf[0] == 0 ? ""
+				      : " (model=", (char const *)model_buf, " serial=", (char const *)sn_buf, ")");
+				throw Root::Invalid_args();
+			}
+
+			if (!Ahci_driver::avail(num)) {
+				error("Device ", num, " not available");
+				throw Root::Unavailable();
+			}
 
 			size_t ram_quota =
 					Arg_string::find_arg(args, "ram_quota").ulong_value(0);
@@ -113,29 +148,10 @@ class Block::Root_multiple_clients : public Root_component< ::Session_component>
 				throw Root::Quota_exceeded();
 			}
 
-			/* Search for configured device */
-			char model_buf[64], sn_buf[64];
-
-			long num = _device_num(label, model_buf, sn_buf, sizeof(model_buf));
-			/* prefer model/serial routing */
-			if ((model_buf[0] != 0) && (sn_buf[0] != 0))
-				num = Ahci_driver::device_number(model_buf, sn_buf);
-
-			if (num < 0) {
-				error("rejecting session request, no matching policy for '", label, "'",
-				      model_buf[0] == 0 ? ""
-				      : " (model=", (char const *)model_buf, " serial=", (char const *)sn_buf, ")");
-				throw Root::Invalid_args();
-			}
-
-			if (!Ahci_driver::avail(num)) {
-				error("Device ", num, " not available");
-				throw Root::Unavailable();
-			}
-
 			Factory *factory = new (&_alloc) Factory(num);
 			::Session_component *session = new (&_alloc)
-				::Session_component(*factory, _env.ep(), tx_buf_size);
+				::Session_component(*factory, _env.ep(), tx_buf_size,
+				                    block_policy, label);
 			log("session opened at device ", num, " for '", label, "'");
 			return session;
 		}
