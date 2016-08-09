@@ -29,7 +29,7 @@ namespace Platform {
 
 struct Ahci_root
 {
-	virtual Server::Entrypoint &entrypoint() = 0;
+	virtual Genode::Entrypoint &entrypoint() = 0;
 	virtual void announce()                  = 0;
 };
 

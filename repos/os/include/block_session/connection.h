@@ -18,7 +18,12 @@
 #include <base/connection.h>
 #include <base/allocator.h>
 
-namespace Block { struct Connection; }
+namespace Block {
+	struct Connection;
+
+	/* recommended packet transmission buffer size */
+	enum { DEFAULT_TX_BUF_SIZE = 128*1024 };
+}
 
 struct Block::Connection : Genode::Connection<Session>, Session_client
 {
@@ -28,10 +33,15 @@ struct Block::Connection : Genode::Connection<Session>, Session_client
 	 * \noapi
 	 */
 	Capability<Block::Session> _session(Genode::Parent &parent,
-	                                    char const *label, Genode::size_t tx_buf_size)
+	                                    Genode::size_t tx_buf_size,
+	                                    bool read, bool write,
+	                                    sector_t offset, sector_t span,
+	                                    char const *label)
 	{
-		return session(parent, "ram_quota=%zd, tx_buf_size=%zd, label=\"%s\"",
-		               3*4096 + tx_buf_size, tx_buf_size, label);
+		return session(parent,
+		               "ram_quota=%zd, tx_buf_size=%zd, "
+		               "readable=%d, writeable=%d, offset=%llu, span=%llu, label=\"%s\"",
+		               3*4096 + tx_buf_size, tx_buf_size, read, write, offset, span, label);
 	}
 
 	/**
@@ -43,10 +53,15 @@ struct Block::Connection : Genode::Connection<Session>, Session_client
 	 */
 	Connection(Genode::Env             &env,
 	           Genode::Range_allocator *tx_block_alloc,
-	           Genode::size_t           tx_buf_size = 128*1024,
-	           const char              *label = "")
+	           Genode::size_t           tx_buf_size = DEFAULT_TX_BUF_SIZE,
+	           sector_t                 offset = 0, /* session offset */
+	           sector_t                 span   = 0, /* session span constraint */
+	           bool                     readable  = true,
+	           bool                     writeable = true,
+	           const char              *label  = "")
 	:
-		Genode::Connection<Session>(env, _session(env.parent(), label, tx_buf_size)),
+		Genode::Connection<Session>(env, _session(
+			env.parent(), tx_buf_size, readable, writeable, offset, span,  label)),
 		Session_client(cap(), tx_block_alloc)
 	{ }
 
@@ -58,10 +73,15 @@ struct Block::Connection : Genode::Connection<Session>, Session_client
 	 *              argument instead
 	 */
 	Connection(Genode::Range_allocator *tx_block_alloc,
-	           Genode::size_t           tx_buf_size = 128*1024,
-	           const char              *label = "")
+	           Genode::size_t           tx_buf_size = DEFAULT_TX_BUF_SIZE,
+	           sector_t                 offset = 0, /* session offset */
+	           sector_t                 span   = 0, /* session span constraint */
+	           bool                     readable  = true,
+	           bool                     writeable = true,
+	           const char              *label  = "")
 	:
-		Genode::Connection<Session>(_session(*Genode::env()->parent(), label, tx_buf_size)),
+		Genode::Connection<Session>(_session(
+			*Genode::env()->parent(), tx_buf_size, readable, writeable, offset, span, label)),
 		Session_client(cap(), tx_block_alloc)
 	{ }
 };

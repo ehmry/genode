@@ -13,18 +13,13 @@
  * under the terms of the GNU General Public License version 2.
  */
 
-#include <os/attached_rom_dataspace.h>
-#include <block_session/rpc_object.h>
+#include <block_session/connection.h>
+#include <base/attached_rom_dataspace.h>
 
-#include "component.h"
-#include "driver.h"
+#include "backend.h"
 #include "gpt.h"
 #include "mbr.h"
-
-
-void Block::Driver::_ready_to_submit() {
-	Block::Session_component::wake_up(); }
-
+#include "proxy.h"
 
 class Main
 {
@@ -32,12 +27,17 @@ class Main
 
 		Block::Partition_table & _table();
 
-		Genode::Env &       _env;
-		Genode::Heap        _heap   { _env.ram(), _env.rm() };
-		Block::Driver       _driver { _env.ep(), _heap      };
-		Mbr_partition_table _mbr    { _heap, _driver        };
-		Gpt                 _gpt    { _heap, _driver        };
-		Block::Root         _root   { _env, _heap, _driver, _table() };
+		Genode::Env &_env;
+		Genode::Attached_rom_dataspace _config_rom { _env, "config" };
+
+		Genode::Heap          _heap { _env.ram(), _env.rm() };
+		Genode::Allocator_avl _tx_block_alloc { &_heap };
+
+		Block::Backend        _block { _env, _tx_block_alloc };
+		Mbr_partition_table   _mbr   { _heap, _block };
+		Gpt                   _gpt   { _heap, _block };
+
+		Block::Proxy _proxy  { _config_rom, _table() };
 
 	public:
 
@@ -45,14 +45,8 @@ class Main
 
 		Main(Genode::Env &env) : _env(env)
 		{
-			/*
-			 * we read all partition information,
-			 * now it's safe to turn in asynchronous mode
-			 */
-			_driver.work_asynchronously();
-
 			/* announce at parent */
-			env.parent().announce(env.ep().manage(_root));
+			env.parent().announce(env.ep().manage(_proxy));
 		}
 };
 

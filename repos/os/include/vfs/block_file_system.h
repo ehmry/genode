@@ -105,7 +105,8 @@ class Vfs::Block_file_system : public Single_file_system
 			_block_buffer(0),
 			_block_buffer_count(1),
 			_tx_block_alloc(env()->heap()),
-			_block(&_tx_block_alloc, 128*1024, _label.string),
+			_block(&_tx_block_alloc, Block::DEFAULT_TX_BUF_SIZE,
+			       0, 0, true, true, _label.string),
 			_tx_source(_block.tx()),
 			_readable(false),
 			_writeable(false)
