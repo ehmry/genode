@@ -14,6 +14,7 @@
 /* Genode includes */
 #include <base/component.h>
 #include <base/printf.h>
+#include <base/log.h>
 #include <base/thread.h>
 #include <base/rpc_server.h>
 #include <base/rpc_client.h>
@@ -26,22 +27,8 @@
 #include "libc_init.h"
 
 
-/* escape sequences for highlighting debug message prefixes */
-#define LIBC_ESC_START "\033[32m"
-#define LIBC_ESC_END   "\033[0m"
-
-#define P(...)                                           \
-	do {                                                 \
-		int dummy;                                       \
-		using namespace Genode;                          \
-		Hex ctx((addr_t)&dummy >> 20, Hex::OMIT_PREFIX); \
-		log(LIBC_ESC_START "[", ctx, "] ",               \
-		    __PRETTY_FUNCTION__, ":", __LINE__,          \
-		    LIBC_ESC_END "  ", ##__VA_ARGS__);           \
-	} while (0)
-
-
 namespace Libc {
+
 	class Task;
 
 	void (*original_call_component_construct)(Genode::Env &);
@@ -56,8 +43,8 @@ struct Task_resume
 };
 
 
-Genode::size_t Component::stack_size() {
-	return 32UL * 1024 * sizeof(Genode::addr_t); }
+Genode::size_t Component::stack_size() { return 32*1024*sizeof(long); }
+
 
 /**
  * Libc task
@@ -111,6 +98,8 @@ class Libc::Task : public Genode::Rpc_object<Task_resume, Libc::Task>
 
 		~Task() { Genode::error(__PRETTY_FUNCTION__, " should not be executed!"); }
 
+		Genode::Env & env() { return _env; }
+
 		void run()
 		{
 			/* save continuation of libc task (incl. current stack) */
@@ -124,13 +113,21 @@ class Libc::Task : public Genode::Rpc_object<Task_resume, Libc::Task>
 			/* _setjmp() returned after _longjmp() -> we're done */
 		}
 
+		void suspend()
+		{
+			if (!_setjmp(_app_task)) {
+				_longjmp(_libc_task, 1);
+			}
+		}
+
 		/**
-		 * Called in the context of the entrypoint via RPC
+		 * Called in the context of the entrypoint (e.g., via RPC)
 		 */
 		void resume()
 		{
-			if (!_setjmp(_libc_task))
+			if (!_setjmp(_libc_task)) {
 				_longjmp(_app_task, 1);
+			}
 		}
 
 		/**
@@ -192,6 +189,11 @@ namespace Libc {
 	{
 		task->schedule_suspend(suspended);
 	}
+
+	Genode::Entrypoint & task_ep() { return task->env().ep(); }
+
+	void task_suspend() { task->suspend(); }
+	void task_resume()  { task->resume(); }
 }
 
 
