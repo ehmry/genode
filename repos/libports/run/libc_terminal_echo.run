@@ -1,0 +1,105 @@
+set build_components {
+	core init
+	drivers/framebuffer
+	drivers/input
+	drivers/timer
+	server/terminal
+	test/libc_echo
+}
+
+source ${genode_dir}/repos/base/run/platform_drv.inc
+append_platform_drv_build_components
+
+build $build_components
+
+create_boot_directory
+
+set config {
+<config verbose="yes">
+	<parent-provides>
+		<service name="CPU"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="IRQ"/>
+		<service name="LOG"/>
+		<service name="PD"/>
+		<service name="RAM"/>
+		<service name="RM"/>
+		<service name="ROM"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>}
+
+append_platform_drv_config
+
+append_if [have_spec sdl] config {
+	<start name="fb_sdl">
+		<resource name="RAM" quantum="4M"/>
+		<provides>
+			<service name="Input"/>
+			<service name="Framebuffer"/>
+		</provides>
+	</start>}
+
+append_platform_drv_config
+
+append_if [have_spec framebuffer] config {
+	<start name="fb_drv">
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="Framebuffer"/></provides>
+	</start>}
+
+append_if [have_spec ps2] config {
+	<start name="ps2_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Input"/></provides>
+	</start> }
+
+append config {
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="terminal">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="Terminal"/></provides>
+		<config>
+			<!-- supported built-in font sizes are 8, 12, and 16 -->
+			<font size="12" />
+		</config>
+	</start>
+
+	<start name="test-libc_echo">
+		<resource name="RAM" quantum="4M"/>
+		<config>
+			<libc stdin="/dev/terminal" stdout="/dev/terminal" stderr="/dev/terminal">
+				<vfs> <dir name="dev"> <terminal/> </dir> </vfs>
+			</libc>
+		</config>
+	</start>
+
+</config>
+}
+
+install_config $config
+
+set boot_modules {
+	core init ld.lib.so
+	libc.lib.so
+	terminal
+	test-libc_echo
+	timer
+}
+
+# platform-specific modules
+lappend_if [have_spec       linux] boot_modules fb_sdl
+lappend_if [have_spec framebuffer] boot_modules fb_drv
+lappend_if [have_spec         ps2] boot_modules ps2_drv
+
+append_platform_drv_boot_modules
+
+build_boot_image $boot_modules
+
+run_genode_until forever
+
