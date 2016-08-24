@@ -7,7 +7,6 @@
 # Collect object files and avoid duplicates (by using 'sort')
 #
 SRC_O  += $(addprefix binary_,$(addsuffix .o,$(notdir $(SRC_BIN))))
-# Nim comes first because it compiles to C or C++
 SRC     =$(sort $(SRC_C) $(SRC_CC) $(SRC_ADA) $(SRC_RS) $(SRC_NIM) $(SRC_S) $(SRC_O))
 OBJECTS = $(addsuffix .o,$(basename $(SRC)))
 
@@ -87,6 +86,8 @@ endif
 	$(VERBOSE)$(NIM) compileToCpp \
 		--nimcache:. \
 		--os:genode \
+		--noLinking \
+		--gcc.cpp.exe:$(CXX) \
 		$(NIM_OPT) \
 		$(foreach D,$(CXX_DEF),--passC:$(D)) \
 		$(foreach O,$(CC_CXX_OPT),--passC:$(O)) \
