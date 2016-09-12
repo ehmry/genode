@@ -1,0 +1,4 @@
+The file_system library is not a client library, but rather a server library
+for implementing file system services. An exclusive C calling convention is
+provided for use with languages other than C++.
+
