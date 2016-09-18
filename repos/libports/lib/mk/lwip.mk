@@ -1,49 +1,42 @@
 #
 # lwIP TCP/IP library
 #
-# The library implementes TCP and UDP as well as DNS and DHCP.
+# The library implements TCP and UDP as well as DNS and DHCP.
 #
 
 LWIP_PORT_DIR := $(call select_from_ports,lwip)
-LWIP_DIR      := $(LWIP_PORT_DIR)/src/lib/lwip
+LWIPDIR := $(LWIP_PORT_DIR)/src/lib/lwip/lwip-2.0.2/src
+
+-include $(LWIPDIR)/Filelists.mk
 
 # Genode platform files
-SRC_CC   = nic.cc printf.cc sys_arch.cc
+SRC_CC = assert.cc printf.h rand.cc sys_arch.cc
 
 # Core files
-SRC_C    = init.c mem.c memp.c netif.c pbuf.c stats.c udp.c raw.c sys.c \
-           tcp.c tcp_in.c tcp_out.c dhcp.c dns.c timers.c def.c inet_chksum.c
+SRC_C += $(notdir $(COREFILES))
 
 # IPv4 files
-SRC_C   += icmp.c  igmp.c  ip4_addr.c  ip4.c  ip_frag.c
+SRC_C += $(notdir $(CORE4FILES))
 
-# API files
-SRC_C   += err.c api_lib.c api_msg.c netbuf.c netdb.c netifapi.c sockets.c \
-           tcpip.c
+# IPv6 files
+SRC_C += $(notdir $(CORE6FILES))
 
 # Network interface files
-SRC_C   += etharp.c
+SRC_C += $(notdir $(NETIFFILES))
 
-LIBS     = alarm libc timed_semaphore
-
-D_OPTS   = ERRNO
-D_OPTS  := $(addprefix -D,$(D_OPTS))
-CC_DEF  += $(D_OPTS)
-
-LD_OPT  += --version-script=$(REP_DIR)/src/lib/lwip/symbol.map
+# can't avoid string.h
+LIBS = libc
 
 INC_DIR += $(REP_DIR)/include/lwip \
            $(LWIP_PORT_DIR)/include/lwip \
-           $(LWIP_DIR)/src/include \
-           $(LWIP_DIR)/src/include/ipv4 \
-           $(LWIP_DIR)/src/include/api \
-           $(LWIP_DIR)/src/include/netif \
+           $(LWIPDIR)/include \
+           $(LWIPDIR)/include/ipv4 \
+           $(LWIPDIR)/include/api \
+           $(LWIPDIR)/include/netif \
            $(REP_DIR)/src/lib/lwip/include
 
 vpath %.cc $(REP_DIR)/src/lib/lwip/platform
-vpath %.c  $(LWIP_DIR)/src/core
-vpath %.c  $(LWIP_DIR)/src/core/ipv4
-vpath %.c  $(LWIP_DIR)/src/api
-vpath %.c  $(LWIP_DIR)/src/netif
-
-SHARED_LIB = yes
+vpath %.c  $(LWIPDIR)/core
+vpath %.c  $(LWIPDIR)/core/ipv4
+vpath %.c  $(LWIPDIR)/core/ipv6
+vpath %.c  $(LWIPDIR)/netif
