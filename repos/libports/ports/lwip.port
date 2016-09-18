@@ -1,30 +1,20 @@
 LICENSE   := BSD
-VERSION   := git
-DOWNLOADS := lwip.git window_scaling_patch.file
+VERSION   := 2.0.2
+DOWNLOADS := lwip.archive
 
-URL(lwip) := git://git.savannah.nongnu.org/lwip.git
-REV(lwip) := fe63f36656bd66b4051bdfab93e351a584337d7c
+URL(lwip) := http://download.savannah.nongnu.org/releases/lwip/lwip-$(VERSION).zip
+SHA(lwip) := 5d3d16753567a972fc3c3a1f8399d6da3547f7c6
 DIR(lwip) := src/lib/lwip
 
-URL(window_scaling_patch)  := https://savannah.nongnu.org/patch/download.php?file_id=28026
-NAME(window_scaling_patch) := src/lib/lwip/window_scaling.patch
-SHA(window_scaling_patch)  := 5be562adddc05fa00ecead8fbca8d7797e76670e
+UNPACKED_DIR := src/lib/lwip/lwip-$(VERSION)
 
-PATCHES := $(addprefix src/lib/lwip/,window_scaling.patch \
-                                     errno.patch \
-                                     libc_select_notify.patch \
-                                     sockets_c_errno.patch \
-                                     sol_socket_definition.patch \
-                                     remove_warnings.patch \
-                                     api_msg.patch \
-                                     nonblocking_connect.patch)
+DIRS := \
+	include/lwip/lwip \
+	include/lwip/lwip/priv \
+	include/lwip/lwip/prot \
+	include/lwip/netif \
 
-PATCH_OPT := -p1 -d src/lib/lwip
-
-DIRS := include/lwip/lwip include/lwip/netif
-
-DIR_CONTENT(include/lwip/lwip) := src/lib/lwip/src/include/lwip/*.h \
-                                  src/lib/lwip/src/include/ipv4/lwip/*.h \
-                                  src/lib/lwip/src/include/ipv6/lwip/*.h
-
-DIR_CONTENT(include/lwip/netif) := src/lib/lwip/src/include/netif/*.h
+DIR_CONTENT(include/lwip/lwip/priv) := $(UNPACKED_DIR)/src/include/lwip/priv/*.h
+DIR_CONTENT(include/lwip/lwip/prot) := $(UNPACKED_DIR)/src/include/lwip/prot/*.h
+DIR_CONTENT(include/lwip/lwip)      := $(UNPACKED_DIR)/src/include/lwip/*.h
+DIR_CONTENT(include/lwip/netif)     := $(UNPACKED_DIR)/src/include/netif/*.h
