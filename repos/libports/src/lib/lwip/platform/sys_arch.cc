@@ -24,6 +24,7 @@
 #include <ring_buffer.h>
 #include <thread.h>
 #include <verbose.h>
+#include <lwip/netifapi.h>
 
 
 namespace Lwip {
@@ -86,6 +87,7 @@ extern "C" {
 #include <arch/sys_arch.h>
 #include <arch/cc.h>
 #include <nic.h>
+#include <lwip/netifapi.h>
 
 /*
  * Sanitize check, whether somebody tries to use our LwIP backend,
@@ -106,16 +108,9 @@ extern "C" {
 	 */
 	static void status_callback(struct netif *netif)
 	{
-		static ip_addr_t ip_addr = { 0 };
-
-		if (ip_addr.addr != netif->ip_addr.addr) {
-			Genode::log("got IP address ",
-			            ip4_addr1(&(netif->ip_addr)), ".",
-			            ip4_addr2(&(netif->ip_addr)), ".",
-			            ip4_addr3(&(netif->ip_addr)), ".",
-			            ip4_addr4(&(netif->ip_addr)));
-			ip_addr.addr = netif->ip_addr.addr;
-		}
+		char buf[IPADDR_STRLEN_MAX];
+		ipaddr_ntoa_r(&netif->ip_addr, buf, sizeof(buf));
+		Genode::log("got IP address ", (char const*)buf);
 	}
 
 
@@ -152,13 +147,13 @@ extern "C" {
 
 
 	/* in lwip/genode.h */
-	int lwip_nic_init(Genode::int32_t ip_addr,
-	                  Genode::int32_t netmask,
-	                  Genode::int32_t gateway,
+	int lwip_nic_init(Genode::uint32_t ip_addr,
+	                  Genode::uint32_t netmask,
+	                  Genode::uint32_t gateway,
 	                  Genode::size_t  tx_buf_size,
 	                  Genode::size_t  rx_buf_size)
 	{
-		struct ip_addr ip, nm, gw;
+		ip4_addr_t ip, nm, gw;
 		static struct netif_buf_sizes nbs;
 		nbs.tx_buf_size = tx_buf_size;
 		nbs.rx_buf_size = rx_buf_size;
@@ -184,16 +179,17 @@ extern "C" {
 			if (ret != ERR_OK)
 				throw Nic_not_availble();
 
+			/* Register callback functions. */
+			netif.status_callback = status_callback;
+			netif.link_callback = link_callback;
+
 			/* Set Genode's nic as the default nic */
 			netifapi_netif_set_default(&netif);
 
 			/* If no static ip was set, we do dhcp */
 			if (!ip_addr) {
 #if LWIP_DHCP
-				/* Register callback functions. */
-				netif.status_callback = status_callback;
-				netif.link_callback = link_callback;
-
+				netifapi_netif_set_up(&netif);
 				netifapi_dhcp_start(&netif);
 #else
 				/* no IP address - no networking */
