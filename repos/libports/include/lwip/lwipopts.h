@@ -1,7 +1,10 @@
 /*
  * \brief  Configuration file for LwIP, adapt it to your needs.
  * \author Stefan Kalkowski
+ * \author Emery Hemingway
  * \date   2009-11-10
+ *
+ * See lwip/src/include/lwip/opt.h for all options
  */
 
 /*
@@ -14,49 +17,36 @@
 #ifndef __LWIP__LWIPOPTS_H__
 #define __LWIP__LWIPOPTS_H__
 
-#include <stdlib.h>
-#include <string.h>
+/* Genode includes */
+#include <base/fixed_stdint.h>
 
-#define NO_SYS                      0  /* single-threaded? do not touch! */
-#define SYS_LIGHTWEIGHT_PROT        1  /* do we provide lightweight protection */
-#define LWIP_ARP                    1  /* ARP support */
-#define LWIP_RAW                    0  /* LwIP raw API */
-#define LWIP_UDP                    1  /* UDP support */
-#define LWIP_TCP                    1  /* TCP support */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * Use lwIP without OS-awareness
+ */
+#define NO_SYS 1
+#define SYS_LIGHTWEIGHT_PROT 0
+
 #define LWIP_DNS                    1  /* DNS support */
 #define LWIP_DHCP                   1  /* DHCP support */
-#define LWIP_SOCKET                 1  /* LwIP socket API */
-#define LWIP_COMPAT_SOCKETS         0  /* Libc compatibility layer */
-#define LWIP_COMPAT_MUTEX           1  /* use binary semaphore instead of mutex */
-#define LWIP_NETIF_API              1  /* Network interface API */
+#define LWIP_SOCKET                 0  /* LwIP socket API */
 #define LWIP_NETIF_LOOPBACK         1  /* Looping back to same address? */
-#define LWIP_HAVE_LOOPIF            1  /* 127.0.0.1 support ? */
 #define LWIP_STATS                  0  /* disable stating */
-#define LWIP_STATS_DISPLAY          0  /* disable stating display function */
-#define LWIP_SO_RCVTIMEO            1  /* support timeouts for socket recv */
-#define LWIP_SO_SNDTIMEO            1  /* support timeouts for socket send */
 #define LWIP_TCP_TIMESTAMPS         1
-#define LWIP_SO_RCVBUF              1  /* enable SO_RCVBUF */
-#define SO_REUSE                    1  /* enable SO_REUSE */
 #define LWIP_WND_SCALE              1  /* enable window scaling */
 #define TCP_RCV_SCALE               2  /* receive scale factor IETF RFC 1323 */
 
-#if LWIP_DHCP
 #define LWIP_NETIF_STATUS_CALLBACK  1  /* callback function used for interface changes */
 #define LWIP_NETIF_LINK_CALLBACK    1  /* callback function used for link-state changes */
-#endif
 
 /***********************************
  ** Checksum calculation settings **
  ***********************************/
 
 /* checksum calculation for outgoing packets can be disabled if the hardware supports it */
-#define CHECKSUM_GEN_IP             1  /* calculate checksum for outgoing IP packets */
-#define CHECKSUM_GEN_TCP            1  /* calculate checksum for outgoing TCP packets */
-
-#define CHECKSUM_CHECK_IP           1  /* check checksum of incoming IP packets */
-#define CHECKSUM_CHECK_TCP          1  /* check checksum of incoming TCP packets */
-
 #define LWIP_CHECKSUM_ON_COPY       1  /* calculate checksum during memcpy */
 
 /*********************
@@ -85,26 +75,10 @@
 
 #define TCP_SND_QUEUELEN            ((32 * (TCP_SND_BUF) + (TCP_MSS - 1))/(TCP_MSS))
 
-#define RECV_BUFSIZE_DEFAULT        128 * 1024
-
 #define PBUF_POOL_SIZE             96
-
-/*
- * We reduce the maximum segment lifetime from one minute to one second to
- * avoid queuing up PCBs in TIME-WAIT state. This is the state, PCBs end up
- * after closing a TCP connection socket at the server side. The number of PCBs
- * in this state is apparently not limited by the value of 'MEMP_NUM_TCP_PCB'.
- * One allocation costs around 160 bytes. If clients connect to the server at a
- * high rate, those allocations accumulate quickly and thereby may exhaust the
- * memory of the server. By reducing the segment lifetime, PCBs in TIME-WAIT
- * state are cleaned up from the 'tcp_tw_pcbs' queue in a more timely fashion
- * (by 'tcp_slowtmr()').
- */
-#define TCP_MSL 1000UL
 
 #define MEMP_NUM_SYS_TIMEOUT        16
 #define MEMP_NUM_TCP_PCB           128
-#define MEMP_NUM_NETCONN (MEMP_NUM_TCP_PCB + MEMP_NUM_UDP_PCB + MEMP_NUM_RAW_PCB + MEMP_NUM_TCP_PCB_LISTEN - 1)
 
 void genode_memcpy(void * dst, const void *src, unsigned long size);
 #define MEMCPY(dst,src,len)             genode_memcpy(dst,src,len)
@@ -130,5 +104,37 @@ void genode_memcpy(void * dst, const void *src, unsigned long size);
 /* #define MEMP_DEBUG      LWIP_DBG_ON */
 /* #define SYS_DEBUG       LWIP_DBG_ON */
 /* #define TCP_DEBUG       LWIP_DBG_ON */
+
+
+/*
+   ----------------------------------
+   ---------- DHCP options ----------
+   ----------------------------------
+*/
+
+#define LWIP_DHCP_CHECK_LINK_UP         1
+
+
+/*
+   ----------------------------------------------
+   ---------- Sequential layer options ----------
+   ----------------------------------------------
+*/
+/* no Netconn API */
+#define LWIP_NETCONN                    0
+
+
+/*
+   ---------------------------------------
+   ---------- IPv6 options ---------------
+   ---------------------------------------
+*/
+
+#define LWIP_IPV6                       1
+#define IPV6_FRAG_COPYHEADER            1
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __LWIP__LWIPOPTS_H__ */
