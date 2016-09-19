@@ -15,10 +15,27 @@
 #ifndef _LIBC__TASK_H_
 #define _LIBC__TASK_H_
 
+#include <base/debug.h>
+
+extern "C" void wait_for_continue(void);
+
 namespace Libc {
 
-	void task_suspend();
-	void task_resume();
+	/**
+	 * Task represents a thread of user execution.
+	 * When a blocking call is made a task will suspend
+	 * until unblocked by the Libc "kernel".
+	 */
+	struct Task
+	{
+		/* Suspend task execution */
+		virtual void   block() = 0;
+
+		/* Resume task execution */
+		virtual void unblock() = 0;
+	};
+
+	Task &this_task();
 
 }
 

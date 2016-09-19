@@ -123,7 +123,6 @@ install_config $config
 set boot_modules {
 	core init ld.lib.so
 	libc.lib.so
-	libc_pipe.lib.so
 	libm.lib.so
 	lxip.lib.so
 	nic_drv

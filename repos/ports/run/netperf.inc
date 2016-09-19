@@ -4,14 +4,6 @@
 # \date   2013-04-18
 #
 
-# setting environment variable FORCE_QEMU permits running netperf in qemu
-set force_qemu [info exists ::env(FORCE_QEMU)]
-
-if {[expr [have_include "power_on/qemu"] && !$force_qemu]} {
-	puts "\nNetperf running on Qemu is not recommended.\n"
-	exit
-}
-
 if {[have_spec hw_odroid_xu] || [have_spec hw_wand_quad]} {
 	puts "Run script does not support this platform."
 	exit 0
@@ -71,10 +63,11 @@ set build_components {
 	core init
 	drivers/timer
 	app/netperf
-	server/vfs
 }
 
-lappend build_components $netperf_target
+lappend build_components lib/vfs/$stack_name
+
+lappend_if $use_socket_fs       build_components server/vfs
 
 lappend_if $use_nic_driver      build_components drivers/nic
 lappend_if $use_usb_driver      build_components drivers/usb
@@ -133,11 +126,11 @@ append_if [have_spec gpio] config {
 
 append_if $use_nic_bridge config {
 	<start name="nic_bridge">
-		<resource name="RAM" quantum="5M"/>
+		<resource name="RAM" quantum="4M"/>
 		<provides><service name="Nic"/></provides>
 		<config>}
 append_if [expr $use_nic_bridge && [have_spec linux]] config "
-			<policy label_prefix=\"netserver_genode\" ip_addr=\"$lx_ip_addr\"/>"
+			<policy label=\"socket_fs\" ip_addr=\"$lx_ip_addr\"/>"
 append_if $use_nic_bridge config {
 		</config>
 		<route>
@@ -180,7 +173,7 @@ append_if $use_wifi_driver config {
 		<resource name="RAM" quantum="4M"/>
 		<provides> <service name="File_system"/> </provides>
 		<config>
-			<policy label_prefix="config_rom" root="/"/>
+			<policy label="config_rom" root="/"/>
 			<policy label="wifi_drv -> config" root="/" writeable="yes"/>
 			<content>
 				<inline name="wlan_configuration">}
@@ -227,20 +220,24 @@ append_if $use_wifi_driver config {
 
 append_platform_drv_config
 
+if $use_socket_fs {
 append config {
 	<start name="socket_fs">
 		<binary name="vfs"/>
 		<resource name="RAM" quantum="32M"/>
 		<provides> <service name="File_system"/> </provides>
 		<config ld_verbose="yes">
-			<vfs audit="yes">
-				<lxip }
+			<vfs> <}
+append config $stack_name
 append_if [have_spec linux] config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\""
 append config {/> </vfs>
 			<default-policy writeable="yes" />
 		</config>
 	</start>
+}
+}
 
+append config {
 	<start name="netserver">
 		<resource name="RAM" quantum="32M"/>
 		<config>
@@ -255,7 +252,14 @@ append config {/> </vfs>
 			      stdout="/dev/log" stderr="/dev/log" socket="/socket">
 				<vfs>
 					<dir name="dev"> <log/> </dir>
- 					<dir name="socket"> <fs/>  </dir>
+ 					<dir name="socket"> <}
+if $use_socket_fs {
+	append config "fs"
+} else {
+	append config $stack_name
+	append_if [have_spec linux] config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\""
+}
+append config {/>   </dir>
 				</vfs>
 			</libc>
 		</config>}
@@ -280,8 +284,9 @@ set boot_modules {
 	core init timer
 	ld.lib.so libc.lib.so libm.lib.so
 	netserver
-	vfs
 }
+
+lappend_if $use_socket_fs boot_modules vfs
 
 append                     boot_modules " $netperf_stack "
 lappend_if $use_nic_bridge boot_modules nic_bridge
@@ -316,12 +321,12 @@ build_boot_image $boot_modules
 #
 
 # qemu config
-append qemu_args " -m 128 "
+append qemu_args " -m 128 -nographic"
 
 append_if [have_spec x86]     qemu_args " -net nic,model=e1000 "
 append_if [have_spec lan9118] qemu_args " -net nic,model=lan9118 "
 
-append qemu_args " -net user -redir tcp:12865::12865 -redir tcp:49153::49153 "
+append qemu_args " -net user -redir tcp:12865::12865 -redir tcp:49153::49153 -net dump,file=/tmp/netperf.pcap"
 
 if {[have_spec linux]} {
 	run_genode_until {.*family AF_INET.*\n} 60

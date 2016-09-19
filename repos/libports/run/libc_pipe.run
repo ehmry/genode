@@ -1,4 +1,4 @@
-build "core init test/libc_pipe"
+build "core init lib/vfs/pipe test/libc_pipe"
 
 create_boot_directory
 
@@ -22,8 +22,11 @@ install_config {
 	<start name="test-libc_pipe">
 		<resource name="RAM" quantum="4M"/>
 		<config>
-			<libc stdout="/dev/log" stderr="/dev/log">
-				<vfs> <dir name="dev"> <log/> </dir> </vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" pipe="/pipe">
+				<vfs>
+					<dir name="dev"> <log/> </dir>
+					<dir name="pipe"> <pipe/> </dir>
+				</vfs>
 			</libc>
 		</config>
 	</start>
@@ -32,7 +35,7 @@ install_config {
 
 build_boot_image {
 	core init test-libc_pipe
-	ld.lib.so libc.lib.so libc_pipe.lib.so pthread.lib.so
+	ld.lib.so libc.lib.so vfs_pipe.lib.so pthread.lib.so
 }
 
 append qemu_args " -nographic -m 64 "
