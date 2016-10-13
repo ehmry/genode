@@ -268,6 +268,8 @@ namespace {
 			return port;
 		}
 	};
+
+	enum { MAX_CONTROL_PATH_LEN = 16 };
 }
 
 
@@ -406,7 +408,7 @@ extern "C" int socket_fs_accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 	if (!(context = dynamic_cast<Socket_context *>(fd->context)))
 		return Errno(ENOTSOCK);
 
-	char accept_socket[10];
+	char accept_socket[MAX_CONTROL_PATH_LEN];
 	{
 		int n = 0;
 		/* XXX currently reading accept may return without new connection */
@@ -429,7 +431,7 @@ extern "C" int socket_fs_accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 		Absolute_path file("remote", accept_path.base());
 		int const fd = open(file.base(), O_RDONLY|context->fd_flags());
 		if (fd == -1) {
-			Genode::error(__func__, ": remote file not accessible");
+			Genode::error(__func__, ": remote file '",file,"'not accessible");
 			return Errno(EINVAL);
 		}
 		Sockaddr_string remote;
@@ -616,7 +618,7 @@ static ssize_t do_sendto(Libc::File_descriptor *fd,
 		Absolute_path file("remote", context->path.base());
 		int const fd = open(file.base(), O_WRONLY);
 		if (fd == -1) {
-			Genode::error(__func__, ": remote file not accessible");
+			Genode::error(__func__, ": remote file '",file,"'not accessible");
 			return Errno(EINVAL);
 		}
 		int const len = strlen(addr_string.base());
@@ -689,8 +691,7 @@ extern "C" int socket_fs_shutdown(int libc_fd, int how)
 	return 0;
 }
 
-
-static Genode::String<16> new_socket(Absolute_path const &path)
+static Genode::String<MAX_CONTROL_PATH_LEN> new_socket(Absolute_path const &path)
 {
 	Absolute_path new_socket("new_socket", path.base());
 
@@ -699,14 +700,14 @@ static Genode::String<16> new_socket(Absolute_path const &path)
 		Genode::error(__func__, ": new_socket file not accessible - socket fs not mounted?");
 		throw New_socket_failed();
 	}
-	char buf[10];
+	char buf[MAX_CONTROL_PATH_LEN];
 	int const n = read(fd, buf, sizeof(buf));
 	close(fd);
-	if (n == -1 || !n || n >= (int)sizeof(buf) - 1)
+	if (n == -1 || !n || n > (int)sizeof(buf))
 		throw New_socket_failed();
 	buf[n] = 0;
 
-	return Genode::String<16>(buf);
+	return Genode::String<MAX_CONTROL_PATH_LEN>(buf);
 }
 
 
@@ -735,7 +736,7 @@ extern "C" int socket_fs_socket(int domain, int type, int protocol)
 		else
 			proto_path.append("/udp");
 
-		Genode::String<16> socket_path = new_socket(proto_path);
+		Genode::String<MAX_CONTROL_PATH_LEN> socket_path = new_socket(proto_path);
 		path.append("/");
 		path.append(socket_path.string());
 	} catch (New_socket_failed) { return Errno(EINVAL); }
