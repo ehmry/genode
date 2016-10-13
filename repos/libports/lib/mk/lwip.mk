@@ -49,5 +49,3 @@ vpath %.c  $(LWIP_DIR)/src/core/ipv4
 vpath %.c  $(LWIP_DIR)/src/core/ipv6
 vpath %.c  $(LWIP_DIR)/src/api
 vpath %.c  $(LWIP_DIR)/src/netif
-
-SHARED_LIB = yes
