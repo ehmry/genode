@@ -82,6 +82,8 @@ namespace Socket_fs {
 	struct Local_functor;
 
 	Plugin & plugin();
+
+	enum { MAX_CONTROL_PATH_LEN = 16 };
 }
 
 
@@ -447,7 +449,7 @@ extern "C" int socket_fs_accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 	/* TODO EOPNOTSUPP - no SOCK_STREAM */
 	/* TODO ECONNABORTED */
 
-	char accept_socket[10];
+	char accept_socket[MAX_CONTROL_PATH_LEN];
 	{
 		int n = 0;
 		/* XXX currently reading accept may return without new connection */
@@ -546,7 +548,7 @@ extern "C" int socket_fs_listen(int libc_fd, int backlog)
 	Socket_fs::Context *context = dynamic_cast<Socket_fs::Context *>(fd->context);
 	if (!context) return Errno(ENOTSOCK);
 
-	char buf[10];
+	char buf[MAX_CONTROL_PATH_LEN];
 	int const len = snprintf(buf, sizeof(buf), "%d", backlog);
 	int const n   = write(context->listen_fd(), buf, len);
 	if (n != len) return Errno(EOPNOTSUPP);
@@ -733,7 +735,7 @@ extern "C" int socket_fs_shutdown(int libc_fd, int how)
 }
 
 
-static Genode::String<16> new_socket(Absolute_path const &path)
+static Genode::String<MAX_CONTROL_PATH_LEN> new_socket(Absolute_path const &path)
 {
 	Absolute_path new_socket("new_socket", path.base());
 
@@ -742,14 +744,14 @@ static Genode::String<16> new_socket(Absolute_path const &path)
 		Genode::error(__func__, ": new_socket file not accessible - socket fs not mounted?");
 		throw New_socket_failed();
 	}
-	char buf[10];
+	char buf[MAX_CONTROL_PATH_LEN];
 	int const n = read(fd, buf, sizeof(buf));
 	close(fd);
 	if (n == -1 || !n || n >= (int)sizeof(buf) - 1)
 		throw New_socket_failed();
 	buf[n] = 0;
 
-	return Genode::String<16>(buf);
+	return Genode::String<MAX_CONTROL_PATH_LEN>(buf);
 }
 
 
@@ -780,7 +782,7 @@ extern "C" int socket_fs_socket(int domain, int type, int protocol)
 		case Proto::UDP: proto_path.append("/udp"); break;
 		}
 
-		Genode::String<16> socket_path = new_socket(proto_path);
+		auto socket_path = new_socket(proto_path);
 		path.append("/");
 		path.append(socket_path.string());
 	} catch (New_socket_failed) { return Errno(EACCES); }

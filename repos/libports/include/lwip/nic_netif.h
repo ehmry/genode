@@ -237,21 +237,15 @@ class Lwip::Nic_netif
 
 			netif_set_default(&_netif);
 			netif_set_up(&_netif);
-			set_status_callback(nic_netif_status_callback);
+			netif_set_status_callback(
+				&_netif, nic_netif_status_callback);
 			configure(config);
 		}
 
 		/**
-		 * Set a custom status callback
+		* Status callback to override in subclass
 		 */
-		void set_status_callback(netif_status_callback_fn status_callback) {
-			netif_set_status_callback(&_netif, status_callback); }
-
-		/**
-		 * Set a custom link callback
-		 */
-		void set_link_callback(netif_status_callback_fn link_callback) {
-			netif_set_link_callback(&_netif, link_callback); }
+		virtual void status_callback() { }
 
 		/**
 		 * Callback issued by lwIP to initialize netif struct
@@ -339,6 +333,12 @@ class Lwip::Nic_netif
 			LINK_STATS_INC(link.xmit);
 			return ERR_OK;
 		}
+
+		bool ready()
+		{
+			return netif_is_up(&_netif) &&
+				!ip_addr_isany(&_netif.ip_addr);
+		}
 };
 
 
@@ -381,6 +381,8 @@ static err_t nic_netif_linkoutput(struct netif *netif, struct pbuf *p)
 
 static void nic_netif_status_callback(struct netif *netif)
 {
+	Lwip::Nic_netif *nic_netif = (Lwip::Nic_netif *)netif->state;
+
 	if (netif_is_up(netif)) {
 		if (IP_IS_V6_VAL(netif->ip_addr)) {
 			Genode::log("lwIP Nic interface up"
@@ -399,6 +401,8 @@ static void nic_netif_status_callback(struct netif *netif)
 	} else {
 			Genode::log("lwIP Nic interface down");
 	}
+
+	nic_netif->status_callback();
 }
 
 	}
