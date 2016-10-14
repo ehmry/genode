@@ -72,7 +72,7 @@ if { false } { append config {
 		<provides> <service name="File_system"/> </provides>
 		<config ld_verbose="yes">
 			<vfs>
-				<dir name="socket">
+				<dir name="socket" audit="yes">
 					<lxip ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/>
 				</dir>
 			</vfs>

@@ -28,9 +28,6 @@
 #include <lxip/lxip.h>
 
 
-static bool const verbose = false;
-#define PDBGV(...) if (verbose) PDBG(__VA_ARGS__)
-
 Vfs::Ticker **vfs_ticker = nullptr;
 
 static void vfs_tick()
@@ -58,6 +55,8 @@ namespace Lxip {
 
 	struct Protocol_dir;
 	struct Socket_dir;
+
+	class Tcp_proto_dir;
 
 	enum {
 		MAX_SOCKETS         = 128,      /* 3 */
@@ -419,10 +418,14 @@ class Vfs::Lxip_remote_file : public Vfs::Lxip_file
 
 class Vfs::Lxip_accept_file : public Vfs::Lxip_file
 {
+	private:
+
+		char const *_format;
+
 	public:
 
-		Lxip_accept_file(Lxip::Socket_dir &p, Lxip::Socketcall &s, Lxip::Handle &h)
-		: Lxip_file(p, s, h, "accept") { }
+		Lxip_accept_file(Lxip::Socket_dir &p, Lxip::Socketcall &s, Lxip::Handle &h, char const *format)
+		: Lxip_file(p, s, h, "accept"), _format(format) { }
 
 		/********************
 		 ** File interface **
@@ -440,7 +443,7 @@ class Vfs::Lxip_accept_file : public Vfs::Lxip_file
 
 			try {
 				unsigned const id = _parent.accept(h);
-				return Genode::snprintf(dst, len, "%u\n", id);
+				return Genode::snprintf(dst, len, _format, id);
 			} catch (...) { PERR("Could not adopt new client socket"); }
 
 			return -1;
@@ -477,7 +480,7 @@ class Vfs::Lxip_socket_dir : public Vfs::Directory,
 			return n;
 		}
 
-		Lxip_accept_file  _accept_file  { *this, _sc, _handle };
+		Lxip_accept_file  _accept_file  { *this, _sc, _handle, "tcp/%u\n" };
 		Lxip_bind_file    _bind_file    { *this, _sc, _handle };
 		Lxip_connect_file _connect_file { *this, _sc, _handle };
 		Lxip_data_file    _data_file    { *this, _sc, _handle };
@@ -588,10 +591,12 @@ class Vfs::Lxip_new_socket_file : public Vfs::File
 		Lxip::Protocol_dir &_parent;
 		Lxip::Socketcall   &_sc;
 
+		char const         *_format;
+
 	public:
 
-		Lxip_new_socket_file(Lxip::Protocol_dir &parent, Lxip::Socketcall &sc)
-		: File("new_socket"), _parent(parent), _sc(sc) { }
+		Lxip_new_socket_file(Lxip::Protocol_dir &parent, Lxip::Socketcall &sc, char const *format)
+		: File("new_socket"), _parent(parent), _sc(sc), _format(format) { }
 
 		Lxip::ssize_t read(char *dst, Genode::size_t len, file_size seek_offset)
 		{
@@ -609,7 +614,7 @@ class Vfs::Lxip_new_socket_file : public Vfs::File
 
 			try {
 				unsigned const id = _parent.adopt_socket(h, false);
-				return Genode::snprintf(dst, len, "%u\n", id);
+				return Genode::snprintf(dst, len, _format, id);
 			} catch (...) {
 				PERR("Could not adopt socket");
 			}
@@ -619,10 +624,6 @@ class Vfs::Lxip_new_socket_file : public Vfs::File
 		}
 };
 
-
-/*******************************
- ** Filesystem implementation **
- *******************************/
 
 struct Vfs::Lxip_vfs_handle : Vfs::Vfs_handle
 {
@@ -636,23 +637,19 @@ struct Vfs::Lxip_vfs_handle : Vfs::Vfs_handle
 };
 
 
-class Vfs::Lxip_file_system : public Vfs::File_system,
-                              public Vfs::Directory,
-                              public Lxip::Protocol_dir
+class Lxip::Tcp_proto_dir : public Lxip::Protocol_dir,
+                            public Vfs::Directory
 {
 	private:
 
 		Genode::Allocator &_alloc;
 
-		Genode::Xml_node _config;
-		char             _config_buf[128];
-
-		char *_parse_config(Genode::Xml_node);
-
 		/**
 		 * Interface to LXIP stack
 		 */
-		struct Lxip::Socketcall &socketcall { Lxip::init(_parse_config(_config)) };
+		struct Lxip::Socketcall &_socketcall;
+
+		Vfs::File_system &_parent;
 
 
 		/**************************
@@ -686,7 +683,30 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 				}
 		}
 
-		Vfs::Node *_lookup(char const *path)
+		bool _is_root(const char *path)
+		{
+			return (Genode::strcmp(path, "") == 0) || (Genode::strcmp(path, "/") == 0);
+		}
+
+		Vfs::Lxip_new_socket_file _new_socket_file { *this, _socketcall, "tcp/%u\n" };
+
+	public:
+
+		Tcp_proto_dir(Genode::Allocator &alloc,
+		              Lxip::Socketcall  &socketcall,
+		              Vfs::File_system  &parent)
+		: Directory("tcp"), _alloc(alloc), _socketcall(socketcall), _parent(parent)
+		{
+			for (Genode::size_t i = 0; i < MAX_NODES; i++) {
+				_nodes[i] = nullptr;
+			}
+
+			_nodes[0] = &_new_socket_file;
+		}
+
+		~Tcp_proto_dir() { }
+
+		Vfs::Node *lookup(char const *path)
 		{
 			if (*path == '/') path++;
 			if (*path == '\0') return this;
@@ -709,31 +729,6 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 			return nullptr;
 		}
 
-		bool _is_root(const char *path)
-		{
-			return (strcmp(path, "") == 0) || (strcmp(path, "/") == 0);
-		}
-
-		Lxip_new_socket_file _new_socket_file { *this, socketcall };
-
-	public:
-
-		Lxip_file_system(Genode::Allocator &alloc, Genode::Xml_node config)
-		: Directory("tcp"), _alloc(alloc), _config(config)
-		{
-			for (Genode::size_t i = 0; i < MAX_NODES; i++) {
-				_nodes[i] = nullptr;
-			}
-
-			_nodes[0] = &_new_socket_file;
-
-			socketcall.register_ticker(vfs_tick);
-		}
-
-		~Lxip_file_system() { }
-
-		char const *name() { return "lxip"; }
-
 
 		/****************************
 		 ** Protocol_dir interface **
@@ -746,8 +741,8 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 
 			unsigned const id = ((unsigned char*)node - (unsigned char*)_nodes)/sizeof(*_nodes);
 
-			Lxip_socket_dir *dir = new (&_alloc)
-				Lxip_socket_dir(_alloc, id, *this, socketcall, h, from_accept);
+			Vfs::Lxip_socket_dir *dir = new (&_alloc)
+				Vfs::Lxip_socket_dir(_alloc, id, *this, _socketcall, h, from_accept);
 
 			*node = dir;
 			return id;
@@ -769,26 +764,205 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 		 ** Directory interface **
 		 *************************/
 
-		void dirent(file_offset index, Directory_service::Dirent &out)
+		void dirent(Vfs::file_offset index, Vfs::Directory_service::Dirent &out)
 		{
 			out.fileno  = index+1;
-			out.type    = Directory_service::DIRENT_TYPE_END;
+			out.type    = Vfs::Directory_service::DIRENT_TYPE_END;
 			out.name[0] = '\0';
 
 			if ((unsigned long long)index > MAX_NODES) return;
 
 			if (!_nodes[index]) return;
 
-			strncpy(out.name, _nodes[index]->name(), sizeof(out.name));
+			Genode::strncpy(out.name, _nodes[index]->name(), sizeof(out.name));
 
 			Vfs::Directory *dir = dynamic_cast<Vfs::Directory*>(_nodes[index]);
 			if (dir) {
-				out.type = Directory_service::DIRENT_TYPE_DIRECTORY;
+				out.type = Vfs::Directory_service::DIRENT_TYPE_DIRECTORY;
 			}
 
 			Vfs::Lxip_file *file = dynamic_cast<Vfs::Lxip_file*>(_nodes[index]);
 			if (file) {
-				out.type = Directory_service::DIRENT_TYPE_FILE;
+				out.type = Vfs::Directory_service::DIRENT_TYPE_FILE;
+			}
+		}
+
+		Vfs::Node *child(char const *name) { return nullptr; }
+
+
+		/*********************************
+		 ** Directory-service interface **
+		 *********************************/
+
+		Vfs::Directory_service::Stat_result
+		stat(char const *path, Vfs::Directory_service::Stat &out)
+		{
+			out = Vfs::Directory_service::Stat();
+
+			Vfs::Node *node = lookup(path);
+			if (!node) return Vfs::Directory_service::STAT_ERR_NO_ENTRY;
+
+			Vfs::Directory *dir = dynamic_cast<Vfs::Directory*>(node);
+			if (dir) {
+				out.mode = Vfs::Directory_service::STAT_MODE_DIRECTORY | 0777;
+				return Vfs::Directory_service::STAT_OK;
+			}
+
+			Vfs::File *file = dynamic_cast<Vfs::File*>(node);
+			if (file) {
+				out.mode = Vfs::Directory_service::STAT_MODE_FILE | 0666;
+				out.size = 0x1000;  /* there may be something to read */
+				return Vfs::Directory_service::STAT_OK;
+			}
+
+			return Vfs::Directory_service::STAT_ERR_NO_ENTRY;
+		}
+
+		Vfs::Directory_service::Open_result
+		open(char const *path, unsigned mode,
+		                 Vfs::Vfs_handle **out_handle,
+		                 Genode::Allocator &alloc)
+		{
+			if (mode & Vfs::Directory_service::OPEN_MODE_CREATE)
+				return Vfs::Directory_service::OPEN_ERR_NO_PERM;
+
+			Vfs::Node *node = lookup(path);
+			if (!node) return Vfs::Directory_service::OPEN_ERR_UNACCESSIBLE;
+
+			Vfs::File *file = dynamic_cast<Vfs::File*>(node);
+			if (file) {
+				*out_handle = new (alloc) Vfs::Lxip_vfs_handle(_parent, alloc, 0, file);
+				return Vfs::Directory_service::OPEN_OK;
+			}
+
+			return Vfs::Directory_service::OPEN_ERR_UNACCESSIBLE;
+		}
+
+		Vfs::Directory_service::Unlink_result
+		unlink(char const *path)
+		{
+			Vfs::Node *node = lookup(path);
+			if (!node) return Vfs::Directory_service::UNLINK_ERR_NO_ENTRY;
+
+			Vfs::Directory *dir = dynamic_cast<Vfs::Directory*>(node);
+			if (!dir) return Vfs::Directory_service::UNLINK_ERR_NO_ENTRY;
+
+			_free_node(node);
+
+			Genode::destroy(&_alloc, dir);
+
+			return Vfs::Directory_service::UNLINK_OK;
+		}
+
+
+		/*************************************
+		 ** Lxip_file I/O service interface **
+		 *************************************/
+
+		Vfs::File_io_service::Write_result
+		write(Vfs::Vfs_handle *vfs_handle, char const *src,
+		                   Vfs::file_size count,
+		                   Vfs::file_size &out_count)
+		{
+			Vfs::File *file = static_cast<Vfs::Lxip_vfs_handle*>(vfs_handle)->file();
+
+			try {
+				Lxip::ssize_t res = file->write(src, count, vfs_handle->seek());
+				if (res < 0) return Vfs::File_io_service::WRITE_ERR_IO;
+
+				out_count = res;
+				return Vfs::File_io_service::WRITE_OK;
+
+			} catch (Vfs::File::Would_block) {
+				return Vfs::File_io_service::WRITE_ERR_WOULD_BLOCK; }
+		}
+
+		Vfs::File_io_service::Read_result
+		read(Vfs::Vfs_handle *vfs_handle, char *dst,
+		                 Vfs::file_size count,
+		                 Vfs::file_size &out_count)
+		{
+			Vfs::File *file = static_cast<Vfs::Lxip_vfs_handle*>(vfs_handle)->file();
+
+			try {
+				Lxip::ssize_t res = file->read(dst, count, vfs_handle->seek());
+				if (res < 0) return Vfs::File_io_service::READ_ERR_IO;
+
+				out_count = res;
+				return Vfs::File_io_service::READ_OK;
+
+			} catch (Vfs::File::Would_block) {
+				return Vfs::File_io_service::READ_ERR_WOULD_BLOCK; }
+		}
+};
+
+
+/*******************************
+ ** Filesystem implementation **
+ *******************************/
+
+class Vfs::Lxip_file_system : public Vfs::File_system,
+                              public Vfs::Directory
+{
+	private:
+
+		Genode::Allocator &_alloc;
+
+		Genode::Xml_node _config;
+		char             _config_buf[128];
+
+		char *_parse_config(Genode::Xml_node);
+
+		/**
+		 * Interface to LXIP stack
+		 */
+		struct Lxip::Socketcall &_socketcall { Lxip::init(_parse_config(_config)) };
+
+		Lxip::Tcp_proto_dir _tcp_dir { _alloc, _socketcall, *this };
+
+		Vfs::Node *_lookup(char const *path)
+		{
+			if (*path == '/') path++;
+			if (*path == '\0') return this;
+
+			if (Genode::strcmp(path, "tcp", 3) == 0)
+				return _tcp_dir.lookup(&path[3]);
+
+			return nullptr;
+		}
+
+		bool _is_root(const char *path)
+		{
+			return (Genode::strcmp(path, "") == 0) || (Genode::strcmp(path, "/") == 0);
+		}
+
+	public:
+
+		Lxip_file_system(Genode::Allocator &alloc, Genode::Xml_node config)
+		: Directory(""), _alloc(alloc), _config(config)
+		{
+			_socketcall.register_ticker(vfs_tick);
+		}
+
+		~Lxip_file_system() { }
+
+		char const *name() { return "lxip"; }
+
+
+		/*************************
+		 ** Directory interface **
+		 *************************/
+
+		void dirent(file_offset index, Directory_service::Dirent &out)
+		{
+			if (index == 0) {
+				out.fileno  = (Genode::addr_t)&_tcp_dir;
+				out.type    = Directory_service::DIRENT_TYPE_DIRECTORY;
+				Genode::strncpy(out.name, "tcp", sizeof(out.name));
+			} else {
+				out.fileno  = 0;
+				out.type    = Directory_service::DIRENT_TYPE_END;
+				out.name[0] = '\0';
 			}
 		}
 
@@ -806,7 +980,6 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 
 		Stat_result stat(char const *path, Stat &out) override
 		{
-			PDBGV("path: '%s'", path);
 			out = Stat();
 
 			Vfs::Node *node = _lookup(path);
@@ -830,7 +1003,6 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 
 		Dirent_result dirent(char const *path, file_offset index, Dirent &out) override
 		{
-			PDBGV("path: '%s' index: %lld", path, index);
 			Vfs::Node *node = _lookup(path);
 			if (!node) return DIRENT_ERR_INVALID_PATH;
 
@@ -845,7 +1017,7 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 
 		file_size num_dirent(char const *path) override
 		{
-			if (_is_root(path)) return _num_nodes();
+			if (_is_root(path)) return 2;
 
 			Vfs::Node *node = _lookup(path);
 			if (!node) return 0;
@@ -864,7 +1036,6 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 
 		char const *leaf_path(char const *path) override
 		{
-			PDBGV("path: '%s'", path);
 			return path;
 		}
 
@@ -872,13 +1043,10 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 		                 Vfs_handle **out_handle,
 		                 Genode::Allocator &alloc) override
 		{
-			PDBGV("path: '%s'", path);
 			if (mode & OPEN_MODE_CREATE) return OPEN_ERR_NO_PERM;
 
 			Vfs::Node *node = _lookup(path);
 			if (!node) return OPEN_ERR_UNACCESSIBLE;
-
-			PDBGV("node: '%s'", node->name());
 
 			Vfs::File *file = dynamic_cast<Vfs::File*>(node);
 			if (file) {
@@ -898,18 +1066,11 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 
 		Unlink_result unlink(char const *path) override
 		{
-			PDBGV("path: '%s'", path);
-			Vfs::Node *node = _lookup(path);
-			if (!node) return UNLINK_ERR_NO_ENTRY;
+			if (*path == '/') path++;
 
-			Vfs::Directory *dir = dynamic_cast<Vfs::Directory*>(node);
-			if (!dir) return UNLINK_ERR_NO_ENTRY;
-
-			_free_node(node);
-
-			Genode::destroy(&_alloc, dir);
-
-			return UNLINK_OK;
+			if (Genode::strcmp(path, "tcp", 3) == 0)
+				return _tcp_dir.unlink(&path[3]);
+			return UNLINK_ERR_NO_ENTRY;
 		}
 
 		Readlink_result readlink(char const *, char *, file_size,

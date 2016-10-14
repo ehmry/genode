@@ -600,7 +600,7 @@ extern "C" int shutdown(int libc_fd, int how)
 
 static void new_tcp_socket(Absolute_path &path)
 {
-	Absolute_path new_socket("new_socket", path.base());
+	Absolute_path new_socket("tcp/new_socket", path.base());
 
 	int const fd = open(new_socket.base(), O_RDONLY);
 	if (fd == -1) {
@@ -631,13 +631,13 @@ extern "C" int _socket(int domain, int type, int protocol)
 		return -1;
 	}
 
-	if (type != SOCK_STREAM || (protocol != 0 && protocol != IPPROTO_TCP)) {
+	if (type == SOCK_STREAM && (protocol == 0 || protocol == IPPROTO_TCP)) {
+		try { new_tcp_socket(path); } catch (New_socket_failed) { return -1; }
+	} else {
 		Genode::error(__func__, ": only TCP for now");
 		errno = EAFNOSUPPORT;
 		return -1;
 	}
-
-	try { new_tcp_socket(path); } catch (New_socket_failed) { return -1; }
 
 	Socket_context *context = new (Genode::env()->heap())
 	                          Socket_context(path);
