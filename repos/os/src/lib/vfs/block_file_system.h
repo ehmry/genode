@@ -45,7 +45,6 @@ class Vfs::Block_file_system : public Single_file_system
 		Block::sector_t             _block_count;
 		Block::Session::Operations  _block_ops;
 		Block::Session::Tx::Source *_tx_source;
-
 		bool                        _readable;
 		bool                        _writeable;
 
@@ -116,7 +115,8 @@ class Vfs::Block_file_system : public Single_file_system
 		                  Genode::Allocator &alloc,
 		                  Genode::Xml_node config)
 		:
-			Single_file_system(NODE_TYPE_BLOCK_DEVICE, name(), config),
+			Single_file_system(NODE_TYPE_BLOCK_DEVICE, name(),
+			                  config, OPEN_MODE_RDWR),
 			_alloc(alloc),
 			_label(config.attribute_value("label", Label())),
 			_block_buffer(0),
@@ -166,12 +166,11 @@ class Vfs::Block_file_system : public Single_file_system
 		 ** File I/O service interface **
 		 ********************************/
 
-		Write_result write(Vfs_handle *vfs_handle, char const *buf,
-		                   file_size count, file_size &out_count) override
+		void write(Vfs_handle *vfs_handle, file_size count) override
 		{
 			if (!_writeable) {
 				Genode::error("block device is not writeable");
-				return WRITE_ERR_INVALID;
+				return vfs_handle->write_status(Callback::ERR_INVALID);
 			}
 
 			file_size seek_offset = vfs_handle->seek();
@@ -202,12 +201,16 @@ class Vfs::Block_file_system : public Single_file_system
 				if (displ == 0 && (count % _block_size) >= 0 && !(count < _block_size)) {
 					file_size bytes_left = count - (count % _block_size);
 
-					nbytes = _block_io(blk_nr, (void*)(buf + written),
+					nbytes = _block_io(blk_nr, vfs_handle,
 					                   bytes_left, true, true);
 					if (nbytes == 0) {
 						Genode::error("error while write block:", blk_nr, " from block device");
-						return WRITE_ERR_INVALID;
+						return vfs_handle->write_status(Callback::ERR_INVALID);
 					}
+
+					Callback::Status s = length == count ?
+						Callback::COMPLETE : Callback::PARTIAL;
+					vfs_handle->write_callback(_block_buffer + displ, length, s);
 
 					written += nbytes;
 					count   -= nbytes;
@@ -230,30 +233,27 @@ class Vfs::Block_file_system : public Single_file_system
 					seek_offset -= _block_size;
 				}
 
-				Genode::memcpy(_block_buffer + displ, buf + written, length);
+				Callback::Status s = length == count ?
+					Callback::COMPLETE : Callback::PARTIAL;
+				vfs_handle->write_callback(_block_buffer + displ, length, s);
 
 				nbytes = _block_io(blk_nr, _block_buffer, _block_size, true);
 				if ((unsigned)nbytes != _block_size) {
 					Genode::error("error while writing block:", blk_nr, " to Block_device");
-					return WRITE_ERR_INVALID;
+					return vfs_handle->write_status(Callback::ERR_INVALID);
 				}
 
 				written += length;
 				count -= length;
 				seek_offset += length;
 			}
-
-			out_count = written;
-
-			return WRITE_OK;
 		}
 
-		Read_result read(Vfs_handle *vfs_handle, char *dst, file_size count,
-		                 file_size &out_count) override
+		void read(Vfs_handle *vfs_handle, file_size count) override
 		{
 			if (!_readable) {
 				Genode::error("block device is not readable");
-				return READ_ERR_INVALID;
+				return vfs_handle->read_status(Callback::ERR_INVALID);
 			}
 
 			file_size seek_offset = vfs_handle->seek();
@@ -284,10 +284,10 @@ class Vfs::Block_file_system : public Single_file_system
 				if (displ == 0 && (count % _block_size) >= 0 && !(count < _block_size)) {
 					file_size bytes_left = count - (count % _block_size);
 
-					nbytes = _block_io(blk_nr, dst + read, bytes_left, false, true);
+					nbytes = _block_io(blk_nr, vfs_handle, bytes_left, false, true);
 					if (nbytes == 0) {
 						Genode::error("error while reading block:", blk_nr, " from block device");
-						return READ_ERR_INVALID;
+						return vfs_handle->read_status(Callback::ERR_INVALID);
 					}
 
 					read  += nbytes;
@@ -300,19 +300,17 @@ class Vfs::Block_file_system : public Single_file_system
 				nbytes = _block_io(blk_nr, _block_buffer, _block_size, false);
 				if ((unsigned)nbytes != _block_size) {
 					Genode::error("error while reading block:", blk_nr, " from block device");
-					return READ_ERR_INVALID;
+					return vfs_handle->read_status(Callback::ERR_INVALID);
 				}
 
-				Genode::memcpy(dst + read, _block_buffer + displ, length);
+				Callback::Status s = length == count ?
+					Callback::COMPLETE : Callback::PARTIAL;
+				vfs_handle->read_callback(_block_buffer + displ, length, s);
 
 				read  += length;
 				count -= length;
 				seek_offset += length;
 			}
-
-			out_count = read;
-
-			return READ_OK;
 		}
 
 		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override

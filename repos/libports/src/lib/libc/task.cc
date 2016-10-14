@@ -25,6 +25,7 @@
 #include <base/internal/unmanaged_singleton.h>
 #include "vfs_plugin.h"
 #include "libc_init.h"
+#include "task.h"
 
 
 namespace Libc {

@@ -2,9 +2,11 @@ assert_spec linux
 
 set build_components {
 	core init
-	drivers/timer drivers/nic server/ram_fs server/vfs
-	test/netty
+	drivers/nic
+	drivers/timer
 	lib/vfs/lxip
+	server/vfs
+	test/netty
 }
 
 source ${genode_dir}/repos/base/run/platform_drv.inc
@@ -22,12 +24,10 @@ set config {
 		<service name="IRQ"/>
 		<service name="IO_MEM"/>
 		<service name="IO_PORT"/>
-		<service name="CAP"/>
 		<service name="PD"/>
 		<service name="RM"/>
 		<service name="CPU"/>
 		<service name="LOG"/>
-		<service name="SIGNAL"/>
 	</parent-provides>
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
@@ -41,45 +41,16 @@ set config {
 		<provides> <service name="Nic"/> </provides>
 	</start>
 
-	<start name="socket_fs">}
-
-if { false } { append config {
-		<binary name="ram_fs"/>
-		<resource name="RAM" quantum="10M"/>
-		<provides> <service name="File_system"/> </provides>
-		<config>
-			<content>
-				<inline name="new_socket">33</inline>
-				<dir name="33">
-					<inline name="bind"></inline>
-					<inline name="listen"></inline>
-					<inline name="accept">44</inline>
-					<inline name="local">10.0.2.55:8888</inline>
-					<!-- not connected <inline name="remote"></inline> -->
-					<!-- not connected <inline name="data"></inline> -->
-				</dir>
-				<dir name="44">
-					<inline name="local">10.0.2.55:8888</inline>
-					<inline name="remote">10.0.2.1:13001</inline>
-					<inline name="data">REQUEST</inline>
-				</dir>
-			</content>
-			<default-policy root="/" writeable="yes" />
-		</config>}
-} else { append config {
+	<start name="socket_fs">
 		<binary name="vfs"/>
 		<resource name="RAM" quantum="32M"/>
 		<provides> <service name="File_system"/> </provides>
 		<config ld_verbose="yes">
-			<vfs>
-				<dir name="socket" audit="yes">
-					<lxip ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/>
-				</dir>
+			<vfs audit="no">
+				<lxip ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/>
 			</vfs>
-			<default-policy root="/socket" writeable="yes" />
-		</config>}
-}
-append config {
+			<default-policy writeable="yes" />
+		</config>
 	</start>
 
 	<start name="netty-server-80">
@@ -150,10 +121,17 @@ append config {
 install_config $config
 
 set boot_modules {
-	core init timer nic_drv ram_fs vfs
-	ld.lib.so libc.lib.so libm.lib.so stdcxx.lib.so libc_pipe.lib.so
-	vfs_lxip.lib.so lxip.lib.so
+	core init ld.lib.so
+	libc.lib.so
+	libc_pipe.lib.so
+	libm.lib.so
+	lxip.lib.so
+	nic_drv
+	stdcxx.lib.so
 	test-netty
+	timer
+	vfs
+	vfs_lxip.lib.so
 }
 
 append_platform_drv_boot_modules

@@ -1,0 +1,94 @@
+#
+# \brief  VFS callback test
+# \author Emery Hemingway
+# \date   2016-05-10
+#
+
+set build_components {
+	core init
+	drivers/timer
+	server/ram_fs
+	server/vfs
+	test/vfs_callback
+}
+
+build $build_components
+
+#
+# Build EXT2-file-system image
+#
+catch { exec $dd if=/dev/zero of=bin/ext2.raw bs=1M count=16 }
+catch { exec $mke2fs -F bin/ext2.raw }
+
+create_boot_directory
+
+install_config {
+<config>
+	<affinity-space width="3" height="2" />
+	<parent-provides>
+		<service name="CPU"/>
+		<service name="IO_PORT"/>
+		<service name="IRQ"/>
+		<service name="LOG"/>
+		<service name="PD"/>
+		<service name="RAM"/>
+		<service name="RM"/>
+		<service name="ROM"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> </any-service>
+	</default-route>
+
+	<start name="timer">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+
+	<start name="ram_fs">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="File_system"/></provides>
+		<config>
+			<default-policy root="/" writeable="yes"/>
+		</config>
+	</start>
+
+	<start name="vfs">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="File_system"/></provides>
+		<config>
+			<vfs> <ram/> </vfs>
+			<default-policy writeable="yes"/>
+		</config>
+	</start>
+
+	<start name="test-vfs_callback">
+		<resource name="RAM" quantum="4M"/>
+		<config>
+			<vfs>
+				<dir name="ram"> <ram/> </dir>
+				<dir name="ram_fs"> <fs label="ram_fs"/> </dir>
+				<dir name="vfs"> <fs label="vfs"/> </dir>
+			</vfs>
+		</config>
+		<route>
+			<service name="File_system" label="ram_fs"> <child name="ram_fs"/> </service>
+			<service name="File_system" label="vfs">    <child name="vfs"/>    </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+</config>
+}
+
+set boot_modules {
+	core init ld.lib.so
+	ram_fs
+	test-vfs_callback
+	timer
+	vfs
+}
+
+build_boot_image $boot_modules
+
+append qemu_args "-nographic"
+
+run_genode_until ".*child \"test-vfs_callback\" exited with exit value 0.*" 60

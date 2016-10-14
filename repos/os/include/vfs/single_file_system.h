@@ -16,6 +16,7 @@
 
 #include <vfs/file_system.h>
 #include <vfs/vfs_handle.h>
+#include <base/log.h>
 
 namespace Vfs { class Single_file_system; }
 
@@ -29,12 +30,14 @@ class Vfs::Single_file_system : public File_system
 			NODE_TYPE_CHAR_DEVICE, NODE_TYPE_BLOCK_DEVICE
 		};
 
+		enum { FILENAME_MAX_LEN = 64 };
+		typedef Genode::String<FILENAME_MAX_LEN> Filename;
+
 	private:
 
 		Node_type const _node_type;
-
-		enum { FILENAME_MAX_LEN = 64 };
-		char _filename[FILENAME_MAX_LEN];
+		Filename  const _filename;
+		unsigned  const _mode;
 
 	protected:
 
@@ -45,20 +48,38 @@ class Vfs::Single_file_system : public File_system
 
 		bool _single_file(const char *path)
 		{
-			return (strlen(path) == (strlen(_filename) + 1)) &&
-			       (strcmp(&path[1], _filename) == 0);
+			return (strlen(path) == (_filename.length())) &&
+			       (_filename == &path[1]);
 		}
 
 	public:
 
-		Single_file_system(Node_type node_type, char const *type_name, Xml_node config)
+		/**
+		 * Constructor
+		 *
+		 * \node_type  basic node type
+		 * \type_name  type name and default name
+		 * \config     XML configuration sub-node
+		 * \mode       bitmask of valid open modes
+		 */
+		Single_file_system(Node_type node_type, Filename type_name,
+		                   Xml_node config,     unsigned  mode)
 		:
-			_node_type(node_type)
+			_node_type(node_type),
+			_filename(config.attribute_value("name", type_name)),
+			_mode(mode)
 		{
-			strncpy(_filename, type_name, sizeof(_filename));
+			if (_filename == "") {
+				Genode::error("VFS node '", type_name.string(), "' missing name attribute");
+				throw Xml_node::Nonexistent_attribute();
+			}
 
-			try { config.attribute("name").value(_filename, sizeof(_filename)); }
-			catch (...) { }
+			for (char const *p = _filename.string(); *p; ++p)
+				if (*p == '/') {
+					Genode::error("invalid VFS ", type_name.string(),
+					              " node name \"", _filename.string(), "\"");
+					throw Genode::Exception();
+				}
 		}
 
 
@@ -108,7 +129,7 @@ class Vfs::Single_file_system : public File_system
 				case NODE_TYPE_CHAR_DEVICE:  out.type = DIRENT_TYPE_CHARDEV;  break;
 				case NODE_TYPE_BLOCK_DEVICE: out.type = DIRENT_TYPE_BLOCKDEV; break;
 				}
-				strncpy(out.name, _filename, sizeof(out.name));
+				strncpy(out.name, _filename.string(), sizeof(out.name));
 			} else {
 				out.type = DIRENT_TYPE_END;
 			}
@@ -137,12 +158,15 @@ class Vfs::Single_file_system : public File_system
 			return _single_file(path) ? path : 0;
 		}
 
-		Open_result open(char const  *path, unsigned,
+		Open_result open(char const  *path, unsigned mode,
 		                 Vfs_handle **out_handle,
 		                 Allocator   &alloc) override
 		{
 			if (!_single_file(path))
 				return OPEN_ERR_UNACCESSIBLE;
+
+			if (mode & Vfs::Directory_service::OPEN_MODE_CREATE)
+				return OPEN_ERR_EXISTS;
 
 			*out_handle = new (alloc) Vfs_handle(*this, *this, alloc, 0);
 			return OPEN_OK;
@@ -187,10 +211,14 @@ class Vfs::Single_file_system : public File_system
 		 ** File I/O service interface **
 		 ********************************/
 
-		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override
-		{
-			return FTRUNCATE_ERR_NO_PERM;
-		}
+		void write(Vfs_handle *handle, file_size) override {
+			handle->write_status(Callback::ERR_INVALID); }
+
+		void read(Vfs_handle *handle, file_size) override {
+			handle->read_status(Callback::ERR_INVALID); }
+
+		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override {
+			return FTRUNCATE_ERR_NO_PERM; }
 };
 
 #endif /* _INCLUDE__VFS__SINGLE_FILE_SYSTEM_H_ */

@@ -28,6 +28,8 @@
 #include <libc-plugin/plugin.h>
 #include <libc-plugin/fd_alloc.h>
 
+#include "task.h"
+
 namespace Libc {
 
 	Genode::Xml_node config();
@@ -46,6 +48,58 @@ namespace Libc { class Vfs_plugin; }
 
 class Libc::Vfs_plugin : public Libc::Plugin
 {
+	public:
+
+		struct Context : Libc::Plugin_context
+		{
+			Vfs::Vfs_handle &_handle;
+
+			Context(Vfs::Vfs_handle &h) : _handle(h) { }
+
+			Vfs::Vfs_handle &handle() { return _handle; }
+		};
+
+		struct Meta_path : Libc::Absolute_path
+		{
+			Meta_path() { }
+
+			Meta_path(char const *path, char const *pwd = 0)
+			: Absolute_path(path, pwd)
+			{
+				remove_trailing('\n');
+			}
+		};
+
+		struct Socket_context : Context
+		{
+			Meta_path const path;
+
+			Vfs::Vfs_handle *_accept_handle = nullptr;
+
+			Socket_context(Absolute_path const &path, Vfs::Vfs_handle &data_handle)
+			: Context(data_handle), path(path.base()) { }
+
+			virtual ~Socket_context() { }
+
+			Vfs::Vfs_handle *accept_handle() { return _accept_handle; }
+
+			void accept_handle(Vfs::Vfs_handle *handle)
+			{
+				if (!_accept_handle)
+					_accept_handle = handle;
+			}
+		};
+
+		static Libc::Vfs_plugin::Context *vfs_context(Libc::File_descriptor *fd)
+		{
+			return dynamic_cast<Libc::Vfs_plugin::Context *>(fd->context);
+		}
+
+		static Libc::Plugin_context *vfs_context(Libc::Vfs_plugin::Context *context)
+		{
+			return reinterpret_cast<Libc::Plugin_context *>(context);
+		}
+
 	private:
 
 		Genode::Allocator &_alloc;
@@ -76,6 +130,9 @@ class Libc::Vfs_plugin : public Libc::Plugin
 				return;
 			}
 
+			/* make stdio blocking */
+			fd->status = fd->status & ~O_NONBLOCK;
+
 			/*
 			 * We need to manually register the path. Normally this is done
 			 * by '_open'. But we call the local 'open' function directly
@@ -86,6 +143,9 @@ class Libc::Vfs_plugin : public Libc::Plugin
 			 */
 			fd->fd_path = strdup(path);
 		}
+
+		ssize_t _read(Vfs::Vfs_handle&, void*, Vfs::file_size, bool blocking);
+		ssize_t _write(Vfs::Vfs_handle&, void const *, Vfs::file_size);
 
 	public:
 
@@ -120,6 +180,8 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		bool supports_unlink(const char *)                     override { return true; }
 		bool supports_mmap()                                   override { return true; }
 
+		bool supports_socket(int domain, int type, int protocol) override { return true; }
+
 		Libc::File_descriptor *open(const char *, int, int libc_fd);
 
 		Libc::File_descriptor *open(const char *path, int flags) override
@@ -149,6 +211,21 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		ssize_t write(Libc::File_descriptor *, const void *, ::size_t ) override;
 		void   *mmap(void *, ::size_t, int, int, Libc::File_descriptor *, ::off_t) override;
 		int     munmap(void *, ::size_t) override;
+
+		int getpeername(Libc::File_descriptor*, sockaddr*, socklen_t*) override;
+		int getsockname(Libc::File_descriptor*, sockaddr*, socklen_t*) override;
+		Libc::File_descriptor* accept(Libc::File_descriptor*, sockaddr*, socklen_t*) override;
+		int bind(Libc::File_descriptor*, const sockaddr*, socklen_t) override;
+		int connect(Libc::File_descriptor*, const sockaddr*, socklen_t) override;
+		int listen(Libc::File_descriptor*, int) override;
+		ssize_t recvfrom(Libc::File_descriptor*, void*, size_t, int, sockaddr*, socklen_t*) override;
+		ssize_t recv(Libc::File_descriptor*, void*, size_t, int) override;
+		ssize_t sendto(Libc::File_descriptor*, const void*, size_t, int, const sockaddr*, socklen_t) override;
+		ssize_t send(Libc::File_descriptor*, const void*, size_t, int) override;
+		int getsockopt(Libc::File_descriptor*, int, int, void*, socklen_t*) override;
+		int setsockopt(Libc::File_descriptor*, int, int, const void*, socklen_t) override;
+		int shutdown(Libc::File_descriptor*, int) override;
+		Libc::File_descriptor* socket(int, int, int) override;
 };
 
 #endif

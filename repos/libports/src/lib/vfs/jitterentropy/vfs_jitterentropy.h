@@ -52,7 +52,7 @@ class Jitterentropy_file_system : public Vfs::Single_file_system
 
 		Jitterentropy_file_system(Genode::Xml_node config)
 		:
-			Single_file_system(NODE_TYPE_CHAR_DEVICE, name(), config),
+			Single_file_system(NODE_TYPE_CHAR_DEVICE, name(), config, OPEN_MODE_RDONLY),
 			_ec_stir(0),
 			_initialized(_init_jitterentropy())
 		{ }
@@ -70,16 +70,12 @@ class Jitterentropy_file_system : public Vfs::Single_file_system
 		 ** File I/O service interface **
 		 ********************************/
 
-		Write_result write(Vfs::Vfs_handle *, char const *,
-		                   Vfs::file_size count,
-		                   Vfs::file_size &count_out) override
+		Write_result write(Vfs::Vfs_handle *, Vfs::file_size count) override
 		{
 			return WRITE_ERR_IO;
 		}
 
-		Read_result read(Vfs::Vfs_handle *vfs_handle, char *dst,
-		                 Vfs::file_size count,
-		                 Vfs::file_size &out_count) override
+		Read_result read(Vfs::Vfs_handle *vfs_handle, Vfs::file_size count) override
 		{
 			if (!_initialized)
 				return READ_ERR_IO;
@@ -92,10 +88,7 @@ class Jitterentropy_file_system : public Vfs::Single_file_system
 			if (jent_read_entropy(_ec_stir, buf, len) < 0)
 				return READ_ERR_IO;
 
-			Genode::memcpy(dst, buf, len);
-
-			out_count = len;
-
+			vfs_handle->read_callback(buf, len, Vfs::Callback::COMPLETE);
 			return READ_OK;
 		}
 };

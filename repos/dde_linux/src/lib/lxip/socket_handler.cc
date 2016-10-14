@@ -15,15 +15,11 @@
 #include <base/env.h>
 #include <base/signal.h>
 #include <base/log.h>
-#include <base/thread.h>
 
 /* local includes */
 #include <lxip/lxip.h>
 #include <lx.h>
 #include <nic.h>
-
-
-static const bool verbose = false;
 
 
 namespace Linux {
@@ -86,130 +82,21 @@ unsigned get_addr(char const *s)
 } /* anonymous helper foo */
 
 
-namespace Net
-{
-	struct Ticker;
-		class Socketcall;
+namespace Net { class Socketcall; };
 
-		enum Opcode { OP_SOCKET   = 0,  OP_CLOSE  = 1, OP_BIND     = 2,  OP_LISTEN  = 3,
-		              OP_ACCEPT   = 4,  OP_POLL   = 5, OP_RECV     = 6,  OP_CONNECT = 7,
-		              OP_SEND     = 8,  OP_SETOPT = 9, OP_GETOPT   = 10, OP_GETNAME = 11,
-		              OP_PEERNAME = 12, OP_IOCTL = 13, OP_SHUTDOWN = 14 };
-
-		struct Call
-		{
-			Opcode       opcode;
-			Lxip::Handle handle;
-
-			union
-			{
-				struct
-				{
-					Lxip::Type type;
-				} socket;
-				struct
-				{
-					int backlog;
-				} listen;
-				struct
-				{
-					void           *addr;
-					Lxip::uint32_t *len;
-				} accept;
-				struct
-				{
-					mutable void   *buf;
-					Lxip::size_t    len;
-					int             flags;
-					void           *addr;
-					Lxip::uint32_t  addr_len;
-				} msg;
-				struct
-				{
-					int             level;
-					int             optname;
-					const void     *optval;
-					Lxip::uint32_t  optlen;
-					int            *optlen_ptr;
-				} sockopt;
-				struct {
-					bool block;
-				} poll;
-				struct {
-					int           request;
-					unsigned long arg;
-				} ioctl;
-				struct {
-					int how;
-				} shutdown;
-			};
-
-			struct Linux::sockaddr_storage addr;
-			Lxip::uint32_t                 addr_len;
-		};
-
-		union Result
-		{
-			int           err;
-			Lxip::ssize_t len;
-		};
-};
-
-
-struct Net::Ticker
-{
-	void (*_tick)()      = nullptr;
-	bool _skip_next_tick = false;
-
-	void tick_function(void (*tick)()) { _tick = tick; }
-
-	void skip_next_tick() { _skip_next_tick = true; }
-
-	void tick()
-	{
-		if (!_skip_next_tick && _tick)
-			_tick();
-
-		_skip_next_tick = false;
-	}
-};
-
-
-static Net::Ticker *TICKER = nullptr;
-
-extern "C" void TICK() { if (TICKER) TICKER->tick(); }
-
-
-class Net::Socketcall : public Genode::Signal_dispatcher_base,
-                        public Genode::Signal_context_capability,
-                        public Lxip::Socketcall,
-                        public Genode::Thread_deprecated<64 * 1024 * sizeof(Genode::addr_t)>
+class Net::Socketcall : public Lxip::Socketcall
 {
 	private:
 
-		Call         _call;
-		Result       _result;
-		Lxip::Handle _handle;
+		struct Linux::sockaddr_storage _addr;
+		Lxip::uint32_t                 _addr_len;
+		int                            _listen_backlog;
+		Lxip::Handle                   _handle;
 
-		Genode::Signal_receiver    &_sig_rec;
-		Genode::Signal_transmitter  _signal;
-		Genode::Semaphore           _block;
-
-		Ticker _ticker;
-
-		void _submit_and_block()
+		struct Linux::socket * call_socket(Lxip::Handle &handle)
 		{
-			_signal.submit(); /* global submit */
-			_block.down();
+			return static_cast<struct Linux::socket *>(handle.socket);
 		}
-
-		void _unblock() { _block.up(); }
-
-		struct Linux::socket * call_socket()
-		{
-			return static_cast<struct Linux::socket *>(_call.handle.socket);
-		}
-
 
 		Lxip::uint32_t _family_handler(Lxip::uint16_t family, void *addr)
 		{
@@ -223,7 +110,7 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 				case AF_INET:
 
 					struct sockaddr_in *in  = (struct sockaddr_in *)addr;
-					struct sockaddr_in *out = (struct sockaddr_in *)&_call.addr;
+					struct sockaddr_in *out = (struct sockaddr_in *)&_addr;
 
 					out->sin_family       = family;
 					out->sin_port         = in->sin_port;
@@ -235,114 +122,128 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			return 0;
 		}
 
-		/******************************************
-		 ** Glue interface to Linux TCP/IP stack **
-		 ******************************************/
+	public:
 
-		void _do_accept()
+		/**************************
+		 ** Socketcall interface **
+		 **************************/
+
+		Lxip::Handle accept(Lxip::Handle handle, void *addr, Lxip::uint32_t *len)
 		{
 			using namespace Linux;
 
-			struct socket *sock     = call_socket();
+			struct socket *sock     = call_socket(handle);
 			struct socket *new_sock = sock_alloc();
 
 			_handle.socket = 0;
 
 			if (!new_sock)
-				return;
+				return _handle;
 
 			new_sock->type = sock->type;
 			new_sock->ops  = sock->ops;
 
-			int flags = 0;
-			if (_call.handle.non_block) flags |= Linux::O_NONBLOCK;
+			int flags = Linux::O_NONBLOCK;
 
 			if (int err = sock->ops->accept(sock, new_sock, flags)) {
 				if (err == -EAGAIN) _handle.socket = (void*)0x1;
 				kfree(new_sock);
-				return;
+				return _handle;
 			}
 
 			_handle.socket = static_cast<void *>(new_sock);
 
-			if (!_call.accept.addr)
-				return;
+			if (addr) {
+				int tmp_len;
+				if ((new_sock->ops->getname(new_sock, (struct sockaddr *)&_addr,
+				    &tmp_len, 2)) < 0)
+					return _handle;
 
-			int len;
-			if ((new_sock->ops->getname(new_sock, (struct sockaddr *)&_call.addr,
-			    &len, 2)) < 0)
-				return;
+				*len = min(*len, tmp_len);
+				Genode::memcpy(addr, &_addr, *len);
+			}
 
-			*_call.accept.len = min(*_call.accept.len, len);
-			Genode::memcpy(_call.accept.addr, &_call.addr, *_call.accept.len);
+			return _handle;
 		}
 
-		void _do_bind()
+		int bind(Lxip::Handle h, Lxip::uint16_t family, void *addr)
 		{
-			struct Linux::socket *sock = call_socket();
+			_addr_len = _family_handler(family, addr);
 
-			_result.err = sock->ops->bind(sock, (struct Linux::sockaddr *) &_call.addr,
-			                              _call.addr_len);
+			struct Linux::socket *sock = call_socket(h);
+
+			return sock->ops->bind(sock, (struct Linux::sockaddr *) &_addr,
+			                       _addr_len);
 		}
 
-		void _do_close()
+		void close(Lxip::Handle h)
 		{
-			using namespace Linux;
+			struct Linux::socket *sock = call_socket(h);
 
-			struct socket *s = call_socket();
-			if (s->ops)
-				s->ops->release(s);
+			if (sock->ops)
+				sock->ops->release(sock);
 
-			kfree(s->wq);
-			kfree(s);
+			kfree(sock->wq);
+			kfree(sock);
 		}
 
-		void _do_connect()
+		int connect(Lxip::Handle h, Lxip::uint16_t family, void *addr)
 		{
-			Linux::socket *sock = call_socket();
+			_addr_len = _family_handler(family, addr);
+
+			Linux::socket *sock = call_socket(h);
 
 			//XXX: have a look at the file flags
-			_result.err = sock->ops->connect(sock, (struct Linux::sockaddr *) &_call.addr,
-			                                 _call.addr_len, 0);
+			return sock->ops->connect(sock, (struct Linux::sockaddr *) &_addr,
+			                          _addr_len, 0);
 		}
 
-		void _do_getname(int peer)
+		int getpeername(Lxip::Handle h, void *addr, Genode::int32_t *len)
 		{
-			int len = sizeof(Linux::sockaddr_storage);
-			_result.err = call_socket()->ops->getname(call_socket(),
-			                                          (struct Linux::sockaddr *)&_call.addr,
-			                                          &len, peer);
-
-			*_call.accept.len = Linux::min(*_call.accept.len, len);
-			Genode::memcpy(_call.accept.addr, &_call.addr, *_call.accept.len);
+			Linux::socket *sock = call_socket(h);
+			return sock->ops->getname(
+				sock, (struct Linux::sockaddr *)addr, len, 1);
 		}
 
-
-		void _do_getopt()
+		int getsockname(Lxip::Handle h, void *addr, Lxip::uint32_t *len)
 		{
-			_result.err = Linux::sock_getsockopt(call_socket(), _call.sockopt.level,
-			                                     _call.sockopt.optname,
-			                                     (char *)_call.sockopt.optval,
-			                                     _call.sockopt.optlen_ptr);
+			int tmp_len = sizeof(Linux::sockaddr_storage);
+			Linux::socket *sock = call_socket(h);
+			int err = sock->ops->getname(sock,
+			                                       (struct Linux::sockaddr *)&_addr,
+			                                       &tmp_len, 0);
+
+			*len = Linux::min(*len, tmp_len);
+			Genode::memcpy(addr, &_addr, *len);
+
+			return err;
 		}
 
-		void _do_ioctl()
+		int getsockopt(Lxip::Handle h, int level, int optname,
+		               void *optval, int *optlen)
 		{
-			_result.err = call_socket()->ops->ioctl(call_socket(),
-			                                        _call.ioctl.request,
-			                                        _call.ioctl.arg);
+			return Linux::sock_getsockopt(call_socket(h), level,
+			                              optname, (char *)optval, optlen);
 		}
 
-		void _do_listen()
+		int ioctl(Lxip::Handle h, int request, char *arg)
 		{
-			_result.err = call_socket()->ops->listen(call_socket(),
-			                                         _call.listen.backlog);
+			struct Linux::socket *sock = call_socket(h);
+			return sock->ops->ioctl(sock, request, (unsigned long)arg);
 		}
 
-		void _do_poll()
+		int listen(Lxip::Handle h, int backlog)
+		{
+			_listen_backlog = backlog;
+			struct Linux::socket *sock = call_socket(h);
+			return sock->ops->listen(sock, backlog);
+		}
+
+		int poll(Lxip::Handle h, bool block)
 		{
 			using namespace Linux;
-			struct socket *sock = call_socket();
+			struct Linux::socket *sock = call_socket(h);
+
 			enum {
 				POLLIN_SET  = (POLLRDNORM | POLLRDBAND | POLLIN | POLLHUP | POLLERR),
 				POLLOUT_SET = (POLLWRBAND | POLLWRNORM | POLLOUT | POLLERR),
@@ -358,356 +259,106 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			/*
 			 * Set socket wait queue to one so we can block poll in 'tcp_poll -> poll_wait'
 			 */
-			set_sock_wait(sock, _call.poll.block ? 1 : 0);
+			set_sock_wait(sock, block ? 1 : 0);
 			int mask = sock->ops->poll(&f, sock, 0);
 			set_sock_wait(sock, 0);
 
-			_result.err = 0;
+			int result = 0;
 			if (mask & POLLIN_SET)
-				_result.err |= Lxip::POLLIN;
+				result |= Lxip::POLLIN;
 			if (mask & POLLOUT_SET)
-				_result.err |= Lxip::POLLOUT;
+				result |= Lxip::POLLOUT;
 			if (mask & POLLEX_SET)
-				_result.err |= Lxip::POLLEX;
-		}
+				result |= Lxip::POLLEX;
 
-		void _do_recv()
-		{
-			using namespace Linux;
-			struct msghdr msg;
-			struct iovec  iov;
-
-			msg.msg_name    = _call.msg.addr;
-			msg.msg_namelen = _call.msg.addr_len;
-
-			msg.msg_control      = nullptr;
-			msg.msg_controllen   = 0;
-			msg.msg_iter.iov     = &iov;
-			msg.msg_iter.nr_segs = 1;
-			msg.msg_iter.count   = _call.msg.len;
-
-			iov.iov_len        = _call.msg.len;
-			iov.iov_base       = _call.msg.buf;
-			msg.msg_flags      = 0;
-
-			if (_call.handle.non_block)
-				msg.msg_flags |= MSG_DONTWAIT;
-
-			//XXX: check for non-blocking flag
-			_result.len = call_socket()->ops->recvmsg(call_socket(), &msg,
-			                                          _call.msg.len,
-			                                          _call.msg.flags);
-
-			_call.msg.addr_len = msg.msg_namelen;
-		}
-
-		void _do_send()
-		{
-			using namespace Linux;
-			struct msghdr msg;
-			struct iovec  iov;
-
-			_result.len = socket_check_state(call_socket());
-			if (_result.len < 0)
-				return;
-
-			msg.msg_control      = nullptr;
-			msg.msg_controllen   = 0;
-			msg.msg_iter.iov     = &iov;
-			msg.msg_iter.nr_segs = 1;
-			msg.msg_iter.count   = _call.msg.len;
-
-			iov.iov_len        = _call.msg.len;
-			iov.iov_base       = _call.msg.buf;
-			msg.msg_name       = _call.msg.addr;
-			msg.msg_namelen    = _call.msg.addr_len;
-			msg.msg_flags      = _call.msg.flags;
-
-			if (_call.handle.non_block)
-				msg.msg_flags |= MSG_DONTWAIT;
-
-			_result.len = call_socket()->ops->sendmsg(call_socket(), &msg,
-			                                          _call.msg.len);
-		}
-
-		void _do_setopt()
-		{
-			_result.err = Linux::sock_setsockopt(call_socket(), _call.sockopt.level,
-			                                     _call.sockopt.optname,
-			                                     (char *)_call.sockopt.optval,
-			                                     _call.sockopt.optlen);
-		}
-
-		void _do_shutdown()
-		{
-			_result.err = call_socket()->ops->shutdown(call_socket(),
-			                                            _call.shutdown.how);
-		}
-
-		void _do_socket()
-		{
-			using namespace Linux;
-			int type = _call.socket.type == Lxip::TYPE_STREAM ? SOCK_STREAM  :
-			                                                    SOCK_DGRAM;
-
-			struct socket *s = sock_alloc();
-
-			if (sock_create_kern(nullptr, AF_INET, type, 0, &s)) {
-				_handle.socket = 0;
-				kfree(s);
-				return;
-			}
-
-			_handle.socket = static_cast<void *>(s);
-		}
-
-	public:
-
-		Socketcall(Genode::Signal_receiver &sig_rec)
-		:
-			Thread_deprecated("socketcall"),
-			_sig_rec(sig_rec),
-			_signal(Genode::Signal_context_capability(_sig_rec.manage(this)))
-		{
-			start();
-		}
-
-		~Socketcall() { _sig_rec.dissolve(this); }
-
-		void entry()
-		{
-			while (true) {
-				Genode::Signal s = _sig_rec.wait_for_signal();
-				static_cast<Genode::Signal_dispatcher_base *>(s.context())->dispatch(s.num());
-
-				_ticker.tick();
-			}
-		}
-
-		/***********************
-		 ** Signal dispatcher **
-		 ***********************/
-
-		void dispatch(unsigned num)
-		{
-			switch (_call.opcode) {
-
-				case OP_ACCEPT   : _do_accept();   break;
-				case OP_BIND     : _do_bind();     break;
-				case OP_CLOSE    : _do_close();    break;
-				case OP_CONNECT  : _do_connect();  break;
-				case OP_GETNAME  : _do_getname(0); break;
-				case OP_GETOPT   : _do_getopt();   break;
-				case OP_IOCTL    : _do_ioctl();    break;
-				case OP_PEERNAME : _do_getname(1); break;
-				case OP_LISTEN   : _do_listen();   break;
-				case OP_POLL     : _do_poll();     break;
-				case OP_RECV     : _do_recv();     break;
-				case OP_SEND     : _do_send();     break;
-				case OP_SETOPT   : _do_setopt();   break;
-				case OP_SHUTDOWN : _do_shutdown(); break;
-				case OP_SOCKET   : _do_socket();   break;
-
-				default:
-					_handle.socket = 0;
-					Genode::warning("unkown opcode: ", (int)_call.opcode);
-			}
-
-			/* XXX socketcall operations do not tick */
-			_ticker.skip_next_tick();
-
-			_unblock();
-		}
-
-
-		/**************************
-		 ** Socketcall interface **
-		 **************************/
-
-		Lxip::Handle accept(Lxip::Handle h, void *addr, Lxip::uint32_t *len)
-		{
-			_call.opcode      = OP_ACCEPT;
-			_call.handle      = h;
-			_call.accept.addr = addr;
-			_call.accept.len  = len;
-
-			_submit_and_block();
-
-			return _handle;
-		}
-
-		int bind(Lxip::Handle h, Lxip::uint16_t family, void *addr)
-		{
-			_call.opcode   = OP_BIND;
-			_call.handle   = h;
-			_call.addr_len = _family_handler(family, addr);
-
-			_submit_and_block();
-
-			return _result.err;
-		}
-
-		void close(Lxip::Handle h)
-		{
-			_call.opcode = OP_CLOSE;
-			_call.handle = h;
-
-			_submit_and_block();
-		}
-
-		int connect(Lxip::Handle h, Lxip::uint16_t family, void *addr)
-		{
-			_call.opcode   = OP_CONNECT;
-			_call.handle   = h;
-			_call.addr_len = _family_handler(family, addr);
-
-			_submit_and_block();
-
-			return _result.err;
-		}
-
-		int getpeername(Lxip::Handle h, void *addr, Lxip::uint32_t *len)
-		{
-			_call.opcode      = OP_PEERNAME;
-			_call.handle      = h;
-			_call.accept.len  = len;
-			_call.accept.addr = addr;
-
-			_submit_and_block();
-
-			return _result.err;
-		}
-
-		int getsockname(Lxip::Handle h, void *addr, Lxip::uint32_t *len)
-		{
-			_call.opcode      = OP_GETNAME;
-			_call.handle      = h;
-			_call.accept.len  = len;
-			_call.accept.addr = addr;
-
-			_submit_and_block();
-
-			return _result.err;
-		}
-
-		int getsockopt(Lxip::Handle h, int level, int optname,
-		               void *optval, int *optlen)
-		{
-			_call.opcode             = OP_GETOPT;
-			_call.handle             = h;
-			_call.sockopt.level      = level;
-			_call.sockopt.optname    = optname;
-			_call.sockopt.optval     = optval;
-			_call.sockopt.optlen_ptr = optlen;
-
-			_submit_and_block();
-
-			return _result.err;
-		}
-
-		int ioctl(Lxip::Handle h, int request, char *arg)
-		{
-			_call.opcode        = OP_IOCTL;
-			_call.handle        = h;
-			_call.ioctl.request = request;
-			_call.ioctl.arg     = (unsigned long)arg;
-
-			_submit_and_block();
-
-			return _result.err;
-		}
-
-		int listen(Lxip::Handle h, int backlog)
-		{
-			_call.opcode         = OP_LISTEN;
-			_call.handle         = h;
-			_call.listen.backlog = backlog;
-
-			_submit_and_block();
-
-			return _result.err;
-		}
-
-		int poll(Lxip::Handle h, bool block)
-		{
-			_call.opcode     = OP_POLL;
-			_call.handle     = h;
-			_call.poll.block = block;
-
-			_submit_and_block();
-
-			return _result.err;
+			return result;
 		}
 
 		Lxip::ssize_t recv(Lxip::Handle h, void *buf, Lxip::size_t len, int flags,
 		                   Lxip::uint16_t family, void *addr,
 		                   Lxip::uint32_t *addr_len)
 		{
-			_call.opcode       = OP_RECV;
-			_call.handle       = h;
-			_call.msg.buf      = buf;
-			_call.msg.len      = len;
-			_call.msg.addr     = addr;
-			_call.msg.addr_len = addr_len ? *addr_len : 0;
-			_call.msg.flags    = flags;
-			_call.addr_len     = _family_handler(family, addr);
+			using namespace Linux;
+			struct msghdr msg;
+			struct iovec  iov;
 
-			_submit_and_block();
+			iov.iov_len        = len;
+			iov.iov_base       = buf;
 
-			if (addr_len)
-				*addr_len = _call.msg.addr_len;
+			msg.msg_name       = addr;
+			msg.msg_namelen    = addr ? *addr_len : 0;
+			msg.msg_control    = nullptr;
+			msg.msg_controllen = 0;
+			msg.msg_flags      = 0;
+			msg.msg_iter.iov     = &iov;
+			msg.msg_iter.nr_segs = 1;
+			msg.msg_iter.count   = len;
 
-			return _result.len;
+			struct Linux::socket *sock = call_socket(h);
+			Lxip::ssize_t res = sock->ops->recvmsg(
+				sock, &msg, len, flags|MSG_DONTWAIT);
+
+			if (addr)
+				*addr_len = min(*addr_len, msg.msg_namelen);
+
+			return res;
 		}
 
 		Lxip::ssize_t send(Lxip::Handle h, const void *buf, Lxip::size_t len, int flags,
 		                   Lxip::uint16_t family, void *addr)
 		{
-			_call.opcode        = OP_SEND;
-			_call.handle        = h;
-			_call.msg.buf       = (void *)buf;
-			_call.msg.len       = len;
-			_call.msg.flags     = flags;
-			_call.msg.addr      = addr;
-			_call.msg.addr_len  = addr ? sizeof(Linux::sockaddr_in) : 0;
+			using namespace Linux;
+			struct msghdr msg;
+			struct iovec  iov;
 
-			_submit_and_block();
+			struct Linux::socket *sock = call_socket(h);
 
-			return _result.len;
+			if (Lxip::ssize_t r = socket_check_state(sock) < 0)
+				return r;
+
+			msg.msg_control      = nullptr;
+			msg.msg_controllen   = 0;
+			msg.msg_iter.iov     = &iov;
+			msg.msg_iter.nr_segs = 1;
+			msg.msg_iter.count   = len;
+
+			iov.iov_len        = len;
+			iov.iov_base       = (void*)buf;
+			msg.msg_name       = _addr_len ? &_addr : 0;
+			msg.msg_namelen    = _addr_len;
+			msg.msg_flags      = flags | MSG_DONTWAIT;
+
+			return sock->ops->sendmsg(sock, &msg, len);
 		}
 
 		int setsockopt(Lxip::Handle h, int level, int optname,
 		               const void *optval, Lxip::uint32_t optlen)
 		{
-			_call.opcode          = OP_SETOPT,
-			_call.handle          = h;
-			_call.sockopt.level   = level;
-			_call.sockopt.optname = optname;
-			_call.sockopt.optval  = optval;
-			_call.sockopt.optlen  = optlen;
-
-			_submit_and_block();
-
-			return _result.err;
+			return Linux::sock_setsockopt(
+				call_socket(h), level, optname, (char *)optval, optlen);
 		}
 
 		int shutdown(Lxip::Handle h, int how)
 		{
-			_call.opcode       = OP_SHUTDOWN;
-			_call.handle       = h;
-			_call.shutdown.how = how;
-
-			_submit_and_block();
-
-			return _result.err;
+			struct Linux::socket *sock = call_socket(h);
+			return sock->ops->shutdown(sock, how);
 		}
 
-		Lxip::Handle socket(Lxip::Type type)
+		Lxip::Handle socket(Lxip::Type t)
 		{
-			_call.opcode      = OP_SOCKET;
-			_call.socket.type = type;
+			using namespace Linux;
+			int type = t == Lxip::TYPE_STREAM ? SOCK_STREAM  :
+			                                       SOCK_DGRAM;
 
-			_submit_and_block();
+			struct socket *s = sock_alloc();
+
+			if (sock_create_kern(nullptr, AF_INET, type, 0, &s)) {
+				_handle.socket = 0;
+				kfree(s);
+				return _handle;
+			}
+
+			_handle.socket = static_cast<void *>(s);
 
 			return _handle;
 		}
@@ -716,8 +367,6 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 		/*******************
 		 ** new interface **
 		 *******************/
-
-		void register_ticker(void(*tick)()) { _ticker.tick_function(tick); }
 
 		int bind_port(Lxip::Handle h, char const *addr)
 		{
@@ -734,13 +383,12 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			in_addr.sin_port        = htons(ascii_to_long(port));
 			in_addr.sin_addr.s_addr = s_addr;
 
-			_call.opcode   = OP_BIND;
-			_call.handle   = h;
-			_call.addr_len = _family_handler(AF_INET, (void*)&in_addr);
+			_addr_len = _family_handler(AF_INET, (void*)&in_addr);
+			Genode::memcpy(&_addr, &in_addr, _addr_len);
 
-			_submit_and_block();
-
-			return _result.err;
+			struct Linux::socket *sock = call_socket(h);
+			return sock->ops->bind(sock, (struct Linux::sockaddr *) &_addr,
+			                       _addr_len);
 		}
 
 		int dial(Lxip::Handle h, char const *addr)
@@ -758,13 +406,12 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			in_addr.sin_port        = htons(ascii_to_long(port));
 			in_addr.sin_addr.s_addr = s_addr;
 
-			_call.opcode   = OP_CONNECT;
-			_call.handle   = h;
-			_call.addr_len = _family_handler(AF_INET, (void*)&in_addr);
+			_addr_len = _family_handler(AF_INET, (void*)&in_addr);
+			Genode::memcpy(&_addr, &in_addr, _addr_len);
 
-			_submit_and_block();
-
-			return _result.err;
+			Linux::socket *sock = call_socket(h);
+			return sock->ops->connect(sock, (struct Linux::sockaddr *) &_addr,
+			                          _addr_len, 0);
 		}
 
 		int ifaddr(Lxip::Handle h, char *dst, Lxip::size_t len)
@@ -780,14 +427,11 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			Genode::strncpy(ifr.ifr_name, "eth0", IFNAMSIZ-1);
 			ifr.ifr_addr.sa_family = AF_INET;
 
-			_call.opcode        = OP_IOCTL;
-			_call.handle        = h;
-			_call.ioctl.request = Lxip::Ioctl_cmd::LINUX_IFADDR;
-			_call.ioctl.arg     = (unsigned long)&ifr;
-
-			_submit_and_block();
-
-			if (_result.err < 0) return _result.err;
+			struct Linux::socket *sock = call_socket(h);
+			if (int err = sock->ops->ioctl(sock,
+			                               Lxip::Ioctl_cmd::LINUX_IFADDR,
+			                               (unsigned long)&ifr) < 0)
+				return err;
 
 			in_addr const     addr = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr;
 			unsigned char const *p = (unsigned char*)&addr.s_addr;
@@ -823,7 +467,7 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 
 			sockaddr_in s_addr;
 			Genode::memset(&s_addr, 0, sizeof(s_addr));
-			Lxip::uint32_t s_addr_len = sizeof(s_addr);
+			Genode::int32_t s_addr_len = sizeof(s_addr);
 
 			int res = getpeername(h, &s_addr, &s_addr_len);
 			if (res < 0) return res;
@@ -840,16 +484,17 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 };
 
 
-Lxip::Socketcall & Lxip::init(char const *address_config)
+Lxip::Socketcall & Lxip::init(Genode::Env &env,
+                              Genode::Allocator &alloc,
+                              void (*ticker)(),
+                              char const *address_config)
 {
-	static Genode::Signal_receiver sig_rec;
-
-	Lx::timer_init(sig_rec);
-	Lx::event_init(sig_rec);
-	Lx::nic_client_init(sig_rec);
+	Lx::timer_init(env, alloc, ticker);
+	Lx::event_init(env, ticker);
+	Lx::nic_client_init(env, alloc, ticker);
 
 	static int init = lxip_init(address_config);
-	static Net::Socketcall socketcall(sig_rec);
+	static Net::Socketcall socketcall;
 
 	return socketcall;
 }

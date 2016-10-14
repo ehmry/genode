@@ -18,9 +18,13 @@
 
 namespace Lx {
 
-	void nic_client_init(Genode::Signal_receiver &);
-	void timer_init(Genode::Signal_receiver &);
-	void event_init(Genode::Signal_receiver &);
+	void nic_client_init(Genode::Env &env,
+	                     Genode::Allocator &alloc,
+	                     void (*ticker)());
+	void timer_init(Genode::Env &env,
+	                Genode::Allocator &alloc,
+	                void (*ticker)());
+	void event_init(Genode::Env &env, void (*ticker)());
 
 	void timer_update_jiffies();
 }

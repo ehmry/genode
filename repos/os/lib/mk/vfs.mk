@@ -1,4 +1,4 @@
-SRC_CC += file_system_factory.cc
+SRC_CC += file_system_factory.cc synchronous_io.cc
 
 LIBS = ld
 

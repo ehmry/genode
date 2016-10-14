@@ -15,8 +15,9 @@
 #define _VFS__NODE_H_
 
 /* Genode includes */
-#include <file_system/node.h>
 #include <vfs/file_system.h>
+#include <file_system/node.h>
+#include <file_system_session/file_system_session.h>
 #include <os/path.h>
 
 /* Local includes */
@@ -69,8 +70,6 @@ namespace Vfs_server {
 
 struct Vfs_server::Node : File_system::Node_base
 {
-	struct Operation_would_block { }; /* exception */
-
 	Path const _path;
 	Mode const  mode;
 
@@ -106,102 +105,225 @@ struct Vfs_server::Symlink : Node
 	size_t read(Vfs::File_system &vfs, char *dst, size_t len, seek_off_t seek_offset)
 	{
 		Vfs::file_size res = 0;
-		vfs.readlink(path(), dst, len, res);
-		return res;
+		return vfs.readlink(path(), dst, len, res) == Directory_service::READLINK_OK
+			? res : 0;
 	}
 
 	size_t write(Vfs::File_system &vfs, char const *src, size_t len, seek_off_t seek_offset)
 	{
+		/* symlinks shall be atomic */
+		if (seek_offset != 0) return 0;
+
 		/* ensure symlink gets something null-terminated */
 		Genode::String<MAX_PATH_LEN> target(Genode::Cstring(src, len));
 
-		if (vfs.symlink(target.string(), path()) == Directory_service::SYMLINK_OK)
+		if (vfs.symlink(target.string(), path()) != Directory_service::SYMLINK_OK)
 			return 0;
 
-		mark_as_updated();
-		notify_listeners();
-		return target.length();
+		return target.length()-1; /* do not count termination */
 	}
 };
 
 
-class Vfs_server::File : public Node
+class Vfs_server::File : public Node,
+                         public Vfs::Read_callback,
+                         public Vfs::Write_callback,
+                         public Vfs::Notify_callback
 {
 	private:
+
+		/* signal to notify client with */
+		Genode::Signal_context_capability _sig_cap;
+
+		::File_system::Session::Tx::Sink &_sink;
 
 		Vfs::Vfs_handle *_handle;
 		char const      *_leaf_path; /* offset pointer to Node::_path */
 
+		/* a file can only have one pending packet op */
+		::File_system::Packet_descriptor _packet;
+
+		size_t _packet_offset;
+
 	public:
 
-		File(Vfs::File_system  &vfs,
-		     Genode::Allocator &alloc,
-		     char       const  *file_path,
-		     Mode               fs_mode,
-		     bool               create)
-		: Node(file_path, fs_mode)
+		File(Vfs::File_system                 &vfs,
+		     Genode::Allocator                &alloc,
+		     char                       const *file_path,
+		     ::File_system::Session::Tx::Sink &sink,
+		     Mode                              fs_mode,
+		     bool                              create)
+		: Node(file_path, fs_mode), _sink(sink)
 		{
-			unsigned vfs_mode =
+			unsigned const vfs_mode =
 				(fs_mode-1) | (create ? Vfs::Directory_service::OPEN_MODE_CREATE : 0);
 
 			assert_open(vfs.open(file_path, vfs_mode, &_handle, alloc));
 			_leaf_path = vfs.leaf_path(path());
+
+			unsigned const acc_mode =
+				vfs_mode & Vfs::Directory_service::OPEN_MODE_ACCMODE;
+
+			if (acc_mode & Vfs::Directory_service::OPEN_MODE_WRONLY)
+				_handle->write_callback(*this);
+
+			if (acc_mode != Vfs::Directory_service::OPEN_MODE_WRONLY)
+				_handle->read_callback(*this);
+
+			/* XXX: just make sure this damn thing works */
+			_handle->read_callback(*this);
+			_handle->write_callback(*this);
+
 		}
 
-		~File() { _handle->ds().close(_handle); }
+		~File()
+		{
+			_handle->ds().close(_handle);
+			if (_packet.operation() != Packet_descriptor::INVALID) {
+				_packet.length(0);
+				_packet.result(Packet_descriptor::ERR_INVALID);
+				_sink.acknowledge_packet(_packet);
+			}
+		}
 
 		void truncate(file_size_t size)
 		{
 			assert_truncate(_handle->fs().ftruncate(_handle, size));
-			mark_as_updated();
 		}
+
+		void queue(::File_system::Packet_descriptor const &packet)
+		{
+			if (_packet.operation() != Packet_descriptor::INVALID) {
+				Genode::warning("VFS server acking partial packet");
+				/* push the old op */
+				_packet.result(Packet_descriptor::ERR_INVALID);
+				_sink.acknowledge_packet(_packet);
+			}
+
+			_packet = packet;
+			_packet_offset = 0;
+			_handle->seek(_packet.position());
+
+			switch (_packet.operation()) {
+			case Packet_descriptor::READ:
+				_handle->fs().read(_handle, packet.length()); break;
+
+			case Packet_descriptor::WRITE:
+				_handle->fs().write(_handle, packet.length()); break;
+
+			case Packet_descriptor::INVALID:
+				_sink.acknowledge_packet(_packet); return;
+			}
+		}
+
+		bool sigh(Genode::Signal_context_capability sig_cap)
+		{
+
+			if (_handle->ds().subscribe(_handle)) {
+				_sig_cap = sig_cap;
+				_handle->notify_callback(*this);
+				return true;
+			}
+			return false;
+		}
+
+
+		/************************
+		 ** Callback interface **
+		 ************************/
+
+		/**
+		 * Read callback
+		 */
+		file_size read(char const *src, file_size src_len,
+		               Callback::Status status) override
+		{
+			if (!(_packet.size() && _packet.operation() == Packet_descriptor::READ)) {
+				Genode::error("read callback received for invalid packet");
+				return 0;
+			}
+
+			char        *dst = _sink.packet_content(_packet)+_packet_offset;
+			size_t const out = min(src_len, _packet.size()-_packet_offset);
+
+			if (out) {
+				if (src)
+					Genode::memcpy(dst, src, out);
+				else
+					Genode::memset(dst, 0x00, out);
+				_packet_offset += out;
+			}
+
+			typedef ::File_system::Packet_descriptor::Result Result;
+			switch(status) {
+			case Callback::COMPLETE:       _packet.result(Result::SUCCESS); break;
+			case Callback::PARTIAL:        return out;
+
+			case Callback::ERR_IO:         _packet.result(Result::ERR_IO);         break;
+			case Callback::ERR_INVALID:    _packet.result(Result::ERR_INVALID);    break;
+			case Callback::ERR_TERMINATED: _packet.result(Result::ERR_TERMINATED); break;
+			default: break; /* Callback::PARTIAL is excluded */
+			}
+
+			_packet.length(_packet_offset);
+			_sink.acknowledge_packet(_packet);
+			_packet = Packet_descriptor();
+			return out;
+		}
+
+		/**
+		 * Write callback
+		 */
+		file_size write(char *dst, file_size dst_len,
+		                Callback::Status status) override
+		{
+			file_size out = 0;
+			if (!(_packet.size() && _packet.operation() == Packet_descriptor::WRITE)) {
+				Genode::error("write callback received for invalid packet");
+				return 0;
+			}
+
+			if (dst_len) {
+				char   const *src = _sink.packet_content(_packet)+_packet_offset;
+				out = min(dst_len, _packet.length()-_packet_offset);
+
+				if (dst)
+					Genode::memcpy(dst, src, out);
+
+				_packet_offset += out;
+			}
+
+			typedef ::File_system::Packet_descriptor::Result Result;
+			switch(status) {
+			case Callback::COMPLETE:       _packet.result(Result::SUCCESS); break;
+			case Callback::PARTIAL:        return out;
+
+			case Callback::ERR_IO:         _packet.result(Result::ERR_IO);         break;
+			case Callback::ERR_INVALID:    _packet.result(Result::ERR_INVALID);    break;
+			case Callback::ERR_TERMINATED: _packet.result(Result::ERR_TERMINATED); break;
+			default: break; /* Callback::PARTIAL is excluded */
+			}
+
+			_packet.length(_packet_offset);
+			_sink.acknowledge_packet(_packet);
+			_packet = Packet_descriptor();
+			return out;
+		}
+
+		/**
+		 * Notify callback
+		 */
+		void notify() override {
+			Genode::Signal_transmitter(_sig_cap).submit(); };
 
 
 		/********************
 		 ** Node interface **
 		 ********************/
 
-		size_t read(Vfs::File_system&, char *dst, size_t len, seek_off_t seek_offset)
-		{
-			Vfs::file_size res = 0;
+		size_t read(Vfs::File_system&, char *dst, size_t len, seek_off_t seek_offset) { return 0; }
 
-			if (seek_offset == SEEK_TAIL) {
-				typedef Directory_service::Stat_result Result;
-				Vfs::Directory_service::Stat st;
-
-				/* if stat fails, try and see if the VFS will seek to the end */
-				seek_offset = (_handle->ds().stat(_leaf_path, st) == Result::STAT_OK) ?
-					((len < st.size) ? (st.size - len) : 0) : SEEK_TAIL;
-			}
-
-			_handle->seek(seek_offset);
-			int const ret =_handle->fs().read(_handle, dst, len, res);
-			if (ret == File_io_service::WRITE_ERR_WOULD_BLOCK)
-				throw Operation_would_block();
-			return res;
-		}
-
-		size_t write(Vfs::File_system&, char const *src, size_t len, seek_off_t seek_offset)
-		{
-			Vfs::file_size res = 0;
-
-			if (seek_offset == SEEK_TAIL) {
-				typedef Directory_service::Stat_result Result;
-				Vfs::Directory_service::Stat st;
-
-				/* if stat fails, try and see if the VFS will seek to the end */
-				seek_offset = (_handle->ds().stat(_leaf_path, st) == Result::STAT_OK) ?
-					st.size : SEEK_TAIL;
-			}
-
-			_handle->seek(seek_offset);
-			int const ret = _handle->fs().write(_handle, src, len, res);
-			if (ret == File_io_service::WRITE_ERR_WOULD_BLOCK)
-				throw Operation_would_block();
-			if (res)
-				mark_as_updated();
-			return res;
-		}
+		size_t write(Vfs::File_system&, char const *src, size_t len, seek_off_t seek_offset) { return 0; }
 };
 
 
@@ -217,6 +339,7 @@ struct Vfs_server::Directory : Node
 	File *file(Vfs::File_system  &vfs,
 	           Genode::Allocator &alloc,
 	           char        const *file_path,
+	           ::File_system::Session::Tx::Sink &sink,
 	           Mode               mode,
 	           bool               create)
 	{
@@ -224,10 +347,9 @@ struct Vfs_server::Directory : Node
 		char const *path_str = subpath.base();
 
 		File *file;
-		try { file = new (alloc) File(vfs, alloc, path_str, mode, create); }
+		try { file = new (alloc)
+			File(vfs, alloc, path_str, sink, mode, create); }
 		catch (Out_of_memory) { throw Out_of_metadata(); }
-		if (create)
-			mark_as_updated();
 		return file;
 	}
 
@@ -248,8 +370,6 @@ struct Vfs_server::Directory : Node
 		Symlink *link;
 		try { link = new (alloc) Symlink(vfs, path_str, mode, create); }
 		catch (Out_of_memory) { throw Out_of_metadata(); }
-		if (create)
-			mark_as_updated();
 		return link;
 	}
 

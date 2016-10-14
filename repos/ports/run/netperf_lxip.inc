@@ -1,4 +1,3 @@
-set netperf_target   app/netperf/lxip
-set netperf_app      netserver_lxip 
-set netperf_stack  { lxip.lib.so }
+set netperf_target  lib/vfs/lxip
+set netperf_stack   { vfs_lxip.lib.so lxip.lib.so }
 set ip_match_string "ipaddr=(\[0-9\]+\.\[0-9\]+\.\[0-9\]+\.\[0-9\]+).*\n"

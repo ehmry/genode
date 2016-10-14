@@ -665,20 +665,19 @@ class Vfs::Dir_file_system : public File_system
 		 ** File I/O service interface **
 		 ********************************/
 
-		Write_result write(Vfs_handle *handle, char const *, file_size,
-		                   file_size &) override
-		{
-			return WRITE_ERR_INVALID;
-		}
+		void write(Vfs_handle *handle, file_size) override {
+			handle->write_status(Callback::ERR_INVALID); }
 
-		Read_result read(Vfs_handle *, char *, file_size, file_size &) override
-		{
-			return READ_ERR_INVALID;
-		}
+		void read(Vfs_handle *handle, file_size) override {
+			handle->read_status(Callback::ERR_INVALID); }
 
-		Ftruncate_result ftruncate(Vfs_handle *, file_size) override
+		Ftruncate_result ftruncate(Vfs_handle *, file_size) override {
+			return FTRUNCATE_ERR_NO_PERM; }
+
+		void poll_io() override
 		{
-			return FTRUNCATE_ERR_NO_PERM;
+			Genode::error("directory file-system does not support I/O polling");
+			throw ~0;
 		}
 };
 

@@ -50,6 +50,9 @@ class Terminal::Session_client : public Genode::Rpc_client<Session>
 
 		bool avail() { return call<Rpc_avail>(); }
 
+		/**
+		 * Read by copy
+		 */
 		Genode::size_t read(void *buf, Genode::size_t buf_size)
 		{
 			Genode::Lock::Guard _guard(_lock);
@@ -64,6 +67,30 @@ class Terminal::Session_client : public Genode::Rpc_client<Session>
 			return num_bytes;
 		}
 
+		/**
+		 * Read by lambda
+		 */
+		template <typename FUNC>
+		void read(FUNC const &func, Genode::size_t len)
+		{
+			/* not locking, the lamba might jump stack for a while */
+			while (len) {
+				Genode::size_t n = Genode::min(len, _io_buffer.size());
+
+				/* instruct server to fill the I/O buffer */
+				n = call<Rpc_read>(n);
+				if (n == 0)
+					return;
+
+				/* pass dataspace to lambda */
+				func(_io_buffer.local_addr<char const>(), n);
+				len -= n;
+			}
+		}
+
+		/**
+		 * Write by copy
+		 */
 		Genode::size_t write(void const *buf, Genode::size_t num_bytes)
 		{
 			Genode::Lock::Guard _guard(_lock);
@@ -85,6 +112,25 @@ class Terminal::Session_client : public Genode::Rpc_client<Session>
 				written_bytes += n;
 			}
 			return num_bytes;
+		}
+
+		/**
+		 * Write by lambda
+		 */
+		template <typename FUNC>
+		void write(FUNC const &func, Genode::size_t len)
+		{
+			/* not locking, the lamba might jump stack for a while */
+			while (len) {
+				Genode::size_t n = Genode::min(len, _io_buffer.size());
+
+				/* pass dataspace to lambda */
+				func(_io_buffer.local_addr<char>(), n);
+
+				/* tell server to pick up new I/O buffer content */
+				call<Rpc_write>(n);
+				len -= n;
+			}
 		}
 
 		void connected_sigh(Genode::Signal_context_capability cap)

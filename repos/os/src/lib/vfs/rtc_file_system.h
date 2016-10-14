@@ -34,7 +34,7 @@ class Vfs::Rtc_file_system : public Single_file_system
 		                Genode::Allocator&,
 		                Genode::Xml_node config)
 		:
-			Single_file_system(NODE_TYPE_CHAR_DEVICE, name(), config),
+			Single_file_system(NODE_TYPE_CHAR_DEVICE, name(), config, OPEN_MODE_RDONLY),
 			_rtc(env)
 		{ }
 
@@ -58,28 +58,21 @@ class Vfs::Rtc_file_system : public Single_file_system
 		 ** File I/O service interface **
 		 ********************************/
 
-		Write_result write(Vfs_handle *, char const *, file_size,
-		                   file_size &) override
-		{
-			return WRITE_ERR_IO;
-		}
-
 		/**
 		 * Read the current time from the Rtc session
 		 *
 		 * On each read the current time is queried and afterwards formated
 		 * as '%Y-%m-%d %H:%M\n'.
 		 */
-		Read_result read(Vfs_handle *vfs_handle, char *dst, file_size count,
-		                 file_size &out_count) override
+		void read(Vfs_handle *vfs_handle, file_size count) override
 		{
 			enum { TIMESTAMP_LEN = 17 };
 
 			file_size seek = vfs_handle->seek();
 
 			if (seek >= TIMESTAMP_LEN) {
-				out_count = 0;
-				return READ_OK;
+				vfs_handle->read_status(Callback::COMPLETE);
+				return;
 			}
 
 			Rtc::Timestamp ts = _rtc.current_time();
@@ -91,11 +84,8 @@ class Vfs::Rtc_file_system : public Single_file_system
 			n -= seek;
 			b += seek;
 
-			file_size len = count > n ? n : count;
-			Genode::memcpy(dst, b, len);
-			out_count = len;
-
-			return READ_OK;
+			count = min(count, n);
+			vfs_handle->read_callback(b, count, Callback::COMPLETE);
 		}
 };
 

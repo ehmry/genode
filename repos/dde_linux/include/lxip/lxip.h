@@ -39,7 +39,10 @@ namespace Lxip {
 	 *
 	 * \return Reference to Socketcall object
 	 */
-	Socketcall & init(char const *address_config);
+	Socketcall & init(Genode::Env &env,
+                      Genode::Allocator &alloc,
+	                  void (*ticker)(),
+                      char const *address_config);
 
 	typedef Genode::uint8_t  uint8_t;
 	typedef Genode::uint16_t uint16_t;
@@ -96,7 +99,7 @@ class Lxip::Socketcall
 		virtual int     bind(Handle h, uint16_t family, void *addr) = 0;
 		virtual void    close(Handle h) = 0;
 		virtual int     connect(Handle h, uint16_t family, void *addr) = 0;
-		virtual int     getpeername(Handle h, void *addr, uint32_t *len) = 0;
+		virtual int     getpeername(Handle h, void *addr, Genode::int32_t *len) = 0;
 		virtual int     getsockname(Handle h, void *addr, uint32_t *len) = 0;
 		virtual int     getsockopt(Handle h, int level, int optname,
 		                           void *optval, int *optlen) = 0;
@@ -113,7 +116,6 @@ class Lxip::Socketcall
 		virtual Handle  socket(Type) = 0;
 
 		/* new interface */
-		virtual void register_ticker(void(*tick)()) = 0;
 		virtual int bind_port(Handle h, char const *host) = 0;
 		virtual int dial(Handle h, char const *host) = 0;
 		virtual int ifaddr(Handle h, char *dst, size_t len) = 0;

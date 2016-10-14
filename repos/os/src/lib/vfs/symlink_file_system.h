@@ -35,7 +35,8 @@ class Vfs::Symlink_file_system : public Single_file_system
 		                    Genode::Allocator&,
 		                    Genode::Xml_node config)
 		:
-			Single_file_system(NODE_TYPE_SYMLINK, "symlink", config),
+			Single_file_system(NODE_TYPE_SYMLINK, "symlink",
+			                   config, OPEN_MODE_ACCMODE),
 			_target(config.attribute_value("target", Target()))
 		{ }
 
@@ -69,20 +70,6 @@ class Vfs::Symlink_file_system : public Single_file_system
 
 		void close(Vfs_handle *) override { }
 
-
-		/********************************
-		 ** File I/O service interface **
-		 ********************************/
-
-		Write_result write(Vfs_handle *handle, char const *, file_size,
-		                   file_size &) override {
-			return WRITE_ERR_INVALID; }
-
-		Read_result read(Vfs_handle *, char *, file_size, file_size &) override {
-			return READ_ERR_INVALID; }
-
-		Ftruncate_result ftruncate(Vfs_handle *, file_size) override {
-			return FTRUNCATE_ERR_NO_PERM; }
 };
 
 #endif /* _INCLUDE__VFS__SYMLINK_FILE_SYSTEM_H_ */

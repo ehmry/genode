@@ -14,6 +14,8 @@
 #ifndef _INCLUDE__VFS__FILE_IO_SERVICE_H_
 #define _INCLUDE__VFS__FILE_IO_SERVICE_H_
 
+#include <vfs/types.h>
+
 namespace Vfs {
 	class Vfs_handle;
 	struct File_io_service;
@@ -31,11 +33,22 @@ struct Vfs::File_io_service
 
 	enum Write_result { WRITE_ERR_AGAIN,     WRITE_ERR_WOULD_BLOCK,
 	                    WRITE_ERR_INVALID,   WRITE_ERR_IO,
-	                    WRITE_ERR_INTERRUPT, WRITE_OK };
+	                    WRITE_ERR_INTERRUPT,
+	                    WRITE_QUEUED, WRITE_OK };
 
-	virtual Write_result write(Vfs_handle *vfs_handle,
-	                           char const *buf, file_size buf_size,
-	                           file_size &out_count) = 0;
+	/**
+	 * Submit a write request
+	 *
+	 * \param handle  handle to execute callbacks from
+	 * \param len     number of bytes to write or queue
+	 */
+	virtual void write(Vfs_handle *handle, file_size len) = 0;
+
+	/**
+	 * Synchronous write
+	 */
+	Write_result write(Vfs_handle *handle, char const *buf,
+	                   file_size buf_size, file_size &out_count);
 
 
 	/**********
@@ -44,10 +57,22 @@ struct Vfs::File_io_service
 
 	enum Read_result { READ_ERR_AGAIN,     READ_ERR_WOULD_BLOCK,
 	                   READ_ERR_INVALID,   READ_ERR_IO,
-	                   READ_ERR_INTERRUPT, READ_OK };
+	                   READ_ERR_INTERRUPT,
+	                   READ_QUEUED, READ_OK };
 
-	virtual Read_result read(Vfs_handle *vfs_handle, char *dst, file_size count,
-	                         file_size &out_count) = 0;
+	/**
+	 * Submit a read request
+	 *
+	 * \param handle  handle to execute callbacks from
+	 * \param len     number of bytes to read or queue
+	 */
+	virtual void read(Vfs_handle *handle, file_size len) = 0;
+
+	/**
+	 * Synchronous read
+	 */
+	Read_result read(Vfs_handle *handle, char *dst,
+	                 file_size count, file_size &out_count);
 
 
 	/***************
@@ -58,7 +83,7 @@ struct Vfs::File_io_service
 	                        FTRUNCATE_ERR_INTERRUPT, FTRUNCATE_ERR_NO_SPACE,
 	                        FTRUNCATE_OK };
 
-	virtual Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size len) = 0;
+	virtual Ftruncate_result ftruncate(Vfs_handle *handle, file_size len) = 0;
 
 
 	/***********
@@ -94,7 +119,7 @@ struct Vfs::File_io_service
 		};
 	};
 
-	virtual Ioctl_result ioctl(Vfs_handle *vfs_handle, Ioctl_opcode, Ioctl_arg,
+	virtual Ioctl_result ioctl(Vfs_handle *handle, Ioctl_opcode, Ioctl_arg,
 	                           Ioctl_out &out)
 	{
 		/*
@@ -104,21 +129,32 @@ struct Vfs::File_io_service
 		return IOCTL_ERR_INVALID;
 	}
 
-
 	/**
 	 * Return true if an unblocking condition of the file is satisfied
+	 *
+	 * Deprecated, I/O ops should return zero if blocked.
 	 *
 	 * \param rd  if true, check for data available for reading
 	 * \param wr  if true, check for readiness for writing
 	 * \param ex  if true, check for exceptions
 	 */
-	virtual bool check_unblock(Vfs_handle *vfs_handle,
+	virtual bool check_unblock(Vfs_handle *handle,
 	                           bool rd, bool wr, bool ex)
 	{ return true; }
 
-	virtual void register_read_ready_sigh(Vfs_handle *vfs_handle,
+	/**
+	 * Deprecated, use a notify callback
+	 */
+	virtual void register_read_ready_sigh(Vfs_handle *handle,
 	                                      Signal_context_capability sigh)
 	{ }
+
+	/**
+	 * Hack to block for a callback
+	 *
+	 * \noapi
+	 */
+	virtual void poll_io() { }
 };
 
 #endif /* _INCLUDE__VFS__FILE_IO_SERVICE_H_ */

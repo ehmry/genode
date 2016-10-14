@@ -26,7 +26,8 @@ struct Vfs::Null_file_system : Single_file_system
 	                 Genode::Allocator&,
 	                 Genode::Xml_node config)
 	:
-		Single_file_system(NODE_TYPE_CHAR_DEVICE, name(), config)
+		Single_file_system(NODE_TYPE_CHAR_DEVICE, name(),
+		                   config, OPEN_MODE_RDWR)
 	{ }
 
 	static char const *name() { return "null"; }
@@ -36,21 +37,11 @@ struct Vfs::Null_file_system : Single_file_system
 	 ** File I/O service interface **
 	 ********************************/
 
-	Write_result write(Vfs_handle *handle, char const *, file_size count,
-	                   file_size &out_count) override
-	{
-		out_count = count;
+	void write(Vfs_handle *vfs_handle, file_size len) override {
+		vfs_handle->write_callback(nullptr, len, Callback::COMPLETE); }
 
-		return WRITE_OK;
-	}
-
-	Read_result read(Vfs_handle *vfs_handle, char *, file_size,
-	                 file_size &out_count) override
-	{
-		out_count = 0;
-
-		return READ_OK;
-	}
+	void read(Vfs_handle *vfs_handle, file_size len) override {
+		vfs_handle->read_status(Callback::COMPLETE); }
 
 	Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override
 	{

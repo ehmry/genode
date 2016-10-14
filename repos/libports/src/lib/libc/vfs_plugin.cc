@@ -11,12 +11,6 @@
  * under the terms of the GNU General Public License version 2.
  */
 
-/* Genode includes */
-#include <base/env.h>
-#include <base/log.h>
-#include <vfs/dir_file_system.h>
-#include <os/config.h>
-
 /* libc includes */
 #include <errno.h>
 #include <dirent.h>
@@ -38,19 +32,6 @@
 /* libc-internal includes */
 #include <libc_mem_alloc.h>
 #include "libc_errno.h"
-
-
-static Vfs::Vfs_handle *vfs_handle(Libc::File_descriptor *fd)
-{
-	return reinterpret_cast<Vfs::Vfs_handle *>(fd->context);
-}
-
-
-static Libc::Plugin_context *vfs_context(Vfs::Vfs_handle *vfs_handle)
-{
-	return reinterpret_cast<Libc::Plugin_context *>(vfs_handle);
-}
-
 
 /**
  * Utility to convert VFS stat struct to the libc stat struct
@@ -157,6 +138,7 @@ namespace Libc {
 	}
 }
 
+
 int Libc::Vfs_plugin::access(const char *path, int amode)
 {
 	if (_root_dir.leaf_path(path))
@@ -172,9 +154,9 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 {
 	typedef Vfs::Directory_service::Open_result Result;
 
-	Vfs::Vfs_handle *handle = 0;
+	Vfs::Vfs_handle *handle = nullptr;
 
-	while (handle == 0) {
+	while (handle == nullptr) {
 
 		switch (_root_dir.open(path, flags, &handle, _alloc)) {
 
@@ -184,8 +166,8 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 		case Result::OPEN_ERR_UNACCESSIBLE:
 			{
 				if (!(flags & O_CREAT)) {
-					errno = ENOENT;
-					return 0;
+					Errno(ENOENT);
+					return nullptr;
 				}
 
 				/* O_CREAT is set, so try to create the file */
@@ -194,36 +176,44 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 				case Result::OPEN_OK:
 					break;
 
+				case Result::OPEN_ERR_NO_PERM:       Errno(EPERM);        return nullptr;
 				case Result::OPEN_ERR_EXISTS:
-
-					/* file has been created by someone else in the meantime */
-					break;
-
-				case Result::OPEN_ERR_NO_PERM:       errno = EPERM;        return 0;
-				case Result::OPEN_ERR_UNACCESSIBLE:  errno = ENOENT;       return 0;
-				case Result::OPEN_ERR_NAME_TOO_LONG: errno = ENAMETOOLONG; return 0;
-				case Result::OPEN_ERR_NO_SPACE:      errno = ENOSPC;       return 0;
+					if ((flags & O_CREAT) && (!(flags&O_EXCL))) {
+						flags ^= O_CREAT;
+						break;
+					} else {
+						Errno(EEXIST);
+						return nullptr;
+					}
+				case Result::OPEN_ERR_UNACCESSIBLE:  Errno(ENOENT);       return nullptr;
+				case Result::OPEN_ERR_NAME_TOO_LONG: Errno(ENAMETOOLONG); return nullptr;
+				case Result::OPEN_ERR_NO_SPACE:      Errno(ENOSPC);       return nullptr;
 				}
 			}
 			break;
 
-		case Result::OPEN_ERR_NO_PERM:       errno = EPERM;        return 0;
-		case Result::OPEN_ERR_EXISTS:        errno = EEXIST;       return 0;
-		case Result::OPEN_ERR_NAME_TOO_LONG: errno = ENAMETOOLONG; return 0;
-		case Result::OPEN_ERR_NO_SPACE:      errno = ENOSPC;       return 0;
+		case Result::OPEN_ERR_NO_PERM:       Errno(EPERM);        return nullptr;
+		case Result::OPEN_ERR_EXISTS:        Errno(EEXIST);       return nullptr;
+		case Result::OPEN_ERR_NAME_TOO_LONG: Errno(ENAMETOOLONG); return nullptr;
+		case Result::OPEN_ERR_NO_SPACE:      Errno(ENOSPC);       return nullptr;
 		}
 	}
 
 	/* the file was successfully opened */
+	Context *context;
+	try { context = new (_alloc) Context(*handle); }
+	catch (Genode::Allocator::Out_of_memory) { Errno(ENOMEM); return nullptr; }
 
 	Libc::File_descriptor *fd =
-		Libc::file_descriptor_allocator()->alloc(this, vfs_context(handle), libc_fd);
+		Libc::file_descriptor_allocator()->alloc(this, context, libc_fd);
 
-	fd->status = flags;
+	/* do not block by default */
+	fd->status = flags | O_NONBLOCK;
 
 	if ((flags & O_TRUNC) && (ftruncate(fd, 0) == -1)) {
-		/* XXX leaking fd, missing errno */
-		return 0;
+		close(fd);
+		Errno(EINVAL);
+		return nullptr;
 	}
 
 	return fd;
@@ -232,9 +222,23 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 
 int Libc::Vfs_plugin::close(Libc::File_descriptor *fd)
 {
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
-	handle->ds().close(handle);
+	Libc::Vfs_plugin::Context *context = vfs_context(fd);
+	/*
+	if (Libc::Vfs_plugin::Socket_context *sc =
+		dynamic_cast<Libc::Vfs_plugin::Socket_context *>(context))
+	{
+		Vfs::Vfs_handle *accept = sc->accept_handle();
+		if (accept)
+			accept->ds().close(accept);
+	}
+	*/
+
+	Vfs::Vfs_handle &handle = context->handle();
+
+	destroy(_alloc, context);
 	Libc::file_descriptor_allocator()->free(fd);
+	handle.ds().close(&handle);
+
 	return 0;
 }
 
@@ -303,25 +307,187 @@ int Libc::Vfs_plugin::stat(char const *path, struct stat *buf)
 }
 
 
+ssize_t Libc::Vfs_plugin::_write(Vfs::Vfs_handle &handle, const void *buf,
+                                 Vfs::file_size count)
+{
+	using namespace Vfs;
+	typedef File_io_service::Write_result Result;
+
+	file_size out_count = 0;
+
+	struct Local_callback : Vfs::Write_callback
+	{
+		char const * const buffer;
+		file_size    const buffer_len;
+
+		file_size    accumulator = 0;
+		Callback::Status  status = PARTIAL;
+		bool              tasked = false;
+
+		Local_callback(char const *buf, file_size len)
+		: buffer(buf), buffer_len(len) { }
+
+		file_size write(char *dst, file_size len, Callback::Status st) override
+		{
+			status = st;
+			if (!len) {
+				if (tasked)
+					Libc::task_resume();
+				return 0;
+			}
+
+			file_size out = min(len, buffer_len-accumulator);
+			if (dst) {
+				char const *p = buffer+accumulator;
+				Genode::memcpy(dst, p, out);
+			}
+			accumulator += out;
+			if (tasked && (status != PARTIAL))
+				Libc::task_resume();
+			return out;
+		}
+	} cb { (char const *)buf, count };
+
+	/* this is a stack callback, so it must be removed later */
+	handle.write_callback(cb);
+
+	Result result = handle.fs().write(&handle, count, out_count);
+
+	if (result == Result::WRITE_QUEUED) {
+		cb.tasked = true;
+		Libc::task_suspend();
+
+		/* the libc task will run until the callback completes or errors */
+
+		/* XXX: short write? */
+		out_count = cb.accumulator;
+		result = (cb.status == Callback::ERROR) ?
+			Result::WRITE_ERR_IO : Result::WRITE_OK;
+	}
+
+	/* unset the callback */
+	handle.drop_write();
+
+	switch (result) {
+	case Result::WRITE_OK: break;
+	case Result::WRITE_ERR_AGAIN:
+	case Result::WRITE_ERR_WOULD_BLOCK: return Errno(EWOULDBLOCK);
+	case Result::WRITE_ERR_INVALID:     return Errno(EINVAL);
+	case Result::WRITE_ERR_IO:          return Errno(EIO);
+	case Result::WRITE_ERR_INTERRUPT:   return Errno(EINTR);
+	case Result::WRITE_QUEUED: break;
+	}
+
+	handle.advance_seek(out_count);
+
+	return out_count;
+}
+
+
 ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
                                 ::size_t count)
 {
-	typedef Vfs::File_io_service::Write_result Result;
+	Libc::Vfs_plugin::Context *context = vfs_context(fd);
+	return context ? _write(context->handle(), buf, count) : Errno(EBADF);
+}
 
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
 
-	Vfs::file_size out_count = 0;
+ssize_t Libc::Vfs_plugin::_read(Vfs::Vfs_handle &handle, void *buf,
+                                Vfs::file_size count, bool blocking)
+{
+	using namespace Vfs;
 
-	switch (handle->fs().write(handle, (char const *)buf, count, out_count)) {
-	case Result::WRITE_ERR_AGAIN:       errno = EAGAIN;      return -1;
-	case Result::WRITE_ERR_WOULD_BLOCK: errno = EWOULDBLOCK; return -1;
-	case Result::WRITE_ERR_INVALID:     errno = EINVAL;      return -1;
-	case Result::WRITE_ERR_IO:          errno = EIO;         return -1;
-	case Result::WRITE_ERR_INTERRUPT:   errno = EINTR;       return -1;
-	case Result::WRITE_OK:                                   break;
+	typedef File_io_service::Read_result Result;
+
+	file_size out_count = 0;
+
+	struct Local_callback : Vfs::Read_callback
+	{
+		char *    const buffer;
+		file_size const buffer_len;
+
+		file_size   accumulator = 0;
+		Callback::Status status = PARTIAL;
+		bool             tasked = false;
+
+		Local_callback(char *buf, file_size len)
+		: buffer(buf), buffer_len(len) { }
+
+		file_size read(char const *src, file_size len, Callback::Status st) override
+		{
+			status = st;
+			if (!len) {
+				if (tasked)
+					Libc::task_resume();
+				return 0;
+			}
+			file_size out = min(len, buffer_len-accumulator);
+			char *p = buffer+accumulator;
+			if (src)
+				Genode::memcpy(p, src, len);
+			else
+				Genode::memset(p, 0x00, len);
+			accumulator += out;
+			if (tasked && (status != PARTIAL))
+				Libc::task_resume();
+			return out;
+		}
+	} cb { (char*)buf, count };
+
+	/* this is a stack callback, so it must be removed later */
+	handle.read_callback(cb);
+
+	Result result = handle.fs().read(&handle, count, out_count);
+	for (;;) {
+		if (result == Result::READ_QUEUED) {
+			cb.tasked = true;
+			Libc::task_suspend();
+
+			/* the libc task will run until the callback completes or errors */
+
+			/* XXX: short read? */
+			out_count = cb.accumulator;
+			result = (cb.status == Callback::ERROR) ?
+				Result::READ_ERR_IO : Result::READ_OK;
+		}
+
+		if (blocking && (result == Result::READ_OK) && (out_count == 0)) {
+			if (!handle.ds().subscribe(&handle)) {
+				/* cannot make a blocking read */
+				return Errno(EIO);
+			}
+
+			struct Callback : Vfs::Notify_callback
+			{
+				void notify() override {
+					Libc::task_resume();
+				}
+			} cb;
+
+			handle.notify_callback(cb);
+			Libc::task_suspend();
+
+			/* try it again */
+			handle.drop_notify();
+			result = handle.fs().read(&handle, count, out_count);
+		} else
+			break;
 	}
 
-	handle->advance_seek(out_count);
+	/* unset the read callback */
+	handle.drop_read();
+
+	switch (result) {
+	case Result::READ_OK: break;
+	case Result::READ_ERR_AGAIN:
+	case Result::READ_ERR_WOULD_BLOCK: return Errno(EWOULDBLOCK);
+	case Result::READ_ERR_INVALID:     return Errno(EINVAL);
+	case Result::READ_ERR_IO:          return Errno(EIO);
+	case Result::READ_ERR_INTERRUPT:   return Errno(EINTR);
+	case Result::READ_QUEUED: break;
+	}
+
+	handle.advance_seek(out_count);
 
 	return out_count;
 }
@@ -330,24 +496,9 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
                                ::size_t count)
 {
-	typedef Vfs::File_io_service::Read_result Result;
-
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
-
-	Vfs::file_size out_count = 0;
-
-	switch (handle->fs().read(handle, (char *)buf, count, out_count)) {
-	case Result::READ_ERR_AGAIN:       errno = EAGAIN;      return -1;
-	case Result::READ_ERR_WOULD_BLOCK: errno = EWOULDBLOCK; return -1;
-	case Result::READ_ERR_INVALID:     errno = EINVAL;      return -1;
-	case Result::READ_ERR_IO:          errno = EIO;         return -1;
-	case Result::READ_ERR_INTERRUPT:   errno = EINTR;       return -1;
-	case Result::READ_OK:                                   break;
-	}
-
-	handle->advance_seek(out_count);
-
-	return out_count;
+	Libc::Vfs_plugin::Context *context = vfs_context(fd);
+	return context ?
+		_read(context->handle(), buf, count, !(fd->status&O_NONBLOCK)) : Errno(EBADF);
 }
 
 
@@ -361,7 +512,8 @@ ssize_t Libc::Vfs_plugin::getdirentries(Libc::File_descriptor *fd, char *buf,
 
 	typedef Vfs::Directory_service::Dirent_result Result;
 
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
+	Context *context = vfs_context(fd);
+	Vfs::Vfs_handle *handle = &context->handle();
 
 	Vfs::Directory_service::Dirent dirent_out;
 	Genode::memset(&dirent_out, 0, sizeof(dirent_out));
@@ -506,7 +658,8 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 	Vfs::File_io_service::Ioctl_out out;
 	Genode::memset(&out, 0, sizeof(out));
 
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
+	Context *context = vfs_context(fd);
+	Vfs::Vfs_handle *handle = &context->handle();
 
 	switch (handle->fs().ioctl(handle, opcode, arg, out)) {
 	case Result::IOCTL_ERR_INVALID: errno = EINVAL; return -1;
@@ -553,7 +706,8 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 
 ::off_t Libc::Vfs_plugin::lseek(Libc::File_descriptor *fd, ::off_t offset, int whence)
 {
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
+	Context *context = vfs_context(fd);
+	Vfs::Vfs_handle *handle = &context->handle();
 
 	switch (whence) {
 	case SEEK_SET: handle->seek(offset); break;
@@ -573,7 +727,8 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 
 int Libc::Vfs_plugin::ftruncate(Libc::File_descriptor *fd, ::off_t length)
 {
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
+	Context *context = vfs_context(fd);
+	Vfs::Vfs_handle *handle = &context->handle();
 
 	typedef Vfs::File_io_service::Ftruncate_result Result;
 
@@ -611,17 +766,18 @@ int Libc::Vfs_plugin::fcntl(Libc::File_descriptor *fd, int cmd, long arg)
 
 			return new_fd->libc_fd;
 		}
-	case F_GETFD:                  return fd->flags;
-	case F_SETFD: fd->flags = arg; return 0;
-	case F_GETFL:                  return fd->status;
 
-	default:
-		break;
+	case F_GETFD:
+	case F_SETFD: return 0;
+
+	case F_GETFL: return fd->status;
+	case F_SETFL: fd->status = arg; return 0;
+
+	default: break;
 	}
 
 	Genode::error("fcntl(): command ", cmd, " not supported - vfs");
-	errno = EINVAL;
-	return -1;
+	return Errno(EINVAL);
 }
 
 

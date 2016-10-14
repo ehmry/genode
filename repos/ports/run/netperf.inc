@@ -70,9 +70,12 @@ if {$use_wifi_driver}   { set network_driver "wifi_drv" }
 set build_components {
 	core init
 	drivers/timer
+	app/netperf
+	server/vfs
 }
 
-append     build_components     " $netperf_target "
+lappend build_components $netperf_target
+
 lappend_if $use_nic_driver      build_components drivers/nic
 lappend_if $use_usb_driver      build_components drivers/usb
 lappend_if $use_nic_bridge      build_components server/nic_bridge
@@ -225,21 +228,35 @@ append_if $use_wifi_driver config {
 append_platform_drv_config
 
 append config {
-	<start name="netserver_genode">
-}
-append config "<binary name=\"$netperf_app\"/>"
-append config {
+	<start name="socket_fs">
+		<binary name="vfs"/>
+		<resource name="RAM" quantum="32M"/>
+		<provides> <service name="File_system"/> </provides>
+		<config ld_verbose="yes">
+			<vfs audit="yes">
+				<lxip }
+append_if [have_spec linux] config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\""
+append config {/> </vfs>
+			<default-policy writeable="yes" />
+		</config>
+	</start>
+
+	<start name="netserver">
 		<resource name="RAM" quantum="32M"/>
 		<config>
 			<arg value="netserver"/>
 			<arg value="-D"/>
 			<arg value="-4"/>
 			<arg value="-f"/>
-			<libc tx_buf_size="2M" rx_buf_size="2M"}
-append_if [have_spec linux] config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\""
-append config {
-			      stdout="/dev/log" stderr="/dev/log">
-				<vfs> <dir name="dev"> <log/> </dir> </vfs>
+			<arg value="-d"/>
+			<arg value="-v"/>
+			<arg value="16"/>
+			<libc tx_buf_size="2M" rx_buf_size="2M"
+			      stdout="/dev/log" stderr="/dev/log" socket="/socket">
+				<vfs>
+					<dir name="dev"> <log/> </dir>
+ 					<dir name="socket"> <fs/>  </dir>
+				</vfs>
 			</libc>
 		</config>}
 append_if $use_nic_bridge config {
@@ -262,9 +279,10 @@ install_config $config
 set boot_modules {
 	core init timer
 	ld.lib.so libc.lib.so libm.lib.so
+	netserver
+	vfs
 }
 
-append                     boot_modules " $netperf_app "
 append                     boot_modules " $netperf_stack "
 lappend_if $use_nic_bridge boot_modules nic_bridge
 
@@ -331,7 +349,7 @@ sleep 3
 foreach netperf_test $netperf_tests {
 	puts "\n---------------------------- $netperf_test -----------------------"
 
-	spawn netperf-$version -H $ip_addr -P 1 -v 2 -t $netperf_test -c -C -- -m $packet_size $force_ports
+	spawn netperf-$version -d -H $ip_addr -P 1 -v 2 -t $netperf_test -c -C -- -m $packet_size $force_ports
 	set netperf_id $spawn_id
 
 	set spawn_id_list [list $netperf_id $serial_id]

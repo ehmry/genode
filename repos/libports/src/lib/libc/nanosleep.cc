@@ -20,12 +20,11 @@
 /* Libc includes */
 #include <sys/time.h>
 
+#include "task.h"
 
 namespace Libc {
 
 	Genode::Entrypoint & task_ep();
-	void task_suspend();
-	void task_resume();
 
 	struct Timer;
 	struct Timeout;

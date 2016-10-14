@@ -548,11 +548,16 @@ class Vfs::Tar_file_system : public File_system
 			return node ? path : 0;
 		}
 
-		Open_result open(char const *path, unsigned, Vfs_handle **out_handle, Genode::Allocator& alloc) override
+		Open_result open(char const *path, unsigned mode, Vfs_handle **out_handle, Genode::Allocator& alloc) override
 		{
 			Node const *node = dereference(path);
 			if (!node || !node->record || node->record->type() != Record::TYPE_FILE)
 				return OPEN_ERR_UNACCESSIBLE;
+
+			if (mode & Vfs::Directory_service::OPEN_MODE_CREATE)
+				return OPEN_ERR_EXISTS;
+			if (mode) /* ! OPEN_MODE_RDONLY */
+				return OPEN_ERR_NO_PERM;
 
 			*out_handle = new (alloc) Tar_vfs_handle(*this, alloc, 0, node->record);
 
@@ -580,17 +585,12 @@ class Vfs::Tar_file_system : public File_system
 		 ** File I/O service interface **
 		 ********************************/
 
-		Write_result write(Vfs_handle *, char const *, file_size,
-		                   file_size &) override
-		{
-			return WRITE_ERR_INVALID;
-		}
+		void write(Vfs_handle *handle, file_size) override {
+			handle->write_status(Callback::ERR_INVALID); }
 
-		Read_result read(Vfs_handle *vfs_handle, char *dst, file_size count,
-		                 file_size &out_count) override
+		void read(Vfs_handle *vfs_handle, file_size count) override
 		{
 			Tar_vfs_handle const *handle = static_cast<Tar_vfs_handle *>(vfs_handle);
-
 			file_size const record_size = handle->record()->size();
 
 			file_size const record_bytes_left = record_size >= handle->seek()
@@ -600,16 +600,11 @@ class Vfs::Tar_file_system : public File_system
 
 			char const *data = (char *)handle->record()->data() + handle->seek();
 
-			memcpy(dst, data, count);
-
-			out_count = count;
-			return READ_OK;
+			handle->read_callback(data, count, Callback::COMPLETE);
 		}
 
-		Ftruncate_result ftruncate(Vfs_handle *handle, file_size) override
-		{
-			return FTRUNCATE_ERR_NO_PERM;
-		}
+		Ftruncate_result ftruncate(Vfs_handle *handle, file_size) override {
+			return FTRUNCATE_ERR_NO_PERM; }
 };
 
 #endif /* _INCLUDE__VFS__TAR_FILE_SYSTEM_H_ */

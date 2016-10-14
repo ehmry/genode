@@ -52,7 +52,7 @@ class Vfs::Log_file_system : public Single_file_system
 		                Genode::Allocator&,
 		                Genode::Xml_node config)
 		:
-			Single_file_system(NODE_TYPE_CHAR_DEVICE, name(), config),
+			Single_file_system(NODE_TYPE_CHAR_DEVICE, name(), config, OPEN_MODE_WRONLY),
 			_label(config.attribute_value("label", Label())),
 			_log(_log_session(env))
 		{ }
@@ -64,30 +64,19 @@ class Vfs::Log_file_system : public Single_file_system
 		 ** File I/O service interface **
 		 ********************************/
 
-		Write_result write(Vfs_handle *, char const *src, file_size count,
-		                   file_size &out_count) override
+		void write(Vfs_handle *handle, file_size count) override
 		{
-			out_count = count;
-
 			/* count does not include the trailing '\0' */
 			while (count > 0) {
 				char tmp[Genode::Log_session::MAX_STRING_LEN];
-				int const curr_count = min(count, sizeof(tmp) - 1);
-				memcpy(tmp, src, curr_count);
-				tmp[curr_count > 0 ? curr_count : 0] = 0;
+				file_size n = min(count, sizeof(tmp) - 1);
+				file_size cb_out = handle->write_callback(
+					tmp, n, n == count ? Callback::COMPLETE
+				                       : Callback::PARTIAL);
+				tmp[cb_out > 0 ? cb_out : 0] = 0;
 				_log.write(tmp);
-				count -= curr_count;
-				src   += curr_count;
+				count -= cb_out;
 			}
-
-			return WRITE_OK;
-		}
-
-		Read_result read(Vfs_handle *, char *, file_size,
-		                file_size &out_count) override
-		{
-			out_count = 0;
-			return READ_OK;
 		}
 };
 
