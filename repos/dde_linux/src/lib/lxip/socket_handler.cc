@@ -122,7 +122,7 @@ namespace Net
 					Lxip::size_t    len;
 					int             flags;
 					void           *addr;
-					Lxip::uint32_t *addr_len;
+					Lxip::uint32_t  addr_len;
 				} msg;
 				struct
 				{
@@ -377,6 +377,9 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			struct msghdr msg;
 			struct iovec  iov;
 
+			msg.msg_name    = _call.msg.addr;
+			msg.msg_namelen = _call.msg.addr_len;
+
 			msg.msg_control      = nullptr;
 			msg.msg_controllen   = 0;
 			msg.msg_iter.iov     = &iov;
@@ -385,8 +388,6 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 
 			iov.iov_len        = _call.msg.len;
 			iov.iov_base       = _call.msg.buf;
-			msg.msg_name       = _call.addr_len ? &_call.addr : 0;
-			msg.msg_namelen    = _call.addr_len;
 			msg.msg_flags      = 0;
 
 			if (_call.handle.non_block)
@@ -397,10 +398,7 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			                                          _call.msg.len,
 			                                          _call.msg.flags);
 
-			if (_call.msg.addr) {
-				*_call.msg.addr_len = min(*_call.msg.addr_len, msg.msg_namelen);
-				Genode::memcpy(_call.msg.addr, &_call.addr, *_call.msg.addr_len);
-			}
+			_call.msg.addr_len = msg.msg_namelen;
 		}
 
 		void _do_send()
@@ -421,8 +419,8 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 
 			iov.iov_len        = _call.msg.len;
 			iov.iov_base       = _call.msg.buf;
-			msg.msg_name       = _call.addr_len ? &_call.addr : 0;
-			msg.msg_namelen    = _call.addr_len;
+			msg.msg_name       = _call.msg.addr;
+			msg.msg_namelen    = _call.msg.addr_len;
 			msg.msg_flags      = _call.msg.flags;
 
 			if (_call.handle.non_block)
@@ -650,11 +648,14 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			_call.msg.buf      = buf;
 			_call.msg.len      = len;
 			_call.msg.addr     = addr;
-			_call.msg.addr_len = addr_len;
+			_call.msg.addr_len = addr_len ? *addr_len : 0;
 			_call.msg.flags    = flags;
 			_call.addr_len     = _family_handler(family, addr);
 
 			_submit_and_block();
+
+			if (addr_len)
+				*addr_len = _call.msg.addr_len;
 
 			return _result.len;
 		}
@@ -662,12 +663,13 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 		Lxip::ssize_t send(Lxip::Handle h, const void *buf, Lxip::size_t len, int flags,
 		                   Lxip::uint16_t family, void *addr)
 		{
-			_call.opcode     = OP_SEND;
-			_call.handle     = h;
-			_call.msg.buf    = (void *)buf;
-			_call.msg.len    = len;
-			_call.msg.flags  = flags;
-			_call.addr_len   = _family_handler(family, addr);
+			_call.opcode        = OP_SEND;
+			_call.handle        = h;
+			_call.msg.buf       = (void *)buf;
+			_call.msg.len       = len;
+			_call.msg.flags     = flags;
+			_call.msg.addr      = addr;
+			_call.msg.addr_len  = addr ? sizeof(Linux::sockaddr_in) : 0;
 
 			_submit_and_block();
 
@@ -717,7 +719,7 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 
 		void register_ticker(void(*tick)()) { _ticker.tick_function(tick); }
 
-		int bind_tcp_port(Lxip::Handle h, char const *addr)
+		int bind_port(Lxip::Handle h, char const *addr)
 		{
 			using namespace Linux; /* XXX fix Linux::__be16 in sockaddr_in */
 

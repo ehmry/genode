@@ -114,7 +114,7 @@ class Lxip::Socketcall
 
 		/* new interface */
 		virtual void register_ticker(void(*tick)()) = 0;
-		virtual int bind_tcp_port(Handle h, char const *host) = 0;
+		virtual int bind_port(Handle h, char const *host) = 0;
 		virtual int dial(Handle h, char const *host) = 0;
 		virtual int ifaddr(Handle h, char *dst, size_t len) = 0;
 		virtual int local(Handle h, char *dst, size_t len) = 0;

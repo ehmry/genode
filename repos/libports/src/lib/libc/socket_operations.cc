@@ -446,11 +446,29 @@ extern "C" ssize_t _recvfrom(int libc_fd, void *buf, ::size_t len, int flags,
 		errno = EBADF;
 		return -1;
 	}
-	/* TODO */
+
 	if (src_addr) {
-		Genode::error(__func__, ": src_addr parameter not supported yet");
-		errno = EINVAL;
-		return -1;
+		Sockaddr_string addr_string;
+		Absolute_path file("from", context->path.base());
+		int const fd = open(file.base(), O_RDONLY);
+		if (fd == -1) {
+			Genode::error(__func__, ": ",file," not accessible");
+			return Errno(EINVAL);
+		}
+
+		int const n = read(fd, addr_string.base(), addr_string.capacity() - 1);
+		close(fd);
+		if (n == -1 || !n || n >= (int)addr_string.capacity() - 1)
+			Errno(EIO);
+
+		addr_string.terminate(n);
+		addr_string.remove_trailing_newline();
+
+
+		/* convert the address but do not exceed the caller's buffer */
+		sockaddr_in from_sa = sockaddr_in_struct(addr_string.host(), addr_string.port());
+		memcpy(src_addr, &from_sa, *addrlen);
+		*addrlen = sizeof(from_sa);
 	}
 
 	ssize_t out_len = 0;
@@ -458,9 +476,8 @@ extern "C" ssize_t _recvfrom(int libc_fd, void *buf, ::size_t len, int flags,
 		Absolute_path file("data", context->path.base());
 		int const fd = open(file.base(), O_RDONLY);
 		if (fd == -1) {
-			Genode::error(__func__, ": data file not accessible");
-			errno = EINVAL;
-			return -1;
+			Genode::error(__func__, ": ",file," not accessible");
+			return Errno(EINVAL);
 		}
 		out_len = read(fd, buf, len);
 		close(fd);
@@ -513,11 +530,21 @@ extern "C" ssize_t _sendto(int libc_fd, const void *buf, ::size_t len, int flags
 		errno = EBADF;
 		return -1;
 	}
-	/* TODO */
+
 	if (dest_addr) {
-		Genode::error(__func__, ": dest_addr parameter not supported yet");
-		errno = EINVAL;
-		return -1;
+		Sockaddr_string addr_string(host_string(*(sockaddr_in const *)dest_addr),
+		                            port_string(*(sockaddr_in const *)dest_addr));
+
+		Absolute_path file("to", context->path.base());
+		int const fd = open(file.base(), O_WRONLY);
+		if (fd == -1) {
+			Genode::error(__func__, ": ",file," not accessible");
+			return Errno(EINVAL);
+		}
+		int const len = strlen(addr_string.base());
+		int const n   = write(fd, addr_string.base(), len);
+		close(fd);
+		if (n != len) return Errno(EIO);
 	}
 
 	ssize_t out_len = 0;
@@ -598,9 +625,9 @@ extern "C" int shutdown(int libc_fd, int how)
 }
 
 
-static void new_tcp_socket(Absolute_path &path)
+static void new_socket(Absolute_path &path, char const *new_filename)
 {
-	Absolute_path new_socket("tcp/new_socket", path.base());
+	Absolute_path new_socket(new_filename, path.base());
 
 	int const fd = open(new_socket.base(), O_RDONLY);
 	if (fd == -1) {
@@ -621,23 +648,22 @@ static void new_tcp_socket(Absolute_path &path)
 	path.append(buf);
 }
 
+
 extern "C" int _socket(int domain, int type, int protocol)
 {
 	Absolute_path path(Libc::config_socket());
 
 	if (path == "") {
 		Genode::error(__func__, ": socket fs not mounted");
-		errno = EACCES;
-		return -1;
+		return Errno(EACCES);
 	}
 
-	if (type == SOCK_STREAM && (protocol == 0 || protocol == IPPROTO_TCP)) {
-		try { new_tcp_socket(path); } catch (New_socket_failed) { return -1; }
-	} else {
-		Genode::error(__func__, ": only TCP for now");
-		errno = EAFNOSUPPORT;
-		return -1;
-	}
+	if (type == SOCK_STREAM && (protocol == 0 || protocol == IPPROTO_TCP))
+		try { new_socket(path, "tcp/new_socket"); } catch (New_socket_failed) { return -1; }
+	else if (type == SOCK_DGRAM && (protocol == 0 || protocol == IPPROTO_UDP))
+		try { new_socket(path, "udp/new_socket"); } catch (New_socket_failed) { return -1; }
+	else
+		return Errno(EAFNOSUPPORT);
 
 	Socket_context *context = new (Genode::env()->heap())
 	                          Socket_context(path);
