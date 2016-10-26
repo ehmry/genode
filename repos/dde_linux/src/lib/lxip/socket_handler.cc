@@ -324,8 +324,8 @@ class Net::Socketcall : public Lxip::Socketcall
 
 			iov.iov_len        = len;
 			iov.iov_base       = (void*)buf;
-			msg.msg_name       = _addr_len ? &_addr : 0;
-			msg.msg_namelen    = _addr_len;
+			msg.msg_name       = addr;
+			msg.msg_namelen    = addr ? sizeof(sockaddr_in) : 0;
 			msg.msg_flags      = flags | MSG_DONTWAIT;
 
 			return sock->ops->sendmsg(sock, &msg, len);

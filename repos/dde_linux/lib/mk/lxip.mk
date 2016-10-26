@@ -1,5 +1,3 @@
-SHARED_LIB = yes
-
 LIB_DIR     = $(REP_DIR)/src/lib/lxip
 LIB_INC_DIR = $(LIB_DIR)/include
 
