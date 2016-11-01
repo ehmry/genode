@@ -1,0 +1,15 @@
+##
+# Load components across a shared folder
+#
+
+source [genode_dir]/tool/run/shared_folder.inc
+source [genode_dir]/tool/run/load.inc
+
+proc run_load { } {
+	global load_spawn_id
+	set load_spawn_id -1
+
+	foreach f [glob [run_dir]/genode/*] {
+		file copy -force $f [shared_folder] }
+	return true
+}

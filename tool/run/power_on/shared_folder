@@ -1,0 +1,14 @@
+##
+# Execute scenario across a shared folder
+#
+
+proc run_power_on { } {
+	# wipe out the directory and start fresh
+	#foreach f [glob [shared_folder]/*] {
+	#	file delete $f }
+
+	set fh [open "[shared_folder]/log" "WRONLY CREAT TRUNC"]
+	close $fh
+
+	file copy -force [run_dir]/genode/config [shared_folder]/run.config
+}

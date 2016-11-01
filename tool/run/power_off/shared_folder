@@ -1,0 +1,10 @@
+##
+# Stop a scenario across a shared folder
+#
+
+proc run_power_off { } {
+	set fh [open "[shared_folder]/run.config" "WRONLY CREAT TRUNC"]
+	puts $fh "<config/>"
+	close $fh
+	return true
+}

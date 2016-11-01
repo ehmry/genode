@@ -1,0 +1,17 @@
+##
+# Capture log output across a shared folder
+#
+
+source [genode_dir]/tool/run/shared_folder.inc
+source [genode_dir]/tool/run/log.inc
+
+proc run_log { wait_for_re timeout_value } {
+	global output_spawn_id
+
+	spawn tail -f [shared_folder]/log
+	set tailf_spawn_id $spawn_id
+	set output_spawn_id $tailf_spawn_id
+
+	wait_for_output $wait_for_re $timeout_value $tailf_spawn_id
+	return true
+}
