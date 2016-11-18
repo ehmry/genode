@@ -148,7 +148,7 @@ namespace File_system {
 			source.submit_packet(packet);
 
 			packet = source.get_acked_packet();
-			success = packet.succeeded();
+			success = packet.result() == Packet_descriptor::SUCCESS;
 
 			size_t const read_num_bytes =
 				Genode::min(packet.length(), curr_packet_size);
@@ -209,7 +209,7 @@ namespace File_system {
 			source.submit_packet(packet);
 
 			packet = source.get_acked_packet();;
-			success = packet.succeeded();
+			success = packet.result() == Packet_descriptor::SUCCESS;
 			source.release_packet(packet);
 
 			/* prepare next iteration */

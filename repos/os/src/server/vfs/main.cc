@@ -140,9 +140,6 @@ class Vfs_server::Session_component :
 			size_t     const length  = packet.length();
 			seek_off_t const seek    = packet.position();
 
-			/* assume failure by default */
-			packet.succeeded(false);
-
 			if ((!(content && length)) || (packet.length() > packet.size())) {
 				return;
 			}
@@ -169,10 +166,14 @@ class Vfs_server::Session_component :
 				res_length = node->write(_vfs, (char const *)content, length, seek);
 				break;
 			}
+
+			case Packet_descriptor::INVALID: return;
 			}
 
 			packet.length(res_length);
-			packet.succeeded(!!res_length);
+			packet.result(res_length
+				? Packet_descriptor::SUCCESS
+				: Packet_descriptor::ERR_IO);
 		}
 
 		void _process_packet()
@@ -507,30 +508,8 @@ class Vfs_server::Session_component :
 			to_dir.mark_as_updated();
 		}
 
-		void sigh(Node_handle handle, Signal_context_capability sigh) override
-		{
-			if (!_in_range(handle.value))
-				throw Invalid_handle();
-
-			Node *node = dynamic_cast<Node *>(_nodes[handle.value]);
-			if (!node)
-				throw Invalid_handle();
-
-			Listener &listener = _listeners[handle.value];
-
-			/*
-			 * If there was already a handler registered for the node,
-			 * remove the old handler.
-			 */
-			if (listener.valid())
-				node->remove_listener(&listener);
-
-			/*
-			 * Register new handler
-			 */
-			listener = Listener(sigh);
-			node->add_listener(&listener);
-		}
+		bool sigh(Node_handle handle, Signal_context_capability sigh) override {
+			return false; }
 
 		/**
 		 * Sync the VFS and send any pending signals on the node.

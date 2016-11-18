@@ -61,10 +61,8 @@ namespace Ram_fs {
 				size_t     const length  = packet.length();
 				seek_off_t const offset  = packet.position();
 
-				if (!content || (packet.length() > packet.size())) {
-					packet.succeeded(false);
+				if (!content || (packet.length() > packet.size()))
 					return;
-				}
 
 				/* resulting length */
 				size_t res_length = 0;
@@ -78,10 +76,12 @@ namespace Ram_fs {
 				case Packet_descriptor::WRITE:
 					res_length = node.write((char const *)content, length, offset);
 					break;
+
+				case Packet_descriptor::INVALID: break;
 				}
 
 				packet.length(res_length);
-				packet.succeeded(res_length > 0);
+				packet.result(Packet_descriptor::SUCCESS);
 			}
 
 			void _process_packet()
@@ -89,7 +89,7 @@ namespace Ram_fs {
 				Packet_descriptor packet = tx_sink()->get_packet();
 
 				/* assume failure by default */
-				packet.succeeded(false);
+				packet.result(Packet_descriptor::ERR_INVALID);
 
 				try {
 					Node *node = _handle_registry.lookup_and_lock(packet.handle());
@@ -413,9 +413,10 @@ namespace Ram_fs {
 				node->notify_listeners();
 			}
 
-			void sigh(Node_handle node_handle, Genode::Signal_context_capability sigh)
+			bool sigh(Node_handle node_handle, Genode::Signal_context_capability sigh)
 			{
 				_handle_registry.sigh(node_handle, sigh);
+				return true;
 			}
 	};
 

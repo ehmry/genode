@@ -111,9 +111,9 @@ class File_system::Session_client : public Genode::Rpc_client<Session>
 			call<Rpc_move>(from_dir, from_name, to_dir, to_name);
 		}
 
-		void sigh(Node_handle node, Genode::Signal_context_capability sigh) override
+		bool sigh(Node_handle node, Genode::Signal_context_capability sigh) override
 		{
-			call<Rpc_sigh>(node, sigh);
+			return call<Rpc_sigh>(node, sigh);
 		}
 
 		void sync(Node_handle node) override
