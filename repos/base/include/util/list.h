@@ -111,6 +111,17 @@ class Genode::List
 
 			le->Element::_next = 0;
 		}
+
+		/**
+		 * Apply a function to each list element
+		 */
+		template <typename FUNC>
+		void for_each(FUNC const &func) {
+			for (LT       *e = _first; e; e = e->_next) func(*e); }
+
+		template <typename FUNC>
+		void for_each(FUNC const &func) const {
+			for (LT const *e = _first; e; e = e->_next) func(*e); }
 };
 
 
