@@ -172,6 +172,8 @@ struct Vfs::Lxip_vfs_handle final : Vfs::Vfs_handle, Lxip_vfs_handles::Element
 {
 	Vfs::File &file;
 
+	//file_size queued_write = 0;
+
 	Lxip_vfs_handle(Vfs::File_system &fs, Allocator &alloc, int status_flags,
 	                Vfs::File &file)
 	: Vfs_handle(fs, fs, alloc, status_flags), file(file) { }
@@ -231,8 +233,13 @@ static Vfs::Lxip_vfs_handles _polling_handles;
 
 static void poll_all()
 {
+	using namespace Linux;
+
 	for (Vfs::Lxip_vfs_handle *h = _polling_handles.first(); h; h = h->next())
-		if (h->file.poll())
+		/*if (h->queued_write) {
+			PDBG("retrying queued write");
+			h->file.write(*h, h->queued_write);
+		} else*/ if (h->file.poll())
 			h->notify_callback();
 }
 
@@ -307,13 +314,8 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 		{
 			using namespace Linux;
 
-			switch (_sock.state) {
-			case SS_CONNECTED: break;
-			case SS_DISCONNECTING:
+			if (_sock.state == SS_UNCONNECTED)
 				return handle.write_status(Callback::ERR_TERMINATED);
-			default:
-				return handle.write_status(Callback::ERR_INVALID);
-			}
 
 			struct msghdr   msg;
 			struct iovec    iov;
@@ -326,27 +328,46 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 			msg.msg_control    = nullptr;
 			msg.msg_controllen = 0;
 			msg.msg_iocb       = nullptr;
-			msg.msg_flags      = MSG_DONTWAIT;
+			msg.msg_flags      = 0; // MSG_DONTWAIT;
 
 			iov.iov_base = (void*)Lxip::data_buffer();
 			iov.iov_len  = Lxip::DATA_BUFFER_SIZE;
 
 			file_size remain = len;
 			while (remain) {
-				file_size n = min(remain, Lxip::DATA_BUFFER_SIZE);
+				/*
+				enum { SEND_LIMIT_GUESS = 17824 };
+
+				int outq = 0;
+				if (_sock.ops->ioctl(&_sock, SIOCOUTQ, &outq)) {
+					Genode::error("lxIP: broken ioctl is broken");
+					return;
+				}
+				int const sndbuf = SEND_LIMIT_GUESS - outq;
+
+				if (!sndbuf) {
+					PDBG("sndbuf presumably exhausted");
+					handle.queued_write = remain;
+					return;
+				}
+				 */
+
+				int n = min(remain, /*min(sndbuf,*/ Lxip::DATA_BUFFER_SIZE/*)*/);
 				msg.msg_iter.count = n =
 					handle.write_callback(Lxip::data_buffer(), n, Callback::PARTIAL);
 				if (!n) break;
 
 				int res = _sock.ops->sendmsg(&_sock, &msg, n);
-
-				if ((res == Lxip::ssize_t(Lxip::Io_result::LINUX_EAGAIN))
-				 || (file_size(res) < n)) {
-					Genode::error("short write to lxIP socket, returning error");
-					return handle.write_status(Callback::ERR_IO);
-				} else if (res < 0) {
-					Genode::error("LxIP send error ", res);
-					return handle.write_status(Callback::ERR_IO);
+				if (res != n) {
+					if (res < 0) {
+						Genode::error("LxIP send error ", res);
+						return handle.write_status(Callback::ERR_IO);
+					} else if (res == 0) {
+						return handle.write_status(Callback::ERR_TERMINATED);
+					} else {
+						Genode::error("short write to lxIP socket ",res,"/",n,", returning error");
+						return handle.write_status(Callback::ERR_IO);
+					}
 				}
 
 				remain -= res;
@@ -398,9 +419,11 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 					_parent.close();
 					if (remain != len) {
 						/* recvmsg returned zero but we have some good data */
+						Genode::error("recvmsg returned zero but we have some good data");
 						handle.read_callback(Lxip::data_buffer(), res, Callback::COMPLETE);
 					} else {
 						/* recvmsg returned zero but we have nothing */
+						Genode::error("recvmsg returned zero but we have nothing");
 						handle.read_status(Callback::ERR_TERMINATED);
 					}
 					return;
@@ -564,6 +587,7 @@ class Vfs::Lxip_connect_file : public Vfs::Lxip_file
 		{
 			using namespace Linux;
 
+			PDBG(_sock.state == SS_CONNECTED ? "true" : "false");
 			return _sock.state == SS_CONNECTED;
 		}
 
@@ -810,8 +834,7 @@ class Vfs::Lxip_from_file : public Vfs::Lxip_file
 			iov.iov_len  = sizeof(_content_buffer);
 
 			/* peek to get the address of the currently queued data */
-			Lxip::ssize_t const res =
-				_sock.ops->recvmsg(&_sock, &msg, 0, MSG_PEEK|MSG_DONTWAIT);
+			int const res = _sock.ops->recvmsg(&_sock, &msg, 0, MSG_PEEK|MSG_DONTWAIT);
 			if (res == Lxip::Io_result::LINUX_EAGAIN) {
 				return handle.read_status(Callback::COMPLETE);
 			}
