@@ -1,5 +1,6 @@
 build {
-	core init server/log_terminal noux/minimal lib/libc_noux test/noux_fork
+	core init drivers/timer server/log_terminal
+	noux/minimal lib/libc_noux test/noux_fork
 }
 
 create_boot_directory
@@ -20,6 +21,10 @@ install_config {
 		<default-route>
 			<any-service> <any-child/> <parent/> </any-service>
 		</default-route>
+		<start name="timer">
+			<resource name="RAM" quantum="2M"/>
+			<provides> <service name="Timer"/> </provides>
+		</start>
 		<start name="log_terminal">
 			<resource name="RAM" quantum="2M"/>
 			<provides><service name="Terminal"/></provides>
@@ -35,7 +40,8 @@ install_config {
 }
 
 build_boot_image {
-	core init log_terminal noux ld.lib.so libc.lib.so libc_noux.lib.so
+	core init timer log_terminal
+	noux ld.lib.so libc.lib.so libc_noux.lib.so
 	test-noux_fork
 }
 

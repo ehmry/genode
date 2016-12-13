@@ -8,7 +8,7 @@
 # Build
 #
 
-build { core init server/vfs test/libc_vfs }
+build { core init drivers/timer server/vfs test/libc_vfs }
 
 create_boot_directory
 
@@ -29,6 +29,10 @@ set config {
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
 	</default-route>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
 	<start name="vfs">
 		<resource name="RAM" quantum="12M"/>
 		<provides> <service name="File_system"/> </provides>
@@ -66,7 +70,7 @@ install_config $config
 build_boot_image {
 	core init vfs
 	ld.lib.so libc.lib.so
-	test-libc_vfs
+	timer test-libc_vfs
 }
 
 #

@@ -11,7 +11,7 @@
 # Build
 #
 
-build { core init test/libc_vfs }
+build { core init drivers/timer test/libc_vfs }
 
 create_boot_directory
 
@@ -29,11 +29,15 @@ set config {
 		<service name="CPU"/>
 		<service name="LOG"/>
 	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
 	<start name="test-libc_vfs">
 		<resource name="RAM" quantum="12M"/>
-		<route>
-			<any-service> <parent/> </any-service>
-		</route>
 		<config>
 			<iterations value="1"/>}
 append_if [have_include "power_on/qemu"] config {
@@ -61,7 +65,7 @@ install_config $config
 build_boot_image {
 	core init
 	ld.lib.so libc.lib.so
-	test-libc_vfs
+	timer test-libc_vfs
 }
 
 #
