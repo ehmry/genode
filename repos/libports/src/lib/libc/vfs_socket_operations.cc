@@ -295,6 +295,13 @@ Libc::File_descriptor *Libc::Vfs_plugin::accept(File_descriptor *libc_fd, struct
 		return nullptr;
 	}
 
+	/* sockets need notifications to work */
+	if (!accepted_context->subscribe()) {
+		close(accepted_fd);
+		Errno(EIO);
+		return nullptr;
+	}
+
 	if (addr && addrlen) {
 		Absolute_path file("remote", accept_path.base());
 		Context *remote_ctx = _open(file.base(), Directory_service::OPEN_MODE_RDONLY);
@@ -366,9 +373,6 @@ int Libc::Vfs_plugin::bind(Libc::File_descriptor *fd, const struct sockaddr *add
 
 int Libc::Vfs_plugin::connect(Libc::File_descriptor *fd, sockaddr const *addr, socklen_t addrlen)
 {
-	PDBG("<- this function is racy");
-	/* TODO: NONBLOCK */
-
 	using namespace Vfs;
 
 	/* TODO: IPv6 */
@@ -403,21 +407,22 @@ int Libc::Vfs_plugin::connect(Libc::File_descriptor *fd, sockaddr const *addr, s
 		if (n != len)
 			return (n == -1) ? -1 : Errno(EACCES);
 
-		/*
-		 * return if a notification came in during write,
-		 * otherwise block
-		 */
-		if (!context->notifications()) {
-			PDBG("block for data notification");
-			/* block for notification on the data file (the socket context) */
-			Task &task = Libc::this_task();
-			Task_resume_callback notify_cb(task);
-			notify_cb.add_context(*context);
-			_yield_vfs(task);
-		} else
-			PDBG("connect already notified");
+		if (!(fd->status & O_NONBLOCK)) {
+			/*
+			 * return if a notification came in during write,
+			 * otherwise block
+			 */
+			if (!context->notifications()) {
+				/* block for notification on the data file (the socket context) */
+				Task &task = Libc::this_task();
+				Task_resume_callback notify_cb(task);
+				notify_cb.add_context(*context);
+				_yield_vfs(task);
+			}
+			context->ack();
+			/* decrement the context notification counter */
+		}
 	}
-	context->ack();
 
 	return 0;
 }
@@ -495,11 +500,13 @@ ssize_t Libc::Vfs_plugin::recvfrom(Libc::File_descriptor *fd, void *buf, ::size_
 	 * read the data file and block until both callbacks complete
 	 */
 
+	if (fd->status & O_NONBLOCK)
+		Genode::warning("non-blocking ",__func__," not supported");
+
 	if (src_addr) {
 		using namespace Vfs;
 
 		if (!context->notifications()) {
-			PDBG("blocking for data before reading remote");
 			Task &task = Libc::this_task();
 			Task_resume_callback notify_cb(task);
 			notify_cb.add_context(*context);
@@ -516,7 +523,6 @@ ssize_t Libc::Vfs_plugin::recvfrom(Libc::File_descriptor *fd, void *buf, ::size_
 		Context::Guard guard(_alloc, remote_ctx);
 
 		int const n = _read(*remote_ctx, addr_string.base(), addr_string.capacity() - 1, true);
-		PDBG("read remote returned");
 		if (!n) /* connection closed */
 			return 0;
 
@@ -548,9 +554,8 @@ ssize_t Libc::Vfs_plugin::recv(Libc::File_descriptor *libc_fd, void *buf, ::size
 ssize_t Libc::Vfs_plugin::sendto(Libc::File_descriptor *fd, const void *buf, ::size_t len, int flags,
                             const struct sockaddr *dest_addr, socklen_t addrlen)
 {
-	if (!buf || !len) {
+	if (!buf || !len)
 		return Errno(EINVAL);
-	}
 
 	Socket_context *context;
 	if (!(context = dynamic_cast<Socket_context *>(fd->context)))
