@@ -32,7 +32,7 @@ void inline Genode::backtrace()
 	asm volatile ("mov %0, %%fp" : "=r"(fp) : :);
 
 	while (fp && *fp) {
-		Genode::log(Hex(*fp));
+		Genode::log(fp, ": ", Hex(*fp));
 		fp = (addr_t*)*(fp - 1);
 	}
 }
