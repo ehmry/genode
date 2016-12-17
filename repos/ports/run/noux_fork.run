@@ -41,4 +41,5 @@ build_boot_image {
 
 append qemu_args " -nographic "
 
-run_genode_until "child.*exited.*\n" 20
+run_genode_until "--- parent done ---.*\n" 20
+run_genode_until "child.*exited.*\n" 5 [output_spawn_id]
