@@ -2,6 +2,7 @@
  * \brief  Block device file system
  * \author Josef Soentgen
  * \author Norman Feske
+ * \author Emery Hemingway
  * \date   2013-12-20
  */
 
@@ -26,87 +27,105 @@ class Vfs::Block_file_system : public Single_file_system
 {
 	private:
 
-		Genode::Allocator &_alloc;
-
 		typedef Genode::String<64> Label;
-		Label _label;
 
-		/*
-		 * Serialize access to packet stream of the block session
-		 */
-		Lock _lock;
-
-		char                       *_block_buffer;
-		unsigned                    _block_buffer_count;
-
-		Genode::Allocator_avl       _tx_block_alloc { &_alloc };
+		Genode::Allocator_avl       _tx_block_alloc;
 		Block::Connection           _block;
 		Genode::size_t              _block_size;
 		Block::sector_t             _block_count;
 		Block::Session::Operations  _block_ops;
-		Block::Session::Tx::Source *_tx_source;
+		Block::Session::Tx::Source &_tx_source;
 		bool                        _readable;
 		bool                        _writeable;
 
-		Genode::Signal_receiver           _signal_receiver;
-		Genode::Signal_context            _signal_context;
-		Genode::Signal_context_capability _source_submit_cap;
+		Genode::Signal_handler<Block_file_system> _ack_handler;
 
-		file_size _block_io(file_size nr, void *buf, file_size sz,
-		                    bool write, bool bulk = false)
+		struct Handle final : Vfs_handle, Genode::List<Handle>::Element
 		{
-			Block::Packet_descriptor::Opcode op;
-			op = write ? Block::Packet_descriptor::WRITE : Block::Packet_descriptor::READ;
+			Block::Packet_descriptor::Opcode op =
+				Block::Packet_descriptor::Opcode::END;
 
-			file_size packet_size  = bulk ? sz : _block_size;
-			file_size packet_count = bulk ? (sz / _block_size) : 1;
+			Block::sector_t block_number = 0;
+			Genode::size_t  block_count  = 0;
+			Genode::off_t   op_offset    = 0;
 
-			Block::Packet_descriptor packet;
+			bool bounce_write = false;
 
-			/* sanity check */
-			if (packet_count > _block_buffer_count) {
-				packet_size  = _block_buffer_count * _block_size;
-				packet_count = _block_buffer_count;
+			using Vfs_handle::Vfs_handle;
+		};
+
+		Genode::List<Handle> _handles;
+
+		void _process_ack(Block::Packet_descriptor p)
+		{
+			using namespace Block;
+			typedef Block::Packet_descriptor::Opcode Opcode;
+
+			if (p.operation() == Opcode::END) {
+				Genode::warning("invalid Block packet received client side");
+				_tx_source.release_packet(p);
+				return;
 			}
 
-			while (true) {
-				try {
-					Lock::Guard guard(_lock);
+			_handles.for_each([&] (Handle &h) {
 
-					packet = _tx_source->alloc_packet(packet_size);
-					break;
-				} catch (Block::Session::Tx::Source::Packet_alloc_failed) {
-					if (!_tx_source->ready_to_submit())
-						_signal_receiver.wait_for_signal();
-					else {
-						if (packet_count > 1) {
-							packet_size  /= 2;
-							packet_count /= 2;
+				/* does the handle op fit inside the packet op? */
+				int const block_offset = p.block_number()-h.block_number;
+				if ((h.op == p.operation()) && (block_offset >= 0) &&
+					(h.block_count >= (p.block_count()-block_offset)))
+				{
+					Genode::off_t const op_offset =
+						block_offset*_block_size + h.op_offset;
+
+					Callback::Status const s = p.succeeded() ?
+						Callback::COMPLETE : Callback::ERR_IO;
+					switch (p.operation()) {
+
+					/* callback op lengths are rounded up, deal with it */
+					case Opcode::READ:
+						if (h.bounce_write) {
+							/* write to the packet and resubmit */
+							h.write_callback(_tx_source.packet_content(p)+op_offset,
+							                 h.block_count*_block_size, s);
+							_tx_source.submit_packet(Packet_descriptor(
+								p, p.operation(), p.block_number(), p.block_count()));
+							h.bounce_write = false;
+						} else {
+							/* read, release, and complete */
+							h.read_callback(_tx_source.packet_content(p)+op_offset,
+							                h.block_count*_block_size, s);
+							_tx_source.release_packet(p);
+							p = Packet_descriptor();
+							h.op = Opcode::END;
+							h.read_status(s);
 						}
+						break;
+
+					case Opcode::WRITE:
+						/* release and complete */
+						_tx_source.release_packet(p);
+						p = Packet_descriptor();
+						h.op = Opcode::END;
+						h.write_status(s);
+						break;
+
+					case Opcode::END: break;
+
 					}
 				}
+
+			});
+
+			if (p.operation() != Opcode::END) {
+				Genode::warning("VFS: received block packet without handle");
+				_tx_source.release_packet(p);
 			}
-			Lock::Guard guard(_lock);
+		}
 
-			Block::Packet_descriptor p(packet, op, nr, packet_count);
-
-			if (write)
-				Genode::memcpy(_tx_source->packet_content(p), buf, packet_size);
-
-			_tx_source->submit_packet(p);
-			p = _tx_source->get_acked_packet();
-
-			if (!p.succeeded()) {
-				Genode::error("Could not read block(s)");
-				_tx_source->release_packet(p);
-				return 0;
-			}
-
-			if (!write)
-				Genode::memcpy(buf, _tx_source->packet_content(p), packet_size);
-
-			_tx_source->release_packet(p);
-			return packet_size;
+		void _process_acks()
+		{
+			while(_tx_source.ack_avail())
+				_process_ack(_tx_source.get_acked_packet());
 		}
 
 	public:
@@ -117,34 +136,21 @@ class Vfs::Block_file_system : public Single_file_system
 		:
 			Single_file_system(NODE_TYPE_BLOCK_DEVICE, name(),
 			                  config, OPEN_MODE_RDWR),
-			_alloc(alloc),
-			_label(config.attribute_value("label", Label())),
-			_block_buffer(0),
-			_block_buffer_count(1),
-			_block(env, &_tx_block_alloc, 128*1024, _label.string()),
-			_tx_source(_block.tx()),
+			_tx_block_alloc(&alloc),
+			_block(env, &_tx_block_alloc,
+			      config.attribute_value("buffer_size", Genode::size_t(Block::DEFAULT_TX_BUF_SIZE)),
+			      config.attribute_value("label", Label()).string()),
+			_tx_source(*_block.tx()),
 			_readable(false),
 			_writeable(false),
-			_source_submit_cap(_signal_receiver.manage(&_signal_context))
+			_ack_handler(env.ep(), *this, &Block_file_system::_process_acks)
 		{
-			try { config.attribute("block_buffer_count").value(&_block_buffer_count); }
-			catch (...) { }
-
 			_block.info(&_block_count, &_block_size, &_block_ops);
 
 			_readable  = _block_ops.supported(Block::Packet_descriptor::READ);
 			_writeable = _block_ops.supported(Block::Packet_descriptor::WRITE);
 
-			_block_buffer = new (_alloc) char[_block_buffer_count * _block_size];
-
-			_block.tx_channel()->sigh_ready_to_submit(_source_submit_cap);
-		}
-
-		~Block_file_system()
-		{
-			_signal_receiver.dissolve(&_signal_context);
-
-			destroy(_alloc, _block_buffer);
+			_block.tx_channel()->sigh_ack_avail(_ack_handler);
 		}
 
 		static char const *name() { return "block"; }
@@ -161,6 +167,31 @@ class Vfs::Block_file_system : public Single_file_system
 			return result;
 		}
 
+		Open_result open(char const  *path, unsigned mode,
+		                 Vfs_handle **out_handle,
+		                 Allocator   &alloc) override
+		{
+			if (!_single_file(path))
+				return OPEN_ERR_UNACCESSIBLE;
+
+			if (mode & Vfs::Directory_service::OPEN_MODE_CREATE)
+				return OPEN_ERR_EXISTS;
+
+			Handle *handle = new (alloc) Handle(*this, *this, alloc, 0);
+			_handles.insert(handle);
+			*out_handle = handle;
+			return OPEN_OK;
+		}
+
+		void close(Vfs_handle *vfs_handle) override
+		{
+			Handle *handle = static_cast<Handle *>(vfs_handle);
+			if (handle && (&handle->ds() == this)) {
+				_handles.remove(handle);
+				destroy(handle->alloc(), handle);
+			}
+		}
+
 
 		/********************************
 		 ** File I/O service interface **
@@ -168,149 +199,113 @@ class Vfs::Block_file_system : public Single_file_system
 
 		void write(Vfs_handle *vfs_handle, file_size count) override
 		{
+			using namespace Block;
+
 			if (!_writeable) {
-				Genode::error("block device is not writeable");
+				Genode::warning("block device is not writeable");
 				return vfs_handle->write_status(Callback::ERR_INVALID);
 			}
 
-			file_size seek_offset = vfs_handle->seek();
-
-			file_size written = 0;
-			while (count > 0) {
-				file_size displ   = 0;
-				file_size length  = 0;
-				file_size nbytes  = 0;
-				file_size blk_nr  = seek_offset / _block_size;
-
-				displ = seek_offset % _block_size;
-
-				if ((displ + count) > _block_size)
-					length = (_block_size - displ);
-				else
-					length = count;
-
-				/*
-				 * We take a shortcut and write as much as possible without
-				 * using the block buffer if the offset is aligned on a block
-				 * boundary and the count is a multiple of the block size,
-				 * e.g. 4K writes will be written at once.
-				 *
-				 * XXX this is quite hackish because we have to omit partial
-				 * blocks at the end.
-				 */
-				if (displ == 0 && (count % _block_size) >= 0 && !(count < _block_size)) {
-					file_size bytes_left = count - (count % _block_size);
-
-					nbytes = _block_io(blk_nr, vfs_handle,
-					                   bytes_left, true, true);
-					if (nbytes == 0) {
-						Genode::error("error while write block:", blk_nr, " from block device");
-						return vfs_handle->write_status(Callback::ERR_INVALID);
-					}
-
-					Callback::Status s = length == count ?
-						Callback::COMPLETE : Callback::PARTIAL;
-					vfs_handle->write_callback(_block_buffer + displ, length, s);
-
-					written += nbytes;
-					count   -= nbytes;
-					seek_offset += nbytes;
-
-					continue;
-				}
-
-				/*
-				 * The offset is not aligned on a block boundary. Therefore
-				 * we need to read the block to the block buffer first and
-				 * put the buffer content at the right offset before we can
-				 * write the whole block back. In addition if length is less
-				 * than block size, we also have to read the block first.
-				 */
-				if (displ > 0 || length < _block_size) {
-
-					_block_io(blk_nr, _block_buffer, _block_size, false);
-					/* rewind seek offset to account for the block read */
-					seek_offset -= _block_size;
-				}
-
-				Callback::Status s = length == count ?
-					Callback::COMPLETE : Callback::PARTIAL;
-				vfs_handle->write_callback(_block_buffer + displ, length, s);
-
-				nbytes = _block_io(blk_nr, _block_buffer, _block_size, true);
-				if ((unsigned)nbytes != _block_size) {
-					Genode::error("error while writing block:", blk_nr, " to Block_device");
-					return vfs_handle->write_status(Callback::ERR_INVALID);
-				}
-
-				written += length;
-				count -= length;
-				seek_offset += length;
+			Handle *handle = static_cast<Handle *>(vfs_handle);
+			if (handle->op != Packet_descriptor::END) {
+				Genode::warning("VFS: refusing concurrent write on block handle");
+				return handle->write_status(Callback::ERR_INVALID);
 			}
+
+			if (!_tx_source.ready_to_submit()) {
+				Genode::warning("VFS: block packet queue congested");
+				return handle->write_status(Callback::ERR_IO);
+			}
+
+			Genode::size_t const count_offset = count % _block_size;
+			if (count_offset)
+				count += _block_size - count_offset;
+
+			Packet_descriptor raw_packet;
+			for (;;) {
+				try {
+					raw_packet = _tx_source.alloc_packet(count);
+					break;
+				} catch (...) {
+					count /= 2;
+					if (count < _block_size)
+						return handle->write_status(Callback::ERR_IO);
+				}
+			}
+
+			Genode::size_t  const block_count = count / _block_size;
+			Block::sector_t const block_number = vfs_handle->seek() / _block_size;
+			Block::sector_t const op_offset = vfs_handle->seek() % _block_size;
+
+			if (op_offset || count_offset) {
+
+				/* not aligned, read first */
+				_tx_source.submit_packet(Packet_descriptor(
+					raw_packet, Packet_descriptor::READ, block_number, block_count));
+				handle->bounce_write = true;
+
+			} else {
+
+				handle->write_callback(
+					_tx_source.packet_content(raw_packet), count, Callback::PARTIAL);
+				_tx_source.submit_packet(Packet_descriptor(
+					raw_packet, Packet_descriptor::WRITE, block_number, block_count));
+				handle->bounce_write = false;
+
+			}
+
+			handle->block_number = block_number;
+			handle->block_count  = block_count;
+			handle->op_offset    = op_offset;
 		}
 
 		void read(Vfs_handle *vfs_handle, file_size count) override
 		{
+			using namespace Block;
+
 			if (!_readable) {
-				Genode::error("block device is not readable");
+				Genode::warning("block device is not readeable");
 				return vfs_handle->read_status(Callback::ERR_INVALID);
 			}
 
-			file_size seek_offset = vfs_handle->seek();
-
-			file_size read = 0;
-			while (count > 0) {
-				file_size displ   = 0;
-				file_size length  = 0;
-				file_size nbytes  = 0;
-				file_size blk_nr  = seek_offset / _block_size;
-
-				displ = seek_offset % _block_size;
-
-				if ((displ + count) > _block_size)
-					length = (_block_size - displ);
-				else
-					length = count;
-
-				/*
-				 * We take a shortcut and read the blocks all at once if t he
-				 * offset is aligned on a block boundary and we the count is a
-				 * multiple of the block size, e.g. 4K reads will be read at
-				 * once.
-				 *
-				 * XXX this is quite hackish because we have to omit partial
-				 * blocks at the end.
-				 */
-				if (displ == 0 && (count % _block_size) >= 0 && !(count < _block_size)) {
-					file_size bytes_left = count - (count % _block_size);
-
-					nbytes = _block_io(blk_nr, vfs_handle, bytes_left, false, true);
-					if (nbytes == 0) {
-						Genode::error("error while reading block:", blk_nr, " from block device");
-						return vfs_handle->read_status(Callback::ERR_INVALID);
-					}
-
-					read  += nbytes;
-					count -= nbytes;
-					seek_offset += nbytes;
-
-					continue;
-				}
-
-				nbytes = _block_io(blk_nr, _block_buffer, _block_size, false);
-				if ((unsigned)nbytes != _block_size) {
-					Genode::error("error while reading block:", blk_nr, " from block device");
-					return vfs_handle->read_status(Callback::ERR_INVALID);
-				}
-
-				Callback::Status s = length == count ?
-					Callback::COMPLETE : Callback::PARTIAL;
-				vfs_handle->read_callback(_block_buffer + displ, length, s);
-
-				read  += length;
-				count -= length;
-				seek_offset += length;
+			Handle *handle = static_cast<Handle *>(vfs_handle);
+			if (handle->op != Packet_descriptor::END) {
+				Genode::warning("VFS: refusing concurrent read on block handle");
+				return handle->read_status(Callback::ERR_INVALID);
 			}
+
+			if (!_tx_source.ready_to_submit()) {
+				Genode::warning("VFS: block packet queue congested");
+				return handle->read_status(Callback::ERR_IO);
+			}
+
+			Genode::size_t const count_offset = count % _block_size;
+			if (count_offset)
+				count += _block_size - count_offset;
+
+			Packet_descriptor raw_packet;
+			for (;;) {
+				try {
+					raw_packet = _tx_source.alloc_packet(count);
+					break;
+				} catch (...) {
+					count /= 2;
+					if (count < _block_size)
+						return handle->write_status(Callback::ERR_IO);
+				}
+			}
+
+			Genode::size_t  const block_count = count / _block_size;
+			Block::sector_t const block_number = vfs_handle->seek() / _block_size;
+			Block::sector_t const op_offset = vfs_handle->seek() % _block_size;
+
+			_tx_source.submit_packet(Packet_descriptor(
+				raw_packet, Packet_descriptor::READ, block_number, block_count));
+
+			handle->block_number = block_number;
+			handle->block_count  = block_count;
+			handle->op_offset    = op_offset;
+			handle->bounce_write = false;
 		}
 
 		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override

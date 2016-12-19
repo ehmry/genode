@@ -18,7 +18,10 @@
 #include <base/connection.h>
 #include <base/allocator.h>
 
-namespace Block { struct Connection; }
+namespace Block {
+	enum { DEFAULT_TX_BUF_SIZE = 128*1024 };
+	struct Connection;
+}
 
 struct Block::Connection : Genode::Connection<Session>, Session_client
 {
@@ -43,7 +46,7 @@ struct Block::Connection : Genode::Connection<Session>, Session_client
 	 */
 	Connection(Genode::Env             &env,
 	           Genode::Range_allocator *tx_block_alloc,
-	           Genode::size_t           tx_buf_size = 128*1024,
+	           Genode::size_t           tx_buf_size = DEFAULT_TX_BUF_SIZE,
 	           const char              *label = "")
 	:
 		Genode::Connection<Session>(env, _session(env.parent(), label, tx_buf_size)),

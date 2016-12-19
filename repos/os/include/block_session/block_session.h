@@ -49,7 +49,7 @@ class Block::Packet_descriptor : public Genode::Packet_descriptor
 		Opcode          _op;           /* requested operation */
 		sector_t        _block_number; /* requested block number */
 		Genode::size_t  _block_count;  /* number of blocks to transfer */
-		unsigned        _success :1;   /* indicates success of operation */
+		unsigned        _success;   /* indicates success of operation */
 
 	public:
 
@@ -59,7 +59,7 @@ class Block::Packet_descriptor : public Genode::Packet_descriptor
 		Packet_descriptor(Genode::off_t offset=0, Genode::size_t size = 0)
 		:
 			Genode::Packet_descriptor(offset, size),
-			_op(READ), _block_number(0), _block_count(0), _success(false)
+			_op(END), _block_number(0), _block_count(0), _success(false)
 		{ }
 
 		/**
