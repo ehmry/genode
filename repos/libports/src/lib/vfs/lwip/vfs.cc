@@ -141,6 +141,8 @@ struct Lwip::Lwip_handle final : Vfs::Vfs_handle, Lwip_handle_list::Element
 
 	Type const type;
 
+	void print(Genode::Output &output) const;
+
 	Lwip_handle(Vfs::File_system &fs, Allocator &alloc, int status_flags,
 	            Socket_dir &s, Type t)
 	: Vfs_handle(fs, fs, alloc, status_flags), socket(&s), type(t) { }
@@ -536,16 +538,8 @@ class Lwip::Udp_socket_dir final :
 		 ** Socket_dir interface **
 		 **************************/
 
-		bool subscribeable(Lwip_handle const &handle) override
-		{
-			switch (handle.type) {
-			case Lwip_handle::DATA:
-			case Lwip_handle::REMOTE:
-				return true;
-			default:
-				return false;
-			}
-		}
+		bool subscribeable(Lwip_handle const &handle) override {
+			return handle.type == Lwip_handle::DATA; }
 
 		void subscribe(Lwip_handle &handle) override
 		{
@@ -580,7 +574,6 @@ class Lwip::Udp_socket_dir final :
 					}
 					return handle.read_status(Callback::COMPLETE);
 				}
-
 				break;
 
 			case Type::LOCAL:
@@ -600,7 +593,7 @@ class Lwip::Udp_socket_dir final :
 				/* check if the PCB was connected */
 				if (ip_addr_isany(&_pcb->remote_ip))
 					return handle.read_status(Callback::COMPLETE);
-				/* otherwise fallthru */
+				/* fallthru otherwise */
 
 			case Type::REMOTE:
 				if (state == READY) {
@@ -893,11 +886,6 @@ class Lwip::Tcp_socket_dir final :
 			switch(handle.type) {
 
 			case Type::DATA:
-				if (_pcb->state == Lwip::LISTEN) {
-					Genode::error("cannot read data from a listening socket");
-					break;
-				}
-
 				if (state == READY || state == CLOSING) {
 					if (!_recv_pbuf)
 						return handle.read_status(Callback::COMPLETE);
@@ -1013,7 +1001,7 @@ class Lwip::Tcp_socket_dir final :
 			case Type::DATA:
 				if (state == READY) {
 					/*
-					 * TODO: look over the data handles and if there
+					 * XXX: look over the data handles and if there
 					 * are any pending writes, simply queue this one
 					 * so that it possible to order writes and keep
 					 * track of what has been acknowledged
@@ -1056,6 +1044,7 @@ class Lwip::Tcp_socket_dir final :
 					char buf[ENDPOINT_STRLEN_MAX];
 					ip_addr_t addr;
 					u16_t port = 0;
+
 					file_size n = handle.write_callback(buf, sizeof(buf)-1, Callback::PARTIAL);
 					buf[n] = '\0';
 
@@ -1082,7 +1071,6 @@ class Lwip::Tcp_socket_dir final :
 					file_size n =
 						handle.write_callback(buf, len, Callback::PARTIAL);
 					buf[n] = '\0';
-
 					port = remove_port(buf);
 					if (!ipaddr_aton(buf, &addr))
 						break;
@@ -1144,9 +1132,9 @@ err_t tcp_connect_callback(void *arg, struct tcp_pcb *pcb, err_t err)
 {
 	Lwip::Tcp_socket_dir *socket_dir = static_cast<Lwip::Tcp_socket_dir *>(arg);
 	socket_dir->state = Lwip::Tcp_socket_dir::READY;
+
 	socket_dir->data_handles.for_each([&] (Lwip::Lwip_handle &handle) {
 		handle.notify_callback(); });
-
 	return ERR_OK;
 }
 
@@ -1200,8 +1188,8 @@ err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len)
 				err = tcp_write(tpcb, buf, n2, TCP_WRITE_FLAG_COPY);
 				if (err != ERR_OK) {
 					handle.queued_write = handle.queued_ack = 0;
-					Genode::error("lwIP: tcp_write in ACK callback failed, error ", (int)-err);
 					handle.write_status(Callback::ERR_IO);
+					Genode::error("lwIP: tcp_write in callback failed, error ",(int)-err);
 					break;
 				}
 
@@ -1247,6 +1235,25 @@ class Lwip::File_system final : public Vfs::File_system
 		Tcp_proto_dir _tcp_dir;
 		Udp_proto_dir _udp_dir;
 
+		Lwip_handle_list _fresh_subscriptions;
+
+		/**
+		 * Called from a signal handle so that pending callbacks for new
+		 * subscriptions do not recurse during 'subscribe'
+		 */
+		void _process_subscriptions()
+		{
+			for (Lwip_handle *handle = _fresh_subscriptions.first();
+			     handle; handle = _fresh_subscriptions.first())
+			{
+				_fresh_subscriptions.remove(handle);
+				handle->socket->subscribe(*handle);
+			}
+		}
+
+		Genode::Signal_handler<File_system> _subscription_rx;
+		Genode::Signal_transmitter          _subscription_tx { _subscription_rx };
+
 	public:
 
 		File_system(Genode::Env       &env,
@@ -1254,7 +1261,8 @@ class Lwip::File_system final : public Vfs::File_system
 		            Genode::Xml_node   config)
 		:
 			_netif(env, alloc, config),
-			_tcp_dir(alloc), _udp_dir(alloc)
+			_tcp_dir(alloc), _udp_dir(alloc),
+			_subscription_rx(env.ep(), *this, &File_system::_process_subscriptions)
 		{ }
 
 		~File_system() { }
@@ -1356,14 +1364,12 @@ class Lwip::File_system final : public Vfs::File_system
 
 			Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle);
 			if (handle) {
-				if (handle->socket) {
+				if (handle->socket)
 					handle->socket->write(*handle, len);
-				} else {
+				else
 					handle->write_status(Callback::ERR_TERMINATED);
-				}
-			} else {
+			} else
 				vfs_handle->write_status(Callback::ERR_INVALID);
-			}
 		}
 
 		void read(Vfs_handle *vfs_handle, file_size len) override
@@ -1443,8 +1449,26 @@ class Lwip::File_system final : public Vfs::File_system
 		bool subscribe(Vfs_handle* vfs_handle) override
 		{
 			if (Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle))
-				if (handle->socket && (handle->socket->subscribeable(*handle)))
+				if (handle->socket && (handle->socket->subscribeable(*handle))) {
+					/*
+					 * XXX: juggling the linked lists will
+					 * interrupt pending I/0 callbacks
+					 *
+					 * handle->write_status(Callback::ERR_INVALID);
+					 * handle->read_status(Callback::ERR_INVALID);
+					 */
+
+					/*
+					 * XXX: if the socket is closed before the signal
+					 * handler fires, handle->socket may be a dangling
+					 * pointer
+					 */
+					handle->socket->close(handle);
+					_fresh_subscriptions.insert(handle);
+					// if (!_subscription_rx.pending())
+						_subscription_tx.submit();
 					return true;
+				}
 			return false;
 		}
 };
@@ -1467,4 +1491,19 @@ extern "C" Vfs::File_system_factory *vfs_file_system_factory(void)
 
 	static Factory f;
 	return &f;
+}
+
+void Lwip::Lwip_handle::print(Genode::Output &output) const
+{
+		output.out_string(socket->name().string());
+		switch (type) {
+		case Type::ACCEPT:  output.out_string("/accept"); break;
+		case Type::BIND:    output.out_string("/bind"); break;
+		case Type::DATA:    output.out_string("/data"); break;
+		case Type::LISTEN:  output.out_string("/listen"); break;
+		case Type::REMOTE:  output.out_string("/remote"); break;
+		case Type::CONNECT: output.out_string("/connect"); break;
+		case Type::LOCAL:   output.out_string("/local"); break;
+		case Type::INVALID: output.out_string("/invalid"); break;
+		}
 }
