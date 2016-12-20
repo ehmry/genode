@@ -24,12 +24,6 @@
 /* LwIP includes */
 #include <lwip/nic_netif.h>
 
-namespace Vfs {
-	struct Node;
-	struct File;
-	struct Directory;
-}
-
 namespace Lwip {
 extern "C" {
 #include <lwip/udp.h>
@@ -542,8 +536,16 @@ class Lwip::Udp_socket_dir final :
 		 ** Socket_dir interface **
 		 **************************/
 
-		bool subscribeable(Lwip_handle const &handle) override {
-			return handle.type == Lwip_handle::DATA; }
+		bool subscribeable(Lwip_handle const &handle) override
+		{
+			switch (handle.type) {
+			case Lwip_handle::DATA:
+			case Lwip_handle::REMOTE:
+				return true;
+			default:
+				return false;
+			}
+		}
 
 		void subscribe(Lwip_handle &handle) override
 		{
@@ -610,7 +612,8 @@ class Lwip::Udp_socket_dir final :
 							file_size n = Genode::snprintf(buf, sizeof(buf), "%s:%d\n",
 						                                   ip_str, pkt->port);
 							handle.read_callback(buf, n, Callback::COMPLETE);
-						}
+						} else
+							handle.read_status(Callback::COMPLETE);
 						return;
 					} else {
 						char const *ip_str = ipaddr_ntoa(&_pcb->remote_ip);
@@ -1010,7 +1013,7 @@ class Lwip::Tcp_socket_dir final :
 			case Type::DATA:
 				if (state == READY) {
 					/*
-					 * XXX: look over the data handles and if there
+					 * TODO: look over the data handles and if there
 					 * are any pending writes, simply queue this one
 					 * so that it possible to order writes and keep
 					 * track of what has been acknowledged
