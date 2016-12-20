@@ -32,7 +32,7 @@ LIBS  += virtualbox5-bios virtualbox5-recompiler virtualbox5-runtime \
          virtualbox5-xml virtualbox5-main virtualbox5-apiwrap \
          virtualbox5-dis virtualbox5-hwaccl
 
-LIBS  += pthread libc_terminal libc_pipe libiconv
+LIBS  += pthread libiconv
 
 LIBS  += qemu-usb
 

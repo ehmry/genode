@@ -29,7 +29,7 @@ LIBS  += virtualbox-bios virtualbox-recompiler virtualbox-runtime \
          virtualbox-storage virtualbox-zlib virtualbox-liblzf \
          virtualbox-hwaccl virtualbox-xml virtualbox-main
 
-LIBS  += pthread libc_terminal libc_pipe libiconv
+LIBS  += pthread libiconv
 
 LIBS  += qemu-usb
 
