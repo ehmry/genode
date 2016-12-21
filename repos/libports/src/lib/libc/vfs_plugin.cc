@@ -451,6 +451,7 @@ ssize_t Libc::Vfs_plugin::_read(Context &context, void *buf,
 	Vfs::Vfs_handle &handle = context.handle();
 	Libc_read_callback cb(task, handle, (char*)buf, count);
 
+	context.ack();
 	handle.fs().read(&handle, count);
 
 	while (cb.status == Callback::PARTIAL)
@@ -461,7 +462,6 @@ ssize_t Libc::Vfs_plugin::_read(Context &context, void *buf,
 			Genode::error("refusing blocking read, notifications not supported");
 			return Errno(EIO);
 		}
-		context.reset();
 
 		Task_resume_callback notify_cb(task);
 		notify_cb.add_context(context);
@@ -1025,8 +1025,8 @@ int Libc::Vfs_plugin::select(int nfds, fd_set *readfds, fd_set *writefds,
 				_yield_vfs(task);
 				nready = _select(nfds, readfds, read_in, writefds, write_in);
 			} while (nready == 0);
-		} else {
-			Libc::Timeout task_timeout(task, timeout->tv_sec*1000+timeout->tv_usec/1000);
+		} else if (timeout->tv_sec||timeout->tv_usec) {
+			Libc::Timeout task_timeout(task, (timeout->tv_sec*1000+timeout->tv_usec/1000));
 			do {
 				_yield_vfs(task);
 				nready = _select(nfds, readfds, read_in, writefds, write_in);

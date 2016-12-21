@@ -53,6 +53,8 @@ struct Pdbg_guard
 		Genode::log("exit function ",func); }
 };
 
+#define PGUARD Pdbg_guard pguard(__func__)
+
 namespace Libc { class Vfs_plugin; }
 
 
