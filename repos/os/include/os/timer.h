@@ -59,7 +59,7 @@ class Genode::Timer : public Timeout_scheduler
 				}
 
 				Microseconds curr_time() const {
-					return Microseconds(1000ULL * _session.elapsed_ms()); }
+					return Microseconds(1000UL * _session.elapsed_ms()); }
 
 				void schedule_timeout(Microseconds     duration,
 				                      Timeout_handler &handler)
@@ -74,8 +74,7 @@ class Genode::Timer : public Timeout_scheduler
 					_session.trigger_once(duration.value);
 				}
 
-				Microseconds max_timeout() const {
-					return Microseconds(~0UL); }
+				Microseconds max_timeout() const { return Microseconds::max(); }
 
 		} _time_source;
 
