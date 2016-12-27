@@ -77,7 +77,6 @@ class Libc::Vfs_plugin : public Libc::Plugin
 
 				Notify_callback *_inner_callback = nullptr;
 
-				int  _notifications = 0;
 				bool _subscribed = false;
 
 			public:
@@ -92,7 +91,6 @@ class Libc::Vfs_plugin : public Libc::Plugin
 				{
 					_handle = &h;
 					_inner_callback = nullptr;
-					_notifications = 0;
 					_subscribed = false;
 				}
 
@@ -119,11 +117,6 @@ class Libc::Vfs_plugin : public Libc::Plugin
 				}
 
 				bool   subscribed() const { return _subscribed; }
-				int notifications() const { return _notifications; }
-
-				void ack() { if (_notifications > 0) --_notifications; }
-
-				void reset() { _notifications = 0; }
 
 				void timeout(timeval &to) { _timeout = to; }
 				timeval const &timeout() { return _timeout; }
@@ -134,7 +127,6 @@ class Libc::Vfs_plugin : public Libc::Plugin
 
 				void notify() override
 				{
-					++_notifications;
 					if (_inner_callback)
 						_inner_callback->notify();
 				}
@@ -373,8 +365,8 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		Libc::File_descriptor* socket(int, int, int) override;
 
 		int _select(int nfds,
-		            fd_set *read_out,  fd_set const &read_in,
-		            fd_set *write_out, fd_set const &write_in);
+		            fd_set *read_out,   fd_set const &read_in,
+		            fd_set *write_out,  fd_set const &write_in);
 
 		int select(int nfds, fd_set *readfds, fd_set *writefds,
 		           fd_set *exceptfds, struct timeval *timeout) override;

@@ -412,7 +412,16 @@ class Vfs::Pipe_file_system final : public Vfs::File_system
 		Ftruncate_result ftruncate(Vfs_handle*, file_size len) override {
 			return len ? FTRUNCATE_ERR_NO_PERM : FTRUNCATE_OK; }
 
-		
+		unsigned poll(Vfs_handle *vfs_handle) override
+		{
+			Pipe_handle *handle =
+				dynamic_cast<Pipe_handle *>(vfs_handle);
+
+			return handle
+				? (handle->pipe.write_avail() ? Poll::WRITE_READY : 0)|
+				  (handle->pipe.read_avail()  ? Poll::READ_READY  : 0)
+				: 0;
+		}
 };
 
 

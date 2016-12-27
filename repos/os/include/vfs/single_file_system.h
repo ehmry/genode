@@ -219,6 +219,9 @@ class Vfs::Single_file_system : public File_system
 
 		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override {
 			return FTRUNCATE_ERR_NO_PERM; }
+
+		unsigned poll(Vfs_handle *handle) override {
+			return Poll::READ_READY; }
 };
 
 #endif /* _INCLUDE__VFS__SINGLE_FILE_SYSTEM_H_ */

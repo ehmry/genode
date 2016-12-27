@@ -331,6 +331,13 @@ class Vfs::Block_file_system : public Single_file_system
 			/* never reached */
 			return IOCTL_ERR_INVALID;
 		}
+
+		unsigned poll(Vfs_handle *handle) override
+		{
+			return
+				(_readable  ? Poll::READ_READY  : 0)|
+				(_writeable ? Poll::WRITE_READY : 0);
+		}
 };
 
 #endif /* _INCLUDE__VFS__BLOCK_FILE_SYSTEM_H_ */

@@ -674,11 +674,8 @@ class Vfs::Dir_file_system : public File_system
 		Ftruncate_result ftruncate(Vfs_handle *, file_size) override {
 			return FTRUNCATE_ERR_NO_PERM; }
 
-		void poll_io() override
-		{
-			Genode::error("directory file-system does not support I/O polling");
-			throw ~0;
-		}
+		unsigned poll(Vfs_handle *handle) override {
+			return 0; }
 };
 
 #endif /* _INCLUDE__VFS__DIR_FILE_SYSTEM_H_ */

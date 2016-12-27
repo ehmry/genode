@@ -451,7 +451,6 @@ ssize_t Libc::Vfs_plugin::_read(Context &context, void *buf,
 	Vfs::Vfs_handle &handle = context.handle();
 	Libc_read_callback cb(task, handle, (char*)buf, count);
 
-	context.ack();
 	handle.fs().read(&handle, count);
 
 	while (cb.status == Callback::PARTIAL)
@@ -935,8 +934,8 @@ int Libc::Vfs_plugin::munmap(void *addr, ::size_t)
 }
 
 int Libc::Vfs_plugin::_select(int nfds,
-                             fd_set *read_out,  fd_set const &read_in,
-                             fd_set *write_out, fd_set const &write_in)
+                             fd_set *read_out,   fd_set const &read_in,
+                             fd_set *write_out,  fd_set const &write_in)
 {
 	int nready = 0;
 	for (int libc_fd = 0; libc_fd < nfds; ++libc_fd) {
@@ -950,14 +949,14 @@ int Libc::Vfs_plugin::_select(int nfds,
 
 		Context *context = vfs_context(fdo);
 
-		if (read_out && FD_ISSET(libc_fd, &read_in) && context->notifications()) {
-			//context->reset();
+		unsigned const state = context->handle().fs().poll(&context->handle());
+
+		if (read_out && FD_ISSET(libc_fd, &read_in) && (state&Vfs::Poll::READ_READY)) {
 			FD_SET(libc_fd, read_out);
 			++nready;
 		}
 
-		if (write_out && FD_ISSET(libc_fd, &write_in) && context->notifications()) {
-			//context->reset();
+		if (write_out && FD_ISSET(libc_fd, &write_in) && (state&Vfs::Poll::WRITE_READY)) {
 			FD_SET(libc_fd, write_out);
 			++nready;
 		}
@@ -985,9 +984,6 @@ int Libc::Vfs_plugin::select(int nfds, fd_set *readfds, fd_set *writefds,
 		FD_ZERO(writefds);
 	}
 
-	if (exceptfds)
-		FD_ZERO(exceptfds);
-
 	/* this resumes the task when a context is notified */
 	Task &task = Libc::this_task();
 	Task_resume_callback resume_cb(task);
@@ -1005,7 +1001,11 @@ int Libc::Vfs_plugin::select(int nfds, fd_set *readfds, fd_set *writefds,
 		/* XXX: eventually they all come from this plugin */
 
 		Context *ctx = vfs_context(fdo);
-		if ((FD_ISSET(libc_fd, &read_in)) || (FD_ISSET(libc_fd, &write_in))) {
+		/* resume the task by notification from any descriptor in the three sets*/
+		if ((FD_ISSET(libc_fd, &read_in)) ||
+		    (FD_ISSET(libc_fd, &write_in)) ||
+		    (exceptfds && (FD_ISSET(libc_fd, exceptfds))))
+		{
 			if (!ctx->subscribed()) {
 				if (!ctx->subscribe()) {
 					/* drop it, no notificatigions */
@@ -1018,13 +1018,17 @@ int Libc::Vfs_plugin::select(int nfds, fd_set *readfds, fd_set *writefds,
 		}
 	}
 
+	/* zero this now that descriptors have been extracted */
+	if (exceptfds)
+		FD_ZERO(exceptfds);
+
 	int nready = _select(nfds, readfds, read_in, writefds, write_in);
 	if (nready == 0) {
 		if (timeout == NULL) {
 			do {
 				_yield_vfs(task);
 				nready = _select(nfds, readfds, read_in, writefds, write_in);
-			} while (nready == 0);
+			} while (!nready);
 		} else if (timeout->tv_sec||timeout->tv_usec) {
 			Libc::Timeout task_timeout(task, (timeout->tv_sec*1000+timeout->tv_usec/1000));
 			do {

@@ -43,10 +43,11 @@ struct Vfs::Null_file_system : Single_file_system
 	void read(Vfs_handle *vfs_handle, file_size len) override {
 		vfs_handle->read_status(Callback::COMPLETE); }
 
-	Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override
-	{
-		return FTRUNCATE_OK;
-	}
+	Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override {
+		return FTRUNCATE_OK; }
+
+	unsigned poll(Vfs_handle *handle) override {
+		return Poll::WRITE_READY; }
 };
 
 #endif /* _INCLUDE__VFS__NULL_FILE_SYSTEM_H_ */

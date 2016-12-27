@@ -133,23 +133,23 @@ class Vfs_server::Session_component :
 				size_t     const length  = packet.length();
 				seek_off_t const seek    = packet.position();
 
-				if (!(node && content && length && (packet.length() <= packet.size()))) {
-					/* XXX: debugging */
-					if (!node)
-						Genode::error("packet without node");
-					if (!content)
-						Genode::error("packet without content");
-					if (!length)
-						Genode::error("packet without length");
-					tx_sink()->acknowledge_packet(packet);
-					continue;
-				}
-
 				File *file = dynamic_cast<File *>(node);
 				if (file) { /* async op */
 					file->queue(packet);
 					continue;
 				} else {
+
+					if (!(node && content && length && (packet.length() <= packet.size()))) {
+						/* XXX: debugging */
+						if (!node)
+							Genode::error("packet without node");
+						if (!content)
+							Genode::error("packet without content");
+						if (!length)
+							Genode::error("packet without length");
+						tx_sink()->acknowledge_packet(packet);
+						continue;
+					}
 
 					/* resulting length */
 					size_t res_length = 0;
@@ -485,7 +485,7 @@ class Vfs_server::Session_component :
 		/**
 		 * Sync the VFS and send any pending signals on the node.
 		 */
-		void sync(Node_handle handle)
+		void sync(Node_handle handle) override
 		{
 			try {
 				Node &node = _lookup(handle);
@@ -494,6 +494,9 @@ class Vfs_server::Session_component :
 		}
 
 		void control(Node_handle, Control) { }
+
+		unsigned poll(File_handle handle) override {
+			return _lookup(handle).poll(); }
 };
 
 

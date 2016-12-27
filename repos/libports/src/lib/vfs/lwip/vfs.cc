@@ -283,6 +283,8 @@ struct Lwip::Socket_dir
 
 		virtual void   read(Lwip_handle &h, file_size len) = 0;
 		virtual void write(Lwip_handle &h, file_size len) = 0;
+
+		virtual unsigned poll(Lwip_handle&) = 0;
 };
 
 
@@ -545,9 +547,77 @@ class Lwip::Udp_socket_dir final :
 		{
 			if (handle.type == Lwip_handle::DATA) {
 				data_handles.insert(&handle);
-				if (!_packet_queue.empty())
+				if (!_packet_queue.empty()) {
 					handle.notify_callback();
+				}
 			}
+		}
+
+		unsigned poll(Lwip_handle &handle) override
+		{
+			unsigned ps = 0;
+
+			typedef Lwip_handle::Type Type;
+			switch (handle.type) {
+			case Type::DATA:
+				switch (state) {
+				case READY:
+					if (!_packet_queue.empty())
+						ps = Vfs::READ_READY; break;
+					ps |= Vfs::WRITE_READY; break;
+				default: break;
+				}
+				break;
+
+			case Type::ACCEPT: break;
+
+			case Type::BIND:
+				switch (state) {
+				case NEW:
+					ps = Vfs::WRITE_READY; break;
+				default:
+					ps = Vfs::READ_READY; break;
+				}
+				break;
+
+			case Type::LISTEN:
+				if (state == NEW)
+					ps = Vfs::WRITE_READY;
+				break;
+
+			case Type::REMOTE:
+				switch (state) {
+				case NEW:
+				case BOUND:
+				case LISTEN:
+					break;
+				default:
+					ps = Vfs::READ_READY;
+					break;
+				}
+				break;
+
+			case Type::CONNECT:
+				switch (state) {
+				case LISTEN:
+					break;
+
+				case NEW:
+				case BOUND:
+					ps = Vfs::WRITE_READY;
+
+				default:
+					ps = Vfs::READ_READY;
+					break;
+				}
+				break;
+
+			case Type::LOCAL:
+				ps = Vfs::READ_READY;
+				break;
+			default: break;
+			}
+			return ps;
 		}
 
 		void read(Lwip_handle &handle, file_size len) override
@@ -797,6 +867,7 @@ class Lwip::Tcp_socket_dir final :
 			}
 
 			accept_handles.for_each([&] (Lwip::Lwip_handle &handle) {
+				PDBG("notify accept handle");
 				handle.notify_callback();
 			});
 
@@ -830,10 +901,13 @@ class Lwip::Tcp_socket_dir final :
 		void shutdown()
 		{
 			state = CLOSING;
-			if (_recv_pbuf)
+			if (_recv_pbuf) {
+				PDBG("recved data remains");
 				return;
+			}
 			tcp_close(_pcb);
 			_pcb = NULL;
+			PDBG("drop all the handles");
 			_drop_all_handles();
 		}
 
@@ -862,18 +936,82 @@ class Lwip::Tcp_socket_dir final :
 			switch (handle.type) {
 			case Type::ACCEPT:
 				accept_handles.insert(&handle);
-				if (_pending.first() != nullptr)
+				if (_pending.first() != nullptr) {
 					handle.notify_callback();
+				}
 				return;
 
 			case Type::DATA:
 				data_handles.insert(&handle);
-				if (_recv_pbuf != NULL)
+				if (_recv_pbuf != NULL) {
 					handle.notify_callback();
+				}
 				return;
 
 			default: return;
 			}
+		}
+
+		unsigned poll(Lwip_handle &handle) override
+		{
+			PDBG(handle);
+			unsigned ps = 0;
+
+			typedef Lwip_handle::Type Type;
+			switch (handle.type) {
+			case Type::DATA:
+				switch (state) {
+				case READY:
+					ps = Vfs::WRITE_READY;
+					if (_recv_pbuf != NULL)
+						ps |= Vfs::READ_READY;
+					break;
+				case CLOSING:
+					PDBG("polling a closing data handle");
+					ps = Vfs::WRITE_READY|Vfs::READ_READY;
+					break;
+				default: break;
+				}
+				break;
+
+			case Type::ACCEPT:
+				PDBG("polling accept handle");
+				if (_pending.first() != nullptr)
+					ps = Vfs::READ_READY;
+				break;
+
+			case Type::BIND:
+				switch (state) {
+				case NEW:
+					ps = Vfs::WRITE_READY; break;
+				default:
+					ps = Vfs::READ_READY; break;
+				}
+				break;
+
+			case Type::REMOTE:
+				switch (state) {
+				case NEW:
+				case BOUND:
+				case LISTEN:
+					break;
+				default:
+					ps = Vfs::READ_READY; break;
+				}
+				break;
+
+			case Type::CONNECT:
+				ps = (ip_addr_isany(&_pcb->remote_ip)) ?
+					Vfs::WRITE_READY : Vfs::READ_READY;
+				break;
+
+			case Type::LOCAL:
+				ps = Vfs::READ_READY;
+				break;
+			default: break;
+			}
+
+			return ps;
 		}
 
 		void read(Lwip_handle &handle, file_size len) override
@@ -1130,10 +1268,13 @@ void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_
 static
 err_t tcp_connect_callback(void *arg, struct tcp_pcb *pcb, err_t err)
 {
+	PDBG("");
+
 	Lwip::Tcp_socket_dir *socket_dir = static_cast<Lwip::Tcp_socket_dir *>(arg);
 	socket_dir->state = Lwip::Tcp_socket_dir::READY;
 
 	socket_dir->data_handles.for_each([&] (Lwip::Lwip_handle &handle) {
+		PDBG("notify data handle");
 		handle.notify_callback(); });
 	return ERR_OK;
 }
@@ -1142,6 +1283,8 @@ err_t tcp_connect_callback(void *arg, struct tcp_pcb *pcb, err_t err)
 static
 err_t tcp_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
+	PDBG("");
+
 	Lwip::Tcp_socket_dir *socket_dir = static_cast<Lwip::Tcp_socket_dir *>(arg);
 	return socket_dir->accept(newpcb, err);
 };
@@ -1151,9 +1294,13 @@ static
 err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
 	Lwip::Tcp_socket_dir *socket_dir = static_cast<Lwip::Tcp_socket_dir *>(arg);
-	if (p == NULL)
+	if (p == NULL) {
+		socket_dir->remote_handles.for_each([] (Lwip::Lwip_handle &h) {
+			h.notify_callback(); });
+		socket_dir->data_handles.for_each([] (Lwip::Lwip_handle &h) {
+			h.notify_callback(); });
 		socket_dir->shutdown();
-	else
+	} else
 		socket_dir->recv(p);
 	return ERR_OK;
 }
@@ -1408,37 +1555,17 @@ class Lwip::File_system final : public Vfs::File_system
 			}
 		}
 
-
-		/***********************
-		 ** File system stubs **
-		 ***********************/
-
-		Dirent_result dirent(char const *path, file_offset index, Dirent &) override {
-			return DIRENT_ERR_NO_PERM; }
-
-		Readlink_result readlink(const char*, char*, Vfs::file_size, Vfs::file_size&) override {
-			return READLINK_ERR_NO_PERM; }
-
-		Rename_result rename(char const *from, char const *to) override {
-			return RENAME_ERR_NO_PERM; }
-
-		Mkdir_result mkdir(char const *path, unsigned mode) override {
-			return MKDIR_ERR_NO_PERM; }
-
-		Symlink_result symlink(const char*, const char*) override {
-			return SYMLINK_ERR_NO_PERM; }
-
-		file_size num_dirent(char const *path) override {
-			return 0; }
-
-		Dataspace_capability dataspace(char const *path) override {
-			return Dataspace_capability(); }
-		void release(char const *path, Dataspace_capability) override { };
-
-		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override
+		unsigned poll(Vfs_handle *vfs_handle) override
 		{
-			/* report ok because libc always executes ftruncate() when opening rw */
-			return FTRUNCATE_OK;
+			unsigned ps = 0;
+			if (Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle)) {
+				if (handle->socket)
+					ps = handle->socket->poll(*handle);
+			} else {
+				/* then 'new_socket' file */
+				ps = Poll::READ_READY;
+			}
+			return ps;
 		}
 
 		/**
@@ -1470,6 +1597,38 @@ class Lwip::File_system final : public Vfs::File_system
 					return true;
 				}
 			return false;
+		}
+
+		/***********************
+		 ** File system stubs **
+		 ***********************/
+
+		Dirent_result dirent(char const *path, file_offset index, Dirent &) override {
+			return DIRENT_ERR_NO_PERM; }
+
+		Readlink_result readlink(const char*, char*, Vfs::file_size, Vfs::file_size&) override {
+			return READLINK_ERR_NO_PERM; }
+
+		Rename_result rename(char const *from, char const *to) override {
+			return RENAME_ERR_NO_PERM; }
+
+		Mkdir_result mkdir(char const *path, unsigned mode) override {
+			return MKDIR_ERR_NO_PERM; }
+
+		Symlink_result symlink(const char*, const char*) override {
+			return SYMLINK_ERR_NO_PERM; }
+
+		file_size num_dirent(char const *path) override {
+			return 0; }
+
+		Dataspace_capability dataspace(char const *path) override {
+			return Dataspace_capability(); }
+		void release(char const *path, Dataspace_capability) override { };
+
+		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override
+		{
+			/* report ok because libc always executes ftruncate() when opening rw */
+			return FTRUNCATE_OK;
 		}
 };
 

@@ -186,10 +186,11 @@ class Vfs_server::File : public Node,
 			}
 		}
 
-		void truncate(file_size_t size)
-		{
-			assert_truncate(_handle->fs().ftruncate(_handle, size));
-		}
+		void truncate(file_size_t size) {
+			assert_truncate(_handle->fs().ftruncate(_handle, size)); }
+
+		unsigned poll() {
+			return _handle->fs().poll(_handle); }
 
 		void queue(::File_system::Packet_descriptor const &packet)
 		{

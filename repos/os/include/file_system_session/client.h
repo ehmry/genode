@@ -120,6 +120,11 @@ class File_system::Session_client : public Genode::Rpc_client<Session>
 		{
 			call<Rpc_sync>(node);
 		}
+
+		unsigned poll(File_handle node) override
+		{
+			return call<Rpc_poll>(node);
+		}
 };
 
 #endif /* _INCLUDE__FILE_SYSTEM_SESSION__CLIENT_H_ */

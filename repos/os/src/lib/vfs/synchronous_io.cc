@@ -51,7 +51,7 @@ namespace Vfs {
 
 		write(handle, count);
 		while(cb.status == Callback::PARTIAL);
-			poll_io();
+			handle->fs().poll(handle);
 
 		handle->drop_write();
 		out_count = cb.accumulator;
@@ -94,7 +94,7 @@ namespace Vfs {
 
 		read(handle, count);
 		while(cb.status == Callback::PARTIAL);
-			poll_io();
+			handle->fs().poll(handle);
 
 		handle->drop_read();
 		out_count = cb.accumulator;

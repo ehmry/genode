@@ -387,9 +387,6 @@ int Libc::Vfs_plugin::connect(Libc::File_descriptor *fd, sockaddr const *addr, s
 	if (!(context = dynamic_cast<Socket_context *>(fd->context)))
 		return Errno(ENOTSOCK);
 
-	/* clear notifications (there should be none) */
-	context->reset();
-
 	{
 		Sockaddr_string addr_string(host_string(*(sockaddr_in const *)addr),
 		                            port_string(*(sockaddr_in const *)addr));
@@ -408,19 +405,14 @@ int Libc::Vfs_plugin::connect(Libc::File_descriptor *fd, sockaddr const *addr, s
 			return (n == -1) ? -1 : Errno(EACCES);
 
 		if (!(fd->status & O_NONBLOCK)) {
-			/*
-			 * return if a notification came in during write,
-			 * otherwise block
-			 */
-			if (!context->notifications()) {
+			/* block until notification */
+			{
 				/* block for notification on the data file (the socket context) */
 				Task &task = Libc::this_task();
 				Task_resume_callback notify_cb(task);
 				notify_cb.add_context(*context);
 				_yield_vfs(task);
 			}
-			context->ack();
-			/* decrement the context notification counter */
 		}
 	}
 
@@ -506,7 +498,7 @@ ssize_t Libc::Vfs_plugin::recvfrom(Libc::File_descriptor *fd, void *buf, ::size_
 	if (src_addr) {
 		using namespace Vfs;
 
-		if (!context->notifications()) {
+		{
 			Task &task = Libc::this_task();
 			Task_resume_callback notify_cb(task);
 			notify_cb.add_context(*context);

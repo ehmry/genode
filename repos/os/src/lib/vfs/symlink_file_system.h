@@ -70,6 +70,8 @@ class Vfs::Symlink_file_system : public Single_file_system
 
 		void close(Vfs_handle *) override { }
 
+		unsigned poll(Vfs_handle *handle) override {
+			return 0; }
 };
 
 #endif /* _INCLUDE__VFS__SYMLINK_FILE_SYSTEM_H_ */

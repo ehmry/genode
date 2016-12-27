@@ -369,6 +369,12 @@ struct File_system::Session : public Genode::Session
 	 */
 	virtual void sync(Node_handle) { }
 
+	/**
+	 * Poll handle state
+	 *
+	 * \throw Invalid_handle  node handle is invalid
+	 */
+	virtual unsigned poll(File_handle) = 0;
 
 	/*******************
 	 ** RPC interface **
@@ -415,10 +421,13 @@ struct File_system::Session : public Genode::Session
 	                 GENODE_TYPE_LIST(Invalid_handle),
 	                 Node_handle, Genode::Signal_context_capability);
 	GENODE_RPC(Rpc_sync, void, sync, Node_handle);
+	GENODE_RPC_THROW(Rpc_poll, unsigned, poll,
+	                 GENODE_TYPE_LIST(Invalid_handle),
+	                 File_handle);
 
 	GENODE_RPC_INTERFACE(Rpc_tx_cap, Rpc_file, Rpc_symlink, Rpc_dir, Rpc_node,
 	                     Rpc_close, Rpc_status, Rpc_control, Rpc_unlink,
-	                     Rpc_truncate, Rpc_move, Rpc_sigh, Rpc_sync);
+	                     Rpc_truncate, Rpc_move, Rpc_sigh, Rpc_sync, Rpc_poll);
 };
 
 #endif /* _INCLUDE__FILE_SYSTEM_SESSION__FILE_SYSTEM_SESSION_H_ */

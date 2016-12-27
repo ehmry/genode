@@ -605,6 +605,9 @@ class Vfs::Tar_file_system : public File_system
 
 		Ftruncate_result ftruncate(Vfs_handle *handle, file_size) override {
 			return FTRUNCATE_ERR_NO_PERM; }
+
+		unsigned poll(Vfs_handle *handle) override {
+			return Poll::READ_READY; }
 };
 
 #endif /* _INCLUDE__VFS__TAR_FILE_SYSTEM_H_ */

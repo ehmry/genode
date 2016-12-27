@@ -15,10 +15,16 @@
 #define _INCLUDE__VFS__FILE_IO_SERVICE_H_
 
 #include <vfs/types.h>
+#include <base/debug.h>
 
 namespace Vfs {
 	class Vfs_handle;
 	struct File_io_service;
+
+	enum Poll : unsigned {
+		 READ_READY = 0x01U,
+		WRITE_READY = 0x02U
+	};
 }
 
 
@@ -150,11 +156,9 @@ struct Vfs::File_io_service
 	{ }
 
 	/**
-	 * Hack to block for a callback
-	 *
-	 * \noapi
+	 * Poll handle state
 	 */
-	virtual void poll_io() { }
+	virtual unsigned poll(Vfs_handle *handle) = 0;
 };
 
 #endif /* _INCLUDE__VFS__FILE_IO_SERVICE_H_ */

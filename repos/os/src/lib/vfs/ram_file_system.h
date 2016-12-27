@@ -847,6 +847,9 @@ class Vfs::Ram_file_system final : public Vfs::File_system
 			return FTRUNCATE_OK;
 		}
 
+		unsigned poll(Vfs_handle *handle) override {
+			return Poll::READ_READY|Poll::WRITE_READY; }
+
 
 		/***************************
 		 ** File_system interface **

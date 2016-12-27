@@ -768,14 +768,11 @@ class Vfs::Fs_file_system : public File_system
 			return FTRUNCATE_OK;
 		}
 
-		void poll_io() override
+		unsigned poll(Vfs_handle *vfs_handle) override
 		{
-			::File_system::Session::Tx::Source &source = *_fs.tx();
-
-			if(source.ack_avail()) /* process a packet without delay */
-				_process_ack_packet(source.get_acked_packet());
-			else /* block until something happens somewhere */
-				_env.ep().wait_and_dispatch_one_signal();
+			Fs_vfs_handle *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
+			try { return _fs.poll(handle->file_handle); }
+			catch (::File_system::Invalid_handle) { return 0; }
 		}
 };
 

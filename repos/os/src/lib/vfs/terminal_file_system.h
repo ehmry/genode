@@ -37,8 +37,12 @@ class Vfs::Terminal_file_system : public Single_file_system
 
 		Genode::List<Handle> _subscribers;
 
+		unsigned _poll_state = 0;
+
 		void _notify_all()
 		{
+			_poll_state |= Poll::READ_READY;
+
 			for (Handle *h = _subscribers.first(); h; h = h->next())
 				h->notify_callback();
 		}
@@ -132,21 +136,29 @@ class Vfs::Terminal_file_system : public Single_file_system
 
 		void read(Vfs_handle *handle, file_size len) override
 		{
-			len = Genode::min(_terminal.avail(), len);
-			if (len) {
-				auto func = [&] (char const *buf, Genode::size_t buf_len)
-				{
-					handle->read_callback(buf, len, Callback::PARTIAL);
-				};
+			/* the amount of availabel data is unknown, so reset the state */
+			_poll_state = 0;
 
-				_terminal.read(func, len);
-				handle->read_callback(nullptr, 0, Callback::COMPLETE);
-			}
+			auto func = [&] (char const *buf, Genode::size_t buf_len)
+			{
+				handle->read_callback(buf, len, Callback::PARTIAL);
+			};
+
+			_terminal.read(func, len);
+			handle->read_callback(nullptr, 0, Callback::COMPLETE);
 		}
 
 		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override
 		{
 			return FTRUNCATE_OK;
+		}
+
+		unsigned poll(Vfs_handle *handle) override
+		{
+			return
+				(_poll_state ? _poll_state :
+					(_terminal.avail() ? Poll::READ_READY : 0)) |
+				Poll::WRITE_READY;
 		}
 };
 
