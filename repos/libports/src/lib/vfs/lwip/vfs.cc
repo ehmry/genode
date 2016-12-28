@@ -867,9 +867,7 @@ class Lwip::Tcp_socket_dir final :
 			}
 
 			accept_handles.for_each([&] (Lwip::Lwip_handle &handle) {
-				PDBG("notify accept handle");
-				handle.notify_callback();
-			});
+				handle.notify_callback(); });
 
 			return ERR_OK;
 		}
@@ -901,13 +899,11 @@ class Lwip::Tcp_socket_dir final :
 		void shutdown()
 		{
 			state = CLOSING;
-			if (_recv_pbuf) {
-				PDBG("recved data remains");
+			if (_recv_pbuf)
 				return;
-			}
+
 			tcp_close(_pcb);
 			_pcb = NULL;
-			PDBG("drop all the handles");
 			_drop_all_handles();
 		}
 
@@ -954,7 +950,6 @@ class Lwip::Tcp_socket_dir final :
 
 		unsigned poll(Lwip_handle &handle) override
 		{
-			PDBG(handle);
 			unsigned ps = 0;
 
 			typedef Lwip_handle::Type Type;
@@ -967,7 +962,7 @@ class Lwip::Tcp_socket_dir final :
 						ps |= Vfs::READ_READY;
 					break;
 				case CLOSING:
-					PDBG("polling a closing data handle");
+				case CLOSED:
 					ps = Vfs::WRITE_READY|Vfs::READ_READY;
 					break;
 				default: break;
@@ -975,8 +970,7 @@ class Lwip::Tcp_socket_dir final :
 				break;
 
 			case Type::ACCEPT:
-				PDBG("polling accept handle");
-				if (_pending.first() != nullptr)
+				if (_pending.first())
 					ps = Vfs::READ_READY;
 				break;
 
@@ -1268,13 +1262,10 @@ void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_
 static
 err_t tcp_connect_callback(void *arg, struct tcp_pcb *pcb, err_t err)
 {
-	PDBG("");
-
 	Lwip::Tcp_socket_dir *socket_dir = static_cast<Lwip::Tcp_socket_dir *>(arg);
 	socket_dir->state = Lwip::Tcp_socket_dir::READY;
 
 	socket_dir->data_handles.for_each([&] (Lwip::Lwip_handle &handle) {
-		PDBG("notify data handle");
 		handle.notify_callback(); });
 	return ERR_OK;
 }
@@ -1283,8 +1274,6 @@ err_t tcp_connect_callback(void *arg, struct tcp_pcb *pcb, err_t err)
 static
 err_t tcp_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
-	PDBG("");
-
 	Lwip::Tcp_socket_dir *socket_dir = static_cast<Lwip::Tcp_socket_dir *>(arg);
 	return socket_dir->accept(newpcb, err);
 };
@@ -1557,15 +1546,16 @@ class Lwip::File_system final : public Vfs::File_system
 
 		unsigned poll(Vfs_handle *vfs_handle) override
 		{
-			unsigned ps = 0;
-			if (Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle)) {
+			if (Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle))
 				if (handle->socket)
-					ps = handle->socket->poll(*handle);
-			} else {
-				/* then 'new_socket' file */
-				ps = Poll::READ_READY;
-			}
-			return ps;
+					return handle->socket->poll(*handle);
+
+			/*
+			 * in this case the polled file is a 'new_socket'
+			 * or a file with no associated socket, so a file
+			 * that awaits a read it indicate that it is closed
+			 */
+			return Poll::READ_READY;
 		}
 
 		/**
