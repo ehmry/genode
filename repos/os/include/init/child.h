@@ -691,7 +691,6 @@ class Init::Child : Genode::Child_policy,
 					for (; ; target = target.next()) {
 
 						if (target.has_type("parent")) {
-
 							if ((service = find_service(_parent_services, service_name)))
 								return *service;
 
@@ -797,7 +796,9 @@ class Init::Child : Genode::Child_policy,
 				 && service.name() == service_name)
 					found = true; });
 
-			if (!found)
+			if (found)
+				_session_requester.trigger_update();
+			else
 				Genode::error(name(), ": illegal announcement of "
 				              "service \"", service_name, "\"");
 		}
