@@ -37,11 +37,11 @@ struct Vfs::Callback
 	 * expect to only receive PARTIAL.
 	 */
 	enum Status {
+		COMPLETE,       /* request completed              */
+		PARTIAL,        /* request partially completed    */
 		ERR_IO,         /* internal error                 */
 		ERR_INVALID,    /* handle or operation is invalid */
-		ERR_TERMINATED, /* connection terminated          */
-		PARTIAL,        /* request partially completed    */
-		COMPLETE,       /* request completed              */
+		ERR_CLOSED      /* connection closed              */
 	};
 };
 

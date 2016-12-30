@@ -151,10 +151,10 @@ class Vfs::Fs_file_system : public File_system
 			Callback::Status s = Callback::ERR_INVALID;
 			typedef ::File_system::Packet_descriptor::Result Result;
 			switch(packet.result()) {
-			case Result::SUCCESS:        s = Callback::COMPLETE;       break;
-			case Result::ERR_IO:         s = Callback::ERR_IO;         break;
-			case Result::ERR_INVALID:    s = Callback::ERR_INVALID;    break;
-			case Result::ERR_TERMINATED: s = Callback::ERR_TERMINATED; break;
+			case Result::SUCCESS:      s = Callback::COMPLETE;    break;
+			case Result::ERR_IO:       s = Callback::ERR_IO;      break;
+			case Result::ERR_INVALID:  s = Callback::ERR_INVALID; break;
+			case Result::ERR_CLOSED:   s = Callback::ERR_CLOSED;  break;
 			}
 
 			handle->seek(packet.position());

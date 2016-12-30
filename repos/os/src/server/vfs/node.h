@@ -257,12 +257,12 @@ class Vfs_server::File : public Node,
 
 			typedef ::File_system::Packet_descriptor::Result Result;
 			switch(status) {
-			case Callback::COMPLETE:       _packet.result(Result::SUCCESS); break;
-			case Callback::PARTIAL:        return out;
+			case Callback::COMPLETE:    _packet.result(Result::SUCCESS); break;
+			case Callback::PARTIAL:     return out;
 
-			case Callback::ERR_IO:         _packet.result(Result::ERR_IO);         break;
-			case Callback::ERR_INVALID:    _packet.result(Result::ERR_INVALID);    break;
-			case Callback::ERR_TERMINATED: _packet.result(Result::ERR_TERMINATED); break;
+			case Callback::ERR_IO:      _packet.result(Result::ERR_IO);         break;
+			case Callback::ERR_INVALID: _packet.result(Result::ERR_INVALID);    break;
+			case Callback::ERR_CLOSED:  _packet.result(Result::ERR_CLOSED); break;
 			default: break; /* Callback::PARTIAL is excluded */
 			}
 
@@ -296,12 +296,12 @@ class Vfs_server::File : public Node,
 
 			typedef ::File_system::Packet_descriptor::Result Result;
 			switch(status) {
-			case Callback::COMPLETE:       _packet.result(Result::SUCCESS); break;
-			case Callback::PARTIAL:        return out;
+			case Callback::COMPLETE:    _packet.result(Result::SUCCESS); break;
+			case Callback::PARTIAL:     return out;
 
-			case Callback::ERR_IO:         _packet.result(Result::ERR_IO);         break;
-			case Callback::ERR_INVALID:    _packet.result(Result::ERR_INVALID);    break;
-			case Callback::ERR_TERMINATED: _packet.result(Result::ERR_TERMINATED); break;
+			case Callback::ERR_IO:      _packet.result(Result::ERR_IO);         break;
+			case Callback::ERR_INVALID: _packet.result(Result::ERR_INVALID);    break;
+			case Callback::ERR_CLOSED:  _packet.result(Result::ERR_CLOSED); break;
 			default: break; /* Callback::PARTIAL is excluded */
 			}
 

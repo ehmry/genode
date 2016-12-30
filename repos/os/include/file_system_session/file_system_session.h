@@ -122,7 +122,7 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 		enum Result {
 			ERR_IO,
 			ERR_INVALID,
-			ERR_TERMINATED,
+			ERR_CLOSED,
 			SUCCESS,
 		};
 
