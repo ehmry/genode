@@ -29,8 +29,6 @@
 #include <lxip/lxip.h>
 #include <lx.h>
 
-extern "C" void wait_for_continue(void);
-
 namespace Linux {
 		#include <lx_emul.h>
 
@@ -46,6 +44,12 @@ namespace Linux {
 		                           int __user *optlen);
 		struct socket *sock_alloc(void);
 		#include <lx_emul/extern_c_end.h>
+
+		enum {
+			POLLIN_SET  = (POLLRDNORM | POLLRDBAND | POLLIN | POLLHUP | POLLERR),
+			POLLOUT_SET = (POLLWRBAND | POLLWRNORM | POLLOUT | POLLERR),
+			POLLEX_SET  = (POLLPRI)
+		};
 }
 
 namespace {
@@ -206,10 +210,8 @@ struct Vfs::File : Vfs::Node
 		handle.write_status(Callback::ERR_INVALID);
 	}
 
-	/**
-	 * Check for data to read or write
-	 */
-	virtual bool poll() { return false; }
+	virtual unsigned poll() { return 0U; }
+
 };
 
 
@@ -261,6 +263,26 @@ class Vfs::Lxip_file : public Vfs::File
 		: Vfs::File(name), _parent(p), _sock(s) { }
 
 		virtual ~Lxip_file() { }
+
+		unsigned poll() override
+		{
+			using namespace Linux;
+
+			if (!socket_check_state(&_sock))
+				return Poll::READ_READY;
+
+			{
+				struct file f;
+				f.f_flags = 0;
+
+				unsigned const mask = _sock.ops->poll(&f, &_sock, nullptr);
+
+				return
+					((mask & Lxip::POLLIN_SET)  ? Poll::READ_READY  : 0)|
+					((mask & Lxip::POLLOUT_SET) ? Poll::WRITE_READY : 0)|
+					((mask & Lxip::POLLEX_SET)  ? 0x04 : 0);
+			}
+		}
 };
 
 
@@ -286,17 +308,6 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 		 ** File interface **
 		 ********************/
 
-		bool poll() override
-		{
-			using namespace Linux;
-
-			struct file f;
-			f.f_flags = 0;
-
-			return (_sock.state == SS_CONNECTED) ?
-				_sock.ops->poll(&f, &_sock, nullptr) & (POLLIN) : false;
-		}
-
 		void write(Lxip_vfs_handle &handle, file_size len) override
 		{
 			using namespace Linux;
@@ -319,7 +330,7 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 
 			file_size remain = len;
 			while (remain) {
-				int n = min(remain, /*min(sndbuf,*/ Lxip::DATA_BUFFER_SIZE/*)*/);
+				int n = min(remain, Lxip::DATA_BUFFER_SIZE);
 				msg.msg_iter.count = n =
 					handle.write_callback(Lxip::data_buffer(), n, Callback::PARTIAL);
 				if (!n) break;
@@ -648,16 +659,6 @@ class Vfs::Lxip_remote_file : public Vfs::Lxip_file
 		 ** File interface **
 		 ********************/
 
-		bool poll() override
-		{
-			using namespace Linux;
-
-			struct file f;
-			f.f_flags = 0;
-
-			return _sock.ops->poll(&f, &_sock, nullptr) & (POLLIN);
-		}
-
 		void read(Lxip_vfs_handle &handle, file_size len) override
 		{
 			if (handle.seek() != 0)            return handle.read_status(Callback::ERR_IO);
@@ -740,16 +741,6 @@ class Vfs::Lxip_accept_file : public Vfs::Lxip_file
 		/********************
 		 ** File interface **
 		 ********************/
-
-		bool poll() override
-		{
-			using namespace Linux;
-
-			struct file f;
-			f.f_flags = 0;
-
-			return _sock.ops->poll(&f, &_sock, nullptr) & (POLLIN);
-		}
 
 		void read(Lxip_vfs_handle &handle, file_size len) override
 		{
@@ -1420,6 +1411,14 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 		}
 
 		bool subscribe(Vfs::Vfs_handle *) override { return true; }
+
+		unsigned poll(Vfs::Vfs_handle *vfs_handle) override
+		{
+			Lxip_vfs_handle *handle =
+				static_cast<Vfs::Lxip_vfs_handle*>(vfs_handle);
+
+			return handle->file.poll();
+		}
 };
 
 
