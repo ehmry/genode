@@ -378,11 +378,11 @@ ssize_t Libc::Vfs_plugin::_write(Vfs::Vfs_handle &handle, const void *buf,
 		_yield_vfs(task);
 
 	switch (cb.status) {
-	case Callback::COMPLETE:       break;
-	case Callback::ERR_INVALID:    return Errno(EINVAL);
-	case Callback::ERR_IO:         return Errno(EIO);
-	case Callback::ERR_TERMINATED: break; /* not defined as an error in POSIX */
-	case Callback::PARTIAL:        break;
+	case Callback::COMPLETE:    break;
+	case Callback::ERR_INVALID: return Errno(EINVAL);
+	case Callback::ERR_IO:      return Errno(EIO);
+	case Callback::ERR_CLOSED:  break; /* not defined as an error in POSIX */
+	case Callback::PARTIAL:     break;
 	}
 
 	handle.advance_seek(cb.accumulator);
@@ -481,11 +481,11 @@ ssize_t Libc::Vfs_plugin::_read(Context &context, void *buf,
 	}
 
 	switch (cb.status) {
-	case Callback::COMPLETE:       break;
-	case Callback::ERR_INVALID:    return Errno(EINVAL);
-	case Callback::ERR_IO:         return Errno(EIO);
-	case Callback::ERR_TERMINATED: break; /* not defined as an error in POSIX */
-	case Callback::PARTIAL:        break; /* should never be reached */
+	case Callback::COMPLETE:    break;
+	case Callback::ERR_INVALID: return Errno(EINVAL);
+	case Callback::ERR_IO:      return Errno(EIO);
+	case Callback::ERR_CLOSED:  break; /* not defined as an error in POSIX */
+	case Callback::PARTIAL:     break; /* should never be reached */
 	}
 
 	handle.advance_seek(cb.accumulator);
