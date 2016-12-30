@@ -330,7 +330,7 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 						Genode::error("LxIP send error ", res);
 						return handle.write_status(Callback::ERR_IO);
 					} else if (res == 0) {
-						return handle.write_status(Callback::ERR_TERMINATED);
+						return handle.write_status(Callback::ERR_CLOSED);
 					} else {
 						Genode::error("short write to lxIP socket ",res,"/",n,", returning error");
 						return handle.write_status(Callback::ERR_IO);
@@ -348,7 +348,7 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 			using namespace Linux;
 
 			if (_sock.state == SS_UNCONNECTED)
-				return handle.write_status(Callback::ERR_TERMINATED);
+				return handle.write_status(Callback::ERR_CLOSED);
 
 			struct msghdr   msg;
 			struct iovec    iov;
@@ -392,7 +392,7 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 					} else {
 						/* recvmsg returned zero but we have nothing */
 						_parent.close();
-						handle.read_status(Callback::ERR_TERMINATED);
+						handle.read_status(Callback::ERR_CLOSED);
 					}
 					return;
 				}
