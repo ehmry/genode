@@ -177,8 +177,8 @@ struct Lwip::Socket_dir
 				Lwip_handle *h = list.first();
 				list.remove(h);
 				Genode::warning("sending callbacks blind on a socket disconnect");
-				h->write_status(Callback::ERR_TERMINATED);
-				h->read_status(Callback::ERR_TERMINATED);
+				h->write_status(Callback::ERR_CLOSED);
+				h->read_status(Callback::ERR_CLOSED);
 				h->notify_callback();
 				h->socket = nullptr;
 			}
@@ -1011,7 +1011,7 @@ class Lwip::Tcp_socket_dir final :
 		void read(Lwip_handle &handle, file_size len) override
 		{
 			if (_pcb == NULL)
-				return handle.read_status(Callback::ERR_TERMINATED);
+				return handle.read_status(Callback::ERR_CLOSED);
 
 			typedef Lwip_handle::Type Type;
 
@@ -1125,7 +1125,7 @@ class Lwip::Tcp_socket_dir final :
 		void write(Lwip_handle &handle, file_size len) override
 		{
 			if (_pcb == NULL)
-				return handle.write_status(Callback::ERR_TERMINATED);
+				return handle.write_status(Callback::ERR_CLOSED);
 
 			typedef Lwip_handle::Type Type;
 
@@ -1503,7 +1503,7 @@ class Lwip::File_system final : public Vfs::File_system
 				if (handle->socket)
 					handle->socket->write(*handle, len);
 				else
-					handle->write_status(Callback::ERR_TERMINATED);
+					handle->write_status(Callback::ERR_CLOSED);
 			} else
 				vfs_handle->write_status(Callback::ERR_INVALID);
 		}
@@ -1517,7 +1517,7 @@ class Lwip::File_system final : public Vfs::File_system
 
 			if (Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle)) {
 				if (!handle->socket) /* if the socket was removed then it was closed */
-					return handle->read_status(Callback::ERR_TERMINATED);
+					return handle->read_status(Callback::ERR_CLOSED);
 				handle->socket->read(*handle, len);
 			} else if (Lwip_new_handle *handle = dynamic_cast<Lwip_new_handle*>(vfs_handle)) {
 				if (len < (Socket_dir::Name::capacity()+1)) {
