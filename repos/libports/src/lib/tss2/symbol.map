@@ -1,0 +1,4 @@
+{
+	global: Tss2_*;
+	local: *;
+};
