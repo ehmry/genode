@@ -59,21 +59,25 @@ class Main
 
 Block::Partition_table & Main::_table()
 {
-	bool valid_mbr = false;
-	bool valid_gpt = false;
-	bool use_gpt   = false;
+	bool valid_mbr    = false;
+	bool valid_gpt    = false;
+	bool use_gpt      = false;
+	bool report_table = false;
 
 	try {
 		Genode::Attached_rom_dataspace config(_env, "config");
-		use_gpt = config.xml().attribute_value("use_gpt", false);
+		use_gpt      = config.xml().attribute_value("use_gpt", false);
+		report_table = config.xml().attribute_value("report",  false);
 	} catch(...) {}
 
-	if (use_gpt)
-		try { valid_gpt = _gpt.parse(); } catch (...) { }
+	if (use_gpt) {
+		try { valid_gpt = _gpt.parse(report_table); }
+		catch (...) { Genode::error("failed to parse GPT"); }
+	}
 
 	/* fall back to MBR */
 	if (!valid_gpt) {
-		try { valid_mbr = _mbr.parse(); }
+		try { valid_mbr = _mbr.parse(report_table); }
 		catch (Mbr_partition_table::Protective_mbr_found) {
 			if (!use_gpt)
 				Genode::error("Aborting: found protective MBR but ",
