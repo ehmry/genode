@@ -19,6 +19,7 @@
 #include <base/env.h>
 #include <base/log.h>
 #include <block_session/client.h>
+#include <base/snprintf.h>
 
 #include "partition_table.h"
 
@@ -114,6 +115,46 @@ struct Mbr_partition_table : public Block::Partition_table
 			} while (r->valid());
 		}
 
+		void _report_extented(Partition_record *record, Genode::Reporter::Xml_generator gen)
+		{
+			Partition_record *r = record;
+			unsigned lba = r->_lba;
+
+			/* first logical partition number */
+			int nr = 5;
+			do {
+				Sector s(driver, lba, 1);
+				Mbr *ebr = s.addr<Mbr *>();
+
+				if (!(ebr->valid()))
+					return;
+
+				/* The first record is the actual logical partition. The lba of this
+				 * partition is relative to the lba of the current EBR */
+				Partition_record *logical = &(ebr->_records[0]);
+				if (logical->valid() && nr < MAX_PARTITIONS) {
+
+					gen.node("partition", [&] () {
+						char ptype[3];
+						Genode::snprintf(ptype, sizeof(ptype), "%2x", r->_type);
+
+						gen.attribute("index", nr);
+						gen.attribute("LBA", logical->_lba + lba);
+						gen.attribute("blocks", logical->_sectors);
+						gen.attribute("type", ptype);
+					});
+				}
+
+				/*
+				 * the second record points to the next EBR
+				 * (relative form this EBR)
+				 */
+				r = &(ebr->_records[1]);
+				lba += ebr->_records[1]._lba;
+				++nr;
+			} while (r->valid());
+		}
+
 		void _parse_mbr(Mbr *mbr)
 		{
 			/* no partition table, use whole disc as partition 0 */
@@ -145,6 +186,41 @@ struct Mbr_partition_table : public Block::Partition_table
 			}
 		}
 
+		void _report_mbr(Mbr *mbr, Genode::Reporter::Xml_generator gen)
+		{
+			/* no partition table */
+			if (!(mbr->valid())) {
+				gen.node("partition", [&] () {
+					gen.attribute("index", 0);
+					gen.attribute("LBA", 0);
+					gen.attribute("blocks", driver.blk_cnt() - 1);
+				});
+				return;
+			}
+
+			for (int i = 0; i < 4; i++) {
+				Partition_record *r = &(mbr->_records[i]);
+
+				if (!r->valid())
+					continue;
+
+				gen.node("partition", [&] () {
+					char ptype[3];
+					Genode::snprintf(ptype, sizeof(ptype), "%2x", r->_type);
+
+					gen.attribute("index", i+1);
+					gen.attribute("LBA", r->_lba);
+					gen.attribute("blocks", r->_sectors);
+					gen.attribute("type", ptype);
+				});
+
+				if (r->extented()) {
+					_report_extented(r, gen);
+					continue;
+				}
+			}
+		}
+
 	public:
 
 		using Partition_table::Partition_table;
@@ -152,10 +228,19 @@ struct Mbr_partition_table : public Block::Partition_table
 		Block::Partition *partition(int num) {
 			return (num < MAX_PARTITIONS) ? _part_list[num] : 0; }
 
-		bool parse()
+		bool parse(bool report) override
 		{
 			Sector s(driver, 0, 1);
 			_parse_mbr(s.addr<Mbr *>());
+
+			if (report) {
+				reporter.enabled(report);
+				Genode::Reporter::Xml_generator gen(reporter, [&] () {
+					gen.attribute("type", "MBR");
+					_report_mbr(s.addr<Mbr *>(), gen);
+				});
+			}
+
 			for (unsigned num = 0; num < MAX_PARTITIONS; num++)
 				if (_part_list[num])
 					return true;

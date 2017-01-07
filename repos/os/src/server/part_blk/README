@@ -22,7 +22,22 @@ In order to route a client to the right partition, the server parses its
 configuration section looking for 'policy' tags.
 
 XML Syntax:
-! <policy labal="<program name>" parition="<partition number>" />
+! <policy label="<program name>" parition="<partition number>" />
+
+Alternatively the client may choose the partition when the last element of
+the session label is a partition number and a policy is matched with an
+affirmative 'client_select' attribute.
+
+! <policy label_prefix="<prefix>" client_select="true" />
+
+The server will report the active partition table in when the 'config' node
+contains an affirmative 'report' attribute.
+
+Report example:
+! <partition_table type="MBR">
+!     <partition index="1" LBA="2048" blocks="2048" type="83"/>
+!     <partition index="2" LBA="4096" blocks="2048" type="82"/>
+! </partition_table>
 
 Usage
 -----
@@ -45,7 +60,7 @@ Configuration snippet with two clients and an (hypothetical) IDE driver:
 !
 !  <!-- allow program 'test-part1' to access logical partition '6', while program
 !      'test-part2' receives access to primary partition 1 -->
-!  <config>
+!  <config report="no">
 !    <policy label_prefix="test-part1" partition="6"/>
 !    <policy label_prefix="test-part2" partition="1"/>
 !  </config>

@@ -236,12 +236,19 @@ class Block::Root :
 				Session_policy policy(label);
 
 				/* read partition attribute */
-				policy.attribute("partition").value(&num);
+				try {
+					policy.attribute("partition").value(&num);
+				} catch (Xml_node::Nonexistent_attribute) {
 
-			} catch (Xml_node::Nonexistent_attribute) {
-				error("policy does not define partition number for for '",
-				      label_str, "'");
-				throw Service_denied();
+					if (policy.attribute_value("client_select", false)) {
+						ascii_to(label.last_element().string(), num);
+					} else {
+						error("policy does not define partition number for for '",
+						      label_str, "'");
+						throw Service_denied();
+					}
+				}
+
 			} catch (Session_policy::No_policy_defined) {
 				error("rejecting session request, no matching policy for '",
 				      label_str, "'");

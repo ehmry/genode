@@ -73,12 +73,14 @@ struct Block::Partition_table
 		Genode::Heap & heap;
 		Driver       & driver;
 
+		Genode::Reporter reporter { "partition_table" };
+
 		Partition_table(Genode::Heap & h, Driver & d)
 		: heap(h), driver(d) {}
 
 		virtual Partition *partition(int num) = 0;
 
-		virtual bool parse() = 0;
+		virtual bool parse(bool report) = 0;
 };
 
 #endif /* _PART_BLK__PARTITION_TABLE_H_ */

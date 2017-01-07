@@ -17,6 +17,7 @@
 #include <base/env.h>
 #include <base/log.h>
 #include <block_session/client.h>
+#include <os/reporter.h>
 
 #include "driver.h"
 #include "partition_table.h"
@@ -141,7 +142,16 @@ class Gpt : public Block::Partition_table
 				Genode::uint32_t crc = _hdr_crc;
 				_hdr_crc = 0;
 				if (crc32(this, _hdr_size) != crc) {
-					Genode::error("Wrong GPT header checksum");
+					Genode::warning("Wrong GPT ",
+					                 check_primary
+					                 ? "primary"
+					                 : "secondary",
+					                 " header checksum");
+
+					if (check_primary) {
+						Sector backup_hdr(driver, _backup_hdr_lba, 1);
+						return backup_hdr.addr<Gpt_hdr*>()->valid(driver, false);
+					}
 					return false;
 				}
 
@@ -253,6 +263,38 @@ class Gpt : public Block::Partition_table
 			}
 		}
 
+		/**
+		 * Parse and report the GPT header
+		 */
+		void _report_gpt(Gpt_hdr *gpt, Genode::Reporter::Xml_generator gen)
+		{
+			if (!(gpt->valid(driver)))
+				throw Genode::Exception();
+
+			Sector entry_array(driver, gpt->_gpe_lba,
+			                   gpt->_entries * gpt->_entry_size / driver.blk_size());
+			Gpt_entry *entries = entry_array.addr<Gpt_entry *>();
+
+			for (int i = 0; i < MAX_PARTITIONS; i++) {
+				Gpt_entry *e = (entries + i);
+
+				if (!e->valid())
+					continue;
+
+				Genode::uint64_t start  = e->_lba_start;
+				Genode::uint64_t length = e->_lba_end - e->_lba_start + 1; /* [...) */
+
+				gen.node("partition", [&] () {
+					gen.attribute("index", i+1);
+					gen.attribute("LBA", start);
+					gen.attribute("blocks", length);
+					gen.attribute("type", e->_type.to_string());
+					gen.attribute("unique", e->_guid.to_string());
+					gen.attribute("name", e->name());
+				});
+			}
+	}
+
 	public:
 
 		using Partition_table::Partition_table;
@@ -260,10 +302,18 @@ class Gpt : public Block::Partition_table
 		Block::Partition *partition(int num) {
 			return (num <= MAX_PARTITIONS && num > 0) ? _part_list[num-1] : 0; }
 
-		bool parse()
+		bool parse(bool report) override
 		{
 			Sector s(driver, Gpt_hdr::HEADER_LBA, 1);
 			_parse_gpt(s.addr<Gpt_hdr *>());
+
+			if (report) {
+				reporter.enabled(report);
+				Genode::Reporter::Xml_generator gen(reporter, [&] () {
+					gen.attribute("type", "GPT");
+					_report_gpt(s.addr<Gpt_hdr *>(), gen);
+				});
+			}
 
 			for (unsigned num = 0; num < MAX_PARTITIONS; num++)
 				if (_part_list[num])
