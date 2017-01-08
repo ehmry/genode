@@ -1,0 +1,61 @@
+Blk_router routes block session clients to block servers with fallback logic.
+
+Behavior
+--------
+
+This server routes block session requests using a combination of local policy
+and partition table reports collected from block servers. The intention is
+to make booting more robust by intermediating between clients and many
+potential block partitions.
+
+At startup the server announces and accepts 'Block' and 'Report' services.
+Reports are collected from what are expected to be part_blk servers
+publishing their partition tables.
+
+When a 'Block' session request arrives, a policy must be configured that
+will descriminate one of the many partitions that may be present in reports.
+If no reports are present or no matches are found then resolution will be
+attempted each time a report is published or updated.
+
+Fallback logic is conveyed by attaching ordered 'partition' nodes to policies.
+
+Policy example:
+! <policy label_prefix="boot_fs">
+!   <!-- serve the first partition found labeled 'Genode' -->
+!   <partition name="Genode"/>
+!   <!-- otherwise serve a partition labeled as an installer -->
+!   <partition name="Genode Installer"/>
+! </policy>
+
+Partition policies may also contain timeouts. These partitions are ignored
+during partition resolution until the server lifetime exceeds the timeout
+period given in seconds.
+
+Timeout example:
+! <policy label_prefix="boot_fs">
+!   <!-- serve a recovery partition if one is published -->
+!   <partition name="Recovery partition"/>
+!   <!-- serve a specific GPT partition after 4 seconds -->
+!   <partition unique="612f75ba-37d3-418c-af49-43ecd5cd13fb" timeout="4"/>
+! </policy>
+
+When a partition is resolved a proxy request is made by concatenating the
+label of the server that published the partition, the label of the client
+requesting the block session, and the destination partition number.
+
+Usage
+-----
+
+To interoperate with part_blk requires that part_blk have reports
+enabled and match requests from blk_router with 'client_select' policies.
+Partition report sessions must route from part_blk to blk_router, block
+sessions must route from 'blk_router' to partition servers using the name
+of the partition server as a matching prefix.
+
+Blk_router matches the following attributes between partition policies and
+partition reports:
+* unique - GPT partition GUID
+* type   - two digit hexidecimal MBR type or GPT GUID type
+* name   - GPT partition name
+
+See 'run/blk_router' for a complete example.

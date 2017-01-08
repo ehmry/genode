@@ -1,0 +1,140 @@
+#
+# \brief  Test of Block session routing
+#
+
+
+if [catch { set dd [ exec which dd ] }] {
+   puts "dd needs to be installed!"
+   exit 1
+}
+
+if [catch { set sgdisk [ exec which sgdisk ] }] {
+   puts "sgdisk needs to be installed!"
+   exit 1
+}
+
+#
+# Build
+#
+
+build {
+	core init
+	drivers/timer
+	server/blk_router
+	server/part_blk
+	server/rom_blk
+	test/blk/cli
+}
+
+if { [file exists bin/gpt.raw] == 0 } then {
+	# create empty block device file
+	catch { exec $dd if=/dev/zero of=bin/gpt.raw bs=512 count=20480 }
+
+	# create two paritions
+	puts "using sgdisk to partition disk image"
+	catch { exec $sgdisk -o -n 3:2048:6143 -c 3:first-test-partition -n 96:6144 -c 96:second-test-partition bin/gpt.raw }
+}
+
+create_boot_directory
+
+#
+# Generate config
+#
+
+install_config {
+<config prio_levels="1" verbose="yes">
+	<parent-provides>
+		<service name="CPU"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="IRQ"/>
+		<service name="LOG"/>
+		<service name="PD"/>
+		<service name="RAM"/>
+		<service name="RM"/>
+		<service name="ROM"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<default caps="128"/>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="rom_blk">
+		<resource name="RAM" quantum="32M"/>
+		<provides><service name="Block"/></provides>
+		<config file="gpt.raw" block_size="512"/>
+	</start>
+	<start name="part_blk">
+		<resource name="RAM" quantum="10M" />
+		<provides><service name="Block" /></provides>
+		<route>
+			<service name="Report">
+				<child name="blk_router"/> </service>
+			<any-service><child name="rom_blk"/> <parent/><any-child/></any-service>
+		</route>
+		<config use_gpt="yes" report="yes">
+			<policy label_prefix="blk_router ->" client_select="yes"/>
+		</config>
+	</start>
+	<start name="blk_router">
+		<resource name="RAM" quantum="10M" />
+		<provides>
+			<service name="Report"/>
+			<service name="Block"/>
+		</provides>
+		<route>
+			<service name="Block" label_prefix="part_blk ->">
+				<child name="part_blk"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+		<config>
+			<policy label_prefix="test-part1">
+				<partition name="best partition ever"/>
+				<partition name="first-test-partition" timeout="2"/>
+			</policy>
+			<policy label_prefix="test-part2">
+				<partition name="second-test-partition"/>
+			</policy>
+		</config>
+	</start>
+	<start name="test-part1">
+		<binary name="test-blk-cli"/>
+		<resource name="RAM" quantum="5M"/>
+		<route>
+			<any-service> <child name="blk_router"/> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="test-part2">
+		<binary name="test-blk-cli"/>
+		<resource name="RAM" quantum="5M"/>
+		<route>
+			<any-service> <child name="blk_router"/> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+</config> }
+
+#
+# Boot modules
+#
+
+build_boot_image {
+	core ld.lib.so init
+	blk_router
+	part_blk
+	rom_blk
+	test-blk-cli
+	timer
+	gpt.raw
+}
+
+#
+# Qemu
+#
+
+append qemu_args " -nographic -m 128 "
+
+run_genode_until "Tests finished successfully.*\n.*Tests finished successfully.*\n" 100
+exec rm bin/gpt.raw
