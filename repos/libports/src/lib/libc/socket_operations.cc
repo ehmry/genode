@@ -117,7 +117,7 @@ namespace {
 		int local_fd()
 		{
 			if (_local_fd == -1)
-				_local_fd = _open_file("remote");
+				_local_fd = _open_file("local");
 
 			return _local_fd;
 		}
@@ -299,12 +299,17 @@ static int read_sockaddr_in(int read_fd, Socket_context *context,
 	addr_string.terminate(n);
 	addr_string.remove_trailing_newline();
 
-	/* convert the address but do not exceed the caller's buffer */
-	sockaddr_in saddr = sockaddr_in_struct(addr_string.host(), addr_string.port());
-	memcpy(addr, &saddr, *addrlen);
-	*addrlen = sizeof(saddr);
+	try {
+		/* convert the address but do not exceed the caller's buffer */
+		sockaddr_in saddr = sockaddr_in_struct(addr_string.host(), addr_string.port());
+		memcpy(addr, &saddr, *addrlen);
+		*addrlen = sizeof(saddr);
 
-	return 0;
+		return 0;
+	} catch (Address_conversion_failed) {
+		Genode::warning("IP address conversion failed");
+		return Errno(ENOBUFS);
+	}
 }
 
 
@@ -583,7 +588,7 @@ extern "C" ssize_t recv(int libc_fd, void *buf, ::size_t len, int flags)
 
 extern "C" ssize_t _recvmsg(int libc_fd, struct msghdr *msg, int flags)
 {
-	Genode::warning("##########  TODO  ##########");
+	Genode::warning("##########  TODO  ########## ", __func__);
 	return 0;
 }
 
@@ -606,6 +611,7 @@ static ssize_t do_sendto(Libc::File_descriptor *fd,
 		Sockaddr_string addr_string(host_string(*(sockaddr_in const *)dest_addr),
 		                            port_string(*(sockaddr_in const *)dest_addr));
 
+#warning TODO use remote_fd()
 		Absolute_path file("remote", context->path.base());
 		int const fd = open(file.base(), O_WRONLY);
 		if (fd == -1) {
@@ -655,7 +661,7 @@ extern "C" ssize_t send(int libc_fd, const void *buf, ::size_t len, int flags)
 extern "C" int _getsockopt(int libc_fd, int level, int optname,
                           void *optval, socklen_t *optlen)
 {
-	Genode::warning("##########  TODO  ##########");
+	Genode::warning("##########  TODO  ########## ", __func__);
 	return 0;
 }
 
@@ -670,7 +676,7 @@ extern "C" int getsockopt(int libc_fd, int level, int optname,
 extern "C" int _setsockopt(int libc_fd, int level, int optname,
                           const void *optval, socklen_t optlen)
 {
-	Genode::warning("##########  TODO  ##########");
+	Genode::warning("##########  TODO  ########## ", __func__);
 	return 0;
 }
 

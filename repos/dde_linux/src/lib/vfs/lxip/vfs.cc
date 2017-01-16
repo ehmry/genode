@@ -563,9 +563,6 @@ class Vfs::Lxip_local_file : public Vfs::Lxip_file
 		{
 			using namespace Linux;
 
-			if (len < sizeof(_content_buffer))
-				return -1;
-
 			sockaddr_storage addr_storage;
 			sockaddr_in *addr = (sockaddr_in *)&addr_storage;
 
@@ -576,7 +573,7 @@ class Vfs::Lxip_local_file : public Vfs::Lxip_file
 			in_addr const i_addr   = addr->sin_addr;
 			unsigned char const *a = (unsigned char *)&i_addr.s_addr;
 			unsigned char const *p = (unsigned char *)&addr->sin_port;
-			return Genode::snprintf(_content_buffer, len,
+			return Genode::snprintf(dst, len,
 			                        "%d.%d.%d.%d:%u\n",
 			                        a[0], a[1], a[2], a[3], (p[0]<<8)|(p[1]<<0));
 		}
