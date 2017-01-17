@@ -341,13 +341,12 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 
 	Result result = Result::READ_ERR_IO;
 
-	while (!handle->fs().queue_read(handle, count)) ;
-
-	for (bool completed = false; !completed; ) {
+	while (!handle->fs().queue_read(handle, count))
 		Libc::suspend();
-		completed = handle->fs().complete_read(handle, (char *)buf, count,
-		                                       result, out_count);
-	}
+
+	while (!handle->fs().complete_read(handle, (char *)buf, count,
+	                                   result, out_count))
+		Libc::suspend();
 
 	switch (result) {
 	case Result::READ_ERR_AGAIN:       return Errno(EAGAIN);

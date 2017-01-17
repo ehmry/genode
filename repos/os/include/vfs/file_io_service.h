@@ -142,9 +142,16 @@ struct Vfs::File_io_service
 	 */
 	virtual bool read_ready(Vfs_handle*) { return true; }
 
-	virtual bool queue_read(Vfs_handle *, file_size) { return false; }
-	virtual bool complete_read(Vfs_handle *, char *, file_size,
-	                           Read_result &, file_size &) { return false; }
+
+	virtual bool queue_read(Vfs_handle *, file_size) { return true; }
+
+	virtual bool complete_read(Vfs_handle *vfs_handle, char *dst, file_size count,
+	                           Read_result &out_result, file_size &out_count)
+	{
+		out_result = read(vfs_handle, dst, count, out_count);
+		return true;
+	}
+
 	virtual bool queue_write(Vfs_handle *, char const *, file_size,
 	                         Write_result &, file_size &) { return false; }
 };
