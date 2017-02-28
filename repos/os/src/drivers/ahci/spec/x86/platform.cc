@@ -15,6 +15,7 @@
 #include <platform_session/connection.h>
 #include <platform_device/client.h>
 #include <util/reconstructible.h>
+#include <base/sleep.h>
 
 #include <ahci.h>
 
@@ -50,7 +51,8 @@ struct X86_hba : Platform::Hba
 
 		if (!pci_device_cap.valid()) {
 			Genode::error("no AHCI controller found");
-				throw -1;
+			env.parent().exit(-1);
+			Genode::sleep_forever();
 		}
 
 		/* construct pci client */
