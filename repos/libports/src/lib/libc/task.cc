@@ -847,7 +847,7 @@ void Component::construct(Genode::Env &env)
 {
 	/* initialize the global pointer to environment variables */
 	static char *null_env = nullptr;
-	environ = &null_env;
+	if (!environ) environ = &null_env;
 
 	/* pass Genode::Env to libc subsystems that depend on it */
 	Libc::init_mem_alloc(env);
