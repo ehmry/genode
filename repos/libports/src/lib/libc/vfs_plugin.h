@@ -38,6 +38,8 @@ class Libc::Vfs_plugin : public Libc::Plugin
 
 		Vfs::File_system &_root_dir;
 
+		Genode::Lock &_lock;
+
 		void _open_stdio(Genode::Xml_node const &node, char const *attr,
 		                 int libc_fd, unsigned flags)
 		{
@@ -74,9 +76,9 @@ class Libc::Vfs_plugin : public Libc::Plugin
 
 	public:
 
-		Vfs_plugin(Libc::Env &env, Genode::Allocator &alloc)
+		Vfs_plugin(Libc::Env &env, Genode::Allocator &alloc, Genode::Lock &lock)
 		:
-			_alloc(alloc), _root_dir(env.vfs())
+			_alloc(alloc), _root_dir(env.vfs()), _lock(lock)
 		{
 			using Genode::Xml_node;
 
@@ -101,6 +103,7 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		bool supports_access(const char *, int)                override { return true; }
 		bool supports_mkdir(const char *, mode_t)              override { return true; }
 		bool supports_open(const char *, int)                  override { return true; }
+		bool supports_pipe()                                   override { return true; }
 		bool supports_readlink(const char *, char *, ::size_t) override { return true; }
 		bool supports_rename(const char *, const char *)       override { return true; }
 		bool supports_rmdir(const char *)                      override { return true; }
@@ -143,6 +146,7 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		void   *mmap(void *, ::size_t, int, int, Libc::File_descriptor *, ::off_t) override;
 		int     munmap(void *, ::size_t) override;
 		int     select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout) override;
+		int     pipe(Libc::File_descriptor *fd[2]) override;
 };
 
 #endif

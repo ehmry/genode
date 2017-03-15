@@ -1,4 +1,4 @@
-build "core init test/libc_pipe"
+build "core init drivers/timer lib/vfs/pipe test/libc_pipe"
 
 create_boot_directory
 
@@ -7,10 +7,6 @@ install_config {
 	<parent-provides>
 		<service name="ROM"/>
 		<service name="RAM"/>
-		<service name="IRQ"/>
-		<service name="IO_MEM"/>
-		<service name="IO_PORT"/>
-		<service name="CAP"/>
 		<service name="PD"/>
 		<service name="RM"/>
 		<service name="CPU"/>
@@ -19,20 +15,26 @@ install_config {
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
 	</default-route>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
 	<start name="test-libc_pipe">
 		<resource name="RAM" quantum="4M"/>
 		<config>
-			<libc stdout="/dev/log" stderr="/dev/log">
-				<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			</libc>
+			<libc stdout="/dev/log" stderr="/dev/log" pipe="/pipe"/>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<dir name="pipe"> <pipe/> </dir>
+			</vfs>
 		</config>
 	</start>
 </config>
 }
 
 build_boot_image {
-	core init test-libc_pipe
-	ld.lib.so libc.lib.so libm.lib.so libc_pipe.lib.so pthread.lib.so
+	core init timer test-libc_pipe
+	ld.lib.so libc.lib.so libm.lib.so vfs_pipe.lib.so pthread.lib.so
 }
 
 append qemu_args " -nographic -m 64 "

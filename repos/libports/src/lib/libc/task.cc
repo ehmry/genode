@@ -326,14 +326,18 @@ extern void (*libc_select_notify)();
 
 struct Libc::Io_response_handler : Vfs::Io_response_handler
 {
+	Genode::Lock lock;
+
 	void handle_io_response(Vfs::Vfs_handle::Context *) override
 	{
+		lock.unlock();
 		/* some contexts may have been deblocked from select() */
 		if (libc_select_notify)
 			libc_select_notify();
 
 		/* resume all as any context may have been deblocked from blocking I/O */
 		Libc::resume_all();
+		lock.lock();
 	}
 };
 
@@ -361,7 +365,7 @@ struct Libc::Kernel
 		Genode::Heap         _heap { _env.ram(), _env.rm() };
 		Io_response_handler  _io_response_handler;
 		Env_implementation   _libc_env { _env, _heap, _io_response_handler };
-		Vfs_plugin           _vfs { _libc_env, _heap };
+		Vfs_plugin           _vfs { _libc_env, _heap, _io_response_handler.lock };
 
 		Genode::Reconstructible<Genode::Signal_handler<Kernel>> _resume_main_handler {
 			_env.ep(), *this, &Kernel::_resume_main };

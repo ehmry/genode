@@ -126,6 +126,13 @@ namespace Libc {
 		static Config_attr socket("socket", "");
 		return socket.string();
 	}
+
+	char const *config_pipe() __attribute__((weak));
+	char const *config_pipe()
+	{
+		static Config_attr pipe("pipe", "");
+		return pipe.string();
+	}
 }
 
 int Libc::Vfs_plugin::access(const char *path, int amode)
@@ -145,6 +152,7 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 
 	Vfs::Vfs_handle *handle = 0;
 
+	Genode::Lock::Guard guard(_lock);
 	while (handle == 0) {
 
 		switch (_root_dir.open(path, flags, &handle, _alloc)) {
@@ -203,6 +211,7 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 
 int Libc::Vfs_plugin::close(Libc::File_descriptor *fd)
 {
+	Genode::Lock::Guard guard(_lock);
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
 	handle->ds().close(handle);
 	Libc::file_descriptor_allocator()->free(fd);
@@ -240,6 +249,7 @@ int Libc::Vfs_plugin::mkdir(const char *path, mode_t mode)
 {
 	typedef Vfs::Directory_service::Mkdir_result Result;
 
+	Genode::Lock::Guard guard(_lock);
 	switch (_root_dir.mkdir(path, mode)) {
 	case Result::MKDIR_ERR_EXISTS:        errno = EEXIST;       return -1;
 	case Result::MKDIR_ERR_NO_ENTRY:      errno = ENOENT;       return -1;
@@ -263,6 +273,7 @@ int Libc::Vfs_plugin::stat(char const *path, struct stat *buf)
 
 	Vfs::Directory_service::Stat stat;
 
+	Genode::Lock::Guard guard(_lock);
 	switch (_root_dir.stat(path, stat)) {
 	case Result::STAT_ERR_NO_ENTRY: errno = ENOENT; return -1;
 	case Result::STAT_ERR_NO_PERM:  errno = EACCES; return -1;
@@ -283,6 +294,7 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 
 	Vfs::file_size out_count = 0;
 
+	Genode::Lock::Guard guard(_lock);
 	switch (handle->fs().write(handle, (char const *)buf, count, out_count)) {
 	case Result::WRITE_ERR_AGAIN:       errno = EAGAIN;      return -1;
 	case Result::WRITE_ERR_WOULD_BLOCK: errno = EWOULDBLOCK; return -1;
@@ -301,15 +313,16 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 typedef Vfs::File_io_service::Read_result Result;
 
 struct Read_check : Libc::Suspend_functor {
+	Genode::Lock &lock;
 	Vfs::Vfs_handle * handle;
 	void            * buf;
 	::size_t        * count;
 	Vfs::file_size  * out_count;
 	Result          * out_result;
 
-	Read_check(Vfs::Vfs_handle * handle, void * buf, ::size_t * count,
+	Read_check(Genode::Lock &lock, Vfs::Vfs_handle * handle, void * buf, ::size_t * count,
 	           Vfs::file_size  * out_count, Result * out_result)
-	: handle(handle), buf(buf), count(count), out_count(out_count),
+	: lock(lock), handle(handle), buf(buf), count(count), out_count(out_count),
 	  out_result(out_result)
 	{ }
 };
@@ -322,37 +335,46 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 	Vfs::file_size out_count  = 0;
 	Result         out_result = Result::READ_OK;
 
+	Genode::Lock::Guard guard(_lock);
 	while (!handle->fs().queue_read(handle, (char *)buf, count,
 	                                out_result, out_count)) {
 		struct Check : Read_check {
-			Check(Vfs::Vfs_handle * handle, void * buf, ::size_t * count,
+			Check(Genode::Lock &lock, Vfs::Vfs_handle * handle, void * buf, ::size_t * count,
 			      Vfs::file_size * out_count, Result * out_result)
-			: Read_check (handle, buf, count, out_count, out_result) { }
+			: Read_check (lock, handle, buf, count, out_count, out_result) { }
 
-			bool suspend() override {
+			bool suspend() override
+			{
+				Genode::Lock::Guard guard(lock);
 				return !handle->fs().queue_read(handle, (char *)buf, *count,
-				                                *out_result, *out_count); }
-		} check ( handle, buf, &count, &out_count, &out_result);
+				                                *out_result, *out_count);
+			}
+		} check ( _lock, handle, buf, &count, &out_count, &out_result);
 
+		_lock.unlock();
 		Libc::suspend(check);
+		_lock.lock();
 	}
 
 	while (out_result == Result::READ_QUEUED) {
 
 		struct Check : Read_check {
-			Check(Vfs::Vfs_handle * handle, void * buf, ::size_t * count,
+			Check(Genode::Lock &lock, Vfs::Vfs_handle * handle, void * buf, ::size_t * count,
 			      Vfs::file_size * out_count, Result * out_result)
-			: Read_check (handle, buf, count, out_count, out_result) { }
+			: Read_check (lock, handle, buf, count, out_count, out_result) { }
 
 			bool suspend() override {
+				Genode::Lock::Guard guard(lock);
 				*out_result = handle->fs().complete_read(handle, (char *)buf,
 				                                         *count, *out_count);
 				/* suspend me if read is still queued */
 				return *out_result == Result::READ_QUEUED;
 			}
-		} check ( handle, buf, &count, &out_count, &out_result);
+		} check ( _lock, handle, buf, &count, &out_count, &out_result);
 
+		_lock.unlock();
 		Libc::suspend(check);
+		_lock.lock();
 	}
 
 	switch (out_result) {
@@ -389,6 +411,7 @@ ssize_t Libc::Vfs_plugin::getdirentries(Libc::File_descriptor *fd, char *buf,
 
 	unsigned const index = handle->seek() / sizeof(Vfs::Directory_service::Dirent);
 
+	Genode::Lock::Guard guard(_lock);
 	switch (handle->ds().dirent(fd->fd_path, index, dirent_out)) {
 	case Result::DIRENT_ERR_INVALID_PATH: errno = ENOENT; return -1;
 	case Result::DIRENT_ERR_NO_PERM:      errno = EACCES; return -1;
@@ -529,6 +552,7 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
 
+	Genode::Lock::Guard guard(_lock);
 	switch (handle->fs().ioctl(handle, opcode, arg, out)) {
 	case Result::IOCTL_ERR_INVALID: errno = EINVAL; return -1;
 	case Result::IOCTL_ERR_NOTTY:   errno = ENOTTY; return -1;
@@ -598,6 +622,7 @@ int Libc::Vfs_plugin::ftruncate(Libc::File_descriptor *fd, ::off_t length)
 
 	typedef Vfs::File_io_service::Ftruncate_result Result;
 
+	Genode::Lock::Guard guard(_lock);
 	switch (handle->fs().ftruncate(handle, length)) {
 	case Result::FTRUNCATE_ERR_NO_PERM:   errno = EPERM;  return -1;
 	case Result::FTRUNCATE_ERR_INTERRUPT: errno = EINTR;  return -1;
@@ -648,6 +673,7 @@ int Libc::Vfs_plugin::fcntl(Libc::File_descriptor *fd, int cmd, long arg)
 
 int Libc::Vfs_plugin::fsync(Libc::File_descriptor *fd)
 {
+	Genode::Lock::Guard guard(_lock);
 	_root_dir.sync(fd->fd_path);
 	return 0;
 }
@@ -657,6 +683,7 @@ int Libc::Vfs_plugin::symlink(const char *oldpath, const char *newpath)
 {
 	typedef Vfs::Directory_service::Symlink_result Result;
 
+	Genode::Lock::Guard guard(_lock);
 	switch (_root_dir.symlink(oldpath, newpath)) {
 	case Result::SYMLINK_ERR_EXISTS:        errno = EEXIST;       return -1;
 	case Result::SYMLINK_ERR_NO_ENTRY:      errno = ENOENT;       return -1;
@@ -675,6 +702,7 @@ ssize_t Libc::Vfs_plugin::readlink(const char *path, char *buf, ::size_t buf_siz
 
 	Vfs::file_size out_len = 0;
 
+	Genode::Lock::Guard guard(_lock);
 	switch (_root_dir.readlink(path, buf, buf_size, out_len)) {
 	case Result::READLINK_ERR_NO_ENTRY: errno = ENOENT; return -1;
 	case Result::READLINK_ERR_NO_PERM:  errno = EACCES; return -1;
@@ -695,6 +723,7 @@ int Libc::Vfs_plugin::unlink(char const *path)
 {
 	typedef Vfs::Directory_service::Unlink_result Result;
 
+	Genode::Lock::Guard guard(_lock);
 	switch (_root_dir.unlink(path)) {
 	case Result::UNLINK_ERR_NO_ENTRY:  errno = ENOENT;    return -1;
 	case Result::UNLINK_ERR_NO_PERM:   errno = EPERM;     return -1;
@@ -709,6 +738,7 @@ int Libc::Vfs_plugin::rename(char const *from_path, char const *to_path)
 {
 	typedef Vfs::Directory_service::Rename_result Result;
 
+	Genode::Lock::Guard guard(_lock);
 	if (_root_dir.leaf_path(to_path)) {
 
 		if (_root_dir.directory(to_path)) {
@@ -855,6 +885,47 @@ int Libc::Vfs_plugin::select(int nfds,
 		/* XXX exceptfds not supported */
 	}
 	return nready;
+}
+
+int Libc::Vfs_plugin::pipe(Libc::File_descriptor *fildes[2])
+{
+	using namespace Vfs;
+
+	Absolute_path const meta_path("new_pipe", Libc::config_pipe());
+
+	if (meta_path == "") {
+		Genode::error(__func__, ": pipe fs not mounted");
+		return Errno(EACCES);
+	}
+
+	Libc::File_descriptor *meta_fd = open(meta_path.base(), O_RDONLY);
+	if (!meta_fd) {
+		Genode::error("failed to open '", meta_path, "', pipe VFS plugin not loaded?");
+		return -1; /* open has set errno */
+	}
+
+	char pipe_name[16];
+	auto n =  read(meta_fd, pipe_name, sizeof(pipe_name));
+	close(meta_fd);
+	if (n == -1)
+		return -1; /* read has set errno */
+
+	if (pipe_name[n-1] == '\n')
+			--n;
+	pipe_name[n] = '\0';
+	Absolute_path const pipe_path(pipe_name, Libc::config_pipe());
+
+	fildes[0] = open(pipe_path.base(), O_RDONLY);
+	fildes[1] = open(pipe_path.base(), O_WRONLY);
+
+	if (!fildes[0] || !fildes[1]) {
+		int err = errno;
+		close(fildes[0]);
+		close(fildes[1]);
+		return Errno(err);
+	}
+
+	return 0;
 }
 
 namespace Libc {

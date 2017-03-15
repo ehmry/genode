@@ -1,3 +1,3 @@
 TARGET = test-libc_pipe
-LIBS   = posix libc_pipe pthread
+LIBS   = posix pthread
 SRC_CC = main.cc
