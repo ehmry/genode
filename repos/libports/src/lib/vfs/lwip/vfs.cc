@@ -99,13 +99,6 @@ extern "C" {
 		PORT_STRLEN_MAX = 6, /* :65536 */
 		ENDPOINT_STRLEN_MAX = IPADDR_STRLEN_MAX+PORT_STRLEN_MAX
 	};
-
-	enum { WRITE_BUFFER_SIZE = 4096 };
-	static char *write_buffer()
-	{
-		static char buf[WRITE_BUFFER_SIZE];
-		return buf;
-	}
 }
 
 
@@ -767,7 +760,7 @@ class Lwip::Tcp_socket_dir final :
 		tcp_pcb             *_pcb;
 
 		/* queue of received data */
-		pbuf *_recv_pbuf = NULL;
+		pbuf *_recv_pbuf = nullptr;
 		u16_t _recv_off  = 0;
 
 
@@ -856,12 +849,11 @@ class Lwip::Tcp_socket_dir final :
 		{
 			if (_recv_pbuf && buf) {
 				pbuf_cat(_recv_pbuf, buf);
-			} else
+			} else {
 				_recv_pbuf = buf;
+			}
 
-			/*
-			 * XXX: redundant signaling across FS sessions?
-			 */
+			/* XXX: too many wake ups? */
 			handle_io(data_handles);
 		}
 
@@ -957,24 +949,23 @@ class Lwip::Tcp_socket_dir final :
 
 			case Type::DATA:
 				if (state == READY || state == CLOSING) {
-					if (!_recv_pbuf)
-						return Read_result::READ_OK;
+					if (_recv_pbuf == nullptr)
+						return Read_result::READ_QUEUED;
 
 					u16_t const ucount = count;
-					u16_t n;
-					if (ucount >= (_recv_pbuf->tot_len - _recv_off)) {
-						n = pbuf_copy_partial(_recv_pbuf, dst, ucount, _recv_off);
-						if (n == (_recv_pbuf->tot_len - _recv_off)) {
+					u16_t const n = pbuf_copy_partial(_recv_pbuf, dst, ucount, _recv_off);
+					_recv_off += n;
+					{
+						u16_t new_off;
+						pbuf *new_head = pbuf_skip(_recv_pbuf, _recv_off, &new_off);
+						if (new_head != NULL && new_head != _recv_pbuf) {
+							/* move down the buffer and deref the head */
+							pbuf_ref(new_head);
+							pbuf_realloc(new_head, _recv_pbuf->tot_len+_recv_off);
 							pbuf_free(_recv_pbuf);
-							_recv_pbuf = nullptr;
 						}
-					} else {
-						n = pbuf_copy_partial(_recv_pbuf, dst, ucount, _recv_off);
-						pbuf *new_head = pbuf_skip(_recv_pbuf, _recv_off, &_recv_off);
-						/* move the reference down the chain  and free the head */
-						pbuf_ref(new_head);
-						pbuf_free(_recv_pbuf);
 						_recv_pbuf = new_head;
+						_recv_off = new_off;
 					}
 
 					/* ACK the remote */
@@ -1063,26 +1054,21 @@ class Lwip::Tcp_socket_dir final :
 			switch(handle.type) {
 			case Type::DATA:
 				if (state == READY) {
-					if (pending_ack > 0)
-						Genode::error("VFS lwip: a new write from the application while ACK is pending");
+					LWIP_ASSERT("VFS lwip: a new write from the application while ACK is pending", pending_ack == 0);
 					file_size out = 0;
-					pending_ack = count;
-					while (pending_ack) {
-						if (tcp_sndbuf(_pcb) == 0 || count == 0) {
+					while (count) {
+						while (tcp_sndbuf(_pcb) == 0) {
 							/* time to wait for ack callbacks */
 							_ep.wait_and_dispatch_one_signal();
-							continue;
 						}
 
-						char *buf = write_buffer();
-						file_size n = min(count, min(tcp_sndbuf(_pcb), WRITE_BUFFER_SIZE));
-						Genode::memcpy(buf, src, n);
-						src += n;
-						count -= n;
+						u16_t n = min(count, tcp_sndbuf(_pcb));
+						/* how much can we queue right now? */
 
-						/* write to outgoing TCP buffer */
+						count -= n;
 						err_t err = tcp_write(
-							_pcb, buf, n, count ? TCP_WRITE_FLAG_MORE : 0);
+							_pcb, src, n, count ? TCP_WRITE_FLAG_MORE : 0);
+						/* write to outgoing TCP buffer */
 						if (err == ERR_OK)
 							/* flush the buffer */
 							err = tcp_output(_pcb);
@@ -1091,11 +1077,20 @@ class Lwip::Tcp_socket_dir final :
 							return Write_result::WRITE_ERR_IO;
 						}
 
+						src += n;
 						out += n;
+						pending_ack += n;
 					}
-					if (state == CLOSING)
-						/* change to CLOSED state */
-						shutdown();
+
+					while (pending_ack > 0) {
+						if (state == CLOSING)
+							/* change to CLOSED state */
+							shutdown();
+						else
+							_ep.wait_and_dispatch_one_signal();
+							/* receive ACKs */
+					}
+
 					out_count = out;
 					return Write_result::WRITE_OK;
 				}
@@ -1232,6 +1227,9 @@ static
 void tcp_err_callback(void *arg, err_t err)
 {
 	Genode::error("lwIP: errror ",(int)err);
+	Lwip::Tcp_socket_dir *socket_dir = static_cast<Lwip::Tcp_socket_dir *>(arg);
+	socket_dir->shutdown();
+	/* the error is ERR_ABRT or ERR_RST, both end the session */
 }
 
 	}
