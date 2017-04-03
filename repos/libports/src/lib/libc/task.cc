@@ -605,7 +605,7 @@ struct Libc::Kernel
 			/* _setjmp() returned after _longjmp() - user context suspended */
 
 			while ((!_app_returned) && (!_suspend_scheduled)) {
-				_env.ep().wait_and_dispatch_one_signal();
+				_env.ep().wait_and_dispatch_one_io_signal();
 
 				if (_resume_main_once && !_setjmp(_kernel_context))
 					_switch_to_user();
@@ -623,7 +623,7 @@ struct Libc::Kernel
 				_switch_to_user();
 
 			while ((!_app_returned) && (!_suspend_scheduled)) {
-				_env.ep().wait_and_dispatch_one_signal();
+				_env.ep().wait_and_dispatch_one_io_signal();
 				if (_resume_main_once && !_setjmp(_kernel_context))
 					_switch_to_user();
 			}
