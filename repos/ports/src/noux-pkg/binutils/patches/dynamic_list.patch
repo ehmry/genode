@@ -1,0 +1,194 @@
+Fix '--dynamic-list' problems
+
+reverts https://github.com/bminor/binutils-gdb/commit/f02cb058822459ea29a9fdaa928c2623df435908
+
+From: Christian Prochaska <christian.prochaska@genode-labs.com>
+
+
+---
+ bfd/elf64-x86-64.c            |    5 +----
+ bfd/elflink.c                 |    3 +--
+ bfd/elfxx-mips.c              |    1 -
+ ld/ldexp.c                    |    4 +---
+ ld/ldlang.c                   |   38 +++++++++++++++-----------------------
+ ld/testsuite/ld-mmix/bpo-10.d |    3 ++-
+ ld/testsuite/ld-mmix/bpo-11.d |    3 ++-
+ 7 files changed, 22 insertions(+), 35 deletions(-)
+
+diff --git a/bfd/elf64-x86-64.c b/bfd/elf64-x86-64.c
+index e0e6c16..3f73eda 100644
+--- a/bfd/elf64-x86-64.c
++++ b/bfd/elf64-x86-64.c
+@@ -1924,10 +1924,7 @@ elf_x86_64_convert_load_reloc (bfd *abfd, asection *sec,
+ 	     bfd_elf_record_link_assignment.   */
+ 	  if (h->def_regular
+ 	      && (h->root.type == bfd_link_hash_new
+-		  || h->root.type == bfd_link_hash_undefined
+-		  || ((h->root.type == bfd_link_hash_defined
+-		       || h->root.type == bfd_link_hash_defweak)
+-		      && h->root.u.def.section == bfd_und_section_ptr)))
++		  || h->root.type == bfd_link_hash_undefined))
+ 	    {
+ 	      /* Skip since R_X86_64_32/R_X86_64_32S may overflow.  */
+ 	      if (require_reloc_pc32)
+diff --git a/bfd/elflink.c b/bfd/elflink.c
+index 69b66f2..df6bde6 100644
+--- a/bfd/elflink.c
++++ b/bfd/elflink.c
+@@ -13143,8 +13143,7 @@ _bfd_elf_gc_keep (struct bfd_link_info *info)
+       if (h != NULL
+ 	  && (h->root.type == bfd_link_hash_defined
+ 	      || h->root.type == bfd_link_hash_defweak)
+-	  && !bfd_is_abs_section (h->root.u.def.section)
+-	  && !bfd_is_und_section (h->root.u.def.section))
++	  && !bfd_is_abs_section (h->root.u.def.section))
+ 	h->root.u.def.section->flags |= SEC_KEEP;
+     }
+ }
+diff --git a/bfd/elfxx-mips.c b/bfd/elfxx-mips.c
+index 723853f..6375303 100644
+--- a/bfd/elfxx-mips.c
++++ b/bfd/elfxx-mips.c
+@@ -1808,7 +1808,6 @@ mips_elf_local_pic_function_p (struct mips_elf_link_hash_entry *h)
+ 	   || h->root.root.type == bfd_link_hash_defweak)
+ 	  && h->root.def_regular
+ 	  && !bfd_is_abs_section (h->root.root.u.def.section)
+-	  && !bfd_is_und_section (h->root.root.u.def.section)
+ 	  && (!ELF_ST_IS_MIPS16 (h->root.other)
+ 	      || (h->fn_stub && h->need_fn_stub))
+ 	  && (PIC_OBJECT_P (h->root.root.u.def.section->owner)
+diff --git a/ld/ldexp.c b/ld/ldexp.c
+index 792e21e..0d2d8d3 100644
+--- a/ld/ldexp.c
++++ b/ld/ldexp.c
+@@ -1073,7 +1073,6 @@ exp_fold_tree_1 (etree_type *tree)
+ 		 before relaxation and so be stripped incorrectly.  */
+ 	      if (expld.phase == lang_mark_phase_enum
+ 		  && expld.section != bfd_abs_section_ptr
+-		  && expld.section != bfd_und_section_ptr
+ 		  && !(expld.result.valid_p
+ 		       && expld.result.value == 0
+ 		       && (is_value (tree->assign.src, 0)
+@@ -1082,8 +1081,7 @@ exp_fold_tree_1 (etree_type *tree)
+ 			   || is_align_conditional (tree->assign.src))))
+ 		expld.section->flags |= SEC_KEEP;
+ 
+-	      if (!expld.result.valid_p
+-		  || expld.section == bfd_und_section_ptr)
++	      if (!expld.result.valid_p)
+ 		{
+ 		  if (expld.phase != lang_mark_phase_enum)
+ 		    einfo (_("%F%S invalid assignment to"
+diff --git a/ld/ldlang.c b/ld/ldlang.c
+index dafc348..7b0b94c 100644
+--- a/ld/ldlang.c
++++ b/ld/ldlang.c
+@@ -5644,7 +5644,6 @@ lang_do_assignments_1 (lang_statement_union_type *s,
+ 	case lang_output_section_statement_enum:
+ 	  {
+ 	    lang_output_section_statement_type *os;
+-	    bfd_vma newdot;
+ 
+ 	    os = &(s->output_section_statement);
+ 	    os->after_end = *found_end;
+@@ -5656,24 +5655,18 @@ lang_do_assignments_1 (lang_statement_union_type *s,
+ 		    prefer_next_section = FALSE;
+ 		  }
+ 		dot = os->bfd_section->vma;
+-	      }
+-	    newdot = lang_do_assignments_1 (os->children.head,
+-					    os, os->fill, dot, found_end);
+-	    if (!os->ignored)
+-	      {
+-		if (os->bfd_section != NULL)
+-		  {
+-		    /* .tbss sections effectively have zero size.  */
+-		    if (!IS_TBSS (os->bfd_section)
+-			|| bfd_link_relocatable (&link_info))
+-		      dot += TO_ADDR (os->bfd_section->size);
+-
+-		    if (os->update_dot_tree != NULL)
+-		      exp_fold_tree (os->update_dot_tree,
+-				     bfd_abs_section_ptr, &dot);
+-		  }
+-		else
+-		  dot = newdot;
++
++		lang_do_assignments_1 (os->children.head,
++				       os, os->fill, dot, found_end);
++
++		/* .tbss sections effectively have zero size.  */
++		if (!IS_TBSS (os->bfd_section)
++		    || bfd_link_relocatable (&link_info))
++		  dot += TO_ADDR (os->bfd_section->size);
++
++		if (os->update_dot_tree != NULL)
++		  exp_fold_tree (os->update_dot_tree, bfd_abs_section_ptr,
++				 &dot);
+ 	      }
+ 	  }
+ 	  break;
+@@ -5697,7 +5690,7 @@ lang_do_assignments_1 (lang_statement_union_type *s,
+ 	      if (expld.result.section != NULL)
+ 		s->data_statement.value += expld.result.section->vma;
+ 	    }
+-	  else if (expld.phase == lang_final_phase_enum)
++	  else
+ 	    einfo (_("%F%P: invalid data statement\n"));
+ 	  {
+ 	    unsigned int size;
+@@ -5730,7 +5723,7 @@ lang_do_assignments_1 (lang_statement_union_type *s,
+ 			 bfd_abs_section_ptr, &dot);
+ 	  if (expld.result.valid_p)
+ 	    s->reloc_statement.addend_value = expld.result.value;
+-	  else if (expld.phase == lang_final_phase_enum)
++	  else
+ 	    einfo (_("%F%P: invalid reloc statement\n"));
+ 	  dot += TO_ADDR (bfd_get_reloc_size (s->reloc_statement.howto));
+ 	  break;
+@@ -5766,8 +5759,7 @@ lang_do_assignments_1 (lang_statement_union_type *s,
+ 		*found_end = TRUE;
+ 	    }
+ 	  exp_fold_tree (s->assignment_statement.exp,
+-			 (current_os->bfd_section != NULL
+-			  ? current_os->bfd_section : bfd_und_section_ptr),
++			 current_os->bfd_section,
+ 			 &dot);
+ 	  break;
+ 
+diff --git a/ld/testsuite/ld-mmix/bpo-10.d b/ld/testsuite/ld-mmix/bpo-10.d
+index 6f49287..1cb7d61 100644
+--- a/ld/testsuite/ld-mmix/bpo-10.d
++++ b/ld/testsuite/ld-mmix/bpo-10.d
+@@ -14,10 +14,11 @@ SYMBOL TABLE:
+ 0+7f8 l +d  \.MMIX.reg_contents	0+ (|\.MMIX\.reg_contents)
+ 0+ l    df \*ABS\*	0+ .*
+ 0+ l       \.init	0+ _start
++0+ l    df \*ABS\*	0+ .*
++0+4 l       \.init	0+ _start\.
+ 2000000000000000 g       \.init	0+ __bss_start
+ 2000000000000000 g       \.init	0+ _edata
+ 2000000000000000 g       \.init	0+ _end
+-0+4 g       \.init	0+ _start\.
+ 
+ Contents of section \.init:
+  0000 e37704a6                             .*
+diff --git a/ld/testsuite/ld-mmix/bpo-11.d b/ld/testsuite/ld-mmix/bpo-11.d
+index 1abf381..9b38be8 100644
+--- a/ld/testsuite/ld-mmix/bpo-11.d
++++ b/ld/testsuite/ld-mmix/bpo-11.d
+@@ -16,12 +16,13 @@ SYMBOL TABLE:
+ 0+7e8 l    d  \.MMIX\.reg_contents	0+ (|\.MMIX\.reg_contents)
+ 0+ l    df \*ABS\*	0+ .*
+ 0+ l       \.init	0+ _start
++0+ l    df \*ABS\*	0+ .*
++0+10 l       \.text	0+ _start\.
+ 0+14 g       \.text	0+ x
+ 0+10 g       \.text	0+ x2
+ 2000000000000000 g       \.text	0+ __bss_start
+ 2000000000000000 g       \.text	0+ _edata
+ 2000000000000000 g       \.text	0+ _end
+-0+10 g       \.text	0+ _start\.
+ 
+ Contents of section \.init:
+  0000 00000000 0000003d 00000000 0000003a  .*
