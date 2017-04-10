@@ -481,11 +481,13 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 
 		void close(Node_handle handle) override
 		{
-			_apply(handle, [&] (Node &node) {
-				/* root directory should not be freed */
-				if (!(node.id() == _root->id()))
-					_close(node);
-			});
+			try {
+				_apply(handle, [&] (Node &node) {
+					/* root directory should not be freed */
+					if (!(node.id() == _root->id()))
+						_close(node);
+				});
+			} catch (Invalid_handle) { }
 		}
 
 		Status status(Node_handle node_handle) override
