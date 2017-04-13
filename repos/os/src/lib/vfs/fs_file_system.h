@@ -361,10 +361,11 @@ class Vfs::Fs_file_system : public File_system
 
 		Stat_result stat(char const *path, Stat &out) override
 		{
+			Absolute_path abs_path(path);
 			::File_system::Status status;
 
 			try {
-				::File_system::Node_handle node = _fs.node(path);
+				::File_system::Node_handle node = _fs.node(abs_path.base());
 				Fs_handle_guard node_guard(*this, _fs, node, _handle_space);
 				status = _fs.status(node);
 			}
@@ -394,12 +395,13 @@ class Vfs::Fs_file_system : public File_system
 			Lock::Guard guard(_lock);
 
 			using ::File_system::Directory_entry;
+			Absolute_path dir_path(path);
 
 			if (strcmp(path, "") == 0)
 				path = "/";
 
 			::File_system::Dir_handle dir_handle;
-			try { dir_handle = _fs.dir(path, false); }
+			try { dir_handle = _fs.dir(dir_path.base(), false); }
 			catch (::File_system::Lookup_failed) { return DIRENT_ERR_INVALID_PATH; }
 			catch (::File_system::Name_too_long) { return DIRENT_ERR_INVALID_PATH; }
 			catch (...) { return DIRENT_ERR_NO_PERM; }
@@ -576,11 +578,10 @@ class Vfs::Fs_file_system : public File_system
 
 		file_size num_dirent(char const *path) override
 		{
-			if (strcmp(path, "") == 0)
-				path = "/";
+			Absolute_path dir_path(path);
 
 			::File_system::Node_handle node;
-			try { node = _fs.node(path); } catch (...) { return 0; }
+			try { node = _fs.node(dir_path.base()); } catch (...) { return 0; }
 			Fs_handle_guard node_guard(*this, _fs, node, _handle_space);
 
 			::File_system::Status status = _fs.status(node);
@@ -590,8 +591,9 @@ class Vfs::Fs_file_system : public File_system
 
 		bool directory(char const *path) override
 		{
+			Absolute_path dir_path(path);
 			try {
-				::File_system::Node_handle node = _fs.node(path);
+				::File_system::Node_handle node = _fs.node(dir_path.base());
 				Fs_handle_guard node_guard(*this, _fs, node, _handle_space);
 
 				::File_system::Status status = _fs.status(node);
@@ -603,9 +605,11 @@ class Vfs::Fs_file_system : public File_system
 
 		char const *leaf_path(char const *path) override
 		{
+			Absolute_path abs_path(path);
+
 			/* check if node at path exists within file system */
 			try {
-				::File_system::Node_handle node = _fs.node(path);
+				::File_system::Node_handle node = _fs.node(abs_path.base());
 				_fs.close(node);
 			}
 			catch (...) { return 0; }
@@ -681,8 +685,9 @@ class Vfs::Fs_file_system : public File_system
 
 		void sync(char const *path) override
 		{
+			Absolute_path abs_path(path);
 			try {
-				::File_system::Node_handle node = _fs.node(path);
+				::File_system::Node_handle node = _fs.node(abs_path.base());
 				_fs.sync(node);
 				_fs.close(node);
 			} catch (...) { }
