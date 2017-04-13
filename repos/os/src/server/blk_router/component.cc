@@ -174,6 +174,8 @@ struct Blk_router::Main
 		config.sigh(config_handler);
 		session_requests.sigh(session_request_handler);
 		timer.sigh(session_request_handler);
+
+		handle_session_requests();
 	}
 
 	Session_label lookup_partition(Session_label const &client_label);
