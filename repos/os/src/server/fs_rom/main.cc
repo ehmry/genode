@@ -16,6 +16,8 @@
 #include <file_system_session/connection.h>
 #include <file_system/util.h>
 #include <os/path.h>
+#include <os/session_policy.h>
+#include <base/attached_rom_dataspace.h>
 #include <root/component.h>
 #include <base/component.h>
 #include <base/session_label.h>
@@ -122,9 +124,9 @@ class Rom_session_component : public Genode::Rpc_object<Genode::Rom_session>
 
 				try { return fs.dir(dir_path.base(), false); }
 
+				catch (Lookup_failed)     { }
 				catch (Invalid_handle)    { Genode::error(_file_path, ": invalid_handle"); }
 				catch (Invalid_name)      { Genode::error(_file_path, ": invalid_name"); }
-				catch (Lookup_failed)     { Genode::error(_file_path, ": lookup_failed"); }
 				catch (Permission_denied) { Genode::error(_file_path, ": permission_denied"); }
 				catch (Name_too_long)     { Genode::error(_file_path, ": name_too_long"); }
 				catch (No_space)          { Genode::error(_file_path, ": no_space"); }
@@ -159,9 +161,9 @@ class Rom_session_component : public Genode::Rpc_object<Genode::Rom_session>
 				file_handle = fs.file(dir, file_name.base() + 1,
 				                      File_system::READ_ONLY, false);
 			}
+			catch (Lookup_failed)     { }
 			catch (Invalid_handle)    { Genode::error(_file_path, ": Invalid_handle"); }
 			catch (Invalid_name)      { Genode::error(_file_path, ": invalid_name"); }
-			catch (Lookup_failed)     { Genode::error(_file_path, ": lookup_failed"); }
 
 			return file_handle;
 		}
@@ -267,19 +269,25 @@ class Rom_session_component : public Genode::Rpc_object<Genode::Rom_session>
 		 *
 		 * \param fs        file-system session to read the file from
 		 * \param filename  requested file name
-		 * \param sig_rec   signal receiver used to get notified about changes
-		 *                  within the compound directory (in the case when
-		 *                  the requested file could not be found at session-
-		 *                  creation time)
+		 * \param wait      wait for missing files to appear
 		 */
 		Rom_session_component(Genode::Env &env,
-		                      File_system::Session &fs, const char *file_path)
+		                      File_system::Session &fs,
+		                      const char *file_path,
+		                      bool wait)
 		:
 			_env(env), _fs(fs), _file_path(file_path),
 			_file_handle(_open_file(_fs, _file_path))
 		{
-			if (!_file_handle.valid())
-				_register_for_compound_dir_changes();
+			if (!_file_handle.valid()) {
+				if (!wait) {
+					Genode::log("'", file_path, "' is unavailable");
+					throw Root::Unavailable();
+				} else {
+					Genode::log("waiting for '", file_path, "' to appear");
+					_register_for_compound_dir_changes();
+				}
+			}
 		}
 
 		/**
@@ -328,6 +336,8 @@ class Rom_root : public Genode::Root_component<Rom_session_component>
 		/* open file-system session */
 		File_system::Connection _fs { _env, _fs_tx_block_alloc };
 
+		Genode::Attached_rom_dataspace _config_rom { _env, "config" };
+
 		Rom_session_component *_create_session(const char *args)
 		{
 			Genode::Session_label const label = label_from_args(args);
@@ -335,9 +345,16 @@ class Rom_root : public Genode::Root_component<Rom_session_component>
 
 			Genode::log("request for ", label);
 
+			bool wait = true;
+
+			try {
+				Genode::Session_policy policy(label, _config_rom.xml());
+				wait = policy.attribute_value("wait", wait);
+			} catch (Session_policy::No_policy_defined) { }
+
 			/* create new session for the requested file */
 			return new (md_alloc())
-				Rom_session_component(_env, _fs, module_name.string());
+				Rom_session_component(_env, _fs, module_name.string(), wait);
 		}
 
 	public:
