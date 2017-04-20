@@ -570,8 +570,6 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			});
 		}
 
-		void sigh(Node_handle handle, Signal_context_capability sigh) override { }
-
 		/**
 		 * Sync the VFS and send any pending signals on the node.
 		 */
