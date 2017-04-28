@@ -18,7 +18,7 @@
 #include <base/exception.h>
 #include <base/log.h>
 #include <cpu/cpu_state.h>
-#include <drivers/board_base.h>
+#include <drivers/defs/imx53.h>
 #include <os/ring_buffer.h>
 #include <terminal_session/connection.h>
 #include <timer_session/connection.h>
