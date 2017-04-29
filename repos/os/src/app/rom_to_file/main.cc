@@ -124,9 +124,12 @@ void Rom_to_file::Main::_handle_update()
 				Handle_guard dir_guard(_fs, dir_handle);
 				File_handle handle;
 
-				handle = _fs.file(dir_handle, file_name, File_system::WRITE_ONLY, true);
-
-				_fs.truncate(handle, 0);
+				try {
+					handle = _fs.file(dir_handle, file_name, File_system::WRITE_ONLY, true);
+				} catch (Permission_denied) {
+					handle = _fs.file(dir_handle, file_name, File_system::WRITE_ONLY, false);
+					_fs.truncate(handle, 0);
+				}
 
 				size_t len     = max(strlen(_rom_ds->local_addr<char>()), _rom_ds->size());
 				size_t written = write(_fs, handle, _rom_ds->local_addr<void>(), len, 0);
