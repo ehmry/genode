@@ -1,0 +1,126 @@
+#
+# Test of the Report VFS plugin through a gratuitous pipeline
+#
+
+#
+# Build
+#
+set build_components {
+	core init
+	app/rom_logger
+	app/rom_to_file
+	drivers/timer
+	server/dynamic_rom
+	server/report_rom
+	server/vfs
+}
+
+build $build_components
+
+create_boot_directory
+
+#
+# Generate config
+#
+append config {
+<config>
+	<parent-provides>
+		<service name="CPU"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="IRQ"/>
+		<service name="LOG"/>
+		<service name="PD"/>
+		<service name="RAM"/>
+		<service name="RM"/>
+		<service name="ROM"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="vfs">
+		<resource name="RAM" quantum="10M"/>
+		<provides><service name="File_system"/></provides>
+		<config>
+			<vfs> <report name="vfs_report_file"/> </vfs>
+			<policy label_prefix="rom_to_file" writeable="yes"/>
+		</config>
+	</start>
+	<start name="dynamic_rom">
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="ROM"/></provides>
+		<config verbose="yes">
+			<rom name="vfs_report_file">
+				<inline description="iteration 1">
+					<iteration num="1" />
+				</inline>
+				<sleep milliseconds="500" />
+				<inline description="iteration 2">
+					<iteration num="2" />
+				</inline>
+				<sleep milliseconds="500" />
+				<inline description="iteration 3">
+					<iteration num="3" />
+				</inline>
+				<sleep milliseconds="500" />
+				<inline description="iteration 4">
+					<iteration num="4" />
+				</inline>
+				<sleep milliseconds="500" />
+			</rom>
+		</config>
+	</start>
+	<start name="rom_to_file">
+		<resource name="RAM" quantum="2M"/>
+		<config rom="vfs_report_file"/>
+		<route>
+			<service name="ROM" label="vfs_report_file"> <child name="dynamic_rom"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="report_rom">
+		<resource name="RAM" quantum="2M"/>
+		<provides>
+			<service name="ROM"/>
+			<service name="Report"/>
+		</provides>
+		<config>
+			<policy label="rom_logger -> vfs_report_file" report="vfs -> vfs_report_file"/>
+		</config>
+	</start>
+	<start name="rom_logger">
+		<resource name="RAM" quantum="1M"/>
+		<config rom="vfs_report_file"/>
+		<route>
+			<service name="ROM" label="vfs_report_file"> <child name="report_rom"/> </service>
+			<any-service> <parent/> </any-service>
+		</route>
+	</start>
+</config>}
+
+install_config $config
+
+#
+# Boot modules
+#
+
+# generic modules
+set boot_modules {
+	core ld.lib.so init
+	dynamic_rom
+	report_rom
+	rom_logger
+	rom_to_file
+	timer
+	vfs
+}
+
+build_boot_image $boot_modules
+
+append qemu_args " -m 256 -nographic"
+
+run_genode_until {iteration num="4"} 40

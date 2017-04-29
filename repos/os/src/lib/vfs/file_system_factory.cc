@@ -23,13 +23,13 @@
 #include <log_file_system.h>
 #include <null_file_system.h>
 #include <ram_file_system.h>
+#include <report_file_system.h>
 #include <rom_file_system.h>
 #include <rtc_file_system.h>
 #include <symlink_file_system.h>
 #include <tar_file_system.h>
 #include <terminal_file_system.h>
 #include <zero_file_system.h>
-
 
 namespace Vfs {
 
@@ -241,16 +241,17 @@ Vfs::Global_file_system_factory::Global_file_system_factory(Genode::Allocator &a
 :
 	_md_alloc(alloc)
 {
-	_add_builtin_fs<Vfs::Tar_file_system>();
-	_add_builtin_fs<Vfs::Fs_file_system>();
-	_add_builtin_fs<Vfs::Terminal_file_system>();
-	_add_builtin_fs<Vfs::Null_file_system>();
-	_add_builtin_fs<Vfs::Zero_file_system>();
 	_add_builtin_fs<Vfs::Block_file_system>();
-	_add_builtin_fs<Vfs::Log_file_system>();
-	_add_builtin_fs<Vfs::Rom_file_system>();
+	_add_builtin_fs<Vfs::Fs_file_system>();
 	_add_builtin_fs<Vfs::Inline_file_system>();
-	_add_builtin_fs<Vfs::Rtc_file_system>();
+	_add_builtin_fs<Vfs::Log_file_system>();
+	_add_builtin_fs<Vfs::Null_file_system>();
 	_add_builtin_fs<Vfs::Ram_file_system>();
+	_add_builtin_fs<Vfs::Report_file_system>();
+	_add_builtin_fs<Vfs::Rom_file_system>();
+	_add_builtin_fs<Vfs::Rtc_file_system>();
 	_add_builtin_fs<Vfs::Symlink_file_system>();
+	_add_builtin_fs<Vfs::Tar_file_system>();
+	_add_builtin_fs<Vfs::Terminal_file_system>();
+	_add_builtin_fs<Vfs::Zero_file_system>();
 }
