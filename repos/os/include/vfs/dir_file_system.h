@@ -126,17 +126,20 @@ class Vfs::Dir_file_system : public File_system
 		 */
 		char const *_sub_path(char const *path) const
 		{
+			/* paths without a leading slash are invalid */
+			if (path[0] != '/')
+				return nullptr;
+
 			/* do not strip anything from the path when we are root */
 			if (_root())
 				return path;
 
-			/* skip heading slash in path if present */
-			if (path[0] == '/')
-				path++;
+			/* skip heading slash */
+			path++;
 
 			Genode::size_t const name_len = strlen(_name);
 			if (strcmp(path, _name, name_len) != 0)
-				return 0;
+				return nullptr;
 			path += name_len;
 
 			/*
@@ -145,7 +148,7 @@ class Vfs::Dir_file_system : public File_system
 			 * first path element matches the name length.
 			 */
 			if (*path != 0 && *path != '/')
-				return 0;
+				return nullptr;
 
 			return path;
 		}
