@@ -3,8 +3,9 @@ assert_spec x86
 set build_components {
 	core init
 	drivers/timer drivers/nic server/ram_fs server/vfs
-	lib/vfs/lxip
 }
+
+append build_components " $vfs_plugin_target "
 
 source ${genode_dir}/repos/base/run/platform_drv.inc
 append_platform_drv_build_components
@@ -49,9 +50,10 @@ append config {
 		<provides> <service name="File_system"/> </provides>
 		<config ld_verbose="yes">
 			<vfs>
-				<dir name="socket">
-					<lxip ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1" nameserver="8.8.8.8"/>
-					<!-- <lxip dhcp="yes"/> -->
+				<dir name="socket">}
+append config "				<$vfs_plugin_name"
+append config { ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1" nameserver="8.8.8.8"/>
+					<!-- <lwip dhcp="yes"/> -->
 				</dir>
 			</vfs>
 			<default-policy root="/socket" writeable="yes" />
@@ -63,8 +65,9 @@ append boot_modules {
 	core init timer } [nic_drv_binary] { ram_fs vfs
 	ld.lib.so libc.lib.so libm.lib.so
 	libc_resolv.lib.so stdcxx.lib.so libc_pipe.lib.so
-	vfs_lxip.lib.so lxip.lib.so
 }
+
+append boot_modules " $vfs_plugin_modules "
 
 append_platform_drv_boot_modules
 

@@ -1,0 +1,3 @@
+source ${genode_dir}/repos/libports/run/netty_lxip.inc
+source ${genode_dir}/repos/libports/run/netty_udp.inc
+source ${genode_dir}/repos/libports/run/netty.inc
