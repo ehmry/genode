@@ -73,6 +73,7 @@ set build_components {
 	core init
 	drivers/timer
 	app/netperf
+	server/vfs
 }
 
 append     build_components     " $vfs_plugin_target "
@@ -234,10 +235,30 @@ append_if $use_wifi_driver config {
 append_platform_drv_config
 
 append config {
-	<start name="netserver_genode" caps="200">
-	<start name="netserver_genode">
-		<binary name="netserver"/>
+	<start name="socket_fs" caps="200">
+		<binary name="vfs"/>
 		<resource name="RAM" quantum="32M"/>
+		<provides> <service name="File_system"/> </provides>
+		<config>
+			<vfs>
+}
+append config "<$vfs_plugin_name"
+append_if [have_spec linux] config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\" nameserver=\"10.0.2.1\""
+append config {/>
+			</vfs>
+			<default-policy writeable="yes"/>
+		</config>}
+append_if $use_nic_bridge config {
+		<route>
+			<service name="Nic"> <child name="nic_bridge"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>}
+append config {
+	</start>
+
+	<start name="netserver_genode" caps="200">
+		<binary name="netserver"/>
+		<resource name="RAM" quantum="4M"/>
 		<config>
 			<arg value="netserver"/>
 			<arg value="-D"/>
@@ -250,20 +271,11 @@ append config {
 				<dir name="dev">
 					<log/>
 					<dir name="socket">
-}
-append config "<$vfs_plugin_name"
-append_if [have_spec linux] config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\" nameserver=\"10.0.2.1\""
-append config {/>
+						<fs label="socket_fs"/>
 					</dir>
 				</dir>
 			</vfs>
-		</config>}
-append_if $use_nic_bridge config {
-		<route>
-			<service name="Nic"> <child name="nic_bridge"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>}
-append config {
+		</config>
 	</start>
 </config>
 }
@@ -279,6 +291,7 @@ set boot_modules {
 	core init ld.lib.so
 	timer
 	netserver
+	vfs
 	libc.lib.so libm.lib.so libc_resolv.lib.so
 }
 
