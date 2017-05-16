@@ -1,0 +1,144 @@
+#
+# Check used commands
+#
+set mkfsfat [check_installed mkfs.fat]
+set mcopy [check_installed mcopy]
+set mdir [check_installed mdir]
+
+#
+# Build
+#
+set build_components {
+	drivers/rtc
+	drivers/timer
+	lib/vfs/ffat
+	server/fs_rom
+	server/ram_blk
+	server/blk_cache
+	server/vfs
+	test/libc_vfs
+}
+
+build $build_components
+
+create_boot_directory
+
+import_from_depot \
+	genodelabs/src/[base_src] \
+	genodelabs/src/init \
+
+#
+# Build FAT-file-system image
+#
+# Test binaries are stored in the image
+#
+file delete bin/fat_rom.raw
+catch { exec $mkfsfat -C -n "fat_rom.run" bin/fat_rom.raw 2048 }
+exec $mcopy -i bin/fat_rom.raw bin/libc.lib.so ::libc.lib.so
+exec $mcopy -i bin/fat_rom.raw bin/test-libc_vfs ::test-libc_vfs
+
+#
+# Generate config
+#
+append config {
+<config>
+	<parent-provides>
+		<service name="CPU"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="IRQ"/>
+		<service name="LOG"/>
+		<service name="PD"/>
+		<service name="RAM"/>
+		<service name="RM"/>
+		<service name="ROM"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<default caps="128"/>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
+	<start name="rtc_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Rtc"/> </provides>
+	</start>
+	<start name="ram_blk">
+		<resource name="RAM" quantum="8M"/>
+		<provides> <service name="Block"/> </provides>
+		<config file="fat_rom.raw" block_size="512"/>
+	</start>
+	<!-- ram_blk is fast enough, but make sure the plugin works with a cache -->
+	<start name="blk_cache">
+		<resource name="RAM" quantum="8M" />
+		<provides> <service name="Block" /> </provides>
+		<route>
+			<service name="Block"><child name="ram_blk" /></service>
+			<any-service> <parent /> </any-service>
+		</route>
+	</start>
+	<start name="fat_fs">
+		<binary name="vfs"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides> <service name="File_system"/> </provides>
+		<config>
+			<vfs> <ffat/> </vfs>
+			<policy label_prefix="fs_rom"/>
+			<policy label="test-libc_vfs -> fat" writeable="yes"/>
+		</config>
+		<route>
+			<service name="Block"><child name="blk_cache" /></service>
+			<any-service> <parent /> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="fs_rom">
+		<resource name="RAM" quantum="4M"/>
+		<provides> <service name="ROM"/> </provides>
+	</start>
+	<start name="test-libc_vfs">
+		<resource name="RAM" quantum="10M"/>
+		<config ld_verbose="true">
+			<libc stdout="/dev/log"/>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<fs label="fat"/>
+			</vfs>
+		</config>
+		<route>
+			<service name="ROM" unscoped_label="ld.lib.so"> <parent/> </service>
+			<any-service> <any-child/> <parent/> </any-service>
+		</route>
+	</start>
+</config>}
+
+install_config $config
+
+#
+# Boot modules
+#
+
+# generic modules
+#
+# skip test binaries, they are in the image
+#
+set boot_modules {
+	blk_cache
+	fs_rom
+	ram_blk
+	rtc_drv
+	timer
+	vfs
+	vfs_ffat.lib.so
+
+	fat_rom.raw
+}
+
+build_boot_image $boot_modules
+
+append qemu_args " -m 256 -nographic"
+
+run_genode_until {.*child "test-libc_vfs" exited with exit value 0.*} 60
+
+file delete bin/fat_rom.raw
