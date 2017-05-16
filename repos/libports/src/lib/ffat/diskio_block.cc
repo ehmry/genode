@@ -2,6 +2,8 @@
  * \brief   Low level disk I/O module using a Block session
  * \author  Christian Prochaska
  * \date    2011-05-30
+ *
+ * See doc/en/appnote.html in the FatFS source.
  */
 
 /*
@@ -12,85 +14,102 @@
  */
 
 /* Genode includes */
+#include <block_session/connection.h>
+#include <rtc_session/connection.h>
 #include <base/allocator_avl.h>
 #include <base/log.h>
-#include <block_session/connection.h>
 
 /* Genode block backend */
 #include <ffat/block.h>
 
-/* Ffat includes */
+
+namespace Ffat {
+
 extern "C" {
+/* ffat includes */
 #include <ffat/diskio.h>
 }
 
-namespace Ffat {
-	void block_init(Genode::Env &, Genode::Allocator &alloc);
+	using namespace Genode;
+
+	struct Drive;
+	struct Platform
+	{
+		Genode::Env &env;
+		Genode::Allocator &alloc;
+		Genode::Allocator_avl tx_alloc { &alloc };
+
+		Constructible<Rtc::Connection> rtc;
+
+		enum { MAX_DEV_NUM = 8 };
+
+		/* XXX: could make a tree... */
+		Drive* drives[MAX_DEV_NUM];
+
+		Platform(Genode::Env &env, Genode::Allocator &alloc)
+		: env(env), alloc(alloc)
+		{
+			try { rtc.construct(env, "FatFS"); }
+			catch (Service_denied) { }
+
+			for (int i = 0; i < MAX_DEV_NUM; ++i)
+				drives[i] = nullptr;
+		}
+	};
+
+	static Constructible<Platform> _platform;
+
+	void block_init(Genode::Env &env, Genode::Allocator &alloc) {
+		_platform.construct(env, alloc); }
+
+	struct Drive : Block::Connection
+	{
+		Block::sector_t block_count;
+		Genode::size_t  block_size;
+		Block::Session::Operations ops;
+
+		Drive(Platform &platform, char const *label)
+		: Block::Connection(platform.env, &platform.tx_alloc, 128*1024, label)
+		{
+			info(&block_count, &block_size, &ops);
+		}
+	};
 }
 
-using namespace Genode;
 
-static bool const verbose = false;
-
-static Constructible<Genode::Allocator_avl> _block_alloc;
-static Constructible<Block::Connection>     _block_connection;
-static size_t _blk_size = 0;
-static Block::sector_t _blk_cnt  = 0;
-static Block::Session::Tx::Source *_source;
-static Genode::Env *_global_env;
+using namespace Ffat;
 
 
-void Ffat::block_init(Genode::Env &env, Genode::Allocator &alloc)
+extern "C" Ffat::DSTATUS disk_initialize (BYTE drv)
 {
-	_global_env = &env;
-	_block_alloc.construct(&alloc);
-}
-
-
-extern "C" DSTATUS disk_initialize (BYTE drv)
-{
-	static bool initialized = false;
-
-	if (verbose)
-		Genode::log("disk_initialize(drv=", drv, ") called.");
-
-	if (drv != 0) {
-		Genode::error("only one disk drive is supported at this time.");
-		return STA_NOINIT;
+	if (drv >= Platform::MAX_DEV_NUM) {
+		Genode::error("only ", (int)Platform::MAX_DEV_NUM," supported");
+		return STA_NODISK;
 	}
 
-	if (initialized) {
-		Genode::error("drv 0 has already been initialized.");
+	if (_platform->drives[drv])
 		return STA_NOINIT;
-	}
 
 	try {
-		_block_connection.construct(*_global_env, &*_block_alloc);
-	} catch(...) {
-		Genode::error("could not open block connection");
-		return STA_NOINIT;
+		String<2> label(drv);
+		_platform->drives[drv] = new (_platform->alloc) Drive(*_platform, label.string());
+	} catch(Service_denied) {
+		Genode::error("could not open block connection for drive ", drv);
+		return STA_NODISK;
 	}
 
-	_source = _block_connection->tx();
-
-	Block::Session::Operations  ops;
-	_block_connection->info(&_blk_cnt, &_blk_size, &ops);
+	Drive &drive = *_platform->drives[drv];
 
 	/* check for read- and write-capability */
-	if (!ops.supported(Block::Packet_descriptor::READ)) {
-		Genode::error("block device not readable!");
-		_block_connection.destruct();
+	if (!drive.ops.supported(Block::Packet_descriptor::READ)) {
+		Genode::error("drive ", drv, " not readable!");
+		destroy(_platform->alloc, _platform->drives[drv]);
+		_platform->drives[drv] = nullptr;
 		return STA_NOINIT;
 	}
-	if (!ops.supported(Block::Packet_descriptor::WRITE)) {
-		Genode::warning("block device not writeable!");
-	}
 
-	if (verbose)
-		Genode::log(__func__, ": We have ", _blk_cnt, " blocks with a "
-		            "size of ", _blk_size, " bytes");
-
-	initialized = true;
+	if (!drive.ops.supported(Block::Packet_descriptor::WRITE))
+		return STA_PROTECT;
 
 	return 0;
 }
@@ -98,91 +117,121 @@ extern "C" DSTATUS disk_initialize (BYTE drv)
 
 extern "C" DSTATUS disk_status (BYTE drv)
 {
-	if (drv != 0) {
-		Genode::error("only one disk drive is supported at this time.");
-		return STA_NODISK;
+	if (_platform->drives[drv]) {
+		if (_platform->drives[drv]->ops.supported(Block::Packet_descriptor::WRITE))
+			return 0;
+		return STA_PROTECT;
 	}
 
-	return 0;
+	return STA_NOINIT;
 }
 
 
-extern "C" DRESULT disk_read(BYTE drv, BYTE *buff, DWORD sector, BYTE count)
+extern "C" DRESULT disk_read (BYTE pdrv, BYTE* buff, DWORD sector, UINT count)
 {
-	if (verbose)
-		Genode::log(__func__, ": disk_read(drv=", drv, ", buff=", buff, ", "
-		            "sector=", sector, ", count=", count, ") called.");
+	if (!_platform->drives[pdrv])
+		return RES_NOTRDY;
 
-	if (drv != 0) {
-		Genode::error("only one disk drive is supported at this time.");
-		return RES_ERROR;
-	}
+	Drive &drive = *_platform->drives[pdrv];
+
+	Genode::size_t const op_len = drive.block_size*count;
 
 	/* allocate packet-descriptor for reading */
-	Block::Packet_descriptor p(_source->alloc_packet(_blk_size),
+	Block::Packet_descriptor p(drive.tx()->alloc_packet(op_len),
 	                           Block::Packet_descriptor::READ, sector, count);
-	_source->submit_packet(p);
-	p = _source->get_acked_packet();
+	drive.tx()->submit_packet(p);
+	p = drive.tx()->get_acked_packet();
 
-	/* check for success of operation */
-	if (!p.succeeded()) {
-		Genode::error("could not read block(s)");
-		_source->release_packet(p);
-		return RES_ERROR;
+	DRESULT res;
+	if (p.succeeded() && p.size() >= op_len) {
+		Genode::memcpy(buff, drive.tx()->packet_content(p), op_len);
+		res = RES_OK;
+	} else {
+		Genode::error(__func__, " failed at sector ", sector, ", count ", count);
+		res = RES_ERROR;
 	}
 
-	memcpy(buff, _source->packet_content(p), count * _blk_size);
-
-	_source->release_packet(p);
-	return RES_OK;
+	drive.tx()->release_packet(p);
+	return res;
 }
 
 
 #if _READONLY == 0
-extern "C" DRESULT disk_write(BYTE drv, const BYTE *buff, DWORD sector, BYTE count)
+extern "C" DRESULT disk_write (BYTE pdrv, const BYTE* buff, DWORD sector, UINT count)
 {
-	if (verbose)
-		Genode::log(__func__, ": disk_write(drv=", drv, ", buff=", buff, ", "
-		            "sector=", sector, ", count=", count, ") called.");
+	if (!_platform->drives[pdrv])
+		return RES_NOTRDY;
 
-	if (drv != 0) {
-		Genode::error("only one disk drive is supported at this time.");
-		return RES_ERROR;
-	}
+	Drive &drive = *_platform->drives[pdrv];
+
+	Genode::size_t const op_len = drive.block_size*count;
 
 	/* allocate packet-descriptor for writing */
-	Block::Packet_descriptor p(_source->alloc_packet(_blk_size),
+	Block::Packet_descriptor p(drive.tx()->alloc_packet(op_len),
 	                           Block::Packet_descriptor::WRITE, sector, count);
 
-	memcpy(_source->packet_content(p), buff, count * _blk_size);
+	Genode::memcpy(drive.tx()->packet_content(p), buff, op_len);
 
-	_source->submit_packet(p);
-	p = _source->get_acked_packet();
+	drive.tx()->submit_packet(p);
+	p = drive.tx()->get_acked_packet();
 
-	/* check for success of operation */
-	if (!p.succeeded()) {
-		Genode::error("could not write block(s)");
-		_source->release_packet(p);
-		return RES_ERROR;
+	DRESULT res;
+	if (p.succeeded()) {
+		res = RES_OK;
+	} else {
+		Genode::error(__func__, " failed at sector ", sector, ", count ", count);
+		res = RES_ERROR;
 	}
 
-	_source->release_packet(p);
-	return RES_OK;
+	drive.tx()->release_packet(p);
+	return res;
 }
 #endif /* _READONLY */
 
 
-extern "C" DRESULT disk_ioctl(BYTE drv, BYTE ctrl, void *buff)
+extern "C" DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff)
 {
-	Genode::warning(__func__, "(drv=", drv, ", ctrl=", ctrl, ", buff=", buff, ") "
-	                "called - not yet implemented.");
-	return RES_OK;
+	if (!_platform->drives[pdrv])
+		return RES_NOTRDY;
+
+	Drive &drive = *_platform->drives[pdrv];
+
+	switch (cmd) {
+	case CTRL_SYNC:
+		drive.sync();
+		return RES_OK;
+
+	case GET_SECTOR_COUNT:
+		*((DWORD*)buff) = drive.block_count;
+		return RES_OK;
+
+	case GET_SECTOR_SIZE:
+		*((WORD*)buff) = drive.block_size;
+		return RES_OK;
+
+	case GET_BLOCK_SIZE	:
+		*((DWORD*)buff) = 1;
+		return RES_OK;
+
+	default:
+		return RES_PARERR;
+	}
 }
 
 
-extern "C" DWORD get_fattime(void)
+extern "C" DWORD get_fattime (void)
 {
-	Genode::warning(__func__, "() called - not yet implemented.");
-	return 0;
+	if (_platform->rtc.constructed()) {
+		Rtc::Timestamp const ts =
+			_platform->rtc->current_time();
+		return
+			((ts.year-1980) << 25) |
+			(ts.month       << 21) |
+			(ts.day         << 16) |
+			(ts.hour        << 11) |
+			(ts.minute      << 5) |
+			(ts.second      << 0);
+	} else {
+		return 0;
+	}
 }
-

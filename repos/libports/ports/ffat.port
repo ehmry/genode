@@ -1,18 +1,16 @@
 LICENSE   := BSD
-VERSION   := 0.07e
+VERSION   := 0.12c
 DOWNLOADS := ffat.archive
 
-#
-# Download archive from genode.org instead of the original location
-# 'http://elm-chan.org/fsw/ff/ff007e.zip' because the elm-chan webserver
-# does not like wget.
-#
-URL(ffat) := https://genode.org/files/ff007e.zip
-SHA(ffat) := 3379ad817e1c4f9993ae2722e86235ec85d7e36d
+URL(ffat) := http://www.elm-chan.org/fsw/ff/arc/ff12c.zip
+SHA(ffat) := 57710831f84c24e55514190a0d85b45c208e8e08
 DIR(ffat) := src/lib/ffat
-
-PATCHES := src/lib/ffat/config.patch
 
 DIRS := include/ffat
 DIR_CONTENT(include/ffat) := $(addprefix src/lib/ffat/src/,\
-                                         ff.h diskio.h integer.h ffconf.h)
+                                         ff.h diskio.h integer.h)
+
+_dirs:
+	$(VERBOSE)rm src/lib/ffat/src/ffconf.h
+
+# Please update include/ffat/ffconf.h when updating this port

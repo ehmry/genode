@@ -3,14 +3,14 @@
 #
 
 FFAT_PORT_DIR := $(call select_from_ports,ffat)
+FFAT_PORT_SRC_DIR := $(FFAT_PORT_DIR)/src/lib/ffat/src
+FFAT_LOCAL_SRC_DIR := $(REP_DIR)/src/lib/ffat
 
-INC_DIR += $(FFAT_PORT_DIR)/include
+INC_DIR += $(REP_DIR)/include/ffat $(FFAT_PORT_DIR)/include
 
-FFAT_DIR := $(FFAT_PORT_DIR)/src/lib/ffat
-
-SRC_C  = ff.c ccsbcs.c
+SRC_C  = ff.c unicode.c
 SRC_CC = diskio_block.cc
 
-vpath % $(REP_DIR)/src/lib/ffat/
-vpath % $(FFAT_DIR)/src
-vpath % $(FFAT_DIR)/src/option
+vpath % $(FFAT_LOCAL_SRC_DIR)
+vpath % $(FFAT_PORT_SRC_DIR)
+vpath % $(FFAT_PORT_SRC_DIR)/option
