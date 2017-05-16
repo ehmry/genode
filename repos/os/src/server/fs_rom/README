@@ -1,8 +1,11 @@
 The 'fs_rom' server translates the 'File_system' session interface to the
 'ROM' session' interface. Each request for a ROM file is handled by looking
-up an equally named file on the file system. If no such file could be found,
-the server watches the file system for the creation of the corresponding file.
-Furthermore, the server reflects file changes as signals to the ROM session.
+up an equally named file on the file system. By default the server will always
+return a valid session if no such file could be found and will watch the file
+system for the creation of the corresponding file. This behavior can be disabled
+with a policy containg a negative 'wait' attribute and the server will reject
+sessions for missing files. In both cases the server reflects file changes it
+detects as signals to the ROM session.
 
 Limitations
 -----------

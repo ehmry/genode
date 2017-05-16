@@ -16,6 +16,8 @@
 #include <file_system_session/connection.h>
 #include <file_system/util.h>
 #include <os/path.h>
+#include <os/session_policy.h>
+#include <base/attached_rom_dataspace.h>
 #include <base/attached_ram_dataspace.h>
 #include <root/component.h>
 #include <base/component.h>
@@ -278,17 +280,27 @@ class Fs_rom::Rom_session_component :
 		 *                  within the compound directory (in the case when
 		 *                  the requested file could not be found at session-
 		 *                  creation time)
+		 * \param wait      wait for missing files to appear
 		 */
 		Rom_session_component(Genode::Env &env,
-		                      File_system::Session &fs, const char *file_path)
+		                      File_system::Session &fs,
+		                      Genode::Session_label const &label,
+		                      bool wait)
 		:
 			_env(env), _fs(fs),
-			_file_path(file_path),
+			_file_path(label.string()),
 			_file_handle(_open_file(_fs, _file_path)),
 			_file_ds(env.ram(), env.rm(), 0) /* realloc later */
 		{
-			if (!_file_handle.valid())
-				_register_for_compound_dir_changes();
+			if (!_file_handle.valid()) {
+				if (!wait) {
+					Genode::log("'", _file_path, "' is unavailable");
+					throw Service_denied();
+				} else {
+					Genode::log("waiting for '", _file_path, "' to appear");
+					_register_for_compound_dir_changes();
+				}
+			}
 		}
 
 		/**
@@ -396,6 +408,9 @@ class Fs_rom::Rom_root : public Genode::Root_component<Fs_rom::Rom_session_compo
 	private:
 
 		Genode::Env          &_env;
+
+		Genode::Attached_rom_dataspace _config_rom { _env, "config" };
+
 		Genode::Heap          _heap { _env.ram(), _env.rm() };
 		Genode::Allocator_avl _fs_tx_block_alloc { &_heap };
 
@@ -411,9 +426,16 @@ class Fs_rom::Rom_root : public Genode::Root_component<Fs_rom::Rom_session_compo
 
 			Genode::log("request for ", label);
 
+			/* wait for missing files by default */
+			bool wait = true;
+			try {
+				Genode::Session_policy policy(label, _config_rom.xml());
+				wait = policy.attribute_value("wait", wait);
+			} catch (Session_policy::No_policy_defined) { }
+
 			/* create new session for the requested file */
 			Rom_session_component *session = new (md_alloc())
-				Rom_session_component(_env, _fs, module_name.string());
+				Rom_session_component(_env, _fs, module_name, wait);
 
 			_packet_handler.sessions.insert(session);
 			return session;
