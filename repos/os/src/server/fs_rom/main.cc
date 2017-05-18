@@ -229,22 +229,25 @@ class Fs_rom::Rom_session_component :
 					_file_handle, File_system::Packet_descriptor::CONTENT_CHANGED));
 
 			size_t const file_size = _file_handle.valid()
-			                       ? _fs.status(_file_handle).size : 0;
+				? _fs.status(_file_handle).size : 0;
 
-			/* allocate new RAM dataspace according to file size */
-			if (file_size > 0) {
-				try {
-					_file_seek = 0;
-					_file_ds.realloc(&_env.ram(), file_size);
-					_file_size = file_size;
-				} catch (...) {
+			if (!file_size) {
+				_register_for_compound_dir_changes();
+				return;
+			} else if (file_size > _file_ds.size()) {
+				/* allocate new RAM dataspace according to file size */
+				try { _file_ds.realloc(&_env.ram(), file_size); }
+				catch (...) {
 					Genode::error("couldn't allocate memory for file, empty result");;
 					return;
 				}
-			} else {
-				_register_for_compound_dir_changes();
-				return;
+			} else if (file_size < _file_ds.size()) {
+				/* wipe old content that will not be overwritten by new */
+				memset(_file_ds.local_addr<char>()+file_size, 0x00, _file_size - file_size);
 			}
+
+			_file_seek = 0;
+			_file_size = file_size;
 
 			/* read content from file */
 			Tx_source &source = *_fs.tx();

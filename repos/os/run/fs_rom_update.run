@@ -38,6 +38,7 @@ append config {
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
 	</default-route>
+	<default caps="64"/>
 	<start name="timer">
 		<resource name="RAM" quantum="1M"/>
 		<provides><service name="Timer"/></provides>
@@ -118,4 +119,4 @@ build_boot_image $boot_modules
 
 append qemu_args " -m 256 -nographic"
 
-run_genode_until {.*child "test-libc_vfs" exited with exit value 0.*} 60
+run_genode_until {.*<config iteration="4" />.*} 60
