@@ -65,7 +65,7 @@ class Vfs::Terminal_file_system : public Single_file_system
 				 *     this object in a signal handler.
 				 */
 
-				_io_handler.handle_io_response(_context);
+				_io_handler.handle_io_response(_context, READ_READY);
 				_context = nullptr;
 			}
 		};

@@ -332,7 +332,7 @@ extern void (*libc_select_notify)();
 
 struct Libc::Io_response_handler : Vfs::Io_response_handler
 {
-	void handle_io_response(Vfs::Vfs_handle::Context *) override
+	void handle_io_response(Vfs::Vfs_handle::Context *, Vfs::File_status) override
 	{
 		/* some contexts may have been deblocked from select() */
 		if (libc_select_notify)

@@ -22,12 +22,19 @@ namespace Vfs {
 	class Vfs_handle;
 	struct Io_response_handler;
 	struct File_io_service;
+
+	enum File_status {
+		READ_READY,     /* file entered a readable state */
+		WRITE_READY,    /* file entered a writeable state */
+		CONTENT_CHANGED /* file content has changed */
+	};
 }
 
 
 struct Vfs::Io_response_handler
 {
-	virtual void handle_io_response(Vfs::Vfs_handle::Context *context) = 0;
+	virtual void handle_io_response(Vfs::Vfs_handle::Context *context,
+	                                File_status status) = 0;
 };
 
 
@@ -163,6 +170,14 @@ struct Vfs::File_io_service
 	virtual void register_read_ready_sigh(Vfs_handle *vfs_handle,
 	                                      Signal_context_capability sigh)
 	{ }
+
+	/**
+	 * Request to be informed of changes to the content or status
+	 * of a file thru the Io_response_handler. Returns false if
+	 * the file is not inquireable.
+	 */
+	virtual bool inquire(Vfs_handle *vfs_handle, File_status status) {
+		return false; }
 };
 
 #endif /* _INCLUDE__VFS__FILE_IO_SERVICE_H_ */

@@ -1,7 +1,3 @@
-if {[have_spec arm]} {
-   assert_spec arm_v7
-}
-
 #
 # Build
 #
@@ -12,7 +8,7 @@ set build_components {
 	drivers/timer
 	server/dynamic_rom
 	server/fs_rom
-	server/ram_fs
+	server/vfs
 }
 
 build $build_components
@@ -24,7 +20,7 @@ create_boot_directory
 #
 append config {
 <config>
-	<default caps="128"/>
+	<default caps="256"/>
 	<parent-provides>
 		<service name="CPU"/>
 		<service name="IO_MEM"/>
@@ -32,6 +28,7 @@ append config {
 		<service name="IRQ"/>
 		<service name="LOG"/>
 		<service name="PD"/>
+		<service name="RAM"/>
 		<service name="RM"/>
 		<service name="ROM"/>
 	</parent-provides>
@@ -42,10 +39,11 @@ append config {
 		<resource name="RAM" quantum="1M"/>
 		<provides><service name="Timer"/></provides>
 	</start>
-	<start name="ram_fs">
+	<start name="vfs">
 		<resource name="RAM" quantum="10M"/>
 		<provides><service name="File_system"/></provides>
 		<config>
+			<vfs> <ram/> </vfs>
 			<policy label_prefix="rom_to_file" root="/" writeable="yes"/>
 			<policy label_prefix="fs_rom" root="/" writeable="no"/>
 		</config>
@@ -107,15 +105,17 @@ set boot_modules {
 	core ld.lib.so init
 	dynamic_rom
 	fs_rom
-	ram_fs
 	rom_logger
 	rom_to_file
 	test-libc_vfs
 	timer
+	vfs
 }
 
 build_boot_image $boot_modules
 
-append qemu_args "  -nographic"
+append qemu_args " -m 256 -nographic"
 
 run_genode_until {.*test iteration="4".*} 20
+
+exec rm -f bin/ext2.raw

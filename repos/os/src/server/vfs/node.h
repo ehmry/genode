@@ -36,9 +36,13 @@ namespace Vfs_server {
 
 	typedef Genode::Id_space<Node> Node_space;
 
+	/**
+	 * Used to back-reference the Session_component for
+	 * issuing notification packets
+	 */
 	struct File_io_handler
 	{
-		virtual void handle_file_io(File &file) = 0;
+		virtual void handle_file_io(File &file, File_status state) = 0;
 	};
 
 	/**
@@ -102,7 +106,7 @@ struct Vfs_server::Node : File_system::Node_base, Node_space::Element,
 	virtual size_t read(Vfs::File_system&, char*, size_t, seek_off_t) { return 0; }
 	virtual size_t write(Vfs::File_system&, char const*, size_t, seek_off_t) { return 0; }
 	virtual bool read_ready() { return false; }
-	virtual void handle_io_response() { }
+	virtual void handle_io_response(File_status state) { }
 };
 
 struct Vfs_server::Symlink : Node
@@ -156,7 +160,9 @@ class Vfs_server::File : public Node
 		Vfs::Vfs_handle *_handle;
 		char const      *_leaf_path; /* offset pointer to Node::_path */
 
+		/* XXX: may not be necissary to track these */
 		bool _notify_read_ready = false;
+		bool _notify_content_changed = false;
 
 		enum class Op_state {
 			IDLE, READ_QUEUED
@@ -180,10 +186,17 @@ class Vfs_server::File : public Node
 
 			assert_open(vfs.open(file_path, vfs_mode, &_handle, alloc));
 			_leaf_path       = vfs.leaf_path(path());
+			/* pass this File object back through the io handler */
 			_handle->context = this;
 		}
 
 		~File() { _handle->ds().close(_handle); }
+
+		void watch_changes()
+		{
+			if (_handle->fs().inquire(_handle, CONTENT_CHANGED))
+			_notify_content_changed = true;
+		}
 
 		void truncate(file_size_t size)
 		{
@@ -198,7 +211,11 @@ class Vfs_server::File : public Node
 			_notify_read_ready = requested;
 		}
 
-		bool notify_read_ready() const { return _notify_read_ready; }
+		bool notify_read_ready() const {
+			return _notify_read_ready; }
+
+		bool notify_content_changed() const {
+			return _notify_content_changed; }
 
 
 		/********************
@@ -305,9 +322,13 @@ class Vfs_server::File : public Node
 
 		bool read_ready() override { return _handle->fs().read_ready(_handle); }
 
-		void handle_io_response() override
+		/**
+		 * Called by the Io_response_handler
+		 */
+		void handle_io_response(File_status status) override
 		{
-			_file_io_handler.handle_file_io(*this);
+			/* _file_io_handler is the Session component */
+			_file_io_handler.handle_file_io(*this, status);
 		}
 };
 

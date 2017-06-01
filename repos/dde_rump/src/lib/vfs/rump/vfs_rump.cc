@@ -19,6 +19,7 @@
 #include <vfs/file_system_factory.h>
 #include <vfs/vfs_handle.h>
 #include <timer_session/connection.h>
+#include <timer/timeout.h>
 #include <os/path.h>
 
 extern "C" {
@@ -29,6 +30,8 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/event.h>
+#include <sys/time.h>
 #include <rump/rump.h>
 #include <rump/rump_syscalls.h>
 }
@@ -59,11 +62,19 @@ class Vfs::Rump_file_system : public File_system
 
 		typedef Genode::Path<MAX_PATH_LEN> Path;
 
-		class Rump_vfs_handle : public Vfs_handle
+		Genode::Env              &_env;
+		Vfs::Io_response_handler &_io_handler;
+
+		class Rump_vfs_handle;
+		typedef class Genode::List<Rump_vfs_handle> Rump_vfs_handles;
+
+		class Rump_vfs_handle
+			: public Vfs_handle, public Rump_vfs_handles::Element
 		{
 			private:
 
 				int _fd;
+				int _kq = -1;
 
 			public:
 
@@ -74,7 +85,41 @@ class Vfs::Rump_file_system : public File_system
 				~Rump_vfs_handle() { rump_sys_close(_fd); }
 
 				int fd() const { return _fd; }
+
+				bool informer() const { return _kq != -1; }
+
+				void kqueue_set()
+				{
+					if (_kq == -1) {
+						struct kevent ev;
+						struct timespec nullts = { 0, 0 };
+						EV_SET(&ev, _fd, EVFILT_VNODE,
+						       EV_ADD|EV_ENABLE|EV_CLEAR,
+						       NOTE_DELETE|NOTE_WRITE|NOTE_RENAME,
+						       0, 0);
+
+						_kq = rump_sys_kqueue();
+						rump_sys_kevent(_kq, &ev, 1, NULL, 0, &nullts);
+					}
+				}
+
+				bool kqueue_check()
+				{
+					if (_kq == -1) {
+						return false;
+					} else {
+						struct kevent ev;
+						struct timespec nullts = { 0, 0 };
+
+						int n = rump_sys_kevent(
+							_kq, NULL, 0, &ev, 1, &nullts);
+						return (n > 0);
+					}
+				}
 		};
+
+		/* handles to pass to I/O response handler */
+		Rump_vfs_handles _inform_handles;
 
 		/**
 		 * We define our own fs arg structure to fit all sizes, we assume that 'fspec'
@@ -140,9 +185,25 @@ class Vfs::Rump_file_system : public File_system
 			return DIRENT_OK;
 		}
 
+		/**
+		 * Iterate the open handles and run the I/O handler
+		 */
+		void _run_handler()
+		{
+			for (Rump_vfs_handle *h = _inform_handles.first();
+			     h; h = h->next())
+			{
+				if (h->kqueue_check())
+					_io_handler.handle_io_response(h->context, CONTENT_CHANGED);
+			}
+		}
+
 	public:
 
-		Rump_file_system(Xml_node const &config)
+		Rump_file_system(Genode::Env              &env,
+		                 Xml_node const           &config,
+		                 Vfs::Io_response_handler &handler)
+		: _env(env), _io_handler(handler)
 		{
 			typedef Genode::String<16> Fs_type;
 
@@ -180,8 +241,11 @@ class Vfs::Rump_file_system : public File_system
 		 ** Directory service interface **
 		 *********************************/
 
-		void sync(char const *path) override {
-			_rump_sync(); }
+		void sync(char const *path) override
+		{
+			_rump_sync();
+			_run_handler();
+		}
 
 		Genode::Dataspace_capability dataspace(char const *path) override
 		{
@@ -195,9 +259,9 @@ class Vfs::Rump_file_system : public File_system
 			char *local_addr = nullptr;
 			Ram_dataspace_capability ds_cap;
 			try {
-				ds_cap = env()->ram_session()->alloc(ds_size);
+				ds_cap = _env.ram().alloc(ds_size);
 
-				local_addr = env()->rm_session()->attach(ds_cap);
+				local_addr = _env.rm().attach(ds_cap);
 
 				enum { CHUNK_SIZE = 16U << 10 };
 
@@ -208,11 +272,11 @@ class Vfs::Rump_file_system : public File_system
 					i += n;
 				}
 
-				env()->rm_session()->detach(local_addr);
+				_env.rm().detach(local_addr);
 			} catch(...) {
 				if (local_addr)
-					env()->rm_session()->detach(local_addr);
-				env()->ram_session()->free(ds_cap);
+					_env.rm().detach(local_addr);
+				_env.ram().free(ds_cap);
 			}
 			rump_sys_close(fd);
 			return ds_cap;
@@ -222,7 +286,7 @@ class Vfs::Rump_file_system : public File_system
 		             Genode::Dataspace_capability ds_cap) override
 		{
 			if (ds_cap.valid())
-				env()->ram_session()->free(
+				_env.ram().free(
 					static_cap_cast<Genode::Ram_dataspace>(ds_cap));
 		}
 
@@ -309,8 +373,10 @@ class Vfs::Rump_file_system : public File_system
 			Rump_vfs_handle *rump_handle =
 				static_cast<Rump_vfs_handle *>(vfs_handle);
 
-			if (rump_handle)
-				destroy(vfs_handle->alloc(), rump_handle);
+			if (rump_handle->informer())
+				_inform_handles.remove(rump_handle);
+			destroy(vfs_handle->alloc(), rump_handle);
+			_run_handler();
 		}
 
 		Stat_result stat(char const *path, Stat &stat)
@@ -487,6 +553,15 @@ class Vfs::Rump_file_system : public File_system
 			}
 			return FTRUNCATE_OK;
 		}
+
+		bool inquire(Vfs_handle *vfs_handle, File_status status) override {
+			Rump_vfs_handle *handle =
+				static_cast<Rump_vfs_handle *>(vfs_handle);
+			if (!handle->informer())
+				_inform_handles.insert(handle);
+			handle->kqueue_set();
+			return true;
+		}
 };
 
 
@@ -494,8 +569,8 @@ class Rump_factory : public Vfs::File_system_factory
 {
 	private:
 
-		Timer::Connection                       _timer;
-		Genode::Io_signal_handler<Rump_factory> _sync_handler;
+		Timer::Connection                    _timer;
+		Genode::Signal_handler<Rump_factory> _sync_handler;
 
 		void _sync() { _rump_sync(); }
 
@@ -520,18 +595,18 @@ class Rump_factory : public Vfs::File_system_factory
 			rump_sys_umask(S_ISUID|S_ISGID|S_ISVTX);
 
 			/* start syncing */
-			enum { TEN_SEC = 10*1000*1000 };
+			enum { TWO_SEC = 2*1000*1000 };
 			_timer.sigh(_sync_handler);
-			_timer.trigger_periodic(TEN_SEC);
+			_timer.trigger_periodic(TWO_SEC);
 
 		}
 
 		Vfs::File_system *create(Genode::Env       &env,
 		                         Genode::Allocator &alloc,
 		                         Genode::Xml_node   config,
-		                         Vfs::Io_response_handler &) override
+		                         Vfs::Io_response_handler &handler) override
 		{
-			return new (alloc) Vfs::Rump_file_system(config);
+			return new (alloc) Vfs::Rump_file_system(env, config, handler);
 		}
 };
 

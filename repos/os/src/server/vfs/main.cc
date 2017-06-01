@@ -194,8 +194,15 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				break;
 
 			case Packet_descriptor::CONTENT_CHANGED:
-				/* The VFS does not track file changes yet */
-				throw Dont_ack();
+				try {
+					_apply(static_cast<File_handle>(packet.handle().value), [] (File &node) {
+						node.watch_changes();
+						throw Dont_ack();
+					});
+				}
+				catch (Dont_ack) { throw; }
+				catch (...) { }
+				break;
 			}
 
 			packet.length(res_length);
@@ -379,19 +386,38 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			_ram.upgrade(new_quota);
 		}
 
-		/* File_io_handler interface */
-		void handle_file_io(File &file) override
+		/**
+		 *  File_io_handler interface, triggered by the Io_response_handler
+		 */
+		void handle_file_io(File &file, File_status status) override
 		{
-			if (file.notify_read_ready() && file.read_ready()
-			 && tx_sink()->ready_to_ack()) {
-				Packet_descriptor packet(Packet_descriptor(),
-				                         Node_handle(file.id().value),
-				                         Packet_descriptor::READ_READY,
-				                         0, 0);
-				tx_sink()->acknowledge_packet(packet);
-				file.notify_read_ready(false);
+			/* XXX: dropping notifications during congestion */
+			if (!tx_sink()->ready_to_ack())
+				return;
+
+			switch (status) {
+			case READ_READY:
+				if (file.notify_read_ready()) {
+					Packet_descriptor packet(Packet_descriptor(),
+					                         Node_handle(file.id().value),
+					                         Packet_descriptor::READ_READY,
+					                         0, 0);
+					tx_sink()->acknowledge_packet(packet);
+					file.notify_read_ready(false);
+				}
+				break;
+
+			case CONTENT_CHANGED:
+				if (file.notify_content_changed()) {
+					Packet_descriptor packet(Packet_descriptor(),
+					                         Node_handle(file.id().value),
+					                         Packet_descriptor::CONTENT_CHANGED,
+					                         0, 0);
+					tx_sink()->acknowledge_packet(packet);
+					file.notify_read_ready(false);
+				}
+				break;
 			}
-			_process_packets();
 		}
 
 		/***************************
@@ -595,10 +621,11 @@ struct Vfs_server::Io_response_handler : Vfs::Io_response_handler
 	Io_response_handler(Session_registry &session_registry)
 	: _session_registry(session_registry) { }
 
-	void handle_io_response(Vfs::Vfs_handle::Context *context) override
+	void handle_io_response(Vfs::Vfs_handle::Context *context,
+	                        File_status status) override
 	{
 		if (Vfs_server::Node *node = static_cast<Vfs_server::Node *>(context))
-			node->handle_io_response();
+			node->handle_io_response(status);
 	}
 };
 
