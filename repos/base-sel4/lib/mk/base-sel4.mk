@@ -1,5 +1,7 @@
 include $(BASE_DIR)/lib/mk/base.inc
 
+CC_OPT += -Wno-unused-variable
+
 SRC_CC += capability_space.cc
 SRC_CC += thread_start.cc thread_init.cc
 SRC_CC += cache.cc

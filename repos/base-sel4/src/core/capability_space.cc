@@ -99,7 +99,7 @@ Capability_space::create_rpc_obj_cap(Native_capability ep_cap,
 		seL4_CNode     const src_root   = seL4_CapInitThreadCNode;
 		seL4_Word      const src_index  = ep_sel.value();
 		uint8_t        const src_depth  = 32;
-		seL4_CapRights const rights     = seL4_AllRights;
+		seL4_CapRights_t const rights   = seL4_AllRights;
 		seL4_CapData_t const badge      = seL4_CapData_Badge_new(rpc_obj_key.value());
 
 		int const ret = seL4_CNode_Mint(service,

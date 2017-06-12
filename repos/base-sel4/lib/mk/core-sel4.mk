@@ -1,5 +1,7 @@
 GEN_CORE_DIR = $(BASE_DIR)/src/core
 
+CC_OPT      += -Wno-unused-variable
+
 SRC_CC      += \
                main.cc \
                pd_session_component.cc \
