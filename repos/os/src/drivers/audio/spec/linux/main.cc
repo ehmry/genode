@@ -306,4 +306,8 @@ struct Audio_out::Main
  ** Component **
  ***************/
 
-void Component::construct(Genode::Env &env) { static Audio_out::Main main(env); }
+void Component::construct(Genode::Env &env)
+{
+	try { static Audio_out::Main main(env); }
+	catch (...) { env.parent().exit(-1); }
+}

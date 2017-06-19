@@ -528,12 +528,24 @@ class Init::Child : Child_policy, Routed_service::Wakeup
 
 		void exit(int exit_value) override
 		{
+			if (_verbose.enabled())
+				log("child \"", _unique_name, "\" exit with ", exit_value);
+
 			try {
 				if (_start_node->xml().sub_node("exit").attribute_value("propagate", false)) {
 					_env.parent().exit(exit_value);
 					return;
 				}
 			} catch (...) { }
+
+			/* Destroy services provided by this child */
+			_child_services.for_each([&] (Routed_service &service) {
+				if (_provided_by_this(service)) {
+					if (_verbose.enabled())
+						log("  rescinds service ", service.name());
+					destroy(_alloc, &service);
+				}
+			});
 
 			/*
 			 * Print a message as the exit is not handled otherwise. There are
