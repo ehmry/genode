@@ -9,4 +9,4 @@ LIBS += syscall-sel4
 
 CC_OPT += -Wno-unused-variable
 
-include $(BASE_DIR)/lib/mk/spec/x86_32/startup.inc
+include $(BASE_DIR)/lib/mk/spec/x86_64/startup.inc
