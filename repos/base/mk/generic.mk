@@ -97,7 +97,10 @@ else
 NIM_MAKEFILES := $(foreach X,$(SRC_NIM),$(X).mk)
 NIM_ARGS  = --compileOnly --os:genode --cpu:$(NIM_CPU)
 NIM_ARGS += --verbosity:0 --hint[Processing]:off --nimcache:.
-NIM_ARGS += $(NIM_OPT)
+
+NIM_PATH_ARGS = $(foreach REP,$(REPOSITORIES),--path:$(REP)/include/nim)
+
+NIM_ARGS += $(NIM_PATH_ARGS) $(NIM_OPT)
 
 # Generate the C++ sources and compilation info
 #
