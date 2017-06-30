@@ -24,6 +24,9 @@
 /* local includes */
 #include <directory.h>
 
+#include <fcntl.h>
+#include <stdio.h>
+
 
 namespace File_system {
 	struct Main;
@@ -297,9 +300,21 @@ class File_system::Session_component : public Session_rpc_object
 			file->truncate(size);
 		}
 
-		void move(Dir_handle, Name const &, Dir_handle, Name const &)
+		void move(Dir_handle from_dir_handle, Name const &from_name,
+		          Dir_handle   to_dir_handle, Name const   &to_name)
 		{
-			Genode::error(__func__, " not implemented");
+			Directory *from_dir = _handle_registry.lookup_and_lock(from_dir_handle);
+			Node_lock_guard from_dir_guard(from_dir);
+			Directory *to_dir = _handle_registry.lookup_and_lock(to_dir_handle);
+			Node_lock_guard to_dir_guard(to_dir);
+
+			char const *from_str = from_name.string();
+			char const   *to_str =   to_name.string();
+
+			int r = renameat(from_dir->fd(), from_str,
+			                   to_dir->fd(),   to_str);
+			if (r != 0)
+				throw Permission_denied();
 		}
 
 		/**

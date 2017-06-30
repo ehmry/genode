@@ -89,6 +89,8 @@ class File_system::Directory : public Node
 			closedir(_fd);
 		}
 
+		int fd() const { return dirfd(_fd); }
+
 		/* FIXME returned file node must be locked */
 		File * file(char const *name, Mode mode, bool create)
 		{
