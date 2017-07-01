@@ -51,7 +51,7 @@ typedef          long goffset;
 #define G_GOFFSET_CONSTANT(val) G_GINT64_CONSTANT(val)
 
 #define GLIB_SIZEOF_VOID_P 8
-#define GLIB_SIZEOF_LONG   4
+#define GLIB_SIZEOF_LONG   8
 #define GLIB_SIZEOF_SIZE_T 8
 
 #define GPOINTER_TO_INT(p)	((gint64)   (p))

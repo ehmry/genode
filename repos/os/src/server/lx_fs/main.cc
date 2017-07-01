@@ -285,9 +285,16 @@ class File_system::Session_component : public Session_rpc_object
 			Genode::error(__func__, " not implemented");
 		}
 
-		void unlink(Dir_handle, Name const &)
+		void unlink(Dir_handle handle, Name const &name)
 		{
-			Genode::error(__func__, " not implemented");
+			if (!_writable)
+				throw Permission_denied();
+
+			if (!valid_name(name.string()))
+				throw Invalid_name();
+
+			Directory *dir = _handle_registry.lookup_and_lock(handle);
+			dir->unlink(name.string());
 		}
 
 		void truncate(File_handle file_handle, file_size_t size)
@@ -303,6 +310,12 @@ class File_system::Session_component : public Session_rpc_object
 		void move(Dir_handle from_dir_handle, Name const &from_name,
 		          Dir_handle   to_dir_handle, Name const   &to_name)
 		{
+			if (!_writable)
+				throw Permission_denied();
+
+			if (!valid_name(from_name.string()) || !valid_name(to_name.string()))
+				throw Invalid_name();
+
 			Directory *from_dir = _handle_registry.lookup_and_lock(from_dir_handle);
 			Node_lock_guard from_dir_guard(from_dir);
 			Directory *to_dir = _handle_registry.lookup_and_lock(to_dir_handle);
@@ -313,8 +326,11 @@ class File_system::Session_component : public Session_rpc_object
 
 			int r = renameat(from_dir->fd(), from_str,
 			                   to_dir->fd(),   to_str);
-			if (r != 0)
+			if (r != 0) {
+				int err = errno;
+				Genode::error(__func__, ": ", (char const *)strerror(err));
 				throw Permission_denied();
+			}
 		}
 
 		/**

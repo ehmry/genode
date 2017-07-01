@@ -33,5 +33,11 @@ void Component::construct(Genode::Env &env)
 	String<32> hex(Hex(3));
 	log("String(Hex(3)):     ", hex);
 
+	log("sizeof size_t: ", sizeof(size_t));
+	log("sizeof addr_t: ", sizeof(addr_t));
+	log("sizeof off_t: ", sizeof(off_t));
+	log("sizeof long: ", sizeof(long));
+
 	log("Test done.");
+	env.parent().exit(0);
 }

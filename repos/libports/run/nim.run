@@ -1,13 +1,17 @@
+create_boot_directory
+
+import_from_depot \
+	genodelabs/src/[base_src] \
+	genodelabs/src/init \
+	genodelabs/src/dynamic_rom \
+	genodelabs/src/libc \
+
 set build_components {
-	core init
-	drivers/timer
 	drivers/rtc
 	test/nim
 }
 
 build $build_components
-
-create_boot_directory
 
 set config {
 <config>
@@ -32,7 +36,31 @@ set config {
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Rtc"/> </provides>
 	</start>
-	<start name="test-nim">
+	<start name="dynamic_rom">
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="ROM"/></provides>
+		<config verbose="no">
+			<rom name="dynamic_test_rom">
+				<inline description="iteration 1">
+					<iteration n="1" />
+				</inline>
+				<sleep milliseconds="1000" />
+				<inline description="iteration 2">
+					<iteration n="2" />
+				</inline>
+				<sleep milliseconds="1000" />
+				<inline description="iteration 3">
+					<iteration n="3" />
+				</inline>
+				<sleep milliseconds="1000" />
+				<inline description="iteration 4">
+					<iteration n="4" />
+				</inline>
+				<sleep milliseconds="1000" />
+			</rom>
+		</config>
+	</start>
+	<start name="test-nim" caps="128">
 		<resource name="RAM" quantum="10M"/>
 		<config>
 			<vfs>
@@ -40,6 +68,11 @@ set config {
 			</vfs>
 			<libc stdout="/log" stderr="/log" rtc="/rtc"/>
 		</config>
+		<route>
+			<service name="ROM" label="dynamic_test_rom">
+				<child name="dynamic_rom"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
 	</start>
 </config>
 }
@@ -47,11 +80,8 @@ set config {
 install_config $config
 
 set boot_modules {
-	core init ld.lib.so
-	libc.lib.so
 	rtc_drv
 	test-nim
-	timer
 }
 
 build_boot_image $boot_modules

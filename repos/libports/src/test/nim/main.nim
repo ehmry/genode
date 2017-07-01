@@ -109,4 +109,22 @@ suite "time":
 suite "garbage collector":
   echo GC_getStatistics()
 
+import asyncdispatch, rom, os, streams
+suite "ROM":
+
+  test "config":
+    let
+      cb = proc (s: Stream) = echo s.readAll
+      configRom = newRomClient("config", cb)
+    trigger configRom
+    close configRom
+
+  test "dynamic":
+    var
+      cb = proc (s: Stream) = echo s.readAll
+      dynamicRom = newRomClient("dynamic_test_rom", cb)
+    for i in 1..4:
+      echo "polling"
+      poll()
+
 echo "done"

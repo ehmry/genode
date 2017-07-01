@@ -18,6 +18,7 @@
 
 #include <lx_util.h>
 
+#include <string.h>
 
 namespace File_system {
 	using namespace Genode;
@@ -174,7 +175,7 @@ class File_system::Directory : public Node
 				return 0;
 			}
 
-			strncpy(e->name, dent->d_name, sizeof(e->name));
+			Genode::strncpy(e->name, dent->d_name, sizeof(e->name));
 
 			return sizeof(Directory_entry);
 		}
@@ -193,6 +194,20 @@ class File_system::Directory : public Node
 			while (readdir(_fd)) ++num;
 
 			return num;
+		}
+
+		void unlink(char const *name)
+		{
+			Path path(name, _path.base());
+			if (::unlink(path.base()) != 0) {
+				int err = errno;
+				switch (err) {
+				case ENOENT: throw Lookup_failed();
+				default:
+					Genode::error((char const *)strerror(err));
+					throw Permission_denied();
+				}
+			}
 		}
 };
 
