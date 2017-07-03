@@ -1,0 +1,22 @@
+LICENSE   := MIT
+VERSION   := git
+DOWNLOADS := pixman.git
+
+URL(pixman) := git://anongit.freedesktop.org/git/pixman.git
+REV(pixman) := tags/pixman-0.34.0
+DIR(pixman) := src/lib/pixman
+
+DIRS := include/pixman
+DIR_CONTENT(include/pixman) := src/lib/pixman/pixman/pixman.h
+
+default: include/pixman/pixman-version.h
+
+include/pixman/pixman-version.h: src/lib/pixman/pixman/pixman-version.h.in
+	@$(MSG_GENERATE)$@
+	$(VERBOSE)sed \
+		-e "s/@PIXMAN_VERSION_MAJOR@/0/"\
+		-e "s/@PIXMAN_VERSION_MINOR@/34/"\
+		-e "s/@PIXMAN_VERSION_MICRO@/0/"\
+		$< > $@
+
+src/lib/pixman/pixman/pixman-version.h.in: $(DOWNLOADS)
