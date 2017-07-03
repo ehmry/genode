@@ -20,7 +20,7 @@
 #include <base/stdint.h>
 #include <base/signal.h>
 
-#include <ram_session/ram_session.h>
+#include <base/ram_allocator.h>
 #include <block_session/rpc_object.h>
 
 namespace Block {
@@ -83,7 +83,7 @@ class Block::Driver
 {
 	private:
 
-		Genode::Ram_session &_ram_session;
+		Genode::Ram_allocator &_ram_alloc;
 
 		Driver_session_base *_session = nullptr;
 
@@ -98,8 +98,8 @@ class Block::Driver
 		/**
 		 * Constructor
 		 */
-		Driver(Genode::Ram_session &ram_session)
-		: _ram_session(ram_session) { }
+		Driver(Genode::Ram_allocator &ram_alloc)
+		: _ram_alloc(ram_alloc) { }
 
 		/**
 		 * Destructor
@@ -209,7 +209,7 @@ class Block::Driver
 		 */
 		virtual Genode::Ram_dataspace_capability
 		alloc_dma_buffer(Genode::size_t size) {
-			return _ram_session.alloc(size); }
+			return _ram_alloc.alloc(size); }
 
 		/**
 		 * Free buffer which is suitable for DMA.
@@ -217,7 +217,7 @@ class Block::Driver
 		 * Note: has to be overriden by DMA-capable devices
 		 */
 		virtual void free_dma_buffer(Genode::Ram_dataspace_capability c) {
-			return _ram_session.free(c); }
+			return _ram_alloc.free(c); }
 
 		/**
 		 * Synchronize with device.
