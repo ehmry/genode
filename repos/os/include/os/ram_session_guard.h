@@ -16,6 +16,7 @@
 
 #include <base/ram_allocator.h>
 #include <pd_session/capability.h>
+#include <dataspace/client.h>
 
 namespace Genode { struct Ram_session_guard; }
 
@@ -68,6 +69,13 @@ class Genode::Ram_session_guard : public Genode::Ram_allocator
 			return true;
 		}
 
+		/**
+		 * Calculate available RAM
+		 */
+		Ram_quota avail() const
+		{
+			return Ram_quota { _quota - _used };
+		}
 
 		/*****************************
 		 ** Ram_allocator interface **
@@ -79,12 +87,17 @@ class Genode::Ram_session_guard : public Genode::Ram_allocator
 			if (_used + size <= _used || _used + size > _quota)
 				throw Out_of_ram();
 
-			Ram_dataspace_capability cap = _ram_alloc.alloc(size, cached);
-
-			if (cap.valid())
-				_used += size;
-
-			return cap;
+			try {
+				Ram_dataspace_capability cap = _ram_alloc.alloc(size, cached);
+				if (cap.valid())
+					_used += size;
+				return cap;
+			} catch (Out_of_ram) {
+				warning("RAM guard backend exhausted, reducing quota");
+				/* leave room for a few smaller allocations */
+				_quota -= (_quota - _used) / 2;
+				throw;
+			}
 		}
 
 		void free(Ram_dataspace_capability ds) override
