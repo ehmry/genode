@@ -15,6 +15,7 @@
 #include <block_session/connection.h>
 #include <block/component.h>
 #include <os/packet_allocator.h>
+#include <os/ram_session_guard.h>
 
 #include "chunk.h"
 
@@ -115,6 +116,8 @@ class Driver : public Block::Driver
 	private:
 
 		Genode::Env                      &_env;
+		Genode::Ram_session_guard         _ram_guard; /* RAM allocator      */
+		Genode::Heap                      _heap;      /* guarded heap       */
 		Genode::Tslab<Request, SLAB_SZ>   _r_slab;    /* slab for requests  */
 		Genode::List<Request>             _r_list;    /* list of requests   */
 		Genode::Packet_allocator          _alloc;     /* packet allocator   */
@@ -125,7 +128,8 @@ class Driver : public Block::Driver
 		Chunk_level_0                     _cache;     /* chunk hierarchy    */
 		Genode::Io_signal_handler<Driver> _source_ack;
 		Genode::Io_signal_handler<Driver> _source_submit;
-		Genode::Io_signal_handler<Driver> _yield;
+		Genode::Io_signal_handler<Driver> _resource_handler;
+		Genode::Io_signal_handler<Driver> _yield_handler;
 
 		Driver(Driver const&);            /* singleton pattern */
 		Driver& operator=(Driver const&); /* singleton pattern */
@@ -310,6 +314,31 @@ class Driver : public Block::Driver
 		}
 
 		/*
+		 * Signal handler for parent resource upgrade
+		 */
+		void _parent_resources()
+		{
+			using namespace Genode;
+
+			Ram_quota parent_avail = _env.pd().avail_ram();
+			Ram_quota guard_avail = _ram_guard.avail();
+
+			if (parent_avail.value > guard_avail.value) {
+				/* more ram available */
+				_ram_guard.upgrade(parent_avail.value - guard_avail.value);
+			} else {
+				/* guard is over-provisioned */
+				_ram_guard.withdraw(guard_avail.value - parent_avail.value);
+			}
+
+			/* beg the parent for RAM until it stops responding */
+			Ram_quota parent_quota = _env.pd().ram_quota();
+			Parent::Resource_args args(String<64>(
+				"ram_quota=", parent_quota.value / 4));
+			_env.parent().resource_request(args);
+		}
+
+		/*
 		 * Signal handler for yield requests of the parent
 		 */
 		void _parent_yield()
@@ -322,6 +351,7 @@ class Driver : public Block::Driver
 
 			/* flush the requested amount of RAM from cache */
 			POLICY::flush(requested_ram_quota);
+			_ram_guard.withdraw(requested_ram_quota);
 			_env.parent().yield_response();
 		}
 
@@ -332,25 +362,29 @@ class Driver : public Block::Driver
 		 *
 		 * \param ep  server entrypoint
 		 */
-		Driver(Genode::Env &env, Genode::Heap &heap)
-		: Block::Driver(env.ram()),
+		Driver(Genode::Env &env)
+		: Block::Driver(env.pd()),
 		  _env(env),
-		  _r_slab(&heap),
-		  _alloc(&heap, CACHE_BLK_SIZE),
+		  _ram_guard(env.pd(), env.pd().ram_quota().value),
+		  _heap(_ram_guard, _env.rm()),
+		  _r_slab(_heap),
+		  _alloc(&_heap, CACHE_BLK_SIZE),
 		  _blk(_env, &_alloc, Block::Session::TX_QUEUE_SIZE*CACHE_BLK_SIZE),
 		  _blk_sz(0),
 		  _blk_cnt(0),
-		  _cache(heap, 0),
+		  _cache(_heap, 0),
 		  _source_ack(env.ep(), *this, &Driver::_ack_avail),
 		  _source_submit(env.ep(), *this, &Driver::_ready_to_submit),
-		  _yield(env.ep(), *this, &Driver::_parent_yield)
+		  _resource_handler(env.ep(), *this, &Driver::_parent_resources),
+		  _yield_handler(env.ep(), *this, &Driver::_parent_yield)
 		{
 			using namespace Genode;
 
 			_blk.info(&_blk_cnt, &_blk_sz, &_ops);
 			_blk.tx_channel()->sigh_ack_avail(_source_ack);
 			_blk.tx_channel()->sigh_ready_to_submit(_source_submit);
-			env.parent().yield_sigh(_yield);
+			env.parent().resource_avail_sigh(_resource_handler);
+			env.parent().yield_sigh(_yield_handler);
 
 			if (CACHE_BLK_SIZE % _blk_sz) {
 				error("only devices that block size is divider of ",
@@ -360,6 +394,9 @@ class Driver : public Block::Driver
 
 			/* truncate chunk structure to real size of the device */
 			_cache.truncate(_blk_sz*_blk_cnt);
+
+			/* adjust the guard quota after session allocation is complete */
+			Genode::Signal_transmitter(_resource_handler).submit();
 		}
 
 		~Driver()
@@ -367,6 +404,11 @@ class Driver : public Block::Driver
 			/* when session gets closed, synchronize and flush the cache */
 			_sync();
 			POLICY::flush();
+
+			/* revert the resource handlers */
+			Genode::Signal_context_capability null_cap;
+			_env.parent().yield_sigh(null_cap);
+			_env.parent().resource_avail_sigh(null_cap);
 		}
 
 		Block::Session_client* blk()    { return &_blk;   }

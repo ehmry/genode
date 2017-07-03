@@ -50,35 +50,35 @@ struct Main
 	template <typename T>
 	struct Factory : Block::Driver_factory
 	{
-		Genode::Env  &env;
-		Genode::Heap &heap;
+		Genode::Env  &_env;
 
-		Factory(Genode::Env &env, Genode::Heap &heap) : env(env), heap(heap) {}
+		Genode::Constructible<::Driver<T>> _driver;
+
+		Factory(Genode::Env &env) : _env(env) {}
 
 		Block::Driver *create()
 		{
-			driver = new (&heap) ::Driver<T>(env, heap);
+			if (_driver.constructed())
+				throw Genode::Service_denied();
+			_driver.construct(_env);
+			driver = &(*_driver);
 			return driver;
 		}
 
-		void destroy(Block::Driver *driver) {
-			Genode::destroy(&heap, static_cast<::Driver<T>*>(driver)); }
+		void destroy(Block::Driver *d)
+		{
+			if (d == &(*_driver))
+				_driver.destruct();
+		}
 	};
 
-	void resource_handler() { }
-
 	Genode::Env                 &env;
-	Genode::Heap                 heap    { env.ram(), env.rm()     };
-	Factory<Lru_policy>          factory { env, heap               };
+	Genode::Heap                 heap    { env.pd(), env.rm()      };
+	Factory<Lru_policy>          factory { env                     };
 	Block::Root                  root    { env.ep(), heap, env.rm(), factory };
-	Genode::Signal_handler<Main> resource_dispatcher {
-		env.ep(), *this, &Main::resource_handler };
 
-	Main(Genode::Env &env) : env(env)
-	{
-		env.parent().announce(env.ep().manage(root));
-		env.parent().resource_avail_sigh(resource_dispatcher);
-	}
+	Main(Genode::Env &env) : env(env) {
+		env.parent().announce(env.ep().manage(root)); }
 };
 
 
