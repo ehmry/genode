@@ -1,0 +1,20 @@
+LICENSE   := MIT
+VERSION   := git
+DOWNLOADS := cairo.git
+
+URL(cairo) := git://anongit.freedesktop.org/git/cairo.git
+REV(cairo) := tags/1.15.6
+DIR(cairo) := src/lib/cairo
+
+DIRS := include/cairo
+DIR_CONTENT(include/cairo) := \
+	src/lib/cairo/src/cairo.h \
+	src/lib/cairo/src/cairo-deprecated.h \
+
+default: include/cairo/cairo-version.h
+
+include/cairo/cairo-version.h:
+	@$(MSG_GENERATE)$@
+	$(VERBOSE)echo \#define CAIRO_VERSION_MAJOR 1  >  $@
+	$(VERBOSE)echo \#define CAIRO_VERSION_MINOR 15 >>  $@
+	$(VERBOSE)echo \#define CAIRO_VERSION_MICRO 6  >>  $@
