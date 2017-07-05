@@ -131,9 +131,9 @@ void Platform::_init_allocators()
 	_unused_virt_alloc.add_range(_vm_base, _vm_size);
 
 	/* remove core image from core's virtual address allocator */
-	addr_t const modules_start = reinterpret_cast<addr_t>(&_boot_modules_binaries_begin);
-	addr_t const core_virt_beg = trunc_page((addr_t)&_prog_img_beg),
-	             core_virt_end = round_page((addr_t)&_prog_img_end);
+	addr_t const modules_start  = reinterpret_cast<addr_t>(&_boot_modules_binaries_begin);
+	addr_t const core_virt_beg  = trunc_page((addr_t)&_prog_img_beg),
+	             core_virt_end  = round_page((addr_t)&_prog_img_end);
 	addr_t const image_elf_size = core_virt_end - core_virt_beg;
 
 	_unused_virt_alloc.remove_range(core_virt_beg, image_elf_size);
@@ -411,9 +411,11 @@ Platform::Platform()
 	Cap_sel lock_sel (INITIAL_SEL_LOCK);
 	Cap_sel core_sel = _core_sel_alloc.alloc();
 
-	addr_t phys_addr = Untyped_memory::alloc_page(*ram_alloc());
-	seL4_Untyped const service     = Untyped_memory::untyped_sel(phys_addr).value();
-	create<Notification_kobj>(service, core_cnode().sel(), core_sel);
+	{
+		addr_t       const phys_addr = Untyped_memory::alloc_page(*ram_alloc());
+		seL4_Untyped const service   = Untyped_memory::untyped_sel(phys_addr).value();
+		create<Notification_kobj>(service, core_cnode().sel(), core_sel);
+	}
 
 	/* mint a copy of the notification object with badge of lock_sel */
 	_core_cnode.mint(_core_cnode, core_sel, lock_sel);
@@ -432,11 +434,14 @@ Platform::Platform()
 
 	/* add some minor virtual region for dynamic usage by core */
 	addr_t const virt_size = 32 * 1024 * 1024;
-	void * virt_ptr = 0;
+	void * virt_ptr = nullptr;
 	if (_unused_virt_alloc.alloc(virt_size, &virt_ptr)) {
+
 		addr_t const virt_addr = (addr_t)virt_ptr;
+
 		/* add to available virtual region of core */
 		_core_mem_alloc.virt_alloc()->add_range(virt_addr, virt_size);
+
 		/* back region by page tables */
 		_core_vm_space.alloc_page_tables(virt_addr, virt_size);
 	}

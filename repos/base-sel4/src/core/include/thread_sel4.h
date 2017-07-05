@@ -54,33 +54,39 @@ namespace Genode {
 
 void Genode::Thread_info::init(addr_t const utcb_virt_addr)
 {
-	Platform &platform = *platform_specific();
+	Platform        &platform   = *platform_specific();
 	Range_allocator &phys_alloc = *platform.ram_alloc();
 
 	/* create IPC buffer of one page */
 	ipc_buffer_phys = Untyped_memory::alloc_page(phys_alloc);
 	Untyped_memory::convert_to_page_frames(ipc_buffer_phys, 1);
 
-	addr_t phys_addr = Untyped_memory::alloc_page(phys_alloc);
-	seL4_Untyped const service     = Untyped_memory::untyped_sel(phys_addr).value();
-
 	/* allocate TCB within core's CNode */
-	tcb_sel = platform.core_sel_alloc().alloc();
-	create<Tcb_kobj>(service, platform.core_cnode().sel(), tcb_sel);
+	{
+		addr_t       const phys_addr = Untyped_memory::alloc_page(phys_alloc);
+		seL4_Untyped const service   = Untyped_memory::untyped_sel(phys_addr).value();
 
-	phys_addr = Untyped_memory::alloc_page(phys_alloc);
-	seL4_Untyped const service2  = Untyped_memory::untyped_sel(phys_addr).value();
+		tcb_sel = platform.core_sel_alloc().alloc();
+		create<Tcb_kobj>(service, platform.core_cnode().sel(), tcb_sel);
+	}
 
 	/* allocate synchronous endpoint within core's CNode */
-	ep_sel = platform.core_sel_alloc().alloc();
-	create<Endpoint_kobj>(service2, platform.core_cnode().sel(), ep_sel);
+	{
+		addr_t       const phys_addr = Untyped_memory::alloc_page(phys_alloc);
+		seL4_Untyped const service   = Untyped_memory::untyped_sel(phys_addr).value();
 
-	phys_addr = Untyped_memory::alloc_page(phys_alloc);
-	seL4_Untyped const service3  = Untyped_memory::untyped_sel(phys_addr).value();
+		ep_sel = platform.core_sel_alloc().alloc();
+		create<Endpoint_kobj>(service, platform.core_cnode().sel(), ep_sel);
+	}
 
 	/* allocate asynchronous object within core's CSpace */
-	lock_sel = platform.core_sel_alloc().alloc();
-	create<Notification_kobj>(service3, platform.core_cnode().sel(), lock_sel);
+	{
+		addr_t       const phys_addr = Untyped_memory::alloc_page(phys_alloc);
+		seL4_Untyped const service   = Untyped_memory::untyped_sel(phys_addr).value();
+
+		lock_sel = platform.core_sel_alloc().alloc();
+		create<Notification_kobj>(service, platform.core_cnode().sel(), lock_sel);
+	}
 
 	/* assign IPC buffer to thread */
 	{

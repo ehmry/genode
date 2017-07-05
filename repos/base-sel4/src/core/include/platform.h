@@ -40,6 +40,7 @@ class Genode::Platform : public Platform_generic
 		 * to allocate a range within the phys CNode for ROM modules.
 		 */
 		Phys_allocator _unused_phys_alloc;
+
 		/*
 		 * Allocator for tracking unused virtual addresses, which are not
 		 * backed by page tables.
@@ -51,8 +52,7 @@ class Genode::Platform : public Platform_generic
 
 		Rom_fs _rom_fs;  /* ROM file system */
 
-
-		/**
+		/*
 		 * Virtual address range usable by non-core processes
 		 */
 		addr_t _vm_base;

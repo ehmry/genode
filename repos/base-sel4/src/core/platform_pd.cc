@@ -131,8 +131,8 @@ void Platform_pd::assign_parent(Native_capability parent)
 
 addr_t Platform_pd::_init_page_directory()
 {
-	addr_t const phys_addr = Untyped_memory::alloc_page(*platform()->ram_alloc());
-	seL4_Untyped const service     = Untyped_memory::untyped_sel(phys_addr).value();
+	addr_t       const phys_addr = Untyped_memory::alloc_page(*platform()->ram_alloc());
+	seL4_Untyped const service   = Untyped_memory::untyped_sel(phys_addr).value();
 
 	create<Page_directory_kobj>(service,
 	                            platform_specific()->core_cnode().sel(),

@@ -48,13 +48,13 @@ class Genode::Cnode_base
 		 */
 		void copy(Cnode_base const &from, Index from_idx, Index to_idx)
 		{
-			seL4_CNode     const service    = sel().value();
-			seL4_Word      const dest_index = to_idx.value();
-			uint8_t        const dest_depth = size_log2();
-			seL4_CNode     const src_root   = from.sel().value();
-			seL4_Word      const src_index  = from_idx.value();
-			uint8_t        const src_depth  = from.size_log2();
-			seL4_CapRights_t const rights   = seL4_AllRights;
+			seL4_CNode       const service    = sel().value();
+			seL4_Word        const dest_index = to_idx.value();
+			uint8_t          const dest_depth = size_log2();
+			seL4_CNode       const src_root   = from.sel().value();
+			seL4_Word        const src_index  = from_idx.value();
+			uint8_t          const src_depth  = from.size_log2();
+			seL4_CapRights_t const rights     = seL4_AllRights;
 
 			int const ret = seL4_CNode_Copy(service, dest_index, dest_depth,
 			                                src_root, src_index, src_depth, rights);
@@ -71,14 +71,14 @@ class Genode::Cnode_base
 		 */
 		void mint(Cnode_base const &from, Index from_idx, Index to_idx)
 		{
-			seL4_CNode     const service    = sel().value();
-			seL4_Word      const dest_index = to_idx.value();
-			uint8_t        const dest_depth = size_log2();
-			seL4_CNode     const src_root   = from.sel().value();
-			seL4_Word      const src_index  = from_idx.value();
-			uint8_t        const src_depth  = from.size_log2();
-			seL4_CapRights_t const rights   = seL4_AllRights;
-			seL4_CapData_t const badge      = seL4_CapData_Badge_new(to_idx.value());
+			seL4_CNode       const service    = sel().value();
+			seL4_Word        const dest_index = to_idx.value();
+			uint8_t          const dest_depth = size_log2();
+			seL4_CNode       const src_root   = from.sel().value();
+			seL4_Word        const src_index  = from_idx.value();
+			uint8_t          const src_depth  = from.size_log2();
+			seL4_CapRights_t const rights     = seL4_AllRights;
+			seL4_CapData_t   const badge      = seL4_CapData_Badge_new(to_idx.value());
 
 			int const ret = seL4_CNode_Mint(service, dest_index, dest_depth,
 			                                src_root, src_index, src_depth,
