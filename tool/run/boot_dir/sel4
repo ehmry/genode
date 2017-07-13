@@ -8,7 +8,7 @@ proc binary_name_timer     { } {
 proc kernel_files          { } { return sel4 }
 
 
-proc run_boot_string   { } { return "\n\rStarting node #0" }
+proc run_boot_string   { } { return "\n\rBooting all finished, dropped to user space" }
 proc core_link_address { } { return "0x02000000" }
 
 proc sel4_elfloader_dir { } { return "[pwd]/var/libcache/kernel-sel4/elfloader" }
