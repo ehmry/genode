@@ -15,7 +15,6 @@
 
 /* Genode includes */
 #include <block_session/connection.h>
-#include <rtc_session/connection.h>
 #include <base/allocator_avl.h>
 #include <base/log.h>
 
@@ -39,8 +38,6 @@ extern "C" {
 		Genode::Allocator &alloc;
 		Genode::Allocator_avl tx_alloc { &alloc };
 
-		Constructible<Rtc::Connection> rtc;
-
 		enum { MAX_DEV_NUM = 8 };
 
 		/* XXX: could make a tree... */
@@ -49,9 +46,6 @@ extern "C" {
 		Platform(Genode::Env &env, Genode::Allocator &alloc)
 		: env(env), alloc(alloc)
 		{
-			try { rtc.construct(env, "FatFS"); }
-			catch (Service_denied) { }
-
 			for (int i = 0; i < MAX_DEV_NUM; ++i)
 				drives[i] = nullptr;
 		}
@@ -215,23 +209,5 @@ extern "C" DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff)
 
 	default:
 		return RES_PARERR;
-	}
-}
-
-
-extern "C" DWORD get_fattime (void)
-{
-	if (_platform->rtc.constructed()) {
-		Rtc::Timestamp const ts =
-			_platform->rtc->current_time();
-		return
-			((ts.year-1980) << 25) |
-			(ts.month       << 21) |
-			(ts.day         << 16) |
-			(ts.hour        << 11) |
-			(ts.minute      << 5) |
-			(ts.second      << 0);
-	} else {
-		return 0;
 	}
 }
