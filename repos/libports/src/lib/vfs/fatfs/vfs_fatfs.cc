@@ -28,7 +28,7 @@
 namespace Fatfs {
 
 /* FatFS includes */
-#include <ffat/ff.h>
+#include <ff.h>
 
 	using namespace Vfs;
 	using namespace Ffat;
@@ -40,7 +40,7 @@ class Fatfs::File_system : public Vfs::File_system
 {
 	private:
 
-		typedef Genode::Path<_MAX_LFN> Path;
+		typedef Genode::Path<FF_MAX_LFN> Path;
 
 		struct Ffat_handle;
 		typedef Genode::List<Ffat_handle> Ffat_handles;

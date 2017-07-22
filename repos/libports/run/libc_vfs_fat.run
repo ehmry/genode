@@ -10,12 +10,8 @@ set mdir [check_installed mdir]
 #
 set build_components {
 	drivers/rtc
-	drivers/timer
-	lib/vfs/ffat
-	server/fs_rom
-	server/ram_blk
+	lib/vfs/fatfs
 	server/blk_cache
-	server/vfs
 	test/libc_vfs
 }
 
@@ -25,7 +21,10 @@ create_boot_directory
 
 import_from_depot \
 	genodelabs/src/[base_src] \
+	genodelabs/src/fs_rom \
 	genodelabs/src/init \
+	genodelabs/src/ram_blk \
+	genodelabs/src/vfs \
 
 #
 # Build FAT-file-system image
@@ -84,7 +83,7 @@ append config {
 		<resource name="RAM" quantum="4M"/>
 		<provides> <service name="File_system"/> </provides>
 		<config>
-			<vfs> <ffat/> </vfs>
+			<vfs> <fatfs/> </vfs>
 			<policy label_prefix="fs_rom"/>
 			<policy label="test-libc_vfs -> fat" writeable="yes"/>
 		</config>
@@ -125,12 +124,9 @@ install_config $config
 #
 set boot_modules {
 	blk_cache
-	fs_rom
-	ram_blk
 	rtc_drv
 	timer
-	vfs
-	vfs_ffat.lib.so
+	vfs_fatfs.lib.so
 
 	fat_rom.raw
 }

@@ -26,7 +26,7 @@ namespace Ffat {
 
 extern "C" {
 /* ffat includes */
-#include <ffat/diskio.h>
+#include <fatfs/diskio.h>
 }
 
 	using namespace Genode;
@@ -81,8 +81,10 @@ extern "C" Ffat::DSTATUS disk_initialize (BYTE drv)
 		return STA_NODISK;
 	}
 
-	if (_platform->drives[drv])
-		return STA_NOINIT;
+	if (_platform->drives[drv]) {
+		destroy(_platform->alloc, _platform->drives[drv]);
+		_platform->drives[drv] = nullptr;
+	}
 
 	try {
 		String<2> label(drv);
