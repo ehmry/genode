@@ -5,11 +5,11 @@
  * \date   2016-05-22
  *
  * See http://www.elm-chan.org/fsw/ff/00index_e.html
- * or doc/00index_e.html in the FatFS source.
+ * or documents/00index_e.html in the FatFS source.
  */
 
 /*
- * Copyright (C) 2017 Genode Labs GmbH
+ * Copyright (C) 2016-2017 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -48,7 +48,7 @@ class Fatfs::File_system : public Vfs::File_system
 		/**
 		 * The FatFS library does not support opening a file
 		 * for writing twice, so this plugin manages a tree of
-		 * open files shared across VFS handles.
+		 * open files shared across open VFS handles.
 		 */
 
 		struct File : Genode::Avl_node<File>
@@ -75,12 +75,14 @@ class Fatfs::File_system : public Vfs::File_system
 			}
 
 			/**
-			 * Recursive flush to blocks
+			 * Recursive flush to block device
 			 */
 			void flush()
 			{
+				/* flush the cache for this open file */
 				f_sync(&fil);
 
+				/* flush child nodes */
 				if (File *f = Genode::Avl_node<File>::child(-1))
 					f->flush();
 				if (File *f = Genode::Avl_node<File>::child( 1))
@@ -119,7 +121,7 @@ class Fatfs::File_system : public Vfs::File_system
 		/**
 		 * Timeout to schedule after writes
 		 */
-		Timer::Connection _timer { _env, "vfs_ffat" };
+		Timer::Connection _timer { _env, "vfs_fatfs" };
 
 		Timer::One_shot_timeout<Fatfs::File_system> _flush_timeout {
 			_timer, *this, &File_system::_flush_open };
@@ -174,6 +176,25 @@ class Fatfs::File_system : public Vfs::File_system
 		            Genode::Xml_node   config)
 		: _env(env), _alloc(alloc)
 		{
+			{
+				static unsigned codepage = 0;
+				unsigned const cp = config.attribute_value<unsigned>(
+					"codepage", 0);
+
+				if (codepage != 0 && codepage != cp) {
+					Genode::error(
+						"cannot reinitialize codepage for FAT library, please "
+						"use additional VFS instances for additional codepages");
+					throw ~0;
+				}
+
+				if (f_setcp(cp) != FR_OK) {
+					Genode::error("invalid OEM code page code '", cp, "'");
+					throw FR_INVALID_PARAMETER;
+				}
+				codepage = cp;
+			}
+
 			auto const drive_num = config.attribute_value(
 				"drive", Genode::String<4>("0"));
 
@@ -273,6 +294,8 @@ class Fatfs::File_system : public Vfs::File_system
 				file->handles.remove(handle);
 				if (!file->handles.first())
 					_close(*file);
+				else
+					f_sync(&file->fil);
 			}
 
 			destroy(handle->alloc(), handle);
@@ -282,7 +305,7 @@ class Fatfs::File_system : public Vfs::File_system
 		{
 			/**
 			 * Files are flushed when they are closed so
-			 * only open files need synced.
+			 * only open files need to be synced.
 			 */
 			if (File *file = _opened_file(path))
 				f_sync(&file->fil);
@@ -489,8 +512,8 @@ class Fatfs::File_system : public Vfs::File_system
 
 			switch (fres) {
 			case FR_OK:
-				/* flush to blocks after ~2 seconds of inactivity */
-				_flush_timeout.schedule(Genode::Microseconds(1 << 21));
+				/* flush to blocks after ~1 seconds of inactivity */
+				_flush_timeout.schedule(Genode::Microseconds(1 << 20));
 				return WRITE_OK;
 			case FR_INVALID_OBJECT: return WRITE_ERR_INVALID;
 			case FR_TIMEOUT:        return WRITE_ERR_WOULD_BLOCK;
