@@ -427,6 +427,7 @@ mktime T
 mmap T
 mprotect W
 mrand48 T
+msync T
 munmap T
 nanosleep W
 nextwctype T
@@ -593,6 +594,8 @@ seekdir T
 select W
 semctl T
 semctl T
+semget W
+semop W
 send T
 sendto T
 setbuf T
