@@ -50,7 +50,32 @@ class Vfs::Log_file_system : public Single_file_system
 		{
 			private:
 
+				char _line_buf[Genode::Log_session::MAX_STRING_LEN];
+				int  _line_pos = 0;
+
 				Genode::Log_session &_log;
+
+				void flush()
+				{
+					int strip = 0;
+					for (int i = _line_pos-1; i > 0; --i) {
+						switch(_line_buf[i]) {
+						case '\n':
+						case '\t':
+						case ' ':
+							++strip;
+							--_line_pos;
+							break;
+						default: goto strip;
+						}
+					}
+
+				strip:
+					_line_buf[_line_pos > 1 ? _line_pos : 0] = '\0';
+
+					_log.write(_line_buf);
+					_line_pos = 0;
+				}
 
 			public:
 
@@ -75,19 +100,35 @@ class Vfs::Log_file_system : public Single_file_system
 
 					/* count does not include the trailing '\0' */
 					while (count > 0) {
-						char tmp[Genode::Log_session::MAX_STRING_LEN];
-						int const curr_count = min(count, sizeof(tmp) - 1);
-						memcpy(tmp, src, curr_count);
-						tmp[curr_count > 0 ? curr_count : 0] = 0;
-						_log.write(tmp);
-						count -= curr_count;
-						src   += curr_count;
+					int curr_count = min(count, ((sizeof(_line_buf) - 1) - _line_pos));
+
+					for (int i = 0; i < curr_count; ++i) {
+						if (src[i] == '\n') {
+							curr_count = i+1;
+							break;
+						}
 					}
 
-					return WRITE_OK;
+					memcpy(_line_buf+_line_pos, src, curr_count);
+					_line_pos += curr_count;
+
+					if ((_line_pos == sizeof(_line_buf)-1) || (_line_buf[_line_pos-1] == '\n'))
+						flush();
+
+					count -= curr_count;
+					src   += curr_count;
 				}
 
-				bool read_ready() { return false; }
+				return WRITE_OK;
+			}
+
+			bool read_ready() override { return false; }
+
+			void sync()
+			{
+				if (_line_pos > 0)
+					flush();
+			}
 		};
 
 	public:
@@ -119,6 +160,12 @@ class Vfs::Log_file_system : public Single_file_system
 			*out_handle = new (alloc) Log_vfs_handle(*this, *this, alloc,
 			                                         _log);
 			return OPEN_OK;
+		}
+
+		Sync_result complete_sync(Vfs_handle *vfs_handle)
+		{
+			static_cast<Log_vfs_handle *>(vfs_handle)->sync();
+			return SYNC_OK;
 		}
 };
 
