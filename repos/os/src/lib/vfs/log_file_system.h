@@ -25,6 +25,9 @@ class Vfs::Log_file_system : public Single_file_system
 {
 	private:
 
+		char _line_buf[Genode::Log_session::MAX_STRING_LEN];
+		int  _line_pos = 0;
+
 		typedef Genode::String<64> Label;
 		Label _label;
 
@@ -72,11 +75,44 @@ class Vfs::Log_file_system : public Single_file_system
 
 			/* count does not include the trailing '\0' */
 			while (count > 0) {
-				char tmp[Genode::Log_session::MAX_STRING_LEN];
-				int const curr_count = min(count, sizeof(tmp) - 1);
-				memcpy(tmp, src, curr_count);
-				tmp[curr_count > 0 ? curr_count : 0] = 0;
-				_log.write(tmp);
+				int curr_count = min(count, ((sizeof(_line_buf) - 1) - _line_pos));
+
+				for (int i = 0; i < curr_count; ++i) {
+					if (src[i] == '\n') {
+						curr_count = i+1;
+						break;
+					}
+				}
+
+				memcpy(_line_buf+_line_pos, src, curr_count);
+				_line_pos += curr_count;
+
+				if ((_line_pos == sizeof(_line_buf)-1) || (_line_buf[_line_pos-1] == '\n')) {
+					if (_line_pos == sizeof(_line_buf)-1) {
+						Genode::error("buffer is full");
+					}
+
+					int strip = 0;
+					for (int i = _line_pos-1; i > 0; --i) {
+						switch(_line_buf[i]) {
+						case '\n':
+						case '\t':
+						case ' ':
+							++strip;
+							--_line_pos;
+							break;
+						default: goto strip;
+						}
+					}
+
+				strip:
+
+					_line_buf[_line_pos > 1 ? _line_pos : 0] = '\0';
+
+					_log.write(_line_buf);
+					_line_pos = 0;
+				}
+
 				count -= curr_count;
 				src   += curr_count;
 			}
