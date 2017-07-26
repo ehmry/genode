@@ -210,4 +210,5 @@ DUMMY(int, -1, rmdir,        (const char*));
 DUMMY(int, -1, select,       (int, fd_set *, fd_set *, fd_set *, struct timeval *));
 DUMMY(int, -1, stat,         (const char*, struct stat*));
 DUMMY(int, -1, symlink,      (const char*, const char*));
+DUMMY(void,  , sync,         ());
 DUMMY(int, -1, unlink,       (const char*));

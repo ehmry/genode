@@ -140,6 +140,7 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		int     rmdir(const char *) override;
 		int     stat(const char *, struct stat *) override;
 		int     symlink(const char *, const char *) override;
+		void    sync() override;
 		int     unlink(const char *) override;
 		ssize_t write(Libc::File_descriptor *, const void *, ::size_t ) override;
 		void   *mmap(void *, ::size_t, int, int, Libc::File_descriptor *, ::off_t) override;

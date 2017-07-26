@@ -144,6 +144,7 @@ namespace Libc {
 			virtual File_descriptor *socket(int domain, int type, int protocol);
 			virtual int stat(const char *path, struct stat *buf);
 			virtual int symlink(const char *oldpath, const char *newpath);
+			virtual void sync();
 			virtual int unlink(const char *path);
 			virtual ssize_t write(File_descriptor *, const void *buf, ::size_t count);
 	};

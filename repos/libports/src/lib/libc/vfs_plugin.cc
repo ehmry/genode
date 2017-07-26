@@ -893,3 +893,7 @@ int Libc::Vfs_plugin::select(int nfds,
 	}
 	return nready;
 }
+
+
+void Libc::Vfs_plugin::sync() {
+	_root_dir.sync("/"); }

@@ -647,3 +647,7 @@ extern "C" int __getcwd(char *dst, ::size_t dst_size)
 	Genode::strncpy(dst, cwd().base(), dst_size);
 	return 0;
 }
+
+
+extern "C" void sync(void) {
+	Libc::plugin_registry()->for_each_plugin([] (Libc::Plugin &plugin) { plugin.sync(); }); }
