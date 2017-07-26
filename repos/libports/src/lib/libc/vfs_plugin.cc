@@ -1258,3 +1258,12 @@ int Libc::Vfs_plugin::select(int nfds,
 	}
 	return nready;
 }
+
+
+void Libc::Vfs_plugin::sync() {
+
+	Vfs::Vfs_handle *root_handle = nullptr;
+	_root_dir.opendir("/", false, &root_handle, _alloc);
+	_vfs_sync(root_handle);
+	_root_dir.close(root_handle);
+}
