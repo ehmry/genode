@@ -1,2 +1,2 @@
 include $(REP_DIR)/src/app/iozone/target.inc
-LIBS += libc
+LIBS += libc_noux
