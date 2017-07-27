@@ -703,12 +703,6 @@ void endpwent(void)
 }
 
 
-extern "C" void sync(void)
-{
-	noux_syscall(Noux::Session::SYSCALL_SYNC);
-}
-
-
 extern "C" int kill(__pid_t pid, int sig)
 {
 	if (verbose_signals)
@@ -999,6 +993,7 @@ namespace {
 			void *mmap(void *addr, ::size_t length, int prot, int flags,
 			           Libc::File_descriptor *, ::off_t offset);
 			int munmap(void *addr, ::size_t length);
+			void sync();
 
 			/* Network related functions */
 			Libc::File_descriptor *socket(int, int, int);
@@ -1527,6 +1522,10 @@ namespace {
 		_sysio_to_stat_struct(sysio(), buf);
 		return 0;
 	}
+
+
+	void Plugin::sync() {
+		noux_syscall(Noux::Session::SYSCALL_SYNC); }
 
 
 	int Plugin::fsync(Libc::File_descriptor *fd)
