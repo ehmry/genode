@@ -1,0 +1,185 @@
+diff -ru genode/contrib/iozone-dummy/src/app/iozone/src/current/iozone.c iozone3_465/src/current/iozone.c
+--- src/app/iozone/src/current/iozone.c	2016-08-19 14:13:38.000000000 -0500
++++ src/app/iozone/src/current/iozone.c	2017-07-25 15:22:42.473095240 -0500
+@@ -1043,7 +1043,6 @@
+ void Kill(long long,long long);
+ long long l_min(long long,long long);
+ void multi_throughput_test(long long,long long);
+-long long mythread_create( void *, int );
+ int thread_exit(void);
+ void get_resolution(void);
+ #ifndef NO_THREADS
+@@ -8902,12 +8901,14 @@
+ 			{
+ 			  if(async_flag)
+ 			  {
++#ifdef ASYNC_IO
+ 			    if(no_copy_flag)
+ 			      async_read_no_copy(gc, (long long)fd, &buffer1, (i*reclen), reclen,
+ 			    	1LL,(numrecs64*reclen),depth);
+ 			    else
+ 			      async_read(gc, (long long)fd, nbuff, (i*reclen),reclen,
+ 			    	1LL,(numrecs64*reclen),depth);
++#endif
+ 			  }
+ 			  else
+ 			  {
+@@ -9389,12 +9390,14 @@
+ 			{
+ 			  if(async_flag)
+ 			  {
++#ifdef ASYNC_IO
+ 			     if(no_copy_flag)
+ 			        async_read_no_copy(gc, (long long)fd, &buffer1, offset64,reclen,
+ 			    	  0LL,(numrecs64*reclen),depth);
+ 			     else
+ 				 async_read(gc, (long long)fd, nbuff, (offset64),reclen,
+ 					    	0LL,(numrecs64*reclen),0LL);
++#endif
+ 			  }
+ 			  else
+ 			  {
+@@ -9832,12 +9835,14 @@
+ 			else
+ 			if(async_flag)
+ 			{
++#ifdef ASYNC_IO
+ 			    if(no_copy_flag)
+ 			       async_read_no_copy(gc, (long long)fd, &buffer1, ((((numrecs64-1)-i)*reclen)),
+ 			          reclen, -1LL,(numrecs64*reclen),depth);
+ 			    else
+ 			       async_read(gc, (long long)fd, nbuff, (((numrecs64-1)-i)*reclen),
+ 			       	  reclen,-1LL,(numrecs64*reclen),depth);
++#endif
+ 			}else
+ 			{
+ 				if(read((int)fd, (void*)nbuff, (size_t) reclen) != reclen)
+@@ -10435,12 +10440,14 @@
+ 		{
+ 			if(async_flag)
+ 			{
++#ifdef ASYNC_IO
+ 			    if(no_copy_flag)
+ 			      async_read_no_copy(gc, (long long)fd, &buffer1, current_position,
+ 			      	reclen, stride,(numrecs64*reclen),depth);
+ 			    else
+ 			       async_read(gc, (long long)fd, nbuff, current_position, reclen,
+ 			    	 stride,(numrecs64*reclen),depth);
++#endif
+ 		   	}
+ 			else
+ 			{
+@@ -14988,12 +14995,14 @@
+ 		{
+ 			  if(async_flag)
+ 			  {
++#ifdef ASYNC_IO
+ 			    if(no_copy_flag)
+ 			      async_read_no_copy(gc, (long long)fd, &buffer1, (i*reclen), reclen,
+ 			    	1LL,(numrecs64*reclen),depth);
+ 			    else
+ 			      async_read(gc, (long long)fd, nbuff, (i*reclen), reclen,
+ 			    	1LL,(numrecs64*reclen),depth);
++#endif
+ 			  }
+ 			  else
+ 			  {
+@@ -15531,12 +15540,14 @@
+ 		{
+ 			  if(async_flag)
+ 			  {
++#ifdef ASYNC_IO
+ 			    if(no_copy_flag)
+ 			      async_read_no_copy(gc, (long long)fd, &buffer1, (i*reclen), reclen,
+ 			    	1LL,(numrecs64*reclen),depth);
+ 			    else
+ 			      async_read(gc, (long long)fd, nbuff, (traj_offset), reclen,
+ 			    	1LL,(numrecs64*reclen),depth);
++#endif
+ 			  }
+ 			  else
+ 			  {
+@@ -16101,12 +16112,14 @@
+ 		{
+ 			  if(async_flag)
+ 			  {
++#ifdef ASYNC_IO
+ 			    if(no_copy_flag)
+ 			      async_read_no_copy(gc, (long long)fd, &buffer1, (i*reclen),reclen,
+ 			    	1LL,(filebytes64),depth);
+ 			    else
+ 			      async_read(gc, (long long)fd, nbuff, (i*reclen),reclen,
+ 			    	1LL,(filebytes64),depth);
++#endif
+ 			  }
+ 			  else
+ 			  {
+@@ -16660,12 +16673,14 @@
+ 		{
+ 			  if(async_flag)
+ 			  {
++#ifdef ASYNC_IO
+ 			    if(no_copy_flag)
+ 			      async_read_no_copy(gc, (long long)fd, &buffer1, (current_position),
+ 			      	reclen, -1LL,(numrecs64*reclen),depth);
+ 			    else
+ 			      async_read(gc, (long long)fd, nbuff, (current_position),reclen,
+ 			    	-1LL,(numrecs64*reclen),depth);
++#endif
+ 			  }
+ 			  else
+ 			  {
+@@ -17170,12 +17185,14 @@
+ 		{
+ 			if(async_flag)
+ 			{
++#ifdef ASYNC_IO
+ 			    if(no_copy_flag)
+ 			      async_read_no_copy(gc, (long long)fd, &buffer1, (current_position),
+ 			      	reclen, stride,(numrecs64*reclen),depth);
+ 			    else
+ 			      async_read(gc, (long long)fd, nbuff, (current_position),reclen,
+ 			    	stride,(numrecs64*reclen),depth);
++#endif
+ 			}
+ 			else
+ 			{
+@@ -17893,12 +17910,14 @@
+ 		{
+ 			if(async_flag)
+ 			{
++#ifdef ASYNC_IO
+ 			    if(no_copy_flag)
+ 			      async_read_no_copy(gc, (long long)fd, &buffer1, (current_offset),
+ 			      	 reclen, 0LL,(numrecs64*reclen),depth);
+ 			    else
+ 			      async_read(gc, (long long)fd, nbuff, (current_offset), reclen,
+ 			    	0LL,(numrecs64*reclen),depth);
++#endif
+ 			}
+ 			else
+ 			{
+@@ -24462,23 +24481,6 @@
+ 
+ #ifdef MT_TEST
+ 
+-int main(void)
+-{
+-    int i;
+-    unsigned long long init[4]={0x12345ULL, 0x23456ULL, 0x34567ULL, 0x45678ULL}, length=4;
+-    init_by_array64(init, length);
+-    printf("1000 outputs of genrand64_int64()\n");
+-    for (i=0; i<1000; i++) {
+-      printf("%20llu ", genrand64_int64());
+-      if (i%5==4) printf("\n");
+-    }
+-    printf("\n1000 outputs of genrand64_real2()\n");
+-    for (i=0; i<1000; i++) {
+-      printf("%10.8f ", genrand64_real2());
+-      if (i%5==4) printf("\n");
+-    }
+-    return 0;
+-}
+ #endif
+ 
+ /*----------------------------------------------------------------------*/

@@ -1,0 +1,9 @@
+LICENSE   = iozone
+VERSION   = 3.465
+DOWNLOADS = iozone.archive
+
+URL(iozone) = http://iozone.org/src/current/iozone3_465.tar
+SHA(iozone) = 68c51309ad24e04b4a1f0bf6be3c1c6f37faef38
+DIR(iozone) = src/app/iozone
+
+PATCHES   = src/app/iozone/patch
