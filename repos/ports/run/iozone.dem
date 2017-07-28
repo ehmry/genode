@@ -1,0 +1,16 @@
+# Iozone Gnuplot script
+
+set term x11
+
+set dgrid3d 32,32
+set surface
+set style data lines
+
+set xtics
+set ytics
+set logscale x 2
+set logscale y 2
+set xlabel "File size in 2^n KBytes"
+set ylabel "Record size in 2^n Kbytes"
+set zlabel "bytes/sec"
+set format z "%.2fKB"

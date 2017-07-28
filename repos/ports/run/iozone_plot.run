@@ -1,0 +1,58 @@
+#
+# \brief  IOzone data plotting
+# \author Emery Hemingway
+# \date   2017-07-27
+#
+
+set gnuplot_cmd  [check_installed gnuplot]
+
+set datadir var/data/iozone
+set datafiles [glob $datadir/*.out]
+
+#
+# Spawn Gnuplot and feed it commands thru stdio
+#
+set timeout -1
+spawn $gnuplot_cmd
+
+send "load \"${genode_dir}/repos/ports/run/iozone.dem\"\n"
+
+proc plot {title column} {
+	global datadir
+	global datafiles
+
+	send "clear\n"
+	send "set title \"$title\"\n"
+	send "splot "
+	foreach datafile $datafiles {
+		set name [lindex [split [lindex [split $datafile /] end] . ] 0]
+		set tmppath $datadir/$name.$title.data
+
+		# work around the messy escaping logic
+		set args {$1 ~ /^[0-9]+/ }
+		append args "\{"
+		append args { print  $1 " " $2 " " $}
+		append args "$column \}"
+
+		exec awk $args $datafile > $tmppath
+
+		send "\"$tmppath\" title \"$name\", "
+	}
+	send "\npause mouse button3 \"Press the right mouse button to continue\"\n"
+}
+
+plot write 3
+plot rewrite 4
+plot read 5
+plot reread 6
+plot randread 7
+plot randwrite 8
+plot bkwdread 9
+plot recrewrite 10
+plot strideread 11
+plot fwrite 12
+plot frewrite 13
+plot fread 14
+plot freread 15
+
+expect "nothing"

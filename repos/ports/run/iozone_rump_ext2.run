@@ -1,0 +1,20 @@
+set test_name rump_ext2
+
+set mkfs_cmd  [check_installed mke2fs]
+set mkfs_opts "-F"
+
+set test_build_components "lib/vfs/rump"
+
+set test_vfs_config "<rump fs=\"ext2fs\" writeable=\"yes\"/>"
+
+set test_boot_modules {
+	rump_fs.lib.so
+	rump.lib.so
+	vfs_rump.lib.so
+}
+
+set max_record_size 65536
+
+set use_blk_cache 0
+
+source ${genode_dir}/repos/ports/run/iozone.inc

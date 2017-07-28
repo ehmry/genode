@@ -1,0 +1,18 @@
+set test_name fatfs
+
+set mkfs_cmd  [check_installed mkfs.vfat]
+set mkfs_opts "-F32"
+
+set test_build_components "lib/vfs/fatfs"
+
+set test_vfs_config "<fatfs/>"
+
+set test_boot_modules {
+	vfs_fatfs.lib.so
+}
+
+set use_blk_cache 0
+
+set max_record_size 4096
+
+source ${genode_dir}/repos/ports/run/iozone.inc
