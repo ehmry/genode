@@ -1,0 +1,100 @@
+#
+# \brief  IOzone benchmarking of the RAM VFS plugin in Noux
+# \author Emery Hemingway
+# \date   2017-07-27
+#
+
+#
+# Build
+#
+
+build {
+	noux/minimal
+	noux-pkg/iozone
+}
+
+create_boot_directory
+
+import_from_depot \
+	genodelabs/src/[base_src] \
+	genodelabs/src/init \
+
+#
+# Generate config
+#
+
+set config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<start name="timer" caps="64">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
+	<start name="noux" caps="1024">
+		<resource name="RAM" quantum="3G"/>
+		<config stdin="/dev/null" stdout="/dev/log" stderr="/dev/log">
+			<fstab>
+				<ram/>
+				<dir name="dev"> <log/> <null/> </dir>
+			</fstab>
+			<start name="iozone_noux">
+				<arg value="-a"/>
+				<arg value="-i"/> <arg value="0"/>
+				<arg value="-i"/> <arg value="1"/>
+				<arg value="-i"/> <arg value="2"/>
+				<arg value="-i"/> <arg value="3"/>
+				<arg value="-i"/> <arg value="4"/>
+				<arg value="-i"/> <arg value="5"/>
+				<arg value="-i"/> <arg value="6"/>
+				<arg value="-i"/> <arg value="7"/>
+				<arg value="-i"/> <arg value="8"/>
+			</start>
+		</config>
+	</start>
+</config>
+}
+
+install_config $config
+
+#
+# Boot modules
+#
+
+build_boot_image {
+	iozone_noux
+	libc.lib.so
+	libc_noux.lib.so
+	libm.lib.so
+	noux
+	posix.lib.so
+}
+
+#
+# Execute test case
+#
+
+append qemu_args "  -nographic "
+run_genode_until {child "noux" exited with exit value 0.*\n} 600
+
+regexp ".init -> noux. .*\n" $output iozone_output
+
+set iozone_output [ string map {"\[init -> noux\] " ""} $iozone_output ]
+
+set datadir var/data/iozone
+file mkdir $datadir
+set datafile $datadir/noux_ram.out
+
+set fd [open $datafile w]
+puts $fd $iozone_output
+close $fd
+
+puts "\nIOzone data written to $datafile"

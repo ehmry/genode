@@ -1,0 +1,93 @@
+#
+# \brief  IOzone benchmarking of the RAM VFS plugin
+# \author Emery Hemingway
+# \date   2017-07-25
+#
+
+#
+# Build
+#
+
+build { core init drivers/timer app/iozone }
+
+create_boot_directory
+
+import_from_depot \
+	genodelabs/src/[base_src] \
+	genodelabs/src/init \
+
+#
+# Generate config
+#
+
+set config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<start name="timer" caps="64">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
+	<start name="iozone" caps="1024">
+		<resource name="RAM" quantum="3G"/>
+		<config>
+			<vfs>
+				<ram/>
+				<dir name="dev"> <log/> </dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<arg value="iozone"/>
+			<arg value="-a"/>
+			<arg value="-i"/> <arg value="0"/>
+			<arg value="-i"/> <arg value="1"/>
+			<arg value="-i"/> <arg value="2"/>
+			<arg value="-i"/> <arg value="3"/>
+			<arg value="-i"/> <arg value="4"/>
+			<arg value="-i"/> <arg value="5"/>
+			<arg value="-i"/> <arg value="6"/>
+			<arg value="-i"/> <arg value="7"/>
+			<arg value="-i"/> <arg value="8"/>
+		</config>
+	</start>
+</config>
+}
+
+install_config $config
+
+#
+# Boot modules
+#
+
+build_boot_image {
+	libc.lib.so libm.lib.so posix.lib.so
+	iozone
+}
+
+#
+# Execute test case
+#
+
+append qemu_args "  -nographic "
+run_genode_until {child "iozone" exited with exit value 0.*\n} 600
+
+regexp ".init -> iozone. .*\n" $output iozone_output
+
+set iozone_output [ string map {"\[init -> iozone\] " ""} $iozone_output ]
+
+set datadir var/data/iozone
+file mkdir $datadir
+set datafile $datadir/ram.out
+
+set fd [open $datafile w]
+puts $fd $iozone_output
+close $fd
+
+puts "\nIOzone data written to $datafile"
