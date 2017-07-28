@@ -347,6 +347,9 @@ clean_run:
 	$(VERBOSE)rm -rf var/run
 	$(VERBOSE)rm -rf config-00-00-00-00-00-00
 
+clean_data:
+	$(VERBOSE)rm -rf var/data
+
 clean_gen_files:
 	$(VERBOSE)rm -f $(LIB_PROGRESS_LOG)
 	$(VERBOSE)rm -f $(LIB_DEP_FILE)
@@ -357,7 +360,7 @@ clean_install_dir:
 clean_debug_dir:
 	$(VERBOSE)(test -d $(DEBUG_DIR) && find $(DEBUG_DIR) -type l -not -readable -delete) || true
 
-clean_empty_dirs: clean_targets clean_libcache clean_run clean_gen_files clean_install_dir clean_debug_dir
+clean_empty_dirs: clean_targets clean_libcache clean_run clean_data clean_gen_files clean_install_dir clean_debug_dir
 	$(VERBOSE)$(GNU_FIND) . -depth -type d -empty -delete
 
 clean cleanall: clean_empty_dirs
