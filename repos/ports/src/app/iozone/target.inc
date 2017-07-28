@@ -1,6 +1,5 @@
 # This file is sourced for normal and noux builds of iozone
 
-TARGET = iozone
 LIBS += posix
 
 PORT_SRC_DIR := $(call select_from_ports,iozone)/src/app/iozone/src/current
