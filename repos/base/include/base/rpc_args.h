@@ -128,6 +128,8 @@ class Genode::Rpc_in_buffer : public Rpc_in_buffer_base
 		 * the function 'valid_string' can be used.
 		 */
 		char const *string() const { return valid_string() ? base() : ""; }
+
+		void print(Output &out) const { out.out_string(base(), size()); }
 };
 
 #endif /* _INCLUDE__BASE__RPC_ARGS_H_ */
