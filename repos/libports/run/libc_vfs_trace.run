@@ -1,0 +1,104 @@
+#
+# \brief  Test for using the vfs local ram_fs
+# \author Norman Feske
+# \date   2014-04-10
+#
+# \author Emery Hemingway
+# \date   2015-07-21
+#
+
+#
+# Build
+#
+
+build { app/fs_replay app/sequence server/fs_trace test/libc_vfs }
+
+create_boot_directory
+
+import_from_depot \
+	genodelabs/src/[base_src] \
+	genodelabs/src/init \
+	genodelabs/src/ram_fs \
+
+#
+# Generate config
+#
+
+set config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+	</parent-provides>
+	<default caps="100"/>
+	<start name="ram_fs">
+		<resource name="RAM" quantum="12M"/>
+		<provides> <service name="File_system"/> </provides>
+		<route>
+			<any-service> <parent/> </any-service>
+		</route>
+		<config>
+			<default-policy root="/" writeable="yes"/>
+		</config>
+	</start>
+	<start name="fs_trace">
+		<resource name="RAM" quantum="2M"/>
+		<provides> <service name="File_system"/> </provides>
+		<route>
+			<service name="File_system"> <child name="ram_fs"/> </service>
+			<any-service> <parent/> </any-service>
+		</route>
+	</start>
+	<start name="sequence">
+		<resource name="RAM" quantum="8M"/>
+		<route>
+			<service name="File_system" label_prefix="test-libc_vfs">
+				<child name="fs_trace"/> </service>
+			<service name="File_system" label_prefix="fs_replay">
+				<child name="ram_fs"/> </service>
+			<any-service> <parent/> </any-service>
+		</route>
+		<config>
+			<start name="test-libc_vfs">
+				<config>
+					<iterations value="1"/>}
+append_if [have_include "power_on/qemu"] config {
+					<write-read size="1M" buffer_size="8K"/>}
+append config {
+					<vfs>
+						<dir name="tmp"> <fs/> </dir>
+						<dir name="dev"> <log/> </dir>
+					</vfs>
+					<libc stdout="/dev/log" cwd="/tmp"/>
+				</config>
+			</start>
+			<start name="fs_replay"/>
+		</config>
+	</start>
+</config>
+}
+
+install_config $config
+
+#
+# Boot modules
+#
+
+build_boot_image {
+	fs_replay
+	fs_trace
+	libc.lib.so libm.lib.so test-libc_vfs
+	sequence
+}
+
+#
+# Execute test case
+#
+
+append qemu_args "  -nographic "
+run_genode_until {.*child "sequence" exited with exit value 0.*} 60
+
+# vi: set ft=tcl :
