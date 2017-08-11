@@ -54,8 +54,9 @@ class Fs_trace::Session_component : public File_system::Session_rpc_object
 
 				void _flush()
 				{
-					_buf[_num_chars] = '\0';
-					_log.write(Genode::Log_session::String(_buf, _num_chars+1));
+					_buf[_num_chars++] = '\n';
+					_buf[_num_chars++] = '\0';
+					_log.write(Genode::Log_session::String(_buf, _num_chars));
 					_num_chars = 0;
 				}
 
@@ -67,7 +68,7 @@ class Fs_trace::Session_component : public File_system::Session_rpc_object
 				void out_char(char c) override
 				{
 					_buf[_num_chars++] = c;
-					if (_num_chars >= sizeof(_buf)-1)
+					if (_num_chars >= sizeof(_buf)-2)
 						_flush();
 				}
 
@@ -170,12 +171,7 @@ class Fs_trace::Session_component : public File_system::Session_rpc_object
 			_process_packet_handler(env.ep(), *this, &Session_component::_process_packets),
 			_process_ack_handler(env.ep(), *this, &Session_component::_process_acks)
 		{
-			/*
-			 * Register '_process_packets' dispatch function as signal
-			 * handler for packet-avail and ready-to-ack signals.
-			 */
 			_tx.sigh_packet_avail(_process_packet_handler);
-			// _tx.sigh_ready_to_ack(_process_packet_handler);
 			_fs.sigh_ack_avail(_process_ack_handler);
 		}
 
