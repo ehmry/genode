@@ -11,14 +11,17 @@
 # Build
 #
 
-build { app/fs_replay app/sequence server/fs_trace test/libc_vfs }
+build { app/fs_replay server/fs_trace test/libc_vfs }
 
 create_boot_directory
 
 import_from_depot \
 	genodelabs/src/[base_src] \
+	genodelabs/src/fs_log \
+	genodelabs/src/fs_rom \
 	genodelabs/src/init \
 	genodelabs/src/ram_fs \
+	genodelabs/src/sequence \
 
 #
 # Generate config
@@ -27,11 +30,11 @@ import_from_depot \
 set config {
 <config>
 	<parent-provides>
-		<service name="ROM"/>
-		<service name="PD"/>
-		<service name="RM"/>
 		<service name="CPU"/>
 		<service name="LOG"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="ROM"/>
 	</parent-provides>
 	<default caps="100"/>
 	<start name="ram_fs">
@@ -44,10 +47,28 @@ set config {
 			<default-policy root="/" writeable="yes"/>
 		</config>
 	</start>
+	<start name="fs_log">
+		<resource name="RAM" quantum="4M"/>
+		<provides> <service name="LOG"/> </provides>
+		<route>
+			<service name="File_system"> <child name="ram_fs"/> </service>
+			<any-service> <parent/> </any-service>
+		</route>
+	</start>
+	<start name="fs_rom">
+		<resource name="RAM" quantum="4M"/>
+		<provides> <service name="ROM"/> </provides>
+		<route>
+			<service name="File_system"> <child name="ram_fs"/> </service>
+			<any-service> <parent/> </any-service>
+		</route>
+	</start>
 	<start name="fs_trace">
 		<resource name="RAM" quantum="2M"/>
 		<provides> <service name="File_system"/> </provides>
 		<route>
+			<service name="LOG" label="trace">
+				<child name="fs_log"/> </service>
 			<service name="File_system"> <child name="ram_fs"/> </service>
 			<any-service> <parent/> </any-service>
 		</route>
@@ -59,6 +80,8 @@ set config {
 				<child name="fs_trace"/> </service>
 			<service name="File_system" label_prefix="fs_replay">
 				<child name="ram_fs"/> </service>
+			<service name="ROM" label_suffix="trace.log">
+				<child name="fs_rom"/> </service>
 			<any-service> <parent/> </any-service>
 		</route>
 		<config>
@@ -75,7 +98,11 @@ append config {
 					<libc stdout="/dev/log" cwd="/tmp"/>
 				</config>
 			</start>
-			<start name="fs_replay"/>
+			<start name="fs_replay">
+				<config>
+					<trace rom="/fs_trace/trace.log" />
+				</config>
+			</start>
 		</config>
 	</start>
 </config>
@@ -91,7 +118,6 @@ build_boot_image {
 	fs_replay
 	fs_trace
 	libc.lib.so libm.lib.so test-libc_vfs
-	sequence
 }
 
 #
