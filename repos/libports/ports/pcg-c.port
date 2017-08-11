@@ -1,0 +1,17 @@
+LICENSE   = Apache
+VERSION   = 0.94
+DOWNLOADS = pcg-c.archive
+
+URL(pcg-c) = http://www.pcg-random.org/downloads/pcg-c-$(VERSION).zip
+SHA(pcg-c) = b70a455def217fedb30645a3d2e00b60b6a5ae6b
+DIR(pcg-c) = src/lib/pcg-c
+
+_dirs: include/pcg-c/pcg_variants.h
+
+include/pcg-c/pcg_variants.h: src/lib/pcg-c/include/pcg_variants.h
+	$(VERBOSE)mkdir -p include/pcg-c
+	$(VERBOSE)sed 's/<inttypes.h>/<genode_inttypes.h>/' $< > $@
+
+src/lib/pcg-c/include/pcg_variants.h: $(DOWNLOADS)
+	$(VERBOSE)cp -ru src/lib/pcg-c/pcg-c-$(VERSION)/* src/lib/pcg-c/
+	$(VERBOSE)rm -rf src/lib/pcg-c/pcg-c-$(VERSION)
