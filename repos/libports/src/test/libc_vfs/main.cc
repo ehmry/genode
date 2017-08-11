@@ -44,7 +44,7 @@ struct Test_failed : Genode::Exception { };
 
 static void test_write_read(Genode::Xml_node node)
 {
-	pcg32_random_t rng;
+	pcg32i_random_t rng;
 
 	size_t rounds      = 4;
 	size_t size        = 4*1024*1024;
@@ -80,13 +80,13 @@ static void test_write_read(Genode::Xml_node node)
 		int fd = open(file_name, O_CREAT | O_RDWR);
 
 		/* Initialize the RNG with a round specific sequence */
-		pcg32_srandom_r(&rng, 0, round);
+		pcg32i_srandom_r(&rng, 0, round);
 
 		/* write i_max times the buffer */
 		unsigned const i_max = size/buffer_size;
 		for (unsigned i = 0; i < i_max; ++i) {
 			for (size_t j = 0; j < buffer_size/sizeof(uint32_t); ++j)
-				buf[j] = pcg32_random_r(&rng);
+				buf[j] = pcg32i_random_r(&rng);
 			if (write(fd, buf, buffer_size) == -1) {
 				perror("write");
 				throw Test_failed();
@@ -96,7 +96,7 @@ static void test_write_read(Genode::Xml_node node)
 		lseek(fd, SEEK_SET, 0);
 
 		/* Reinitialize the RNG sequence to the beginning */
-		pcg32_srandom_r(&rng, 0, round);
+		pcg32i_srandom_r(&rng, 0, round);
 
 		/* read i_max times the buffer */
 		for (unsigned i = 0; i < i_max; ++i) {
@@ -105,7 +105,7 @@ static void test_write_read(Genode::Xml_node node)
 				throw Test_failed();
 			}
 			for (size_t j = 0; j < buffer_size/sizeof(uint32_t); ++j) {
-				if (buf[j] != pcg32_random_r(&rng)) {
+				if (buf[j] != pcg32i_random_r(&rng)) {
 					printf(
 						"inconsistency detected at file offset %lu\n",
 						(buffer_size*i)+j);
