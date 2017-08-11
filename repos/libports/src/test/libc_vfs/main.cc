@@ -27,6 +27,8 @@
 #include <string.h>
 #include <errno.h>
 
+/* PCG includes */
+#include <pcg_variants.h>
 
 struct Test_failed : Genode::Exception { };
 
@@ -40,9 +42,10 @@ struct Test_failed : Genode::Exception { };
 		throw Test_failed(); \
 	}
 
-
 static void test_write_read(Genode::Xml_node node)
 {
+	pcg32_random_t rng;
+
 	size_t rounds      = 4;
 	size_t size        = 4*1024*1024;
 	size_t buffer_size = 32*1024;
@@ -63,26 +66,53 @@ static void test_write_read(Genode::Xml_node node)
 		} catch (...) { }
 	} catch (...) { }
 
-	void *buf = malloc(buffer_size);
+	uint32_t *buf = (uint32_t *)malloc(buffer_size);
 	char const *file_name = "write_read.tst";
 
 	printf("write-read test: %zu rounds of %zu MiB (buffer size %zu)\n",
 	       rounds, size/(1024*1024), buffer_size);
 
-	for (unsigned round = 0; buf && round < rounds; ++round) {
+	for (unsigned round = 1; buf && round <= rounds; ++round) {
 		printf("starting round %u\n", round);
 
 		unlink(file_name);
 
 		int fd = open(file_name, O_CREAT | O_RDWR);
 
-		memset(buf, round, buffer_size);
+		/* Initialize the RNG with a round specific sequence */
+		pcg32_srandom_r(&rng, 0, round);
 
-		/* write-read i_max times the buffer */
+		/* write i_max times the buffer */
 		unsigned const i_max = size/buffer_size;
-		for (unsigned i = 0; i < i_max; ++i) write(fd, buf, buffer_size);
+		for (unsigned i = 0; i < i_max; ++i) {
+			for (size_t j = 0; j < buffer_size/sizeof(uint32_t); ++j)
+				buf[j] = pcg32_random_r(&rng);
+			if (write(fd, buf, buffer_size) == -1) {
+				perror("write");
+				throw Test_failed();
+			}
+		}
+
 		lseek(fd, SEEK_SET, 0);
-		for (unsigned i = 0; i < i_max; ++i) read(fd, buf, buffer_size);
+
+		/* Reinitialize the RNG sequence to the beginning */
+		pcg32_srandom_r(&rng, 0, round);
+
+		/* read i_max times the buffer */
+		for (unsigned i = 0; i < i_max; ++i) {
+			if (read(fd, buf, buffer_size) == -1) {
+				perror("read");
+				throw Test_failed();
+			}
+			for (size_t j = 0; j < buffer_size/sizeof(uint32_t); ++j) {
+				if (buf[j] != pcg32_random_r(&rng)) {
+					printf(
+						"inconsistency detected at file offset %lu\n",
+						(buffer_size*i)+j);
+					throw Test_failed();
+				}
+			}
+		}
 
 		close(fd);
 		printf("finished round %u\n", round);
