@@ -1,0 +1,16 @@
+LICENSE   = Apache
+VERSION   = 0.94
+DOWNLOADS = pcg-c.archive
+
+URL(pcg-c) = http://www.pcg-random.org/downloads/pcg-c-$(VERSION).zip
+SHA(pcg-c) = b70a455def217fedb30645a3d2e00b60b6a5ae6b
+DIR(pcg-c) = src/lib/pcg-c
+
+DIRS = include/pcg-c
+DIR_CONTENT(include/pcg-c) = src/lib/pcg-c/include/*
+
+_dirs: src/lib/pcg-c/src
+
+src/lib/pcg-c/src: $(DOWNLOADS)
+	$(VERBOSE)mv src/lib/pcg-c/pcg-c-$(VERSION)/* src/lib/pcg-c
+	$(VERBOSE)rm -rf src/lib/pcg-c/pcg-c-$(VERSION)
