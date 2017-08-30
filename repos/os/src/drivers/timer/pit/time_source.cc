@@ -80,6 +80,7 @@ Duration Timer::Time_source::curr_time()
 	/* determine the time since we looked at the counter */
 	if (wrapped && !_handled_wrap) {
 		ticks = _counter_init_value;
+
 		/* the counter really wrapped around */
 		if (curr_counter)
 			ticks += PIT_MAX_COUNT + 1 - curr_counter;
@@ -92,6 +93,17 @@ Duration Timer::Time_source::curr_time()
 			ticks = PIT_MAX_COUNT + 1 - curr_counter;
 	}
 
+	/*
+	 * Check wether the activation latency was too big and we thus missed a
+	 * counter wrap. If the case, warn user and limit the measured count
+	 * to avoid sudden time jumps.
+	 */
+	if (ticks > PIT_MAX_COUNT) {
+		ticks = PIT_MAX_COUNT;
+		warning("handling of PIT counter too slow");
+	}
+
+	/* translate counter to microseconds and update time value */
 	static_assert(PIT_TICKS_PER_MSEC >= (unsigned)TIMER_MIN_TICKS_PER_MS,
 	              "Bad TICS_PER_MS value");
 	_curr_time_us += timer_ticks_to_us(ticks, PIT_TICKS_PER_MSEC);
