@@ -1,0 +1,72 @@
+##
+# Create VFAT disk image with contents of the run directory
+#
+# \param --image-disk-blockcount   disk size in MiB
+#
+
+source [genode_dir]/tool/run/iso.inc
+
+proc image_fat_size { } { return [get_cmd_arg --image-fat_size 0] }
+proc image_fat_sylinux_path { } {
+	return [get_cmd_arg --image_fat_sylinux_path /usr/lib/syslinux/modules/bios] }
+
+proc mcopy_file { image path target_dir } {
+	exec mcopy -i $image -D O $path ::$target_dir
+}
+
+proc mcopy_dir { image path target_dir } {
+	# copy files
+	foreach file_path [glob -nocomplain -types f $path/*] {
+		mcopy_file $image $file_path $target_dir }
+
+	# copy directories
+	foreach dir_path [glob -nocomplain -types d $path/*] {
+		set target_path $target_dir/[file tail $dir_path]
+		catch {exec mmd -i $image -D s ::$target_path}
+		mcopy_dir $image $dir_path $target_path
+	}
+}
+
+
+##
+# Create disk image with the content of the run directory
+#
+proc run_image { {unused ""} } {
+
+	requires_installation_of mkfs.vfat
+	requires_installation_of mcopy
+	requires_installation_of syslinux
+
+	set run_size [expr [regsub {\s.*} [exec du -smL [run_dir]] {}]]
+
+	if {[image_fat_size] > 0} {
+		set disk_size  [image_fat_size]
+	} else {
+		set disk_size [expr $run_size + 1]
+	}
+
+	set fat_image [run_dir].partition
+	file delete $fat_image
+	exec dd if=/dev/zero of=$fat_image bs=1M count=$disk_size 2>/dev/null
+	exec mkfs.vfat -n GENODE $fat_image
+
+	# create and populate Syslinux directory
+	puts "installing Syslinux to FAT image"
+	exec mmd -i $fat_image -D s ::/boot
+	exec mmd -i $fat_image -D s ::/boot/syslinux
+	mcopy_file $fat_image \
+		[image_fat_sylinux_path]/libcom32.c32 /boot/syslinux/
+	mcopy_file $fat_image \
+		[image_fat_sylinux_path]/mboot.c32 /boot/syslinux/
+	mcopy_file $fat_image \
+		[genode_dir]/tool/boot/bender /boot/
+
+	# install Syslinux to FAT boot sector
+	exec syslinux --directory /boot/syslinux/ --install $fat_image
+
+	# populate partition with rundir
+	puts "populating FAT image with rundir"
+	mcopy_dir $fat_image [run_dir] ""
+
+	puts "Created image file $fat_image"
+}

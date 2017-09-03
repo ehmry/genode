@@ -84,12 +84,15 @@ proc run_power_on { } {
 		if {[have_include "image/disk"]} {
 			append qemu_args " -hda [run_dir].img "
 		} else {
+		if {[have_include "image/fat"]} {
+			append qemu_args " -usbdevice disk:[run_dir].partition "
+		} else {
 		if {[have_include "image/uefi"]} {
 			append qemu_args " --bios [genode_dir]/tool/boot/tianocore.bin -net none -drive format=raw,file=[run_dir].img "
 		} else {
 			puts "Aborting, cannot execute Qemu without a ISO or disk image"
 			exit -4
-		} } } }
+		} } } } }
 	}
 
 	# on ARM, we supply the boot image as kernel

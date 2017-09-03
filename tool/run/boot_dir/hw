@@ -119,6 +119,11 @@ proc run_boot_dir {binaries} {
 		close $fh
 	}
 
+	if {[have_include "image/fat"]} {
+		source [genode_dir]/tool/run/syslinux.inc
+		create_syslinux_cfg "/boot/bender" "/image.elf"
+	}
+
 	if {[have_include image/uefi]} {
 		exec mkdir -p [run_dir]/efi/boot
 		exec cp [genode_dir]/tool/boot/grub2_32.efi [run_dir]/efi/boot/bootia32.efi

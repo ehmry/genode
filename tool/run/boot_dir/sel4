@@ -65,6 +65,12 @@ proc run_boot_dir {binaries} {
 		close $fh
 	}
 
+	if {[have_include "image/fat"]} {
+		source [genode_dir]/tool/run/syslinux.inc
+		create_syslinux_cfg "/boot/bender phys_max=256M" "/sel4 disable_iommu" "/image.elf"
+	}
+
+
 	#
 	# Use seL4 elfloader tool to generate bootable image on ARM
 	#
