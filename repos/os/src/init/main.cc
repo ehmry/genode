@@ -34,6 +34,17 @@ struct Init::Main : State_reporter::Producer, Child::Default_route_accessor,
 	Registry<Routed_service>       _child_services;
 	Child_registry                 _children;
 
+	struct Exit
+	{
+		Registry<Exit>::Element registration;
+		String<64>        const name;
+
+		Exit(Registry<Exit> &registry, Child_policy::Name const &name)
+		: registration(registry, *this), name(name) { }
+	};
+
+	Registry<Exit> _exited;
+
 	Heap _heap { _env.ram(), _env.rm() };
 
 	Attached_rom_dataspace _config { _env, "config" };
@@ -144,9 +155,13 @@ struct Init::Main : State_reporter::Producer, Child::Default_route_accessor,
 	void _update_children_config();
 	void _destroy_abandoned_parent_services();
 	void _handle_config();
+	void _handle_exit();
 
 	Signal_handler<Main> _config_handler {
 		_env.ep(), *this, &Main::_handle_config };
+
+	Signal_handler<Main> _exit_handler {
+		_env.ep(), *this, &Main::_handle_exit };
 
 	Server _server { _env, _heap, _child_services, _state_reporter };
 
@@ -248,6 +263,17 @@ void Init::Main::_abandon_obsolete_children()
 		if (obsolete)
 			child.abandon();
 	});
+
+	_exited.for_each([&] (Exit &exit) {
+		bool obsolete = true;
+		_config_xml.for_each_sub_node("start", [&] (Xml_node node) {
+			if (node.attribute_value("name", Child_policy::Name()) == exit.name)
+				obsolete = false; });
+
+		if (obsolete)
+			destroy(_heap, &exit);
+	});
+
 }
 
 
@@ -334,10 +360,20 @@ void Init::Main::_handle_config()
 	try {
 		_config_xml.for_each_sub_node("start", [&] (Xml_node start_node) {
 
+			auto const start_name = start_node.attribute_value("name", Child_policy::Name());
+
 			/* skip start node if corresponding child already exists */
 			bool exists = false;
 			_children.for_each_child([&] (Child const &child) {
-				if (child.name() == start_node.attribute_value("name", Child_policy::Name()))
+				if (child.name() == start_name)
+					exists = true; });
+			if (exists) {
+				return;
+			}
+
+			/* skip start node if corresponding child existed but exited */
+			_exited.for_each([&] (Exit const &exit) {
+				if (exit.name == start_name)
 					exists = true; });
 			if (exists) {
 				return;
@@ -361,7 +397,8 @@ void Init::Main::_handle_config()
 					            Ram_quota { avail_ram.value  - used_ram.value },
 					            Cap_quota { avail_caps.value - used_caps.value },
 					             *this, prio_levels, affinity_space,
-					            _parent_services, _child_services);
+					            _parent_services, _child_services,
+					            _exit_handler);
 				_children.insert(&child);
 
 				/* account for the start XML node buffered in the child */
@@ -423,6 +460,22 @@ void Init::Main::_handle_config()
 	_children.for_each_child([&] (Child &child) { child.apply_ram_upgrade(); });
 
 	_server.apply_config(_config_xml);
+}
+
+
+void Init::Main::_handle_exit()
+{
+	/* destroy children that have exited */
+	_children.for_each_child([&] (Child &child) {
+		if (child.exited()) {
+			_children.remove(&child);
+
+			/* record the config sub-node as exited */
+			new (_heap) Exit(_exited, child.name());
+
+			destroy(_heap, &child);
+		}
+	});
 }
 
 

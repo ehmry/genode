@@ -641,7 +641,8 @@ Init::Child::Child(Env                      &env,
                    Prio_levels               prio_levels,
                    Affinity::Space const    &affinity_space,
                    Registry<Parent_service> &parent_services,
-                   Registry<Routed_service> &child_services)
+                   Registry<Routed_service> &child_services,
+                   Signal_context_capability exit_sigh)
 :
 	_env(env), _alloc(alloc), _verbose(verbose), _id(id),
 	_report_update_trigger(report_update_trigger),
@@ -656,7 +657,8 @@ Init::Child::Child(Env                      &env,
 	                    _check_cap_constraints(cap_limit), true)),
 	_parent_services(parent_services),
 	_child_services(child_services),
-	_session_requester(_env.ep().rpc_ep(), _env.ram(), _env.rm())
+	_session_requester(_env.ep().rpc_ep(), _env.ram(), _env.rm()),
+	_exit_sigh(exit_sigh)
 {
 	if (_verbose.enabled()) {
 		log("child \"",       _unique_name, "\"");

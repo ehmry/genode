@@ -65,7 +65,7 @@ class Init::Child : Child_policy, Routed_service::Wakeup
 		Id const _id;
 
 		enum State { STATE_INITIAL, STATE_RAM_INITIALIZED, STATE_ALIVE,
-		             STATE_ABANDONED };
+		             STATE_ABANDONED, STATE_EXITED };
 
 		State _state = STATE_INITIAL;
 
@@ -333,6 +333,12 @@ class Init::Child : Child_policy, Routed_service::Wakeup
 		} _ram_pd_accessor { _child };
 
 		/**
+		 * Signal handler to asynchronously post a child exit
+		 * and return from a sychronous 'exit' call.
+		 */
+		Signal_context_capability _exit_sigh;
+
+		/**
 		 * Async_service::Wakeup callback
 		 */
 		void wakeup_async_service() override
@@ -438,7 +444,8 @@ class Init::Child : Child_policy, Routed_service::Wakeup
 		      Prio_levels               prio_levels,
 		      Affinity::Space const    &affinity_space,
 		      Registry<Parent_service> &parent_services,
-		      Registry<Routed_service> &child_services);
+		      Registry<Routed_service> &child_services,
+		      Signal_context_capability exit_sigh);
 
 		virtual ~Child();
 
@@ -486,6 +493,8 @@ class Init::Child : Child_policy, Routed_service::Wakeup
 		}
 
 		bool abandoned() const { return _state == STATE_ABANDONED; }
+
+		bool exited() const { return _state == STATE_EXITED; }
 
 		enum Apply_config_result { MAY_HAVE_SIDE_EFFECTS, NO_SIDE_EFFECTS };
 
@@ -541,6 +550,12 @@ class Init::Child : Child_policy, Routed_service::Wakeup
 			 * printed by the default implementation of 'Child_policy::exit'.
 			 */
 			Child_policy::exit(exit_value);
+
+			abandon();
+			_state = STATE_EXITED;
+
+			/* need to return now, kill the child later */
+			Signal_transmitter(_exit_sigh).submit();
 		}
 
 		void session_state_changed() override
