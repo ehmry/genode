@@ -504,9 +504,8 @@ extern "C" int socket_fs_bind(int libc_fd, sockaddr const *addr, socklen_t addrl
 	int const len = strlen(addr_string.base());
 	int const n   = write(context->bind_fd(), addr_string.base(), len);
 	if (n != len) return Errno(EACCES);
-	fsync(context->bind_fd());
 
-	return 0;
+	return fsync(context->bind_fd());
 }
 
 
@@ -536,7 +535,8 @@ extern "C" int socket_fs_connect(int libc_fd, sockaddr const *addr, socklen_t ad
 	int const n   = write(context->connect_fd(), addr_string.base(), len);
 	if (n != len) return Errno(ECONNREFUSED);
 
-	return 0;
+	/* sync the FD to block for write completion */
+	return fsync(context->connect_fd());
 }
 
 
