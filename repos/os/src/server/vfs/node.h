@@ -39,6 +39,7 @@ namespace Vfs_server {
 	struct Node_io_handler
 	{
 		virtual void handle_node_io(Node &node) = 0;
+		virtual void handle_node_event(Node &node) = 0;
 	};
 
 	/**
@@ -197,6 +198,11 @@ class Vfs_server::Node : public File_system::Node_base, public Node_space::Eleme
 		void handle_io_response()
 		{
 			_node_io_handler.handle_node_io(*this);
+		}
+
+		void handle_event_response()
+		{
+			_node_io_handler.handle_node_event(*this);
 		}
 
 		void notify_read_ready(bool requested)

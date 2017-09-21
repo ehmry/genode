@@ -396,7 +396,11 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			_process_packets();
 		}
 
-		/* Node_io_handler interface */
+
+		/********************************
+		 **  Node_io_handler interface **
+		 ********************************/
+
 		void handle_node_io(Node &node) override
 		{
 			if (node.notify_read_ready() && node.read_ready()
@@ -407,6 +411,18 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				                         0, 0);
 				tx_sink()->acknowledge_packet(packet);
 				node.notify_read_ready(false);
+			}
+			_process_packets();
+		}
+
+		void handle_node_event(Node &node) override
+		{
+			if (tx_sink()->ready_to_ack()) {
+				Packet_descriptor packet(Packet_descriptor(),
+				                         Node_handle { node.id().value },
+				                         Packet_descriptor::CONTENT_CHANGED,
+				                         0, 0);
+				tx_sink()->acknowledge_packet(packet);
 			}
 			_process_packets();
 		}
@@ -626,6 +642,12 @@ struct Vfs_server::Io_response_handler : Vfs::Io_response_handler
 		}
 
 		_in_progress = false;
+	}
+
+	void handle_event_response(Vfs::Vfs_handle::Context *context) override
+	{
+		if (Vfs_server::Node *node = static_cast<Vfs_server::Node *>(context))
+			node->handle_event_response();
 	}
 };
 

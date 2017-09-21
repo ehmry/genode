@@ -349,6 +349,7 @@ class Vfs::Fs_file_system : public File_system
 			Genode::Entrypoint        &_ep;
 			Io_response_handler       &_io_handler;
 			List<Vfs_handle::Context>  _context_list;
+			List<Vfs_handle::Context>  _event_context_list;
 			Lock                       _list_lock;
 			bool                       _null_context_armed { false };
 
@@ -387,12 +388,31 @@ class Vfs::Fs_file_system : public File_system
 				_ep.schedule_post_signal_hook(this);
 			}
 
+			void arm_event(Vfs_handle::Context *context)
+			{
+				{
+					Lock::Guard list_guard(_list_lock);
+
+					for (Vfs_handle::Context *list_context = _event_context_list.first();
+					     list_context;
+					     list_context = list_context->next())
+					{
+						if (list_context == context) {
+							/* already in list */
+							return;
+						}
+					}
+
+					_event_context_list.insert(context);
+				}
+
+				_ep.schedule_post_signal_hook(this);
+			}
+
 			void function() override
 			{
-				Vfs_handle::Context *context = nullptr;
-
 				for (;;) {
-
+					Vfs_handle::Context *context = nullptr;
 					{
 						Lock::Guard list_guard(_list_lock);
 
@@ -409,6 +429,19 @@ class Vfs::Fs_file_system : public File_system
 
 					_io_handler.handle_io_response(context);
 				}
+
+				for (;;) {
+					Vfs_handle::Context *context = nullptr;
+					{
+						Lock::Guard list_guard(_list_lock);
+
+						context = _event_context_list.first();
+						if (!context) break;
+						_event_context_list.remove(context);
+					}
+					_io_handler.handle_event_response(context);
+				}
+
 			}
 		};
 
@@ -531,7 +564,8 @@ class Vfs::Fs_file_system : public File_system
 							break;
 
 						case Packet_descriptor::CONTENT_CHANGED:
-							_post_signal_hook.arm(handle.context);
+							if (handle.context)
+								_post_signal_hook.arm_event(handle.context);
 							break;
 
 						case Packet_descriptor::SYNC:

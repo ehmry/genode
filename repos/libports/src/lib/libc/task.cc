@@ -356,6 +356,8 @@ struct Libc::Io_response_handler : Vfs::Io_response_handler
 		/* resume all as any context may have been deblocked from blocking I/O */
 		Libc::resume_all();
 	}
+
+	void handle_event_response(Vfs::Vfs_handle::Context *) override { }
 };
 
 
