@@ -19,7 +19,7 @@
  </xs:complexType>
 
  <xs:complexType name="template_route">
-  <xs:choice minOccurs="1" maxOccurs="unbounded">
+  <xs:choice minOccurs="0" maxOccurs="unbounded">
    <xs:element name="service" type="template_service"/>
    <xs:element name="any-service" type="template_service"/>
   </xs:choice>
