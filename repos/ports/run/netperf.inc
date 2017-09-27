@@ -287,7 +287,7 @@ install_config $config
 # generic modules
 set boot_modules {
 	core init timer
-	ld.lib.so libc.lib.so libm.lib.so libc_resolv.lib.so posix.lib.so
+	ld.lib.so libc.lib.so libm.lib.so posix.lib.so
 	netserver
 }
 

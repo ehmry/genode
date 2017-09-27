@@ -16,4 +16,7 @@ CC_OPT  += -DHAVE_CONFIG_H -DGENODE_BUILD
 
 CC_WARN = -Wall -Wno-unused
 
+vpath timer.cc $(PRG_DIR)
+vpath %.c      $(NETPERF_DIR)/src
+
 # vi: set ft=make :
