@@ -1210,6 +1210,8 @@ class Lwip::Tcp_socket_dir final :
 			case CONNECT:
 				return Sync_result::SYNC_QUEUED;
 			}
+
+			return Sync_result::SYNC_OK;
 		}
 };
 
