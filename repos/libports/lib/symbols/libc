@@ -248,6 +248,8 @@ getgrnam T
 getgrnam_r T
 getgrouplist T
 getgroups W
+gethostbyaddr T
+gethostbyaddr_r T
 gethostbyname W
 gethostid T
 gethostname T
@@ -281,6 +283,8 @@ getrlimit W
 getrusage W
 gets T
 getservbyname W
+getservbyport T
+getservbyport_r T
 getsid W
 getsockname T
 getsockopt T
