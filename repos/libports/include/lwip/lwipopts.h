@@ -30,15 +30,6 @@ extern "C" {
 #define NO_SYS 1
 #define SYS_LIGHTWEIGHT_PROT 0
 
-/*
-   -----------------------------------------------
-   ---------- Platform specific locking ----------
-   -----------------------------------------------
-*/
-
-void genode_memcpy(void * dst, const void *src, unsigned long size);
-#define MEMCPY(dst,src,len)             genode_memcpy(dst,src,len)
-
 
 /*
    ------------------------------------
@@ -94,7 +85,7 @@ void genode_memcpy(void * dst, const void *src, unsigned long size);
    ----------------------------------
 */
 
-#define LWIP_DNS                        1
+#define LWIP_DNS                        0
 
 
 /*

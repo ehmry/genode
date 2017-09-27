@@ -18,14 +18,14 @@
 extern "C" {
 #endif
 
-void *memcpy(void *dst, const void *src, size_t len);
-void *memset(void *b, int c, size_t len);
+void *memcpy(void *dst, const void *src, unsigned long len);
+void *memset(void *b, int c, unsigned long len);
 
-size_t strlen(const char *s);
+unsigned long strlen(const char *s);
 
-int memcmp(const void *b1, const void *b2, size_t len);
+int memcmp(const void *b1, const void *b2, unsigned long len);
 int strcmp(const char *s1, const char *s2);
-int strncmp(const char *s1, const char *s2, size_t len);
+int strncmp(const char *s1, const char *s2, unsigned long len);
 
 #ifdef __cplusplus
 }

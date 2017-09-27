@@ -18,6 +18,7 @@
 #include <base/sleep.h>
 
 #include <lwip/genode_init.h>
+#include <string.h>
 
 namespace Lwip {
 
@@ -50,8 +51,6 @@ namespace Lwip {
 
 	void genode_init(Genode::Allocator &heap, Timer::Connection &timer)
 	{
-		//LWIP_ASSERT("heap does not track allocation sizes", heap.need_size_for_free());
-
 		_heap = &heap;
 		_sys_timer.construct(timer);
 		lwip_init();
@@ -75,10 +74,10 @@ extern "C" {
 	void *genode_malloc(unsigned long size)
 	{
 		void *ptr = nullptr;
-		return Lwip::_heap->alloc(size, &ptr) ? ptr : 0;
+		return Lwip::_heap->alloc(size, &ptr) ? ptr : nullptr;
 	}
 
-	void *gende_calloc(unsigned long number, unsigned long size)
+	void *genode_calloc(unsigned long number, unsigned long size)
 	{
 		void *ptr = nullptr;
 		size *= number;
@@ -92,7 +91,21 @@ extern "C" {
 	Lwip::u32_t sys_now(void) {
 		return Lwip::_sys_timer->timer.elapsed_ms(); }
 
-	void genode_memcpy(void * dst, const void *src, unsigned long size) {
-		Genode::memcpy(dst, src, size); }
+	void *memcpy(void *dst, const void *src, unsigned long len) {
+		return Genode::memcpy(dst, src, len); }
 
+	void *memset(void *b, int c, unsigned long len) {
+		return Genode::memset(b, c, len); }
+
+	unsigned long strlen(const char *s) {
+		return Genode::strlen(s); }
+
+	int memcmp(const void *b1, const void *b2, unsigned long len) {
+		return Genode::memcmp(b1, b2, len); }
+
+	int strcmp(const char *s1, const char *s2) {
+		return Genode::strcmp( s1, s2); }
+
+	int strncmp(const char *s1, const char *s2, unsigned long len) {
+		return Genode::strcmp(s1, s2, len); }
 }

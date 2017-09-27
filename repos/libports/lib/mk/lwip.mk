@@ -24,9 +24,6 @@ SRC_C += $(notdir $(CORE6FILES))
 # Network interface files
 SRC_C += $(notdir $(NETIFFILES))
 
-# can't avoid string.h
-LIBS = libc-string
-
 INC_DIR += $(REP_DIR)/include/lwip \
            $(LWIP_PORT_DIR)/include/lwip \
            $(LWIPDIR)/include \
