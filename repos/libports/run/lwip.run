@@ -35,7 +35,7 @@ requires_installation_of lynx
 set build_components {
 	core init
 	drivers/timer drivers/nic
-	test/lwip/http_srv
+	test/http_srv
 }
 
 lappend_if $use_usb_driver              build_components drivers/usb
@@ -76,11 +76,16 @@ set config {
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Timer"/> </provides>
 	</start>
-	<start name="test-lwip_httpsrv">
+	<start name="test-httpsrv">
 		<resource name="RAM" quantum="5M"/>
 		<config>
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<vfs>
+				<dir name="dev">
+					<dir name="sockets"> <lwip/> </dir>
+					<log/>
+				</dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/sockets" />
 		</config>
 	</start>}
 
@@ -123,7 +128,7 @@ install_config $config
 # generic modules
 set boot_modules {
 	core init timer
-	ld.lib.so libc.lib.so libm.lib.so lwip.lib.so test-lwip_httpsrv posix.lib.so
+	ld.lib.so libc.lib.so libm.lib.so vfs_lwip.lib.so test-httpsrv posix.lib.so
 }
 
 # platform-specific modules

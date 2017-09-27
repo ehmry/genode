@@ -8,7 +8,7 @@ set build_components {
 	drivers/rtc
 	server/report_rom
 	server/dynamic_rom
-	test/lwip/http_srv
+	test/http_srv
 	lib/vfs/jitterentropy
 }
 
@@ -53,7 +53,7 @@ set config {
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Rtc"/> </provides>
 	</start>
-	<start name="test-lwip_httpsrv">
+	<start name="test-httpsrv">
 		<resource name="RAM" quantum="5M"/>
 		<config>
 			<libc stdout="/dev/log" stderr="/dev/log">
@@ -142,7 +142,7 @@ set boot_modules {
 	wifi.lib.so
 	wifi_drv
 
-	test-lwip_httpsrv lwip.lib.so
+	test-httpsrv vfs_lwip.lib.so
 }
 
 append boot_modules $firmware_modules

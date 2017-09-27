@@ -107,6 +107,7 @@ set build_components {
 	server/tcp_terminal drivers/nic
 	lib/libc_noux
 	noux/minimal
+	lib/vfs/lwip
 }
 
 #
@@ -118,9 +119,10 @@ foreach pkg {bash coreutils} {
 set boot_modules {
 	ram_fs
 	noux libc_noux.lib.so posix.lib.so bash.tar coreutils.tar
-	tcp_terminal lwip.lib.so nic_drv report_rom
+	tcp_terminal nic_drv report_rom
 	input_merger
 	test.bin template.bat
+	vfs_lwip.lib.so
 }
 
 append boot_modules $vbox_file
@@ -136,8 +138,13 @@ set config_of_app {
 		<provides> <service name="Terminal"/> </provides>
 		<config>
 			<policy label_prefix="noux" port="8888"/>
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log"/>
+			<vfs>
+				<dir name="dev">
+					<dir name="sockets"> <lwip/> </dir
+					<log/>
+				</dir>
+			</vfs>
+			<libc stdout="/dev/log" sockets="/dev/sockets"/>
 		</config>
 	</start>
 

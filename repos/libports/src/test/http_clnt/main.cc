@@ -21,12 +21,12 @@
 #include <util/string.h>
 
 extern "C" {
-#include <lwip/sockets.h>
-#include <lwip/api.h>
-#include <netif/etharp.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 }
-
-#include <lwip/genode.h>
 
 
 /**
@@ -34,7 +34,7 @@ extern "C" {
  * and sends as much 'http get' requests as possible,
  * printing out the response.
  */
-void Libc::Component::construct(Libc::Env &env)
+void http_clnt(Libc::Env &env)
 {
 	using namespace Genode;
 	using Address = Genode::String<16>;
@@ -43,34 +43,18 @@ void Libc::Component::construct(Libc::Env &env)
 
 	static Timer::Connection _timer(env);
 	_timer.msleep(2000);
-	lwip_tcpip_init();
 
-	uint32_t ip = 0, nm = 0, gw = 0;
-	Address serv_addr, ip_addr, netmask, gateway;
+	Address serv_addr;
 
 	Attached_rom_dataspace config(env, "config");
 	Xml_node config_node = config.xml();
-	Xml_node libc_node   = env.libc_config();
-	try {
-		libc_node.attribute("ip_addr").value(&ip_addr);
-		libc_node.attribute("netmask").value(&netmask);
-		libc_node.attribute("gateway").value(&gateway);
-		ip = inet_addr(ip_addr.string());
-		nm = inet_addr(netmask.string());
-		gw = inet_addr(gateway.string());
-	} catch (...) {}
 	config_node.attribute("server_ip").value(&serv_addr);
-
-	if (lwip_nic_init(ip, nm, gw, BUF_SIZE, BUF_SIZE)) {
-		error("We got no IP address!");
-		exit(1);
-	}
 
 	for(int j = 0; j != 5; ++j) {
 		_timer.msleep(2000);
 
 		log("Create new socket ...");
-		int s = lwip_socket(AF_INET, SOCK_STREAM, 0 );
+		int s = socket(AF_INET, SOCK_STREAM, 0 );
 		if (s < 0) {
 			error("no socket available!");
 			continue;
@@ -90,9 +74,9 @@ void Libc::Component::construct(Libc::Env &env)
 		addr.sin_family = AF_INET;
 		addr.sin_addr.s_addr = inet_addr(serv_addr.string());
 
-		if((lwip_connect(s, (struct sockaddr *)&addr, sizeof(addr))) < 0) {
+		if((connect(s, (struct sockaddr *)&addr, sizeof(addr))) < 0) {
 			error("Could not connect!");
-			lwip_close(s);
+			close(s);
 			continue;
 		}
 
@@ -102,11 +86,11 @@ void Libc::Component::construct(Libc::Env &env)
 		static const char *http_get_request =
 			"GET / HTTP/1.0\r\nHost: localhost:80\r\n\r\n";
 
-		unsigned long bytes = lwip_send(s, (char*)http_get_request,
+		unsigned long bytes = send(s, (char*)http_get_request,
 		                                Genode::strlen(http_get_request), 0);
 		if ( bytes < 0 ) {
 			error("couldn't send request ...");
-			lwip_close(s);
+			close(s);
 			continue;
 		}
 
@@ -114,7 +98,7 @@ void Libc::Component::construct(Libc::Env &env)
 		for(int i=0; i<2; i++) {
 			char buf[1024];
 			ssize_t buflen;
-			buflen = lwip_recv(s, buf, 1024, 0);
+			buflen = recv(s, buf, 1024, 0);
 			if(buflen > 0) {
 				buf[buflen] = 0;
 				log("Received \"", String<64>(buf), " ...\"");
@@ -123,8 +107,11 @@ void Libc::Component::construct(Libc::Env &env)
 		}
 
 		/* Close socket */
-		lwip_close(s);
+		close(s);
 	}
 
 	log("Test done");
 }
+
+void Libc::Component::construct(Libc::Env &env) {
+	with_libc([&env] () { http_clnt(env); }); }

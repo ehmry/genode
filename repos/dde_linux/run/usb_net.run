@@ -14,7 +14,8 @@
 set build_components {
 	core init
 	drivers/timer drivers/usb
-	test/lwip/http_srv
+	test/http_srv
+	lib/vfs/lwip
 }
 
 proc gpio_drv { } { if {[have_spec rpi] && [have_spec hw]}  { return hw_gpio_drv }
@@ -63,11 +64,16 @@ set config {
 			<nic mac="02:00:00:00:01:01" />
 		</config>
 	</start>
-	<start name="test-lwip_httpsrv">
+	<start name="test-httpsrv">
 		<resource name="RAM" quantum="4M"/>
 		<config>
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<vfs>
+				<dir name="dev">
+					<dir name="sockets"> <lwip/> </dir>
+					<log/>
+				</dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/sockets" />
 		</config>
 	</start>}
 
@@ -93,7 +99,7 @@ install_config $config
 # generic modules
 set boot_modules {
 	core ld.lib.so init timer usb_drv
-	libc.lib.so libm.lib.so lwip.lib.so posix.lib.so test-lwip_httpsrv
+	libc.lib.so libm.lib.so vfs_lwip.lib.so posix.lib.so test-httpsrv
 }
 
 append_platform_drv_boot_modules
