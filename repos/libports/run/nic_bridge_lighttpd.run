@@ -71,7 +71,7 @@ append config {
 			<arg value="-D" />
 			<vfs>
 				<dir name="dev">
-					<dir name="sockets">
+					<dir name="socket">
 						<lwip ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/> </dir>
 					<log/>
 					<null/>
@@ -108,7 +108,7 @@ mimetype.assign      = (
 					</inline>
 				</dir>
 			</vfs>
-			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/dev/sockets" />
+			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/dev/socket" />
 		</config>
 		<route>
 			<service name="Nic"> <child name="nic_bridge"/> </service>
@@ -124,11 +124,11 @@ mimetype.assign      = (
 		<config server_ip="10.0.2.55" server_port="80">
 			<vfs>
 				<dir name="dev">
-					<dir name="sockets"> <lwip/> </dir>
+					<dir name="socket"> <lwip/> </dir>
 					<log/>
 				</dir>
 			</vfs>
-			<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/sockets" />
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/socket" />
 		</config>
 	</start>
 </config>}

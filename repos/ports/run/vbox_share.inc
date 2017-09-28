@@ -140,11 +140,11 @@ set config_of_app {
 			<policy label_prefix="noux" port="8888"/>
 			<vfs>
 				<dir name="dev">
-					<dir name="sockets"> <lwip/> </dir
+					<dir name="socket"> <lwip/> </dir
 					<log/>
 				</dir>
 			</vfs>
-			<libc stdout="/dev/log" sockets="/dev/sockets"/>
+			<libc stdout="/dev/log" socket="/dev/socket"/>
 		</config>
 	</start>
 

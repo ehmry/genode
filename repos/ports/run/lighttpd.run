@@ -57,7 +57,7 @@ append config {
 			<arg value="-D" />
 			<vfs>
 				<dir name="dev">
-					<dir name="sockets"> <lwip/> </dir>
+					<dir name="socket"> <lwip/> </dir>
 					<log/>
 					<null/>
 				</dir>
@@ -93,7 +93,7 @@ mimetype.assign      = (
 					</inline>
 				</dir>
 			</vfs>
-			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/dev/sockets"/>
+			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/dev/socket"/>
 		</config>
 	</start>}
 

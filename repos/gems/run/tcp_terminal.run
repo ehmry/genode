@@ -65,11 +65,11 @@ set config {
 			<policy label_prefix="test-terminal_echo" port="8888"/>
 			<vfs>
 				<dir name="dev">
-					<dir name="sockets"> <lwip/> </dir>
+					<dir name="socket"> <lwip/> </dir>
 					<log/>
 				</dir>
 			</vfs>
-			<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/sockets" />
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/socket" />
 		</config>
 	</start>
 	<start name="test-terminal_echo">

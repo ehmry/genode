@@ -93,11 +93,11 @@ append config {
 				<dir name="dev">
 					<log/>
 					<jitterentropy name="random"/>
-					<dir name="sockets"> <lwip/> </dir>
+					<dir name="socket"> <lwip/> </dir>
 				</dir>
 				<tar name="qt5_fs_arora.tar"/>
 			</vfs>
-			<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/sockets"/>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/socket"/>
 		</config>
 		<route>
 			<service name="Nitpicker"> <child name="wm"/> </service>

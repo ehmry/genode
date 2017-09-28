@@ -100,13 +100,13 @@ append config {
 			<arg value="-D" />
 			<vfs>
 				<dir name="dev">
-					<dir name="sockets"> <lwip/> </dir>
+					<dir name="socket"> <lwip/> </dir>
 					<log/>
 					<null/>
 				</dir>
 				<tar name="genode_org.tar"/>
 			</vfs>
-			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" sockets="/dev/sockets"/>
+			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/dev/socket"/>
 		</config>
 	</start>}
 

@@ -101,13 +101,13 @@ proc client_config { prot index ip_addr gateway netmask nic srv_port srv_ip } {
 			<config server_ip="} $srv_ip {" server_port="} $srv_port {">
 				<vfs>
 					<dir name="dev">
-						<dir name="sockets">
+						<dir name="socket">
 							<lwip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/>
 						</dir>
 						<log/>
 					</dir>
 				</vfs>
-				<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/sockets" />
+				<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/socket" />
 			</config>
 		</start>}
 	return $result
@@ -125,13 +125,13 @@ proc server_config { prot index ip_addr gateway netmask nic port } {
 			<config port="} $port {">
 				<vfs>
 					<dir name="dev">
-						<dir name="sockets">
+						<dir name="socket">
 							<lwip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/>
 						</dir>
 						<log/>
 					</dir>
 				</vfs>
-				<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/sockets" />
+				<libc stdout="/dev/log" stderr="/dev/log" socket="/dev/socket" />
 			</config>
 		</start>}
 	return $result
