@@ -6,6 +6,8 @@ __error T
 __flt_rounds T
 __fpclassifyd T
 __fpclassifyf T
+__h_errno T
+__h_errno_set T
 __inet_addr T
 __inet_aton T
 __inet_nsap_ntoa T
@@ -310,6 +312,10 @@ heapsort T
 hsearch T
 imaxabs T
 imaxdiv T
+in6addr_any R 16
+in6addr_linklocal_allnodes R 16
+in6addr_loopback R 16
+in6addr_nodelocal_allnodes R 16
 index T
 inet_addr W
 inet_aton W
@@ -747,8 +753,8 @@ swscanf T
 symlink T
 sync W
 sys_errlist D 752
-sys_nerr R
-sys_nsig R
+sys_nerr R 4
+sys_nsig R 4
 sys_siglist D 256
 sys_signame D 256
 sysconf T
@@ -905,42 +911,6 @@ _DefaultRuneLocale D 4224
 _CurrentRuneLocale D 8
 __isinff T
 __isinfl T
-
-
-#
-# Symbols needed by libc-resolv
-#
-__inet_nsap_addr T
-_accept T
-_bind T
-_close T
-_connect T
-_fcntl T
-_fstat T
-_getpeername T
-_getsockname T
-_getsockopt T
-_listen T
-_nanosleep W
-_pthread_getspecific W
-_pthread_key_create W
-_pthread_main_np W
-_pthread_mutex_trylock W
-_pthread_mutex_unlock W
-_pthread_once W
-_pthread_rwlock_rdlock W
-_pthread_rwlock_unlock W
-_pthread_rwlock_wrlock W
-_pthread_setspecific W
-_read T
-_recvfrom T
-_select W
-_sendto T
-_setsockopt T
-_sigprocmask W
-_socket T
-_write T
-_writev T
 
 
 #
