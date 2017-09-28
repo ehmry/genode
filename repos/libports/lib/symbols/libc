@@ -2,6 +2,8 @@ ___runetype T
 ___tolower T
 ___toupper T
 __assert T
+__dn_expand T
+__dn_expand T
 __error T
 __flt_rounds T
 __fpclassifyd T
@@ -16,6 +18,9 @@ __inet_ntop T
 __inet_pton T
 __isthreaded B 4
 __mb_cur_max D 8
+__res_init T
+__res_query T
+__res_state T
 __srget T
 __stderrp D 8
 __stdinp D 8
@@ -23,6 +28,8 @@ __stdoutp D 8
 __swbuf T
 __xuname T
 _exit T
+_getlong T
+_getshort T
 a64l T
 abort T
 abs T
