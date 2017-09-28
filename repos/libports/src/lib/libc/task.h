@@ -21,30 +21,9 @@
 #ifndef _LIBC__TASK_H_
 #define _LIBC__TASK_H_
 
+#include <libc/component.h>
+
 namespace Libc {
-
-	/**
-	 * Resume all user contexts
-	 *
-	 * This resumes the main user context as well as any pthread context.
-	 */
-	void resume_all();
-
-	/**
-	 * Suspend the execution of the calling user context
-	 *
-	 * \param timeout_ms  maximum time to stay suspended in milliseconds,
-	 *                    0 for infinite suspend
-	 *
-	 * \return            remaining duration until timeout,
-	 *                    0 if the timeout expired
-	 *
-	 * The context could be running on the component entrypoint as main context
-	 * or as separate pthread. This function returns after the libc kernel
-	 * resumed the user context execution.
-	 */
-	struct Suspend_functor { virtual bool suspend() = 0; };
-	unsigned long suspend(Suspend_functor &, unsigned long timeout_ms = 0UL);
 
 	/**
 	 * Get time since startup in ms

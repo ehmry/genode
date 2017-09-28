@@ -134,6 +134,33 @@ namespace Libc {
 
 		return application_code_func.retval;
 	}
+
+	/**
+	 * Suspend the execution of the calling user context
+	 *
+	 * \param timeout_ms  maximum time to stay suspended in milliseconds,
+	 *                    0 for infinite suspend
+	 *
+	 * \return            remaining duration until timeout,
+	 *                    0 if the timeout expired
+	 *
+	 * The context could be running on the component entrypoint as main context
+	 * or as separate pthread. This function returns after the libc kernel
+	 * resumed the user context execution.
+	 *
+	 * \noapi
+	 */
+	struct Suspend_functor { virtual bool suspend() = 0; };
+	unsigned long suspend(Suspend_functor &, unsigned long timeout_ms = 0UL);
+
+	/**
+	 * Resume all user contexts
+	 *
+	 * This resumes the main user context as well as any pthread context.
+	 *
+	 * \noapi
+	 */
+	void resume_all();
 }
 
 #endif /* _INCLUDE__LIBC__COMPONENT_H_ */
