@@ -1511,6 +1511,8 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 			if (file) {
 				Lxip_vfs_file_handle *handle =
 					new (alloc) Vfs::Lxip_vfs_file_handle(*this, alloc, 0, *file);
+				/* poll all open handles regardless of notify_read_ready */
+				_polling_handles.insert(&handle->polling_le);
 				*out_handle = handle;
 
 				return OPEN_OK;
@@ -1605,19 +1607,6 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 		{
 			/* report ok because libc always executes ftruncate() when opening rw */
 			return FTRUNCATE_OK;
-		}
-
-		bool notify_read_ready(Vfs_handle *vfs_handle) override
-		{
-			Lxip_vfs_file_handle *handle =
-				static_cast<Vfs::Lxip_vfs_file_handle *>(vfs_handle);
-
-			if (dynamic_cast<Lxip_file*>(&handle->file)) {
-				_polling_handles.remove(&handle->polling_le);
-				_polling_handles.insert(&handle->polling_le);
-			}
-
-			return true;
 		}
 
 		bool read_ready(Vfs_handle *vfs_handle) override
