@@ -9,6 +9,7 @@ set build_components {
 	drivers/nic
 	drivers/timer
 	app/lighttpd
+	lib/vfs/lxip
 }
 
 source ${genode_dir}/repos/base/run/platform_drv.inc
@@ -55,6 +56,7 @@ append config {
 			<arg value="/etc/lighttpd/lighttpd.conf" />
 			<arg value="-D" />
 			<vfs>
+				<dir name="socket"> <lxip dhcp="yes"/> </dir>
 				<dir name="dev">
 					<log/>
 					<null/>
@@ -91,7 +93,7 @@ mimetype.assign      = (
 					</inline>
 				</dir>
 			</vfs>
-			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log"/>
+			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
 		</config>
 	</start>}
 
@@ -109,7 +111,7 @@ install_config $config
 append boot_modules {
 	core init timer ld.lib.so } [nic_drv_binary] {
 	libc.lib.so libm.lib.so posix.lib.so
-	lwip.lib.so zlib.lib.so
+	vfs_lxip.lib.so zlib.lib.so
 	lighttpd
 }
 

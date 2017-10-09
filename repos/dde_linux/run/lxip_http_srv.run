@@ -14,7 +14,8 @@ proc gpio_drv { } { if {[have_spec rpi] && [have_spec hw]}  { return hw_gpio_drv
 set build_components {
 	core init
 	drivers/timer drivers/nic
-	test/lxip/http_srv
+	test/http_srv
+	lib/vfs/lxip
 }
 
 lappend_if $use_usb_driver              build_components drivers/usb
@@ -52,11 +53,16 @@ set config {
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Timer"/> </provides>
 	</start>
-	<start name="test-lxip_http_srv" caps="200">
+	<start name="test-httpsrv" caps="200">
 		<resource name="RAM" quantum="28M"/>
 		<config ld_verbose="yes">
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log" ip_addr="10.0.2.55" gateway="10.0.2.1" netmask="255.255.255.0"/>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<dir name="socket">
+					<lxip  ip_addr="10.0.2.55" gateway="10.0.2.1" netmask="255.255.255.0"/>
+				</dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log"/>
 		</config>
 	</start>}
 
@@ -100,7 +106,7 @@ install_config $config
 # generic modules
 set boot_modules {
 	core ld.lib.so init timer posix.lib.so
-	libc.lib.so libm.lib.so lxip.lib.so test-lxip_http_srv
+	libc.lib.so libm.lib.so vfs_lxip.lib.so test-httpsrv
 }
 
 # platform-specific modules

@@ -85,7 +85,7 @@ install_config $config
 
 append boot_modules {
 	core init timer } [nic_drv_binary] { vfs dynamic_rom
-	ld.lib.so vfs_lxip.lib.so lxip.lib.so
+	ld.lib.so vfs_lxip.lib.so
 }
 
 append_platform_drv_boot_modules

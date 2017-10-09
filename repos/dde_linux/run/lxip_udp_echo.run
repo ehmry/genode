@@ -8,7 +8,8 @@ set use_nic_driver [expr [have_spec linux] || [expr !$use_usb_driver && ![have_s
 set build_components {
 	core init
 	drivers/timer drivers/nic
-	test/lxip/udp_echo
+	test/udp_echo
+	lib/vfs/lxip
 }
 
 proc gpio_drv { } { if {[have_spec rpi] && [have_spec hw]}  { return hw_gpio_drv }
@@ -50,12 +51,15 @@ append config {
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Timer"/> </provides>
 	</start>
-	<start name="test-lxip_udp_echo" caps="200">
+	<start name="test-udp_echo" caps="200">
 		<resource name="RAM" quantum="28M"/>
 		<config port="1337">
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log" ip_addr="10.0.2.55"
-			      gateway="10.0.2.1" netmask="255.255.255.0"/>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<dir name="socket">
+					<lxip  ip_addr="10.0.2.55" gateway="10.0.2.1" netmask="255.255.255.0"/> </dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log"/>
 		</config>
 	</start>}
 
@@ -99,7 +103,7 @@ install_config $config
 # generic modules
 set boot_modules {
 	core ld.lib.so init timer
-	libc.lib.so libm.lib.so lxip.lib.so test-lxip_udp_echo
+	libc.lib.so vfs_lxip.lib.so test-udp_echo
 }
 
 # platform-specific modules

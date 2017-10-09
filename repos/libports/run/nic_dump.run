@@ -30,9 +30,9 @@ proc nic_drv_build { } {
 proc gpio_drv_build { } { if {[gpio_drv] != ""} { return drivers/gpio } }
 
 build "core init drivers/timer server/nic_router server/nic_bridge
-       test/lwip/http_srv_static test/lwip/http_clnt test/lxip/udp_echo
-       test/lxip/udp_client server/nic_dump [nic_drv_build] [gpio_drv_build]
-       [platform_drv_build_components]"
+       test/http_srv_static test/http_clnt test/udp_echo
+       test/udp_client server/nic_dump [nic_drv_build] [gpio_drv_build]
+       [platform_drv_build_components] lib/vfs/lxip"
 
 create_boot_directory
 
@@ -77,16 +77,16 @@ proc nic_drv_config { } {
 }
 
 proc client_bin { prot } {
-	if {$prot == "udp"}  { return "test-lxip_udp_client" }
+	if {$prot == "udp"}  { return "test-udp_client" }
 	if {$prot == "http"} { return "test-http_clnt" } }
 
 proc server_bin { prot } {
-	if {$prot == "udp"}  { return "test-lxip_udp_echo" }
-	if {$prot == "http"} { return "test-lwip_httpsrv_static" } }
+	if {$prot == "udp"}  { return "test-udp_echo" }
+	if {$prot == "http"} { return "test-httpsrv_static" } }
 
 proc ram_quota { prot } {
 	if {$prot == "udp"}  { return 29M }
-	if {$prot == "http"} { return 12M }
+	if {$prot == "http"} { return 32M }
 }
 
 proc client_config { prot index ip_addr gateway netmask nic srv_port srv_ip } {
@@ -99,9 +99,12 @@ proc client_config { prot index ip_addr gateway netmask nic srv_port srv_ip } {
 				<any-service> <parent/> <any-child/> </any-service>
 			</route>
 			<config server_ip="} $srv_ip {" server_port="} $srv_port {">
-				<vfs> <dir name="dev"> <log/> </dir> </vfs>
-				<libc stdout="/dev/log" stderr="/dev/log" ip_addr="} $ip_addr {"
-				      gateway="} $gateway {" netmask="} $netmask {"/>
+				<vfs>
+					<dir name="dev"> <log/> </dir>
+					<dir name="socket">
+						<lxip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/> </dir>
+				</vfs>
+				<libc stdout="/dev/log" stderr="/dev/log"/>
 			</config>
 		</start>}
 	return $result
@@ -117,9 +120,12 @@ proc server_config { prot index ip_addr gateway netmask nic port } {
 				<any-service> <parent/> <any-child/> </any-service>
 			</route>
 			<config port="} $port {">
-				<vfs> <dir name="dev"> <log/> </dir> </vfs>
-				<libc stdout="/dev/log" stderr="/dev/log" ip_addr="} $ip_addr {"
-				      gateway="} $gateway {" netmask="} $netmask {"/>
+				<vfs>
+					<dir name="dev"> <log/> </dir>
+					<dir name="socket">
+						<lxip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/> </dir>
+				</vfs>
+				<libc stdout="/dev/log" stderr="/dev/log"/>
 			</config>
 		</start>}
 	return $result
@@ -253,8 +259,8 @@ install_config $config
 
 build_boot_image "
 	core init timer nic_router nic_bridge ld.lib.so libc.lib.so libm.lib.so
-	posix.lib.so lwip.lib.so lxip.lib.so test-http_clnt
-	test-lwip_httpsrv_static nic_dump test-lxip_udp_echo test-lxip_udp_client
+	posix.lib.so vfs_lxip.lib.so test-http_clnt
+	test-httpsrv_static nic_dump test-udp_echo test-udp_client
 	[nic_drv_binary] [gpio_drv] [platform_drv_boot_modules]"
 
 proc nic_qemu_args { } {

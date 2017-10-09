@@ -16,7 +16,7 @@ if {[have_spec odroid_xu]} {
 set build_components {
 	core init
 	drivers/timer drivers/nic
-	test/lwip/pingpong/server
+	test/pingpong/server
 }
 
 lappend_if [expr [have_spec omap4] || [have_spec arndale]] build_components drivers/usb
@@ -56,12 +56,17 @@ set config {
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Timer"/> </provides>
 	</start>
-	<start name="test-ping_server_libc_lwip">
+	<start name="test-ping_server">
 		<resource name="RAM" quantum="16M"/>
 		<config>
 			<argv verbose="0" listenip="0.0.0.0" />
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<vfs>
+				<dir name="socket"> <lxip dhcp="yes"/> </dir>
+				<dir name="dev">
+					<log/>
+				</dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/socket" />
 		</config>
 	</start> }
 
@@ -104,8 +109,8 @@ install_config $config
 # generic modules
 set boot_modules {
 	core init timer
-	ld.lib.so libc.lib.so lwip.lib.so posix.lib.so
-	test-ping_server_libc_lwip
+	ld.lib.so libc.lib.so vfs_lxip.lib.so posix.lib.so
+	test-ping_server
 }
 
 # platform-specific modules

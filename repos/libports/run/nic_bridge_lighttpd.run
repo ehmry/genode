@@ -7,8 +7,8 @@ set build_components {
 	drivers/timer drivers/input drivers/nic
 	server/nic_bridge
 	app/lighttpd
-	test/lwip/http_clnt
-
+	test/http_clnt
+	lib/vfs/lxip
 }
 
 source ${genode_dir}/repos/base/run/platform_drv.inc
@@ -36,7 +36,8 @@ append config {
 	</parent-provides>
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
-	</default-route>}
+	</default-route>
+	<default caps="256"/>}
 
 append_platform_drv_config
 
@@ -69,6 +70,8 @@ append config {
 			<arg value="/etc/lighttpd/lighttpd.conf" />
 			<arg value="-D" />
 			<vfs>
+				<dir name="socket">
+					<lxip ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/> </dir>
 				<dir name="dev">
 					<log/>
 					<null/>
@@ -105,8 +108,7 @@ mimetype.assign      = (
 					</inline>
 				</dir>
 			</vfs>
-			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log"
-			      ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/>
+			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/socket" />
 		</config>
 		<route>
 			<service name="Nic"> <child name="nic_bridge"/> </service>
@@ -120,8 +122,13 @@ mimetype.assign      = (
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 		<config server_ip="10.0.2.55" server_port="80">
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<vfs>
+				<dir name="socket"> <lxip dhcp="yes"/> </dir>
+				<dir name="dev">
+					<log/>
+				</dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/socket" />
 		</config>
 	</start>
 </config>}
@@ -140,7 +147,7 @@ append boot_modules {
 	ld.lib.so
 	libc.lib.so
 	posix.lib.so
-	lwip.lib.so
+	vfs_lxip.lib.so
 	test-http_clnt
 	libm.lib.so
 	zlib.lib.so

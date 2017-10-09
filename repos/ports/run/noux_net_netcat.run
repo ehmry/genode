@@ -18,8 +18,9 @@ set build_components {
 	drivers/timer
 	server/tcp_terminal
 	server/nic_bridge
-	noux/net lib/libc_noux
+	noux lib/libc_noux
 	noux-pkg/netcat
+	lib/vfs/lxip
 }
 
 proc gpio_drv { } { if {[have_spec rpi] && [have_spec hw]}  { return hw_gpio_drv }
@@ -81,7 +82,7 @@ append_if [have_include "power_on/qemu"] config {
 			<service name="Uart"/>
 		</provides>
 		<config>
-			<policy label_prefix="noux_net" uart="1"/>
+			<policy label_prefix="noux" uart="1"/>
 		</config>
 	</start>}
 
@@ -95,7 +96,12 @@ append config {
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 		<config>
-			<policy label_prefix="noux_net" port="8888"/>
+			<policy label_prefix="noux" port="8888"/>
+			<vfs>
+				<dir name="socket"> <lxip dhcp="yes"/> </dir>
+				<tar name="netcat.tar" at="/"/>
+			</vfs>
+			<libc socket="/socket"/>
 		</config>
 	</start>
 	<start name="nic_bridge" caps="200">
@@ -141,10 +147,14 @@ append_if $use_usb_driver config {
 append_platform_drv_config
 
 append config {
-	<start name="noux_net" caps="500">
+	<start name="noux" caps="500">
 		<resource name="RAM" quantum="1G"/>
 		<config>
-			<fstab> <tar name="netcat.tar" at="/"/> </fstab>
+			<fstab>
+				<dir name="socket"> <lxip dhcp="yes"/> </dir>
+				<tar name="netcat.tar" at="/"/>
+			</fstab>
+			<libc/>
 			<start name="/bin/netcat">
 				<arg value="-l"/>
 				<arg value="-p 5555"/>
@@ -171,8 +181,8 @@ install_config $config
 # generic modules
 set boot_modules {
 	core init timer tcp_terminal nic_bridge
-	ld.lib.so noux_net libc.lib.so libm.lib.so libc_pipe.lib.so pthread.lib.so
-	libc_noux.lib.so lwip.lib.so netcat.tar posix.lib.so
+	ld.lib.so noux libc.lib.so libm.lib.so libc_pipe.lib.so pthread.lib.so
+	libc_noux.lib.so vfs_lxip.lib.so netcat.tar posix.lib.so
 }
 
 # platform-specific modules
@@ -202,17 +212,17 @@ if {[have_include "power_on/qemu"]} {
 
 	append qemu_args " -net user -redir tcp:5555::5555 "
 
-	run_genode_until {.*got IP address.*\n} 60
+	run_genode_until {.*IP-Config: Complete.*\n} 60
 	set serial_id [output_spawn_id]
 } else {
 	# wait until we got both IP addresses in the output afterwards
-	run_genode_until {.*got IP address.*\n.*got IP address.*\n} 60
+	run_genode_until {.*IP-Config: Complete.*\n} 60
 	set serial_id [output_spawn_id]
 
-	regexp {\[init -> noux_net\] got IP address [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $output noux_ip_addr
+	regexp {\[init -> noux\] .*ipaddr\=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $output noux_ip_addr
 	regexp {[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $noux_ip_addr noux_ip_addr
 
-	regexp {\[init -> tcp_terminal\] got IP address [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $output serial_ip_addr
+	regexp {\[init -> tcp_terminal\] .*ipaddr\=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $output serial_ip_addr
 	regexp {[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+} $serial_ip_addr serial_ip_addr
 
 	# connect to Genode target and reading log output via network connection
@@ -231,7 +241,7 @@ puts "--- serial '$serial_ip_addr' noux '$noux_ip_addr'"
 #
 exec echo -e "Hello Genode" | netcat $noux_ip_addr 5555 &
 
-run_genode_until {exited with exit value 1} 20 $serial_id
+run_genode_until {exited with exit value 1} 120 $serial_id
 
 sleep 4
 

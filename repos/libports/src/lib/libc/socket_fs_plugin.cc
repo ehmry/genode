@@ -30,9 +30,10 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 /* libc-internal includes */
-#include "socket_fs_plugin.h"
 #include "libc_file.h"
 #include "libc_errno.h"
 #include "task.h"
@@ -82,6 +83,8 @@ namespace Socket_fs {
 	struct Local_functor;
 
 	Plugin & plugin();
+
+	enum { MAX_CONTROL_PATH_LEN = 16 };
 }
 
 
@@ -398,7 +401,7 @@ static int read_sockaddr_in(Socket_fs::Sockaddr_functor &func,
  ** Address functions **
  ***********************/
 
-extern "C" int socket_fs_getpeername(int libc_fd, sockaddr *addr, socklen_t *addrlen)
+extern "C" int _getpeername(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
@@ -419,7 +422,13 @@ extern "C" int socket_fs_getpeername(int libc_fd, sockaddr *addr, socklen_t *add
 }
 
 
-extern "C" int socket_fs_getsockname(int libc_fd, sockaddr *addr, socklen_t *addrlen)
+extern "C" int getpeername(int libc_fd, sockaddr *addr, socklen_t *addrlen)
+{
+	return _getpeername(libc_fd, addr, addrlen);
+}
+
+
+extern "C" int _getsockname(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
@@ -432,11 +441,17 @@ extern "C" int socket_fs_getsockname(int libc_fd, sockaddr *addr, socklen_t *add
 }
 
 
+extern "C" int getsockname(int libc_fd, sockaddr *addr, socklen_t *addrlen)
+{
+	return _getsockname(libc_fd, addr, addrlen);
+}
+
+
 /**************************
  ** Socket transport API **
  **************************/
 
-extern "C" int socket_fs_accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
+extern "C" int _accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
@@ -447,7 +462,7 @@ extern "C" int socket_fs_accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 	/* TODO EOPNOTSUPP - no SOCK_STREAM */
 	/* TODO ECONNABORTED */
 
-	char accept_socket[10];
+	char accept_socket[MAX_CONTROL_PATH_LEN];
 	{
 		int n = 0;
 		/* XXX currently reading accept may return without new connection */
@@ -481,7 +496,13 @@ extern "C" int socket_fs_accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 }
 
 
-extern "C" int socket_fs_bind(int libc_fd, sockaddr const *addr, socklen_t addrlen)
+extern "C" int accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
+{
+	return _accept(libc_fd, addr, addrlen);
+}
+
+
+extern "C" int _bind(int libc_fd, sockaddr const *addr, socklen_t addrlen)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
@@ -502,13 +523,18 @@ extern "C" int socket_fs_bind(int libc_fd, sockaddr const *addr, socklen_t addrl
 	int const len = strlen(addr_string.base());
 	int const n   = write(context->bind_fd(), addr_string.base(), len);
 	if (n != len) return Errno(EACCES);
-	fsync(context->bind_fd());
 
-	return 0;
+	return fsync(context->bind_fd());
 }
 
 
-extern "C" int socket_fs_connect(int libc_fd, sockaddr const *addr, socklen_t addrlen)
+extern "C" int bind(int libc_fd, sockaddr const *addr, socklen_t addrlen)
+{
+	return _bind(libc_fd, addr, addrlen);
+}
+
+
+extern "C" int _connect(int libc_fd, sockaddr const *addr, socklen_t addrlen)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
@@ -534,11 +560,18 @@ extern "C" int socket_fs_connect(int libc_fd, sockaddr const *addr, socklen_t ad
 	int const n   = write(context->connect_fd(), addr_string.base(), len);
 	if (n != len) return Errno(ECONNREFUSED);
 
-	return 0;
+	/* sync the FD to block for write completion */
+	return fsync(context->connect_fd());
 }
 
 
-extern "C" int socket_fs_listen(int libc_fd, int backlog)
+extern "C" int connect(int libc_fd, sockaddr const *addr, socklen_t addrlen)
+{
+    return _connect(libc_fd, addr, addrlen);
+}
+
+
+extern "C" int _listen(int libc_fd, int backlog)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
@@ -546,13 +579,19 @@ extern "C" int socket_fs_listen(int libc_fd, int backlog)
 	Socket_fs::Context *context = dynamic_cast<Socket_fs::Context *>(fd->context);
 	if (!context) return Errno(ENOTSOCK);
 
-	char buf[10];
+	char buf[MAX_CONTROL_PATH_LEN];
 	int const len = snprintf(buf, sizeof(buf), "%d", backlog);
 	int const n   = write(context->listen_fd(), buf, len);
 	if (n != len) return Errno(EOPNOTSUPP);
 
 	context->accept_only();
 	return 0;
+}
+
+
+extern "C" int listen(int libc_fd, int backlog)
+{
+	return _listen(libc_fd, backlog);
 }
 
 
@@ -584,7 +623,7 @@ static ssize_t do_recvfrom(Libc::File_descriptor *fd,
 }
 
 
-extern "C" ssize_t socket_fs_recvfrom(int libc_fd, void *buf, ::size_t len, int flags,
+extern "C" ssize_t _recvfrom(int libc_fd, void *buf, ::size_t len, int flags,
                                       sockaddr *src_addr, socklen_t *src_addrlen)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
@@ -594,17 +633,37 @@ extern "C" ssize_t socket_fs_recvfrom(int libc_fd, void *buf, ::size_t len, int 
 }
 
 
-extern "C" ssize_t socket_fs_recv(int libc_fd, void *buf, ::size_t len, int flags)
+extern "C" ssize_t recvfrom(int libc_fd, void *buf, ::size_t len, int flags,
+                            sockaddr *src_addr, socklen_t *src_addrlen)
 {
-	/* identical to recvfrom() with a NULL src_addr argument */
-	return socket_fs_recvfrom(libc_fd, buf, len, flags, nullptr, nullptr);
+	return _recvfrom(libc_fd, buf, len, flags, src_addr, src_addrlen);
 }
 
 
-extern "C" ssize_t socket_fs_recvmsg(int libc_fd, msghdr *msg, int flags)
+extern "C" ssize_t _recv(int libc_fd, void *buf, ::size_t len, int flags)
+{
+	/* identical to recvfrom() with a NULL src_addr argument */
+	return _recvfrom(libc_fd, buf, len, flags, nullptr, nullptr);
+}
+
+
+extern "C" ssize_t recv(int libc_fd, void *buf, ::size_t len, int flags)
+{
+	/* identical to recvfrom() with a NULL src_addr argument */
+	return _recvfrom(libc_fd, buf, len, flags, nullptr, nullptr);
+}
+
+
+extern "C" ssize_t _recvmsg(int libc_fd, msghdr *msg, int flags)
 {
 	Genode::warning("##########  TODO  ########## ", __func__);
 	return 0;
+}
+
+
+extern "C" ssize_t recvmsg(int libc_fd, msghdr *msg, int flags)
+{
+	return _recvmsg(libc_fd, msg, flags);
 }
 
 
@@ -639,7 +698,7 @@ static ssize_t do_sendto(Libc::File_descriptor *fd,
 }
 
 
-extern "C" ssize_t socket_fs_sendto(int libc_fd, void const *buf, ::size_t len, int flags,
+extern "C" ssize_t _sendto(int libc_fd, void const *buf, ::size_t len, int flags,
                                     sockaddr const *dest_addr, socklen_t dest_addrlen)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
@@ -649,14 +708,21 @@ extern "C" ssize_t socket_fs_sendto(int libc_fd, void const *buf, ::size_t len, 
 }
 
 
-extern "C" ssize_t socket_fs_send(int libc_fd, void const *buf, ::size_t len, int flags)
+extern "C" ssize_t sendto(int libc_fd, void const *buf, ::size_t len, int flags,
+                                    sockaddr const *dest_addr, socklen_t dest_addrlen)
 {
-	/* identical to sendto() with a NULL dest_addr argument */
-	return socket_fs_sendto(libc_fd, buf, len, flags, nullptr, 0);
+	return _sendto(libc_fd, buf, len, flags, dest_addr, dest_addrlen);
 }
 
 
-extern "C" int socket_fs_getsockopt(int libc_fd, int level, int optname,
+extern "C" ssize_t send(int libc_fd, void const *buf, ::size_t len, int flags)
+{
+	/* identical to sendto() with a NULL dest_addr argument */
+	return _sendto(libc_fd, buf, len, flags, nullptr, 0);
+}
+
+
+extern "C" int _getsockopt(int libc_fd, int level, int optname,
                                     void *optval, socklen_t *optlen)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
@@ -692,7 +758,14 @@ extern "C" int socket_fs_getsockopt(int libc_fd, int level, int optname,
 }
 
 
-extern "C" int socket_fs_setsockopt(int libc_fd, int level, int optname,
+extern "C" int getsockopt(int libc_fd, int level, int optname,
+                          void *optval, socklen_t *optlen)
+{
+	return _getsockopt(libc_fd, level, optname, optval, optlen);
+}
+
+
+extern "C" int _setsockopt(int libc_fd, int level, int optname,
                                     void const *optval, socklen_t optlen)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
@@ -709,15 +782,26 @@ extern "C" int socket_fs_setsockopt(int libc_fd, int level, int optname,
 		case SO_REUSEADDR:
 			Genode::log("setsockopt: SO_REUSEADDR not yet implemented - always true");
 			return 0;
-		default: return Errno(ENOPROTOOPT);
+		default:
+			Genode::warning("setsockopt not implemented for SOL_SOCKET opt ", optname);
+			return 0;
 		}
 
-	default: return Errno(EINVAL);
+	default:
+		Genode::warning("setsockopt not implemented for level ", level, " opt ", optname);
+		return 0;
 	}
 }
 
 
-extern "C" int socket_fs_shutdown(int libc_fd, int how)
+extern "C" int setsockopt(int libc_fd, int level, int optname,
+                          void const *optval, socklen_t optlen)
+{
+	return _setsockopt(libc_fd, level, optname, optval, optlen);
+}
+
+
+extern "C" int _shutdown(int libc_fd, int how)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
@@ -733,27 +817,33 @@ extern "C" int socket_fs_shutdown(int libc_fd, int how)
 }
 
 
-static Genode::String<16> new_socket(Absolute_path const &path)
+extern "C" int shutdown(int libc_fd, int how)
+{
+	return _shutdown(libc_fd, how);
+}
+
+
+static Genode::String<MAX_CONTROL_PATH_LEN> new_socket(Absolute_path const &path)
 {
 	Absolute_path new_socket("new_socket", path.base());
 
 	int const fd = open(new_socket.base(), O_RDONLY);
 	if (fd == -1) {
-		Genode::error(__func__, ": new_socket file not accessible - socket fs not mounted?");
+		Genode::error(__func__, ": ", new_socket, " file not accessible - socket fs not mounted?");
 		throw New_socket_failed();
 	}
-	char buf[10];
+	char buf[MAX_CONTROL_PATH_LEN];
 	int const n = read(fd, buf, sizeof(buf));
 	close(fd);
 	if (n == -1 || !n || n >= (int)sizeof(buf) - 1)
 		throw New_socket_failed();
 	buf[n] = 0;
 
-	return Genode::String<16>(buf);
+	return Genode::String<MAX_CONTROL_PATH_LEN>(buf);
 }
 
 
-extern "C" int socket_fs_socket(int domain, int type, int protocol)
+extern "C" int _socket(int domain, int type, int protocol)
 {
 	Absolute_path path(Libc::config_socket());
 
@@ -780,7 +870,7 @@ extern "C" int socket_fs_socket(int domain, int type, int protocol)
 		case Proto::UDP: proto_path.append("/udp"); break;
 		}
 
-		Genode::String<16> socket_path = new_socket(proto_path);
+		auto socket_path = new_socket(proto_path);
 		path.append("/");
 		path.append(socket_path.string());
 	} catch (New_socket_failed) { return Errno(EACCES); }
@@ -791,6 +881,11 @@ extern "C" int socket_fs_socket(int domain, int type, int protocol)
 		Libc::file_descriptor_allocator()->alloc(&plugin(), context);
 
 	return fd->libc_fd;
+}
+
+extern "C" int socket(int domain, int type, int protocol)
+{
+	return _socket(domain, type, protocol);
 }
 
 

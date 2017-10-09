@@ -1,7 +1,7 @@
 util_mmio
 ldso
 timer
-lwip
+lxip
 rm_fault
 rom_blk
 tar_rom
@@ -24,10 +24,6 @@ lx_hybrid_pthread_ipc
 moon
 thread_join
 fault_detection
-netperf_lwip
-netperf_lwip_usb30
-netperf_lwip_bridge
-netperf_lwip_wifi
 netperf_lxip
 netperf_lxip_usb30
 netperf_lxip_bridge

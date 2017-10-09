@@ -91,7 +91,7 @@ append boot_modules {
 	core init timer } [nic_drv_binary] {
 	ld.lib.so libc.lib.so libc_pipe.lib.so posix.lib.so
 	libm.lib.so
-	vfs_lxip.lib.so lxip.lib.so
+	vfs_lxip.lib.so
 	tcp_terminal
 	test-terminal_echo
 	test-vfs_lxip

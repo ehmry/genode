@@ -1368,7 +1368,7 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 				Addr gateway    = config.attribute_value("gateway", Addr());
 				Addr nameserver = config.attribute_value("nameserver", Addr());
 
-				/* either none or all 4 interface attributes must exist */
+				/* either none or all 3 interface attributes must exist */
 				if (ip_addr == "") {
 					warning("Missing \"ip_addr\" attribute. Ignoring network interface config.");
 					throw Genode::Xml_node::Nonexistent_attribute();

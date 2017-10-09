@@ -69,7 +69,7 @@ set boot_modules {
 	core init timer linux_nic_drv ram_fs vfs
 	ld.lib.so libc.lib.so libm.lib.so
 	stdcxx.lib.so
-	vfs_lxip.lib.so lxip.lib.so
+	vfs_lxip.lib.so
 	test-nim_echo_server
 }
 
