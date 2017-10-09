@@ -127,7 +127,7 @@ namespace Libc {
 	char const *config_socket() __attribute__((weak));
 	char const *config_socket()
 	{
-		static Config_attr socket("socket", "");
+		static Config_attr socket("socket", "/socket");
 		return socket.string();
 	}
 
