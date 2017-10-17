@@ -53,8 +53,11 @@ class File_system::Session_rpc_object : public Genode::Rpc_object<Session, Sessi
 		/**
 		 * Stub for old File_system servers
 		 */
-		Watch_handle watch(Path const &path) override {
-			throw Permission_denied(); }
+		Watch_handle watch(Path const &path) override
+		{
+			Genode::error("'", path.string(), "' not watchable");
+			throw Permission_denied();
+		}
 
 };
 

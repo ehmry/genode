@@ -33,12 +33,14 @@ namespace Vfs_server {
 	struct Directory;
 	struct File;
 	struct Symlink;
+	struct Watch;
 
 	typedef Genode::Id_space<Node> Node_space;
 
 	struct Node_io_handler : Interface
 	{
 		virtual void handle_node_io(Node &node) = 0;
+		virtual void handle_node_event(Node &node) = 0;
 	};
 
 	/**
@@ -63,7 +65,7 @@ namespace Vfs_server {
 	template<> struct Node_type<Dir_handle>     { typedef Directory Type; };
 	template<> struct Node_type<File_handle>    { typedef File      Type; };
 	template<> struct Node_type<Symlink_handle> { typedef Symlink   Type; };
-
+	template<> struct Node_type<Watch_handle>   { typedef Watch     Type; };
 
 	/**
 	 * Type trait for determining the handle type for a given node type
@@ -73,6 +75,7 @@ namespace Vfs_server {
 	template<> struct Handle_type<Directory> { typedef Dir_handle     Type; };
 	template<> struct Handle_type<File>      { typedef File_handle    Type; };
 	template<> struct Handle_type<Symlink>   { typedef Symlink_handle Type; };
+	template<> struct Handle_type<Watch>     { typedef Watch_handle   Type; };
 
 	/*
 	 * Note that the file objects are created at the
@@ -213,7 +216,14 @@ class Vfs_server::Node : public  File_system::Node_base,
 
 		void handle_io_response()
 		{
-			_node_io_handler.handle_node_io(*this);
+			if (&_node_io_handler != nullptr)
+				_node_io_handler.handle_node_io(*this);
+		}
+
+		void handle_event_response()
+		{
+			if (&_node_io_handler != nullptr)
+				_node_io_handler.handle_node_event(*this);
 		}
 
 		void notify_read_ready(bool requested)
@@ -406,7 +416,6 @@ struct Vfs_server::Directory : Node
 	Node_space::Id file(Node_space        &space,
 	                    Vfs::File_system  &vfs,
 	                    Genode::Allocator &alloc,
-	                    Node_io_handler   &node_io_handler,
 	                    char        const *file_path,
 	                    Mode               mode,
 	                    bool               create)
@@ -417,7 +426,7 @@ struct Vfs_server::Directory : Node
 		File *file;
 		try {
 			file = new (alloc)
-			       File(space, vfs, alloc, node_io_handler, path_str, mode, create);
+			       File(space, vfs, alloc, _node_io_handler, path_str, mode, create);
 		} catch (Out_of_memory) { throw Out_of_ram(); }
 
 		if (create)
@@ -488,6 +497,52 @@ struct Vfs_server::Directory : Node
 	}
 
 	size_t write(char const *, size_t, seek_off_t) override { return 0; }
+};
+
+
+class Vfs_server::Watch final : public Node,
+                                private Vfs::Vfs_watch_handle::Context
+{
+	private:
+
+		/*
+		 * Noncopyable
+		 */
+		Watch(Watch const &);
+		Watch &operator = (Watch const &);
+
+		Node_io_handler       &_node_io_handler;
+		Vfs::Vfs_watch_handle &_handle;
+
+	public:
+
+		Watch(Node_space &space, Vfs::Vfs_watch_handle &handle,
+		      Node_io_handler &node_io_handler)
+		:
+			Node(space, "", READ_ONLY, node_io_handler),
+			_node_io_handler(node_io_handler),
+			_handle(handle)
+		{
+			/*
+			 * set the context so this Watch object
+			 * is passed back thru the Io_handler
+			 */
+			handle.context(this);
+		}
+
+		~Watch() { _handle.fs().close(&_handle); }
+
+		static Watch &watch_by_context(Vfs::Vfs_watch_handle::Context &context)
+		{
+			return static_cast<Watch &>(context);
+		}
+
+		/**
+		 * Call 'handle_node_event' at the RPC session that
+		 * opened this handle.
+		 */
+		void handle_event_response() {
+			_node_io_handler.handle_node_event(*this); }
 };
 
 #endif /* _VFS__NODE_H_ */

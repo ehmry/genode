@@ -74,6 +74,8 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 		 */
 		Path const _root_path;
 
+		Genode::Session_label const _label;
+
 		bool const _writable;
 
 		/*
@@ -197,7 +199,7 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				break;
 
 			case Packet_descriptor::CONTENT_CHANGED:
-				/* The VFS does not track file changes yet */
+				Genode::warning("ignoring CONTENT_CHANGED packet from client");
 				throw Dont_ack();
 
 			case Packet_descriptor::SYNC:
@@ -339,6 +341,8 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				destroy(_alloc, dir);
 			else if (Symlink *link = dynamic_cast<Symlink*>(&node))
 				destroy(_alloc, link);
+			else if (Watch *watch = dynamic_cast<Watch*>(&node))
+				destroy(_alloc, watch);
 			else
 				destroy(_alloc, &node);
 		}
@@ -355,6 +359,7 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 		 */
 
 		Session_component(Genode::Env         &env,
+		                  char          const *label,
 		                  Genode::Ram_quota    ram_quota,
 		                  Genode::Cap_quota    cap_quota,
 		                  size_t               tx_buf_size,
@@ -370,6 +375,7 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			_process_packet_handler(env.ep(), *this, &Session_component::_process_packets),
 			_vfs(vfs),
 			_root_path(root_path),
+			_label(label),
 			_writable(writable)
 		{
 			/*
@@ -407,9 +413,17 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			_process_packets();
 		}
 
-		/* Node_io_handler interface */
+
+		/********************************
+		 **  Node_io_handler interface **
+		 ********************************/
+
 		void handle_node_io(Node &node) override
 		{
+			if (!tx_sink()->ready_to_ack())
+				Genode::error(
+					"dropping I/O notfication, congested packet buffer to '", _label, "'");
+
 			if (node.notify_read_ready() && node.read_ready()
 			 && tx_sink()->ready_to_ack()) {
 				Packet_descriptor packet(Packet_descriptor(),
@@ -418,6 +432,22 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				                         0, 0);
 				tx_sink()->acknowledge_packet(packet);
 				node.notify_read_ready(false);
+			}
+			_process_packets();
+		}
+
+		void handle_node_event(Node &node) override
+		{
+			if (!tx_sink()->ready_to_ack())
+				Genode::error(
+					"dropping watch notfication, congested packet buffer to '", _label, "'");
+
+			if (tx_sink()->ready_to_ack()) {
+				Packet_descriptor packet(Packet_descriptor(),
+				                         Node_handle { node.id().value },
+				                         Packet_descriptor::CONTENT_CHANGED,
+				                         0, 0);
+				tx_sink()->acknowledge_packet(packet);
 			}
 			_process_packets();
 		}
@@ -464,7 +494,7 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				_assert_valid_name(name_str);
 
 				return File_handle {
-					dir.file(_node_space, _vfs, _alloc, *this, name_str, fs_mode, create).value
+					dir.file(_node_space, _vfs, _alloc, name_str, fs_mode, create).value
 				};
 			});
 		}
@@ -503,6 +533,37 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			catch (Out_of_memory) { throw Out_of_ram(); }
 
 			return Node_handle { node->id().value };
+		}
+
+		Watch_handle watch(File_system::Path const &path) override
+		{
+			char const *path_str = path.string();
+
+			_assert_valid_path(path_str);
+
+			/* re-root the path */
+			Path sub_path(path_str+1, _root_path.base());
+			path_str = sub_path.base();
+
+			Vfs::Vfs_watch_handle *vfs_handle = nullptr;
+			typedef Directory_service::Watch_result Result;
+			switch (_vfs.watch(path_str, &vfs_handle, _alloc)) {
+			case Result::WATCH_OK: break;
+			case Result::WATCH_ERR_UNACCESSIBLE:
+				throw Lookup_failed();
+			case Result::WATCH_ERR_STATIC:
+				throw Permission_denied();
+			case Result::WATCH_ERR_OUT_OF_RAM:
+				throw Out_of_ram();
+			case Result::WATCH_ERR_OUT_OF_CAPS:
+				throw Out_of_caps();
+			}
+
+			Node *node;
+			try { node  = new (_alloc) Watch(_node_space, *vfs_handle, *this); }
+			catch (Out_of_memory) { throw Out_of_ram(); }
+
+			return Watch_handle { node->id().value };
 		}
 
 		void close(Node_handle handle) override
@@ -632,6 +693,12 @@ struct Vfs_server::Io_response_handler : Vfs::Io_response_handler
 
 		_in_progress = false;
 	}
+
+	void handle_event_response(Vfs::Vfs_watch_handle::Context *context) override
+	{
+		if (context)
+			Watch::watch_by_context(*context).handle_event_response();
+	}
 };
 
 
@@ -756,7 +823,7 @@ class Vfs_server::Root : public Genode::Root_component<Session_component>
 			}
 
 			Session_component *session = new (md_alloc())
-				Registered_session(_session_registry, _env,
+				Registered_session(_session_registry, _env, label.string(),
 				                   Genode::Ram_quota{ram_quota},
 				                   Genode::Cap_quota{cap_quota},
 				                   tx_buf_size, _vfs,
