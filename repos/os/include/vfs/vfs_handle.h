@@ -19,6 +19,8 @@
 namespace Vfs{
 	class Vfs_handle;
 	class File_io_service;
+	class File_system;
+	class Vfs_watch_handle;
 }
 
 
@@ -92,5 +94,34 @@ class Vfs::Vfs_handle
 		void advance_seek(file_size incr) { _seek += incr; }
 };
 
+
+class Vfs::Vfs_watch_handle
+{
+	public:
+
+		/**
+		 * Opaque handle context
+		 */
+		struct Context : List<Context>::Element { };
+
+	private:
+
+		File_system       &_fs;
+		Genode::Allocator &_alloc;
+		Context           *_context = nullptr;
+
+	public:
+
+		Vfs_watch_handle(File_system       &fs,
+		                 Genode::Allocator &alloc)
+		:
+			_fs(fs), _alloc(alloc)
+		{ }
+
+		File_system &fs() { return _fs; }
+		Allocator &alloc() { return _alloc; }
+		virtual void context(Context *context) { _context = context; }
+		Context *context() const { return _context; }
+};
 
 #endif /* _INCLUDE__VFS__VFS_HANDLE_H_ */

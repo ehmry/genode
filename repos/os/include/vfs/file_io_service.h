@@ -27,7 +27,9 @@ namespace Vfs {
 
 struct Vfs::Io_response_handler
 {
-	virtual void handle_io_response(Vfs::Vfs_handle::Context *context) = 0;
+	virtual void handle_io_response(Vfs_handle::Context *context) = 0;
+	virtual void handle_event_response(Vfs_watch_handle::Context *context) {
+		Genode::warning(__func__, " discarding event"); };
 };
 
 

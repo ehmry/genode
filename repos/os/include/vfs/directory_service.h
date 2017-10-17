@@ -18,6 +18,7 @@
 
 namespace Vfs {
 	class Vfs_handle;
+	class Vfs_watch_handle;
 	struct Directory_service;
 
 	using Genode::Allocator;
@@ -110,6 +111,28 @@ struct Vfs::Directory_service
 	 */
 	virtual void close(Vfs_handle *handle) = 0;
 
+	enum Watch_result
+	{
+		WATCH_ERR_UNACCESSIBLE,
+		WATCH_ERR_STATIC,
+		WATCH_ERR_OUT_OF_RAM,
+		WATCH_ERR_OUT_OF_CAPS,
+		WATCH_OK
+	};
+
+	/**
+	 * Watch a file-system node for changes.
+	 */
+	virtual Watch_result watch(char const      *path,
+	                           Vfs_watch_handle **handle,
+	                           Allocator        &alloc)
+	{
+		/* default implementation for static file-systems */
+		Genode::warning("cannot watch static VFS plugin");
+		return WATCH_ERR_STATIC;
+	}
+
+	virtual void close(Vfs_watch_handle *handle) { };
 
 	/**********
 	 ** Stat **
