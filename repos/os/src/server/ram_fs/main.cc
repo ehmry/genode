@@ -44,8 +44,6 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 {
 	private:
 
-		typedef File_system::Open_node<Node> Open_node;
-
 		Genode::Entrypoint               &_ep;
 		Genode::Ram_session              &_ram;
 		Genode::Allocator                &_alloc;
@@ -88,9 +86,8 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 				break;
 
 			case Packet_descriptor::CONTENT_CHANGED:
-				open_node.register_notify(*tx_sink());
-				open_node.node().notify_listeners();
-				return;
+				Genode::warning("ignoring CONTENT_CHANGED packet from client");
+				break;
 
 			case Packet_descriptor::READ_READY:
 				/* not supported */
@@ -474,6 +471,18 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 			} catch (Id_space<File_system::Node>::Unknown_id const &) {
 				throw Invalid_handle();
 			}
+		}
+
+		Watch_handle watch(Path const &path)
+		{
+			_assert_valid_path(path.string());
+
+			Node *node = _root.lookup(path.string() + 1);
+
+			Watcher *watcher =
+				new (_alloc) Watcher(*node, _open_node_registry, *tx_sink());
+
+			return File_system::Watch_handle(watcher->id().value);
 		}
 };
 

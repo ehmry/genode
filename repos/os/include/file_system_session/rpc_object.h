@@ -49,6 +49,13 @@ class File_system::Session_rpc_object : public Genode::Rpc_object<Session, Sessi
 		Genode::Capability<Tx> _tx_cap() { return _tx.cap(); }
 
 		Tx::Sink *tx_sink() { return _tx.sink(); }
+
+		/**
+		 * Stub for old File_system servers
+		 */
+		Watch_handle watch(Path const &path) override {
+			throw Permission_denied(); }
+
 };
 
 #endif /* _INCLUDE__FILE_SYSTEM_SESSION__SERVER_H_ */

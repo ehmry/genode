@@ -17,6 +17,7 @@
 /* Genode includes */
 #include <file_system/listener.h>
 #include <file_system/node.h>
+#include <file_system_session/rpc_object.h>
 #include <util/list.h>
 
 namespace Ram_fs {
@@ -26,6 +27,9 @@ namespace Ram_fs {
 	class Node;
 	class File;
 	class Symlink;
+	class Watcher;
+
+	typedef File_system::Open_node<Node> Open_node;
 }
 
 
@@ -115,6 +119,24 @@ class Ram_fs::Node : public File_system::Node_base, public List<Node>::Element
 		}
 
 
+};
+
+
+struct Ram_fs::Watcher : Open_node, File_system::Listener
+{
+	typedef File_system::Session_rpc_object::Tx::Sink Sink;
+
+	Watcher(Ram_fs::Node &node,
+	        Genode::Id_space<File_system::Node> &id_space,
+	        Sink &sink)
+	:
+		Open_node(node, id_space),
+		File_system::Listener(sink,
+		                      File_system::Node_handle{id().value},
+		                      Version{0})
+	{
+		node.add_listener(this);
+	}
 };
 
 #endif /* _INCLUDE__RAM_FS__NODE_H_ */
