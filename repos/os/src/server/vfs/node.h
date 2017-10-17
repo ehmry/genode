@@ -255,6 +255,8 @@ struct Vfs_server::Symlink : Node
 		_handle->context = this;
 	}
 
+	~Symlink() { _handle->ds().close(_handle); }
+
 
 	/********************
 	 ** Node interface **
@@ -377,6 +379,8 @@ struct Vfs_server::Directory : Node
 		assert_opendir(vfs.opendir(dir_path, create, &_handle, alloc));
 		_handle->context = this;
 	}
+
+	~Directory() { _handle->ds().close(_handle); }
 
 	Node_space::Id file(Node_space        &space,
 	                    Vfs::File_system  &vfs,
