@@ -81,6 +81,12 @@ class File_system::Session_client : public Genode::Rpc_client<Session>
 			return call<Rpc_node>(path);
 		}
 
+		Watch_handle watch(Path const &path) override
+		{
+			return call<Rpc_watch>(path);
+		}
+
+
 		void close(Node_handle node) override
 		{
 			call<Rpc_close>(node);

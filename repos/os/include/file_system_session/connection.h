@@ -152,6 +152,12 @@ struct File_system::Connection : File_system::Connection_base
 		return _retry([&] () {
 			return Session_client::node(path); });
 	}
+
+	Watch_handle watch(Path const &path) override
+	{
+		return _retry([&] () {
+			return Session_client::watch(path); });
+	}
 };
 
 #endif /* _INCLUDE__FILE_SYSTEM_SESSION__CONNECTION_H_ */

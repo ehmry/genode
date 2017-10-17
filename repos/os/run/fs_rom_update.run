@@ -1,7 +1,3 @@
-if {[have_spec arm]} {
-   assert_spec arm_v7
-}
-
 #
 # Build
 #
@@ -117,4 +113,4 @@ build_boot_image $boot_modules
 
 append qemu_args " -nographic "
 
-run_genode_until forever
+run_genode_until {.*<config iteration="4" />.*} 60
