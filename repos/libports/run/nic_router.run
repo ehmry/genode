@@ -36,7 +36,7 @@ proc gpio_drv_build { } { if {[gpio_drv] != ""} { return drivers/gpio } }
 build "core init drivers/timer server/nic_router server/nic_bridge
        test/http_srv_static test/http_clnt test/udp_echo
        test/udp_client [nic_drv_build] [gpio_drv_build]
-       [platform_drv_build_components] lib/vfs/lxip"
+       [platform_drv_build_components] lib/vfs/lwip"
 
 create_boot_directory
 
@@ -90,7 +90,7 @@ proc server_bin { prot } {
 
 proc ram_quota { prot } {
 	if {$prot == "udp"}  { return 29M }
-	if {$prot == "http"} { return 32M }
+	if {$prot == "http"} { return 12M }
 }
 
 proc client_config { prot index ip_addr gateway netmask nic srv_port srv_ip } {
@@ -106,7 +106,7 @@ proc client_config { prot index ip_addr gateway netmask nic srv_port srv_ip } {
 				<vfs>
 					<dir name="dev"> <log/> </dir>
 					<dir name="socket">
-						<lxip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/> </dir>
+						<lwip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/> </dir>
 				</vfs>
 				<libc stdout="/dev/log" stderr="/dev/log"/>
 			</config>
@@ -127,7 +127,7 @@ proc server_config { prot index ip_addr gateway netmask nic port } {
 				<vfs>
 					<dir name="dev"> <log/> </dir>
 					<dir name="socket">
-						<lxip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/> </dir>
+						<lwip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/> </dir>
 				</vfs>
 				<libc stdout="/dev/log" stderr="/dev/log"/>
 			</config>
@@ -282,7 +282,7 @@ install_config $config
 
 build_boot_image "
 	core init timer nic_router nic_bridge ld.lib.so libc.lib.so libm.lib.so
-	vfs_lxip.lib.so posix.lib.so test-http_clnt
+	vfs_lwip.lib.so posix.lib.so test-http_clnt
 	test-httpsrv_static test-udp_echo test-udp_client
 	[nic_drv_binary] [gpio_drv] [platform_drv_boot_modules]"
 
