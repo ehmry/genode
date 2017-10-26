@@ -548,29 +548,34 @@ class Vfs::Lxip_connect_file : public Vfs::Lxip_file
 			addr->sin_addr.s_addr = get_addr(_content_buffer);
 			addr->sin_family      = AF_INET;
 
-			int res = _sock.ops->connect(&_sock, (sockaddr *)addr, sizeof(addr_storage), 0);
+			if (_parent.parent().type() == Lxip::Protocol_dir::TYPE_STREAM) {
 
-			switch (res) {
-			case Lxip::Io_result::LINUX_EINPROGRESS:
-				_connecting = true;
-				return -1;
+				int res = _sock.ops->connect(&_sock, (sockaddr *)addr, sizeof(addr_storage), 0);
 
-			case Lxip::Io_result::LINUX_EALREADY:
-				return -1;
+				switch (res) {
+				case Lxip::Io_result::LINUX_EINPROGRESS:
+					Genode::error("LINUX_EINPROGRESS");
+					_connecting = true;
+					return -1;
 
-			case Lxip::Io_result::LINUX_EISCONN:
-				/*
-				 * Connecting on an already connected socket is an error.
-				 * If we get this error after we got EINPROGRESS it is
-				 * fine.
-				 */
-				if (_is_connected || !_connecting) return -1;
-				_is_connected = true;
-				break;
+				case Lxip::Io_result::LINUX_EALREADY:
+					Genode::error("LINUX_EALREADY");
+					return -1;
 
-			default:
-				if (res != 0) return -1;
-				break;
+				case Lxip::Io_result::LINUX_EISCONN:
+					/*
+					 * Connecting on an already connected socket is an error.
+					 * If we get this error after we got EINPROGRESS it is
+					 * fine.
+					 */
+					if (_is_connected || !_connecting) return -1;
+					_is_connected = true;
+					break;
+
+				default:
+					if (res != 0) return -1;
+					break;
+				}
 			}
 
 			sockaddr_in *remote_addr     = (sockaddr_in *)&_parent.remote_addr();
