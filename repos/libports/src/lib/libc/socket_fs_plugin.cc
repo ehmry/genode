@@ -899,6 +899,9 @@ int Socket_fs::Plugin::fcntl(Libc::File_descriptor *fd, int cmd, long arg)
 	if (!context) return Errno(EBADF);
 
 	switch (cmd) {
+	case F_SETFD:
+		Genode::warning("close-on-exec not implemented for socket descriptors");
+		return 0;
 	case F_GETFL:
 		return context->fd_flags();
 	case F_SETFL:
