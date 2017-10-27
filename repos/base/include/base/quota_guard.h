@@ -26,6 +26,12 @@ namespace Genode {
 		static char const *name() { return "bytes"; }
 
 		void print(Output &out) const { Genode::print(out, Number_of_bytes(value)); }
+
+		Ram_quota operator-(Ram_quota other) const {
+			return Ram_quota{ value - other.value }; }
+
+		bool operator>(Ram_quota other) const {
+			return value > other.value; }
 	};
 
 	struct Cap_quota
@@ -35,6 +41,12 @@ namespace Genode {
 		static char const *name() { return "caps"; }
 
 		void print(Output &out) const { Genode::print(out, value); }
+
+		Cap_quota operator-(Cap_quota other) const {
+			return Cap_quota{ value - other.value }; }
+
+		bool operator>(Cap_quota other) const {
+			return value > other.value; }
 	};
 
 	class Quota_guard_untyped;
