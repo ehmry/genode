@@ -87,6 +87,9 @@ typedef unsigned long mem_ptr_t;
 #define PACK_STRUCT_BEGIN
 #define PACK_STRUCT_END
 
+void genode_free(void *ptr);
+void *genode_malloc(unsigned long size);
+void *genode_calloc(unsigned long number, unsigned long size);
 
 #define mem_clib_free genode_free
 #define mem_clib_malloc genode_malloc
