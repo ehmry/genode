@@ -109,6 +109,8 @@ struct Socket_fs::Context : Libc::Plugin_context
 
 		Proto const _proto;
 
+		int const _master_fd;
+
 		struct
 		{
 			char const            *name;
@@ -158,12 +160,14 @@ struct Socket_fs::Context : Libc::Plugin_context
 
 	public:
 
-		Context(Proto proto, Absolute_path const &path)
-		: path(path.base()), _proto(proto) { }
+		Context(Proto proto, int fd, Absolute_path const &path)
+		: path(path.base()), _proto(proto), _master_fd(fd) { }
 
 		~Context()
 		{
 			_fd_apply([] (int fd) { close(fd); });
+			Genode::log("close master fd at ", path);
+			close(_master_fd);
 		}
 
 		Proto proto() const { return _proto; }
@@ -478,8 +482,13 @@ extern "C" int _accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 	}
 
 	Absolute_path accept_path(accept_socket, Libc::config_socket());
+
+	int master_fd = ::open(accept_path.base(), O_RDONLY);
+
+	// TODO: deduplicate open and read 'accept' with 'new_socket'
 	Socket_fs::Context *accept_context = new (&global_allocator)
-	                                     Socket_fs::Context(context->proto(), accept_path);
+		Socket_fs::Context(context->proto(), master_fd, accept_path);
+
 	Libc::File_descriptor *new_fd =
 		Libc::file_descriptor_allocator()->alloc(&plugin(), accept_context);
 
@@ -823,18 +832,23 @@ extern "C" int shutdown(int libc_fd, int how)
 }
 
 
-static Genode::String<MAX_CONTROL_PATH_LEN> new_socket(Absolute_path const &path)
+static int open_new_socket(Absolute_path const &path)
 {
 	Absolute_path new_socket("new_socket", path.base());
 
-	int const fd = open(new_socket.base(), O_RDONLY);
+	int const fd = ::open(new_socket.base(), O_RDONLY);
 	if (fd == -1) {
 		Genode::error(__func__, ": ", new_socket, " file not accessible - socket fs not mounted?");
 		throw New_socket_failed();
 	}
+	return fd;
+}
+
+
+static Genode::String<MAX_CONTROL_PATH_LEN> read_socket_path(int fd)
+{
 	char buf[MAX_CONTROL_PATH_LEN];
 	int const n = read(fd, buf, sizeof(buf));
-	close(fd);
 	if (n == -1 || !n || n >= (int)sizeof(buf) - 1)
 		throw New_socket_failed();
 	buf[n] = 0;
@@ -863,6 +877,8 @@ extern "C" int _socket(int domain, int type, int protocol)
 	/* socket is ensured to be TCP or UDP */
 	typedef Socket_fs::Context::Proto Proto;
 	Proto proto = (type == SOCK_STREAM) ? Proto::TCP : Proto::UDP;
+
+	int master_fd;
 	try {
 		Absolute_path proto_path(path);
 		switch (proto) {
@@ -870,13 +886,15 @@ extern "C" int _socket(int domain, int type, int protocol)
 		case Proto::UDP: proto_path.append("/udp"); break;
 		}
 
-		auto socket_path = new_socket(proto_path);
+		master_fd = open_new_socket(proto_path);
+		auto socket_path = read_socket_path(master_fd);
 		path.append("/");
 		path.append(socket_path.string());
 	} catch (New_socket_failed) { return Errno(EACCES); }
 
+	// TODO: deduplicate open and read 'new_socket' with 'accept'
 	Socket_fs::Context *context =
-		new (&global_allocator) Socket_fs::Context(proto, path);
+		new (&global_allocator) Socket_fs::Context(proto, master_fd, path);
 	Libc::File_descriptor *fd =
 		Libc::file_descriptor_allocator()->alloc(&plugin(), context);
 
@@ -1012,8 +1030,7 @@ int Socket_fs::Plugin::close(Libc::File_descriptor *fd)
 	Socket_fs::Context *context = dynamic_cast<Socket_fs::Context *>(fd->context);
 	if (!context) return Errno(EBADF);
 
-	::unlink(context->path.base());
-
+	/* Context destructor will close master descriptor, freeing socket */
 	Genode::destroy(&global_allocator, context);
 	Libc::file_descriptor_allocator()->free(fd);
 
