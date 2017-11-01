@@ -79,6 +79,7 @@ struct Genode::Duration
 		explicit Duration(Microseconds us) { *this += us; }
 
 		Microseconds trunc_to_plain_us() const;
+		Milliseconds trunc_to_plain_ms() const;
 };
 
 #endif /* _OS__DURATION_H_ */
