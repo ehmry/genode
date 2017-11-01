@@ -16,6 +16,7 @@
 #include <vfs/file_io_service.h>
 #include <vfs/file_system_factory.h>
 #include <vfs/vfs_handle.h>
+#include <timer_session/connection.h>
 #include <util/fifo.h>
 #include <base/tslab.h>
 #include <base/log.h>

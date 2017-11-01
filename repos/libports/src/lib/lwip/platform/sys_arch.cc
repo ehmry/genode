@@ -37,18 +37,18 @@ namespace Lwip {
 		void check_timeouts(Genode::Duration) {
 			Lwip::sys_check_timeouts(); }
 
-		Timer::Connection &timer;
+		Genode::Timeout_scheduler &timer;
 
 		Timer::Periodic_timeout<Sys_timer> timeout {
 			timer, *this, &Sys_timer::check_timeouts,
 			Genode::Microseconds{250*1000} };
 
-		Sys_timer(Timer::Connection &timer) : timer(timer) { }
+		Sys_timer(Genode::Timeout_scheduler &timer) : timer(timer) { }
 	};
 
 	static Genode::Constructible<Sys_timer> _sys_timer;
 
-	void genode_init(Genode::Allocator &heap, Timer::Connection &timer)
+	void genode_init(Genode::Allocator &heap, Genode::Timeout_scheduler &timer)
 	{
 		//LWIP_ASSERT("heap does not track allocation sizes", heap.need_size_for_free());
 
@@ -78,7 +78,7 @@ extern "C" {
 		return Lwip::_heap->alloc(size, &ptr) ? ptr : 0;
 	}
 
-	void *gende_calloc(unsigned long number, unsigned long size)
+	void *genode_calloc(unsigned long number, unsigned long size)
 	{
 		void *ptr = nullptr;
 		size *= number;
@@ -90,7 +90,7 @@ extern "C" {
 	}
 
 	Lwip::u32_t sys_now(void) {
-		return Lwip::_sys_timer->timer.elapsed_ms(); }
+		return Lwip::_sys_timer->timer.curr_time().trunc_to_plain_ms().value; }
 
 	void genode_memcpy(void * dst, const void *src, unsigned long size) {
 		Genode::memcpy(dst, src, size); }

@@ -14,9 +14,9 @@
 #ifndef _INCLUDE__LWIP__GENODE_INIT_H_
 #define _INCLUDE__LWIP__GENODE_INIT_H_
 
-#include <timer_session/connection.h>
+#include <timer/timeout.h>
 #include <base/allocator.h>
 
-namespace Lwip { void genode_init(Genode::Allocator &heap, Timer::Connection &timer); }
+namespace Lwip { void genode_init(Genode::Allocator &heap, Genode::Timeout_scheduler &timer); }
 
 #endif
