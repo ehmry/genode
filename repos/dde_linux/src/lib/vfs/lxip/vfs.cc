@@ -33,7 +33,6 @@
 #include <lx_kit/env.h>
 #include <lx_kit/malloc.h>
 
-
 namespace Linux {
 	#include <lx_emul.h>
 	#include <msghdr.h>
@@ -362,6 +361,16 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 		                    file_size /* ignored */) override
 		{
 			using namespace Linux;
+
+			/* check if there is room to write to the sndbuf */
+			if (_parent.parent().type() == Lxip::Protocol_dir::TYPE_STREAM) {
+				file f;
+				f.f_flags = 0;
+				while (!(_sock.ops->poll(&f, &_sock, nullptr) & (POLLOUT_SET))) {
+					/* TODO: return WOULD_BLOCK */
+					schedule_timeout(100);
+				}
+			}
 
 			iovec iov { const_cast<char *>(src), len };
 
