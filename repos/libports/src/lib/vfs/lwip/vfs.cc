@@ -241,8 +241,6 @@ struct Lwip::Socket_dir
 			return Open_result::OPEN_OK;
 		}
 
-		virtual bool queue_read(file_size count) = 0;
-
 		virtual Read_result read(Lwip_handle &handle,
 		                         char *dst, file_size count,
 		                         file_size &out_count) = 0;
@@ -535,8 +533,6 @@ class Lwip::Udp_socket_dir final :
 		/**************************
 		 ** Socket_dir interface **
 		 **************************/
-
-		bool queue_read(file_size) override { return true; }
 
 		bool read_ready(Lwip_handle &handle) override
 		{
@@ -872,9 +868,6 @@ class Lwip::Tcp_socket_dir final :
 		/**************************
 		 ** Socket_dir interface **
 		 **************************/
-
-		bool queue_read(file_size count) override {
-			return tcp_sndbuf(_pcb) >= count; }
 
 		bool read_ready(Lwip_handle &handle) override
 		{
