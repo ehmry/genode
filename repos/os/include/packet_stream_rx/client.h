@@ -36,6 +36,7 @@ class Packet_stream_rx::Client : public Genode::Rpc_client<CHANNEL>
 		typedef typename Base::Rpc_ready_to_ack    Rpc_ready_to_ack;
 		typedef typename Base::Rpc_ready_to_submit Rpc_ready_to_submit;
 		typedef typename Base::Rpc_ack_avail       Rpc_ack_avail;
+		typedef typename Base::Rpc_sigh_wake       Rpc_sigh_wake;
 
 	public:
 
@@ -61,6 +62,9 @@ class Packet_stream_rx::Client : public Genode::Rpc_client<CHANNEL>
 
 		void sigh_packet_avail(Genode::Signal_context_capability sigh) {
 			Base::template call<Rpc_packet_avail>(sigh); }
+
+		void sigh_wake(Genode::Signal_context_capability sigh) {
+			Base::template call<Rpc_sigh_wake>(sigh); }
 
 		typename CHANNEL::Sink *sink() { return &_sink; }
 };

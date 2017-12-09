@@ -266,6 +266,9 @@ class Genode::Packet_descriptor_transmitter
 		/* facility to send ready-to-receive signals */
 		Genode::Signal_transmitter         _rx_ready;
 
+		/* facility to send wake-up signals */
+		Genode::Signal_transmitter         _rx_wake;
+
 		Genode::Lock _tx_queue_lock;
 		TX_QUEUE    *_tx_queue;
 
@@ -303,6 +306,11 @@ class Genode::Packet_descriptor_transmitter
 				_rx_ready.submit();
 		}
 
+		void register_wake_cap(Genode::Signal_context_capability cap)
+		{
+			_rx_wake.context(cap);
+		}
+
 		bool ready_for_tx()
 		{
 			Genode::Lock::Guard lock_guard(_tx_queue_lock);
@@ -326,8 +334,10 @@ class Genode::Packet_descriptor_transmitter
 
 			} while (_tx_queue->add(packet) == false);
 
-			if (_tx_queue->single_element())
+			if (_tx_queue->single_element()) {
 				_rx_ready.submit();
+				_rx_wake.submit();
+			}
 		}
 
 		/**
@@ -354,6 +364,9 @@ class Genode::Packet_descriptor_receiver
 
 		/* facility to send ready-to-transmit signals */
 		Genode::Signal_transmitter        _tx_ready;
+
+		/* facility to send wake-up signals */
+		Genode::Signal_transmitter        _tx_wake;
 
 		Genode::Lock mutable  _rx_queue_lock;
 		RX_QUEUE             *_rx_queue;
@@ -388,8 +401,15 @@ class Genode::Packet_descriptor_receiver
 			 * before a signal handler was registered,
 			 * a signal has to be send again
 			 */
-			if (!_rx_queue->empty())
+			if (!_rx_queue->empty()) {
 				_tx_ready.submit();
+				_tx_wake.submit();
+			}
+		}
+
+		void register_wake_cap(Genode::Signal_context_capability cap)
+		{
+			_tx_wake.context(cap);
 		}
 
 		bool ready_for_rx()
@@ -402,8 +422,9 @@ class Genode::Packet_descriptor_receiver
 		{
 			Genode::Lock::Guard lock_guard(_rx_queue_lock);
 
-			while (_rx_queue->empty())
+			while (_rx_queue->empty()) {
 				_rx_ready.wait_for_signal();
+			}
 
 			*out_packet = _rx_queue->get();
 
@@ -618,6 +639,15 @@ class Genode::Packet_stream_source : private Packet_stream_base
 		}
 
 		/**
+		 * Register signal handler for wakeups for any packet activity.
+		 */
+		void register_sigh_wake(Genode::Signal_context_capability cap)
+		{
+			_submit_transmitter.register_wake_cap(cap);
+			_ack_receiver.register_wake_cap(cap);
+		}
+
+		/**
 		 * Return signal handler for handling signals indicating that new
 		 * packets can be submitted.
 		 */
@@ -775,6 +805,15 @@ class Genode::Packet_stream_sink : private Packet_stream_base
 		void register_sigh_ready_to_submit(Genode::Signal_context_capability cap)
 		{
 			_submit_receiver.register_tx_ready_cap(cap);
+		}
+
+		/**
+		 * Register signal handler for wakeups for any packet activity.
+		 */
+		void register_sigh_wake(Genode::Signal_context_capability cap)
+		{
+			_submit_receiver.register_wake_cap(cap);
+			_ack_transmitter.register_wake_cap(cap);
 		}
 
 		/**

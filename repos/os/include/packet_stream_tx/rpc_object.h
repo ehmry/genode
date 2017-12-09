@@ -97,7 +97,7 @@ class Packet_stream_tx::Rpc_object : public Genode::Rpc_object<CHANNEL, Rpc_obje
 
 		Genode::Dataspace_capability dataspace() { return _sink.dataspace(); }
 
-		void sigh_ready_to_submit(Genode::Signal_context_capability sigh) {
+		void sigh_ready_to_submit(Genode::Signal_context_capability sigh) override {
 			_sink.register_sigh_ready_to_submit(sigh); }
 
 		void sigh_ack_avail(Genode::Signal_context_capability sigh) {
@@ -108,6 +108,9 @@ class Packet_stream_tx::Rpc_object : public Genode::Rpc_object<CHANNEL, Rpc_obje
 
 		virtual Genode::Signal_context_capability sigh_packet_avail() {
 			return _sigh_packet_avail; }
+
+		void sigh_wake(Genode::Signal_context_capability sigh) override {
+			_sink.register_sigh_wake(sigh); }
 };
 
 #endif /* _INCLUDE__PACKET_STREAM_TX__RPC_OBJECT_H_ */
