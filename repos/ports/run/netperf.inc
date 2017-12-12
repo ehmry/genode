@@ -1,18 +1,12 @@
 #
 # \brief  Test for using netperf
 # \author Alexander Boettcher
-# \author Martin Stein
 # \date   2013-04-18
 #
 
 proc gpio_drv { } { if {[have_spec rpi] && [have_spec hw]}  { return hw_gpio_drv }
                     if {[have_spec rpi] && [have_spec foc]} { return foc_gpio_drv }
                     return gpio_drv }
-
-if {[expr $use_nic_bridge && $use_nic_router]} {
-	puts "Cannot test with both NIC bridge and NIC router.";
-	exit 0
-}
 
 if {[get_cmd_switch --autopilot] && [have_include "power_on/qemu"]} {
 	puts "\nRunning netperf in autopilot on Qemu is not recommended.\n"
@@ -86,13 +80,13 @@ if {$use_wifi_driver}   { set network_driver "wifi_drv" }
 set build_components {
 	core init
 	drivers/timer
+	app/netperf
 }
 
-append     build_components     " $netperf_target "
+append     build_components     " $vfs_plugin_target "
 lappend_if $use_nic_driver      build_components drivers/nic
 lappend_if $use_usb_driver      build_components drivers/usb
 lappend_if $use_nic_bridge      build_components server/nic_bridge
-lappend_if $use_nic_router      build_components server/nic_router
 lappend_if [have_spec gpio]     build_components drivers/gpio
 
 append_if $use_wifi_driver      build_components {
@@ -144,42 +138,6 @@ append_if [have_spec gpio] config "
 		<provides><service name=\"Gpio\"/></provides>
 		<config/>
 	</start>"
-
-append_if $use_nic_router config {
-	<start name="nic_router">
-		<resource name="RAM" quantum="5M"/>
-		<provides><service name="Nic"/></provides>
-		<config verbose_domain_state="yes">
-
-			<policy label_prefix="netserver_genode" domain="server"/>
-
-			<domain name="uplink"}
-append_if [expr $use_nic_router && [have_spec linux]] config "
-				interface=\"$lx_ip_addr/24\" gateway=\"10.0.2.1\""
-append_if $use_nic_router config {
-			>
-				<nat domain="server" tcp-ports="100" />
-				<tcp-forward port="12864" domain="server" to="10.0.3.2" />
-				<tcp-forward port="12865" domain="server" to="10.0.3.2" />
-			</domain>
-
-			<domain name="server" interface="10.0.3.1/24">
-				<dhcp-server ip_first="10.0.3.2"
-				             ip_last="10.0.3.2"
-				             ip_lease_time_sec="600"/>
-			</domain>
-
-		</config>
-		<route>
-			<service name="Nic"> }
-append_if $use_nic_router config "
-				<child name=\"$network_driver\"/>"
-append_if $use_nic_router config {
-			</service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>
-	</start>
-}
 
 append_if $use_nic_bridge config {
 	<start name="nic_bridge">
@@ -285,33 +243,35 @@ append_platform_drv_config
 
 append config {
 	<start name="netserver_genode" caps="220">
-}
-append config "<binary name=\"$netperf_app\"/>"
-append config {
+		<binary name="netserver"/>
 		<resource name="RAM" quantum="32M"/>
 		<config>
 			<arg value="netserver"/>
 			<arg value="-D"/>
 			<arg value="-4"/>
 			<arg value="-f"/>
-			<libc tx_buf_size="2M" rx_buf_size="2M"}
-append_if [expr [have_spec linux] && !$use_nic_router] config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\""
-append config {
-			      stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc"/>
+			<libc tx_buf_size="2M" rx_buf_size="2M"
+			      stdout="/dev/log" stderr="/dev/log"
+			      socket="/dev/socket"/>
 			<vfs>
 				<dir name="dev">
-					<log/> <inline name="rtc">2018-01-01 00:01</inline>
+					<log/>
+					<dir name="socket">
+}
+append config "<$vfs_plugin_name"
+if {[have_spec linux]} {
+	append config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\" nameserver=\"10.0.2.1\""
+} else {
+	append config { dhcp="yes"}
+}
+append config {/>
+					</dir>
 				</dir>
 			</vfs>
 		</config>}
 append_if $use_nic_bridge config {
 		<route>
 			<service name="Nic"> <child name="nic_bridge"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>}
-append_if $use_nic_router config {
-		<route>
-			<service name="Nic"> <child name="nic_router"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>}
 append config {
@@ -329,12 +289,11 @@ install_config $config
 set boot_modules {
 	core init timer
 	ld.lib.so libc.lib.so libm.lib.so posix.lib.so
+	netserver
 }
 
-append                     boot_modules " $netperf_app "
-append                     boot_modules " $netperf_stack "
+append                     boot_modules " $vfs_plugin_modules "
 lappend_if $use_nic_bridge boot_modules nic_bridge
-lappend_if $use_nic_router boot_modules nic_router
 
 # platform-specific modules
 lappend_if [have_spec gpio]          boot_modules [gpio_drv]
@@ -373,12 +332,6 @@ append_if [have_spec lan9118] qemu_args " -net nic,model=lan9118 "
 
 append qemu_args " -net user -redir tcp:12865::12865 -redir tcp:49153::49153 "
 
-set force_ports ""
-if $use_nic_router {
-	set ip_match_string "nic_router\\\] \\\[uplink\\\] IP config: interface (\[0-9]{1,3}.\[0-9]{1,3}.\[0-9]{1,3}.\[0-9]{1,3}).*\n"
-	set force_ports "-P 12864,12864"
-}
-
 if {[have_spec linux]} {
 	run_genode_until {.*family AF_INET.*\n} 60
 } else {
@@ -387,6 +340,7 @@ if {[have_spec linux]} {
 
 set serial_id [output_spawn_id]
 
+set force_ports ""
 if {[have_include "power_on/qemu"]} {
 	set ip_addr "localhost"
 	set force_ports "-P 49153,49153"
@@ -398,7 +352,7 @@ if {[have_include "power_on/qemu"]} {
 }
 
 # give the TCP/IP stack some time to settle down
-sleep 3
+sleep 8
 
 # start netperf client connecting to netperf server running native on Genode
 foreach netperf_test $netperf_tests {
@@ -432,7 +386,6 @@ foreach netperf_test $netperf_tests {
 	# format output parseable for post proccessing scripts
 	puts -nonewline "! PERF: $netperf_test"
 	if {$use_nic_bridge} { puts -nonewline "_bridge" }
-	if {$use_nic_router} { puts -nonewline "_router" }
 	if {$use_usb_driver} {
 		if {![string compare $use_usb_11 "yes"]} { puts -nonewline "_uhci" }
 		if {![string compare $use_usb_20 "yes"]} { puts -nonewline "_ohci" }
