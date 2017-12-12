@@ -80,9 +80,10 @@ if {$use_wifi_driver}   { set network_driver "wifi_drv" }
 set build_components {
 	core init
 	drivers/timer
+	app/netperf
 }
 
-append     build_components     " $netperf_target "
+append     build_components     " $vfs_plugin_target "
 lappend_if $use_nic_driver      build_components drivers/nic
 lappend_if $use_usb_driver      build_components drivers/usb
 lappend_if $use_nic_bridge      build_components server/nic_bridge
@@ -214,7 +215,7 @@ append_if $use_wifi_driver config {
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 	</start>
-	<start name="wifi_drv" caps="250">
+	<start name="wifi_drv" caps="220">
 		<resource name="RAM" quantum="32M"/>
 		<provides> <service name="Nic"/> </provides>
 		<config>
@@ -240,21 +241,32 @@ append_if $use_wifi_driver config {
 append_platform_drv_config
 
 append config {
-	<start name="netserver_genode" caps="220">
-}
-append config "<binary name=\"$netperf_app\"/>"
-append config {
+	<start name="netserver_genode" caps="200">
+		<binary name="netserver"/>
 		<resource name="RAM" quantum="32M"/>
 		<config>
 			<arg value="netserver"/>
 			<arg value="-D"/>
 			<arg value="-4"/>
 			<arg value="-f"/>
-			<libc tx_buf_size="2M" rx_buf_size="2M"}
-append_if [have_spec linux] config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\""
-append config {
-			      stdout="/dev/log" stderr="/dev/log"/>
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
+			<libc tx_buf_size="2M" rx_buf_size="2M"
+			      stdout="/dev/log" stderr="/dev/log"
+			      socket="/dev/socket"/>
+			<vfs>
+				<dir name="dev">
+					<log/>
+					<dir name="socket">
+}
+append config "<$vfs_plugin_name"
+if {[have_spec linux]} {
+	append config " ip_addr=\"$lx_ip_addr\" netmask=\"255.255.255.0\" gateway=\"10.0.2.1\" nameserver=\"10.0.2.1\""
+} else {
+	append config { dhcp="yes"}
+}
+append config {/>
+					</dir>
+				</dir>
+			</vfs>
 		</config>}
 append_if $use_nic_bridge config {
 		<route>
@@ -276,10 +288,10 @@ install_config $config
 set boot_modules {
 	core init timer
 	ld.lib.so libc.lib.so libm.lib.so posix.lib.so
+	netserver
 }
 
-append                     boot_modules " $netperf_app "
-append                     boot_modules " $netperf_stack "
+append                     boot_modules " $vfs_plugin_modules "
 lappend_if $use_nic_bridge boot_modules nic_bridge
 
 # platform-specific modules
