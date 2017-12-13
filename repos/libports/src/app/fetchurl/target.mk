@@ -1,3 +1,3 @@
 TARGET = fetchurl
-LIBS  += curl lwip libc_lwip libc_lwip_nic_dhcp libc ld
+LIBS  += curl libc ld
 SRC_CC = component.cc
