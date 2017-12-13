@@ -1,13 +1,8 @@
 /*
- * \brief  Minimal HTTP server lwIP demonstration
+ * \brief  Minimal HTTP server demonstration
  * \author lwIP Team
  * \author Stefan Kalkowski
  * \date   2009-10-23
- *
- * This small example shows how to use the LwIP in Genode directly.
- * If you simply want to use LwIP's socket API, you might use
- * Genode's libc together with its LwIP backend, especially useful
- * when porting legacy code.
  */
 
 /*
@@ -24,13 +19,14 @@
 #include <nic/packet_allocator.h>
 #include <util/string.h>
 
-/* LwIP includes */
 extern "C" {
-#include <lwip/sockets.h>
-#include <lwip/api.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 }
-
-#include <lwip/genode.h>
 
 using Response = Genode::String<1024>;
 
@@ -47,7 +43,7 @@ void http_server_serve(int conn, Response & response)
 
 	/* Read the data from the port, blocking if nothing yet there.
 	   We assume the request (the part we care about) is in one packet */
-	buflen = lwip_recv(conn, buf, 1024, 0);
+	buflen = recv(conn, buf, 1024, 0);
 	Genode::log("Packet received!");
 
 	/* Ignore all receive errors */
@@ -65,7 +61,7 @@ void http_server_serve(int conn, Response & response)
 			Genode::log("Will send response");
 
 			/* Send our HTML page */
-			lwip_send(conn, response.string(), response.length(), 0);
+			send(conn, response.string(), response.length(), 0);
 		}
 	}
 }
@@ -82,14 +78,6 @@ void Libc::Component::construct(Libc::Env & env)
 	using namespace Genode;
 	using Address  = Genode::String<16>;
 
-	enum { BUF_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE * 128 };
-
-
-	lwip_tcpip_init();
-
-	uint32_t ip = 0;
-	uint32_t nm = 0;
-	uint32_t gw = 0;
 	unsigned port = 0;
 
 	Address ip_addr_str;
@@ -105,21 +93,10 @@ void Libc::Component::construct(Libc::Env & env)
 
 	log("static network interface: ip=", ip_addr_str, " nm=", netmask_str, " gw=", gateway_str);
 
-	ip = inet_addr(ip_addr_str.string());
-	nm = inet_addr(netmask_str.string());
-	gw = inet_addr(gateway_str.string());
-
-	ASSERT((ip != INADDR_NONE && nm != INADDR_NONE && gw != INADDR_NONE),
-	       "Invalid network interface config.");
-
-	/* Initialize network stack  */
-	ASSERT(!lwip_nic_init(ip, nm, gw, BUF_SIZE, BUF_SIZE),
-	       "got no IP address!");
-
 	log("Create new socket ...");
 
 	int s;
-	ASSERT(((s = lwip_socket(AF_INET, SOCK_STREAM, 0)) >= 0),
+	ASSERT(((s = socket(AF_INET, SOCK_STREAM, 0)) >= 0),
 	       "no socket available!");
 
 	static Response response(
@@ -135,23 +112,23 @@ void Libc::Component::construct(Libc::Env & env)
 	in_addr.sin_family = AF_INET;
 	in_addr.sin_port = htons(port);
 	in_addr.sin_addr.s_addr = INADDR_ANY;
-	ASSERT(!lwip_bind(s, (struct sockaddr*)&in_addr, sizeof(in_addr)),
+	ASSERT(!bind(s, (struct sockaddr*)&in_addr, sizeof(in_addr)),
 	       "bind failed!");
 
 	log("Now, I will listen ...");
-	ASSERT(!lwip_listen(s, 5),
+	ASSERT(!listen(s, 5),
 	       "listen failed!");
 
 	log("Start the server loop ...");
 	while (true) {
 		struct sockaddr addr;
 		socklen_t len = sizeof(addr);
-		int client = lwip_accept(s, &addr, &len);
+		int client = accept(s, &addr, &len);
 		if(client < 0) {
 			warning("invalid socket from accept!");
 			continue;
 		}
 		http_server_serve(client, response);
-		lwip_close(client);
+		close(client);
 	}
 }
