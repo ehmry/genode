@@ -17,6 +17,7 @@ if {[have_spec odroid_xu]} {
 set build_components {
 	core init
 	drivers/timer
+	lib/vfs/lwip
 	app/lighttpd
 }
 
@@ -102,9 +103,10 @@ append config {
 					<log/>
 					<null/>
 				</dir>
+				<dir name="socket"> <lwip/> </dir>
 				<tar name="genode_org.tar"/>
 			</vfs>
-			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log"/>
+			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
 		</config>
 	</start>}
 
@@ -161,7 +163,7 @@ exec tar cfv bin/genode_org.tar -h -C bin/genode_org .
 set boot_modules {
 	core init timer ld.lib.so
 	libc.lib.so libm.lib.so posix.lib.so
-	lwip.lib.so zlib.lib.so
+	vfs_lwip.lib.so zlib.lib.so
 	lighttpd genode_org.tar
 }
 
