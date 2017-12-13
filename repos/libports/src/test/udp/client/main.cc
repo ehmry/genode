@@ -35,7 +35,7 @@ struct Read_server_port_attr_failed : Exception { };
 struct Read_server_ip_attr_failed   : Exception { };
 
 
-void Libc::Component::construct(Libc::Env &env)
+static void client(Libc::Env &env)
 {
 	/* wait a while for the server to come up */
 	Timer::Connection timer(env);
@@ -85,3 +85,6 @@ void Libc::Component::construct(Libc::Env &env)
 	}
 	log("Test done");
 }
+
+void Libc::Component::construct(Libc::Env &env) {
+	with_libc([&env] () { client(env); }); }
