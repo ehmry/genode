@@ -9,6 +9,7 @@ set build_components {
 	app/fetchurl
 	drivers/nic
 	drivers/timer
+	lib/vfs/lwip
 }
 
 source ${genode_dir}/repos/base/run/platform_drv.inc
@@ -50,8 +51,11 @@ append config {
 	<start name="fetchurl" caps="500">
 		<resource name="RAM" quantum="8M"/>
 		<config>
-			<vfs> <dir name="dev"> <log/> <null/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<vfs>
+				<dir name="dev"> <log/> <null/> </dir>
+				<dir name="socket"> <lwip/> </dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
 			<fetch url="http://genode.org/about/LICENSE" path="/dev/log"/>
 		</config>
 	</start>
@@ -71,7 +75,7 @@ set boot_modules {
 	libm.lib.so
 	libssh.lib.so
 	libssl.lib.so
-	lwip.lib.so
+	vfs_lwip.lib.so
 	nic_drv
 	timer
 	zlib.lib.so
