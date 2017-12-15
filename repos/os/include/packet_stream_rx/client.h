@@ -25,18 +25,19 @@ class Packet_stream_rx::Client : public Genode::Rpc_client<CHANNEL>
 {
 	private:
 
-		typename CHANNEL::Sink _sink;
-
 		/*
 		 * Type shortcuts
 		 */
-		typedef Genode::Rpc_client<CHANNEL>        Base;
-		typedef typename Base::Rpc_dataspace       Rpc_dataspace;
-		typedef typename Base::Rpc_packet_avail    Rpc_packet_avail;
-		typedef typename Base::Rpc_ready_to_ack    Rpc_ready_to_ack;
-		typedef typename Base::Rpc_ready_to_submit Rpc_ready_to_submit;
-		typedef typename Base::Rpc_ack_avail       Rpc_ack_avail;
-		typedef typename Base::Rpc_sigh_wake       Rpc_sigh_wake;
+		typedef Genode::Rpc_client<CHANNEL>       Base;
+		typedef typename Base::Rpc_dataspace      Rpc_dataspace;
+		typedef typename Base::Rpc_server_sigh    Rpc_server_sigh;
+		typedef typename Base::Rpc_client_sigh    Rpc_client_sigh;
+		typedef typename Base::Rpc_client_io_sigh Rpc_client_io_sigh;
+
+		/**
+		 * Packet-stream sink
+		 */
+		typename CHANNEL::Sink _sink;
 
 	public:
 
@@ -47,24 +48,14 @@ class Packet_stream_rx::Client : public Genode::Rpc_client<CHANNEL>
 		       Genode::Region_map &rm)
 		:
 			Genode::Rpc_client<CHANNEL>(channel_cap),
-			_sink(Base::template call<Rpc_dataspace>(), rm)
+			_sink(Base::template call<Rpc_dataspace>(), rm, true)
 		{
-			/* wire data-flow signals for the packet receiver */
-			_sink.register_sigh_ack_avail(Base::template call<Rpc_ack_avail>());
-			_sink.register_sigh_ready_to_submit(Base::template call<Rpc_ready_to_submit>());
-
-			sigh_ready_to_ack(_sink.sigh_ready_to_ack());
-			sigh_packet_avail(_sink.sigh_packet_avail());
+			_sink.register_sigh(Base::template call<Rpc_server_sigh>());
+			Base::template call<Rpc_client_sigh>(_sink.local_sigh());
 		}
 
-		void sigh_ready_to_ack(Genode::Signal_context_capability sigh) {
-			Base::template call<Rpc_ready_to_ack>(sigh); }
-
-		void sigh_packet_avail(Genode::Signal_context_capability sigh) {
-			Base::template call<Rpc_packet_avail>(sigh); }
-
-		void sigh_wake(Genode::Signal_context_capability sigh) {
-			Base::template call<Rpc_sigh_wake>(sigh); }
+		void io_sigh(Genode::Signal_context_capability sigh) override {
+			Base::template call<Rpc_client_io_sigh>(sigh); }
 
 		typename CHANNEL::Sink *sink() { return &_sink; }
 };

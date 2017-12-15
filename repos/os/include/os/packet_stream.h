@@ -106,6 +106,11 @@ namespace Genode {
 
 	template <typename POLICY = Default_packet_stream_policy>
 	class Packet_stream_sink;
+
+	class Submit_queue_congested { };
+	class Submit_queue_empty     { };
+	class Ack_queue_congested    { };
+	class Ack_queue_empty        { };
 }
 
 
@@ -258,16 +263,8 @@ class Genode::Packet_descriptor_transmitter
 {
 	private:
 
-		/* facility to receive ready-to-transmit signals */
-		Genode::Signal_receiver           _tx_ready;
-		Genode::Signal_context            _tx_ready_context;
-		Genode::Signal_context_capability _tx_ready_cap;
-
-		/* facility to send ready-to-receive signals */
-		Genode::Signal_transmitter         _rx_ready;
-
-		/* facility to send wake-up signals */
-		Genode::Signal_transmitter         _rx_wake;
+		/* facility to send unblocking signals */
+		Genode::Signal_transmitter _rx_ready;
 
 		Genode::Lock _tx_queue_lock;
 		TX_QUEUE    *_tx_queue;
@@ -278,20 +275,8 @@ class Genode::Packet_descriptor_transmitter
 		 * Constructor
 		 */
 		Packet_descriptor_transmitter(TX_QUEUE *tx_queue)
-		:
-			_tx_ready_cap(_tx_ready.manage(&_tx_ready_context)),
-			_tx_queue(tx_queue)
+		: _tx_queue(tx_queue)
 		{ }
-
-		~Packet_descriptor_transmitter()
-		{
-			_tx_ready.dissolve(&_tx_ready_context);
-		}
-
-		Genode::Signal_context_capability tx_ready_cap()
-		{
-			return _tx_ready_cap;
-		}
 
 		void register_rx_ready_cap(Genode::Signal_context_capability cap)
 		{
@@ -302,13 +287,9 @@ class Genode::Packet_descriptor_transmitter
 			 * before a signal handler was registered,
 			 * a signal has to be send again
 			 */
-			if (!_tx_queue->empty())
+			if (!_tx_queue->empty()) {
 				_rx_ready.submit();
-		}
-
-		void register_wake_cap(Genode::Signal_context_capability cap)
-		{
-			_rx_wake.context(cap);
+			}
 		}
 
 		bool ready_for_tx()
@@ -317,27 +298,18 @@ class Genode::Packet_descriptor_transmitter
 			return !_tx_queue->full();
 		}
 
-		void tx(typename TX_QUEUE::Packet_descriptor packet)
+		bool tx(typename TX_QUEUE::Packet_descriptor packet)
 		{
 			Genode::Lock::Guard lock_guard(_tx_queue_lock);
 
-			do {
-				/* block for signal if tx queue is full */
-				if (_tx_queue->full())
-					_tx_ready.wait_for_signal();
-
-				/*
-				 * It could happen that pending signals do not refer to the
-				 * current queue situation. Therefore, we need to double check
-				 * if the queue insertion succeeds and retry if needed.
-				 */
-
-			} while (_tx_queue->add(packet) == false);
+			if (_tx_queue->add(packet) == false)
+				return false;
 
 			if (_tx_queue->single_element()) {
 				_rx_ready.submit();
-				_rx_wake.submit();
 			}
+
+			return true;
 		}
 
 		/**
@@ -357,16 +329,8 @@ class Genode::Packet_descriptor_receiver
 {
 	private:
 
-		/* facility to receive ready-to-receive signals */
-		Genode::Signal_receiver           _rx_ready;
-		Genode::Signal_context            _rx_ready_context;
-		Genode::Signal_context_capability _rx_ready_cap;
-
 		/* facility to send ready-to-transmit signals */
-		Genode::Signal_transmitter        _tx_ready;
-
-		/* facility to send wake-up signals */
-		Genode::Signal_transmitter        _tx_wake;
+		Genode::Signal_transmitter _tx_ready;
 
 		Genode::Lock mutable  _rx_queue_lock;
 		RX_QUEUE             *_rx_queue;
@@ -378,19 +342,8 @@ class Genode::Packet_descriptor_receiver
 		 */
 		Packet_descriptor_receiver(RX_QUEUE *rx_queue)
 		:
-			_rx_ready_cap(_rx_ready.manage(&_rx_ready_context)),
 			_rx_queue(rx_queue)
 		{ }
-
-		~Packet_descriptor_receiver()
-		{
-			_rx_ready.dissolve(&_rx_ready_context);
-		}
-
-		Genode::Signal_context_capability rx_ready_cap()
-		{
-			return _rx_ready_cap;
-		}
 
 		void register_tx_ready_cap(Genode::Signal_context_capability cap)
 		{
@@ -403,13 +356,7 @@ class Genode::Packet_descriptor_receiver
 			 */
 			if (!_rx_queue->empty()) {
 				_tx_ready.submit();
-				_tx_wake.submit();
 			}
-		}
-
-		void register_wake_cap(Genode::Signal_context_capability cap)
-		{
-			_tx_wake.context(cap);
 		}
 
 		bool ready_for_rx()
@@ -418,18 +365,19 @@ class Genode::Packet_descriptor_receiver
 			return !_rx_queue->empty();
 		}
 
-		void rx(typename RX_QUEUE::Packet_descriptor *out_packet)
+		bool rx(typename RX_QUEUE::Packet_descriptor *out_packet)
 		{
 			Genode::Lock::Guard lock_guard(_rx_queue_lock);
 
-			while (_rx_queue->empty()) {
-				_rx_ready.wait_for_signal();
-			}
+			if (_rx_queue->empty())
+				return false;
 
 			*out_packet = _rx_queue->get();
 
-			if (_rx_queue->single_slot_free())
+			if (_rx_queue->single_slot_free()) {
 				_tx_ready.submit();
+			}
+			return true;
 		}
 
 		typename RX_QUEUE::Packet_descriptor rx_peek() const
@@ -463,6 +411,15 @@ class Genode::Packet_stream_base
 		Genode::off_t  _bulk_buffer_offset;
 		Genode::size_t _bulk_buffer_size;
 
+		Genode::Signal_receiver           _sig_rec;
+		Genode::Signal_context            _sig_ctx;
+		Genode::Signal_context_capability _sig_cap;
+
+		Genode::Signal_transmitter _io_tx;
+		bool                       _io_notify = false;
+
+		bool _blocking = false;
+
 		/**
 		 * Constructor
 		 *
@@ -473,7 +430,8 @@ class Genode::Packet_stream_base
 		Packet_stream_base(Genode::Dataspace_capability transport_ds,
 		                   Genode::Region_map &rm,
 		                   Genode::size_t submit_queue_size,
-		                   Genode::size_t ack_queue_size)
+		                   Genode::size_t ack_queue_size,
+		                   bool blocking)
 		:
 			_rm(rm), _ds_cap(transport_ds),
 
@@ -481,7 +439,8 @@ class Genode::Packet_stream_base
 			_ds_local_base(rm.attach(_ds_cap)),
 			_submit_queue_offset(0),
 			_ack_queue_offset(_submit_queue_offset + submit_queue_size),
-			_bulk_buffer_offset(_ack_queue_offset + ack_queue_size)
+			_bulk_buffer_offset(_ack_queue_offset + ack_queue_size),
+			_blocking(blocking)
 		{
 			Genode::size_t ds_size = Genode::Dataspace_client(_ds_cap).size();
 
@@ -504,6 +463,9 @@ class Genode::Packet_stream_base
 				/* unmap transport dataspace locally */
 				_rm.detach(_ds_local_base);
 			} catch (...) { }
+
+			if (_sig_cap.valid())
+				_sig_rec.dissolve(&_sig_ctx);
 		}
 
 		void *_submit_queue_local_base() {
@@ -524,6 +486,25 @@ class Genode::Packet_stream_base
 		 * Return communication buffer
 		 */
 		Genode::Dataspace_capability _dataspace() { return _ds_cap; }
+
+	public:
+
+		/**
+		 * Retrieve capability for local blocking signal receiver.
+		 */
+		Genode::Signal_context_capability local_sigh()
+		{
+			if (!_sig_cap.valid() && _blocking) {
+				_sig_cap = _sig_rec.manage(&_sig_ctx);
+			}
+			return _sig_cap;
+		}
+
+		void register_io_sigh(Genode::Signal_context_capability sigh)
+		{
+			_io_tx.context(sigh);
+			_io_notify = sigh.valid();
+		}
 };
 
 
@@ -552,7 +533,7 @@ struct Genode::Packet_stream_policy
  * Originator of a packet stream
  */
 template <typename POLICY>
-class Genode::Packet_stream_source : private Packet_stream_base
+class Genode::Packet_stream_source final : public Packet_stream_base
 {
 	public:
 
@@ -591,11 +572,13 @@ class Genode::Packet_stream_source : private Packet_stream_base
 		 */
 		Packet_stream_source(Genode::Dataspace_capability  transport_ds_cap,
 		                     Genode::Region_map           &rm,
-		                     Genode::Range_allocator      &packet_alloc)
+		                     Genode::Range_allocator      &packet_alloc,
+		                     bool blocking)
 		:
 			Packet_stream_base(transport_ds_cap, rm,
 			                   sizeof(Submit_queue),
-			                   sizeof(Ack_queue)),
+			                   sizeof(Ack_queue),
+			                   blocking),
 			_packet_alloc(packet_alloc),
 
 			/* construct packet-descriptor queues */
@@ -616,54 +599,19 @@ class Genode::Packet_stream_source : private Packet_stream_base
 		}
 
 		/**
-		 * Return the size of the bulk buffer.
+		 * Register signal handler to notify when the stream is unblocked
+		 * from here.
 		 */
-		Genode::size_t bulk_buffer_size() { return _bulk_buffer_size; }
-
-		/**
-		 * Register signal handler for receiving the signal that new packets
-		 * are available in the submit queue.
-		 */
-		void register_sigh_packet_avail(Genode::Signal_context_capability cap)
+		void register_sigh(Genode::Signal_context_capability cap)
 		{
 			_submit_transmitter.register_rx_ready_cap(cap);
-		}
-
-		/**
-		 * Register signal handler for receiving the signal that there is new
-		 * space for new acknowledgements in the ack queue.
-		 */
-		void register_sigh_ready_to_ack(Genode::Signal_context_capability cap)
-		{
 			_ack_receiver.register_tx_ready_cap(cap);
 		}
 
 		/**
-		 * Register signal handler for wakeups for any packet activity.
+		 * Return the size of the bulk buffer.
 		 */
-		void register_sigh_wake(Genode::Signal_context_capability cap)
-		{
-			_submit_transmitter.register_wake_cap(cap);
-			_ack_receiver.register_wake_cap(cap);
-		}
-
-		/**
-		 * Return signal handler for handling signals indicating that new
-		 * packets can be submitted.
-		 */
-		Genode::Signal_context_capability sigh_ready_to_submit()
-		{
-			return _submit_transmitter.tx_ready_cap();
-		}
-
-		/**
-		 * Return signal handler for handling signals indicating that
-		 * new acknowledgements are available.
-		 */
-		Genode::Signal_context_capability sigh_ack_avail()
-		{
-			return _ack_receiver.rx_ready_cap();
-		}
+		Genode::size_t bulk_buffer_size() { return _bulk_buffer_size; }
 
 		/**
 		 * Allocate packet
@@ -716,7 +664,16 @@ class Genode::Packet_stream_source : private Packet_stream_base
 		 */
 		void submit_packet(Packet_descriptor packet)
 		{
-			_submit_transmitter.tx(packet);
+			while (!_submit_transmitter.tx(packet)) {
+				if (_blocking)
+					_sig_rec.wait_for_signal();
+				else
+					throw Submit_queue_congested();
+			}
+
+			if (_io_notify) {
+				_io_tx.submit();
+			}
 		}
 
 		/**
@@ -730,7 +687,12 @@ class Genode::Packet_stream_source : private Packet_stream_base
 		Packet_descriptor get_acked_packet()
 		{
 			Packet_descriptor packet;
-			_ack_receiver.rx(&packet);
+			while (!_ack_receiver.rx(&packet)) {
+				if (_blocking)
+					_sig_rec.wait_for_signal();
+				else
+					throw Ack_queue_empty();
+			}
 			return packet;
 		}
 
@@ -755,7 +717,7 @@ class Genode::Packet_stream_source : private Packet_stream_base
  * Receiver of a packet stream
  */
 template <typename POLICY>
-class Genode::Packet_stream_sink : private Packet_stream_base
+class Genode::Packet_stream_sink final : public Packet_stream_base
 {
 	public:
 
@@ -778,9 +740,10 @@ class Genode::Packet_stream_sink : private Packet_stream_base
 		 *                      source and sink
 		 */
 		Packet_stream_sink(Genode::Dataspace_capability transport_ds,
-		                   Genode::Region_map &rm)
+		                   Genode::Region_map &rm,
+		                   bool blocking)
 		:
-			Packet_stream_base(transport_ds, rm, sizeof(Submit_queue), sizeof(Ack_queue)),
+			Packet_stream_base(transport_ds, rm, sizeof(Submit_queue), sizeof(Ack_queue), blocking),
 
 			/* construct packet-descriptor queues */
 			_submit_receiver(construct_at<Submit_queue>(_submit_queue_local_base(),
@@ -790,48 +753,13 @@ class Genode::Packet_stream_sink : private Packet_stream_base
 		{ }
 
 		/**
-		 * Register signal handler to notify that new acknowledgements
-		 * are available in the ack queue.
+		 * Register signal handler to notify when the stream is unblocked
+		 * from here.
 		 */
-		void register_sigh_ack_avail(Genode::Signal_context_capability cap)
-		{
-			_ack_transmitter.register_rx_ready_cap(cap);
-		}
-
-		/**
-		 * Register signal handler to notify that new packets
-		 * can be submitted into the submit queue.
-		 */
-		void register_sigh_ready_to_submit(Genode::Signal_context_capability cap)
+		void register_sigh(Genode::Signal_context_capability cap)
 		{
 			_submit_receiver.register_tx_ready_cap(cap);
-		}
-
-		/**
-		 * Register signal handler for wakeups for any packet activity.
-		 */
-		void register_sigh_wake(Genode::Signal_context_capability cap)
-		{
-			_submit_receiver.register_wake_cap(cap);
-			_ack_transmitter.register_wake_cap(cap);
-		}
-
-		/**
-		 * Return signal handler for handling signals indicating that
-		 * new acknowledgements can be generated.
-		 */
-		Genode::Signal_context_capability sigh_ready_to_ack()
-		{
-			return _ack_transmitter.tx_ready_cap();
-		}
-
-		/**
-		 * Return signal handler for handling signals indicating that
-		 * new packets are available in the submit queue.
-		 */
-		Genode::Signal_context_capability sigh_packet_avail()
-		{
-			return _submit_receiver.rx_ready_cap();
+			_ack_transmitter.register_rx_ready_cap(cap);
 		}
 
 		/**
@@ -857,7 +785,12 @@ class Genode::Packet_stream_sink : private Packet_stream_base
 		Packet_descriptor get_packet()
 		{
 			Packet_descriptor packet;
-			_submit_receiver.rx(&packet);
+			while (!_submit_receiver.rx(&packet)) {
+				if (_blocking)
+					_sig_rec.wait_for_signal();
+				else
+					throw Submit_queue_empty();
+			}
 			return packet;
 		}
 
@@ -902,7 +835,16 @@ class Genode::Packet_stream_sink : private Packet_stream_base
 		 */
 		void acknowledge_packet(Packet_descriptor packet)
 		{
-			_ack_transmitter.tx(packet);
+			while (!_ack_transmitter.tx(packet)) {
+				if (_blocking)
+					_sig_rec.wait_for_signal();
+				else
+					throw Ack_queue_congested();
+			}
+
+			if (_io_notify) {
+				_io_tx.submit();
+			}
 		}
 
 		void debug_print_buffers() {
@@ -913,4 +855,3 @@ class Genode::Packet_stream_sink : private Packet_stream_base
 };
 
 #endif /* _INCLUDE__OS__PACKET_STREAM_H_ */
-

@@ -571,7 +571,7 @@ class Vfs::Fs_file_system : public File_system
 			    config.attribute_value("writeable", true),
 			    ::File_system::DEFAULT_TX_BUF_SIZE)
 		{
-			_fs.sigh_ack_avail(_ack_handler);
+			_fs.io_sigh(_ack_handler);
 		}
 
 		/*********************************

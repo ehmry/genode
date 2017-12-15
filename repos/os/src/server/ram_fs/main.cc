@@ -196,10 +196,9 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 		{
 			/*
 			 * Register '_process_packets' method as signal handler for
-			 * packet-avail and ready-to-ack signals.
+			 * packet signals from client.
 			 */
-			_tx.sigh_packet_avail(_process_packet_handler);
-			_tx.sigh_ready_to_ack(_process_packet_handler);
+			_tx.local_sigh(_process_packet_handler);
 		}
 
 		/**

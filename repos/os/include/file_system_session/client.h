@@ -51,15 +51,11 @@ class File_system::Session_client : public Genode::Rpc_client<Session>
 
 		Tx::Source *tx() { return _tx.source(); }
 
-		void sigh_ready_to_submit(Genode::Signal_context_capability sigh)
-		{
-			_tx.sigh_ready_to_submit(sigh);
-		}
-
-		void sigh_ack_avail(Genode::Signal_context_capability sigh)
-		{
-			_tx.sigh_ack_avail(sigh);
-		}
+		/**
+		 * Register signal handler for packet I/O
+		 */
+		void io_sigh(Genode::Signal_context_capability sigh) {
+			_tx.io_sigh(sigh); }
 
 		File_handle file(Dir_handle dir, Name const &name, Mode mode, bool create) override
 		{

@@ -348,7 +348,7 @@ class Vfs::Block_file_system : public Single_file_system
 
 			_block_buffer = new (_alloc) char[_block_buffer_count * _block_size];
 
-			_block.tx_channel()->sigh_ready_to_submit(_source_submit_cap);
+			_block.tx_channel()->io_sigh(_source_submit_cap);
 		}
 
 		~Block_file_system()

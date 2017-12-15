@@ -28,13 +28,11 @@ class Packet_stream_tx::Client : public Genode::Rpc_client<CHANNEL>
 		/*
 		 * Type shortcuts
 		 */
-		typedef Genode::Rpc_client<CHANNEL>        Base;
-		typedef typename Base::Rpc_dataspace       Rpc_dataspace;
-		typedef typename Base::Rpc_packet_avail    Rpc_packet_avail;
-		typedef typename Base::Rpc_ready_to_ack    Rpc_ready_to_ack;
-		typedef typename Base::Rpc_ready_to_submit Rpc_ready_to_submit;
-		typedef typename Base::Rpc_ack_avail       Rpc_ack_avail;
-		typedef typename Base::Rpc_sigh_wake       Rpc_sigh_wake;
+		typedef Genode::Rpc_client<CHANNEL>       Base;
+		typedef typename Base::Rpc_dataspace      Rpc_dataspace;
+		typedef typename Base::Rpc_server_sigh    Rpc_server_sigh;
+		typedef typename Base::Rpc_client_sigh    Rpc_client_sigh;
+		typedef typename Base::Rpc_client_io_sigh Rpc_client_io_sigh;
 
 		/**
 		 * Packet-stream source
@@ -54,23 +52,14 @@ class Packet_stream_tx::Client : public Genode::Rpc_client<CHANNEL>
 		       Genode::Range_allocator &buffer_alloc)
 		:
 			Genode::Rpc_client<CHANNEL>(channel_cap),
-			_source(Base::template call<Rpc_dataspace>(), rm, buffer_alloc)
+			_source(Base::template call<Rpc_dataspace>(), rm, buffer_alloc, true)
 		{
-			/* wire data-flow signals for the packet transmitter */
-			_source.register_sigh_packet_avail(Base::template call<Rpc_packet_avail>());
-			_source.register_sigh_ready_to_ack(Base::template call<Rpc_ready_to_ack>());
-			sigh_ready_to_submit(_source.sigh_ready_to_submit());
-			sigh_ack_avail(_source.sigh_ack_avail());
+			_source.register_sigh(Base::template call<Rpc_server_sigh>());
+			Base::template call<Rpc_client_sigh>(_source.local_sigh());
 		}
 
-		void sigh_ready_to_submit(Genode::Signal_context_capability sigh) {
-			Base::template call<Rpc_ready_to_submit>(sigh); }
-
-		void sigh_ack_avail(Genode::Signal_context_capability sigh) {
-			Base::template call<Rpc_ack_avail>(sigh); }
-
-		void sigh_wake(Genode::Signal_context_capability sigh) {
-			Base::template call<Rpc_sigh_wake>(sigh); }
+		void io_sigh(Genode::Signal_context_capability sigh) override {
+			Base::template call<Rpc_client_io_sigh>(sigh); }
 
 		typename CHANNEL::Source *source() { return &_source; }
 };

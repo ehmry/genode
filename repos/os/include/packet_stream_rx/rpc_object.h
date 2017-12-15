@@ -29,8 +29,7 @@ class Packet_stream_rx::Rpc_object : public Genode::Rpc_object<CHANNEL, Rpc_obje
 		Genode::Capability<CHANNEL> _cap;
 		typename CHANNEL::Source    _source;
 
-		Genode::Signal_context_capability _sigh_ready_to_submit;
-		Genode::Signal_context_capability _sigh_ack_avail;
+		Genode::Signal_context_capability _local_sigh;
 
 	public:
 
@@ -48,46 +47,27 @@ class Packet_stream_rx::Rpc_object : public Genode::Rpc_object<CHANNEL, Rpc_obje
 		           Genode::Region_map           &rm,
 		           Genode::Range_allocator      &buffer_alloc,
 		           Genode::Rpc_entrypoint       &ep)
-		: _ep(ep), _cap(_ep.manage(this)), _source(ds, rm, buffer_alloc),
-
-		  /* init signal handlers with default handlers of source */
-		  _sigh_ready_to_submit(_source.sigh_ready_to_submit()),
-		  _sigh_ack_avail(_source.sigh_ack_avail()) { }
+		: _ep(ep), _cap(_ep.manage(this)), _source(ds, rm, buffer_alloc, false)
+		{ }
 
 		/**
 		 * Destructor
 		 */
 		~Rpc_object() { _ep.dissolve(this); }
 
-		/*
-		 * The 'sigh_ack_avail()' and 'sigh_ready_to_submit()' methods
-		 * may be called at session-creation time to override the default
-		 * data-flow signal handlers as provided by the packet-stream source.
-		 * The default handlers let the server block in the event of data
-		 * congestion. By installing custom signal handlers, a server
-		 * implementation is able to avoid blocking for a single event by
-		 * facilitating the use of a select-like mode of operation.
-		 *
-		 * Note that calling these methods after the finished creation of
-		 * the session has no effect because the client queries the signal
-		 * handlers only once at session-creation time.
-		 */
-
 		/**
-		 * Override default handler for server-side ready-to-submit signals
-		 *
-		 * Must be called at constuction time only.
+		 * Set signal handler for packet processing. Must be
+		 * set only once and before the session capability is
+		 * passed to the client.
 		 */
-		void sigh_ready_to_submit(Genode::Signal_context_capability sigh) {
-			_sigh_ready_to_submit = sigh; }
-
-		/**
-		 * Override default handler for server-side ack-avail signals
-		 *
-		 * Must be called at constuction time only.
-		 */
-		void sigh_ack_avail(Genode::Signal_context_capability sigh) {
-			_sigh_ack_avail = sigh; }
+		void local_sigh(Genode::Signal_context_capability cap)
+		{
+			if (_local_sigh.valid()) {
+				Genode::error("server-side packet signal handler can not be set twice");
+				throw ~0;
+			}
+			_local_sigh = cap;
+		}
 
 		typename CHANNEL::Source *source() { return &_source; }
 
@@ -100,20 +80,33 @@ class Packet_stream_rx::Rpc_object : public Genode::Rpc_object<CHANNEL, Rpc_obje
 
 		Genode::Dataspace_capability dataspace() { return _source.dataspace(); }
 
-		void sigh_ready_to_ack(Genode::Signal_context_capability sigh) override {
-			_source.register_sigh_ready_to_ack(sigh); }
+		/**
+		 * Not part of the outward API, but the capability used by
+		 * the client to request the server to process packets.
+		 */
+		Genode::Signal_context_capability server_sigh()
+		{
+			if (!_local_sigh.valid()) {
+				Genode::error("server-side packet signal handler has not been set");
+				throw ~0;
+			}
+			return _local_sigh;
+		}
 
-		void sigh_packet_avail(Genode::Signal_context_capability sigh) override {
-			_source.register_sigh_packet_avail(sigh); }
+		/**
+		 * Not part of the outward API, but the capability of the
+		 * Signal_receiver the client uses to block the application
+		 * until the server processes packets.
+		 */
+		void sigh(Genode::Signal_context_capability cap) {
+			_source.register_sigh(cap); }
 
-		virtual Genode::Signal_context_capability sigh_ready_to_submit() {
-			return _sigh_ready_to_submit; }
-
-		virtual Genode::Signal_context_capability sigh_ack_avail() {
-			return _sigh_ack_avail; }
-
-		void sigh_wake(Genode::Signal_context_capability sigh) override {
-			_source.register_sigh_wake(sigh); }
+		/**
+		 * Register capability of a client packet processing
+		 * signal handler.
+		 */
+		void io_sigh(Genode::Signal_context_capability cap) override {
+			_source.register_io_sigh(cap); }
 };
 
 #endif /* _INCLUDE__PACKET_STREAM_RX__RPC_OBJECT_H_ */

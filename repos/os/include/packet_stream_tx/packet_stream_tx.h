@@ -35,17 +35,13 @@ struct Packet_stream_tx::Channel
 	 * one program. At the server side of the 'Channel', this method
 	 * has no meaning.
 	 */
-	virtual Source *source() { return 0; }
+	virtual Source *source() { return nullptr; }
 
 	/**
-	 * Register signal receiver for 'ready_to_submit' signals
+	 * Register handler for signals sent from the server as it
+	 * unblocks the stream state.
 	 */
-	virtual void sigh_ready_to_submit(Genode::Signal_context_capability sigh) = 0;
-
-	/**
-	 * Register handler for signals indicating the stream leaving a blocked state
-	 */
-	virtual void sigh_wake(Genode::Signal_context_capability sigh) = 0;
+	virtual void io_sigh(Genode::Signal_context_capability sigh) = 0;
 
 
 	/*******************
@@ -53,14 +49,12 @@ struct Packet_stream_tx::Channel
 	 *******************/
 
 	GENODE_RPC(Rpc_dataspace, Genode::Dataspace_capability, dataspace);
-	GENODE_RPC(Rpc_ack_avail, void, sigh_ack_avail, Genode::Signal_context_capability);
-	GENODE_RPC(Rpc_ready_to_submit, void, sigh_ready_to_submit, Genode::Signal_context_capability);
-	GENODE_RPC(Rpc_ready_to_ack, Genode::Signal_context_capability, sigh_ready_to_ack);
-	GENODE_RPC(Rpc_packet_avail, Genode::Signal_context_capability, sigh_packet_avail);
-	GENODE_RPC(Rpc_sigh_wake, void, sigh_wake, Genode::Signal_context_capability);
+	GENODE_RPC(Rpc_server_sigh, Genode::Signal_context_capability, server_sigh);
+	GENODE_RPC(Rpc_client_sigh, void, sigh, Genode::Signal_context_capability);
+	GENODE_RPC(Rpc_client_io_sigh, void, io_sigh, Genode::Signal_context_capability);
 
-	GENODE_RPC_INTERFACE(Rpc_dataspace, Rpc_ack_avail, Rpc_ready_to_submit,
-	                     Rpc_ready_to_ack, Rpc_packet_avail, Rpc_sigh_wake);
+	GENODE_RPC_INTERFACE(Rpc_dataspace, Rpc_server_sigh,
+	                     Rpc_client_sigh, Rpc_client_io_sigh);
 };
 
 #endif /* _INCLUDE__PACKET_STREAM_TX__PACKET_STREAM_TX_H_ */
