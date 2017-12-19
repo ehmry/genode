@@ -10,7 +10,7 @@ LWIPDIR := $(LWIP_PORT_DIR)/src/lib/lwip/lwip-2.0.3/src
 -include $(LWIPDIR)/Filelists.mk
 
 # Genode platform files
-SRC_CC = printf.h rand.cc sys_arch.cc
+SRC_CC = printf.cc rand.cc sys_arch.cc
 
 # Core files
 SRC_C += $(notdir $(COREFILES))
