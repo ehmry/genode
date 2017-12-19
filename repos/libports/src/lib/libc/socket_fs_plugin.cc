@@ -30,10 +30,9 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 
 /* libc-internal includes */
+#include "socket_fs_plugin.h"
 #include "libc_file.h"
 #include "libc_errno.h"
 #include "task.h"
@@ -502,11 +501,16 @@ extern "C" int socket_fs_bind(int libc_fd, sockaddr const *addr, socklen_t addrl
 	Sockaddr_string addr_string(host_string(*(sockaddr_in *)addr),
 	                            port_string(*(sockaddr_in *)addr));
 
-	int const len = strlen(addr_string.base());
-	int const n   = write(context->bind_fd(), addr_string.base(), len);
-	if (n != len) return Errno(EACCES);
+	try {
+		int const len = strlen(addr_string.base());
+		int const n   = write(context->bind_fd(), addr_string.base(), len);
+		if (n != len) return Errno(EACCES);
 
-	return fsync(context->bind_fd());
+		/* sync to block for write completion */
+		return fsync(context->bind_fd());
+	} catch (Socket_fs::Context::Inaccessible) {
+		return Errno(EINVAL);
+	}
 }
 
 
@@ -536,7 +540,7 @@ extern "C" int socket_fs_connect(int libc_fd, sockaddr const *addr, socklen_t ad
 	int const n   = write(context->connect_fd(), addr_string.base(), len);
 	if (n != len) return Errno(ECONNREFUSED);
 
-	/* sync the FD to block for write completion */
+	/* sync to block for write completion */
 	return fsync(context->connect_fd());
 }
 
@@ -623,18 +627,24 @@ static ssize_t do_sendto(Libc::File_descriptor *fd,
 	/* TODO ENOTCONN, EISCONN, EDESTADDRREQ */
 	/* TODO ECONNRESET */
 
-	if (dest_addr) {
-		Sockaddr_string addr_string(host_string(*(sockaddr_in const *)dest_addr),
-		                            port_string(*(sockaddr_in const *)dest_addr));
-
-		int const len = strlen(addr_string.base());
-		int const n   = write(context->remote_fd(), addr_string.base(), len);
-		if (n != len) return Errno(EIO);
-	}
-
 	try {
+		if (dest_addr) {
+			Sockaddr_string addr_string(host_string(*(sockaddr_in const *)dest_addr),
+			                            port_string(*(sockaddr_in const *)dest_addr));
+
+			int const len = strlen(addr_string.base());
+			int const n   = write(context->remote_fd(), addr_string.base(), len);
+			if (n != len) return Errno(EIO);
+		}
+
 		lseek(context->data_fd(), 0, 0);
 		ssize_t out_len = write(context->data_fd(), buf, len);
+		if (out_len == 0) {
+			switch (context->proto()) {
+				case Socket_fs::Context::Proto::UDP: return Errno(ENETDOWN);
+				case Socket_fs::Context::Proto::TCP: return Errno(EAGAIN);
+			}
+		}
 		return out_len;
 	} catch (Socket_fs::Context::Inaccessible) {
 		return Errno(EINVAL);
@@ -714,12 +724,12 @@ extern "C" int socket_fs_setsockopt(int libc_fd, int level, int optname,
 			return 0;
 		default:
 			Genode::warning("setsockopt not implemented for SOL_SOCKET opt ", optname);
-			return 0;
+			return Errno(ENOPROTOOPT);
 		}
 
 	default:
 		Genode::warning("setsockopt not implemented for level ", level, " opt ", optname);
-		return 0;
+		return Errno(EINVAL);
 	}
 }
 
