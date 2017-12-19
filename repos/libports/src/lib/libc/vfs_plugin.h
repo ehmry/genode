@@ -19,10 +19,6 @@
 /* Genode includes */
 #include <libc/component.h>
 
-/* local includes */
-#include "task.h"
-#include "libc_errno.h"
-
 /* libc includes */
 #include <fcntl.h>
 #include <unistd.h>
@@ -30,6 +26,11 @@
 /* libc plugin interface */
 #include <libc-plugin/plugin.h>
 #include <libc-plugin/fd_alloc.h>
+
+/* local includes */
+#include "task.h"
+#include "libc_errno.h"
+
 
 namespace Libc { class Vfs_plugin; }
 
@@ -77,7 +78,7 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		}
 
 		/**
-		 * Sync a handle and propagate errors on the handle.
+		 * Sync a handle and propagate errors
 		 */
 		int _vfs_sync(Vfs::Vfs_handle *vfs_handle)
 		{
