@@ -21,11 +21,15 @@
 
 namespace Lwip {
 
+extern "C" {
+
 /* LwIP includes */
 #include <lwip/timeouts.h>
 #include <lwip/init.h>
 #include <lwip/sys.h>
 #include <arch/cc.h>
+
+}
 
 	static Genode::Allocator *_heap;
 
@@ -50,7 +54,8 @@ namespace Lwip {
 
 	void genode_init(Genode::Allocator &heap, Genode::Timeout_scheduler &timer)
 	{
-		LWIP_ASSERT("heap does not track allocation sizes", heap.need_size_for_free());
+		LWIP_ASSERT("LwIP initialized with an allocator that does not track sizes",
+		            !heap.need_size_for_free());
 
 		_heap = &heap;
 		_sys_timer.construct(timer);
