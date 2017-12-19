@@ -1,9 +1,11 @@
 SRC_CC = vfs.cc
 
-INC_DIR += $(REP_DIR)/src/lib/vfs/lwip
+VFS_DIR  = $(REP_DIR)/src/lib/vfs/lwip
+INC_DIR += $(VFS_DIR)
+LD_OPT  += --version-script=$(VFS_DIR)/symbol.map
 
-LIBS  += libc lwip
+LIBS += lwip
 
-vpath %.cc $(REP_DIR)/src/lib/vfs/lwip
+vpath %.cc $(VFS_DIR)
 
 SHARED_LIB = yes
