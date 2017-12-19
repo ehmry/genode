@@ -50,7 +50,7 @@ namespace Lwip {
 
 	void genode_init(Genode::Allocator &heap, Genode::Timeout_scheduler &timer)
 	{
-		//LWIP_ASSERT("heap does not track allocation sizes", heap.need_size_for_free());
+		LWIP_ASSERT("heap does not track allocation sizes", heap.need_size_for_free());
 
 		_heap = &heap;
 		_sys_timer.construct(timer);
