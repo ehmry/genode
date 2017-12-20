@@ -20,6 +20,7 @@ set build_components {
 	drivers/timer drivers/nic
 	server/tcp_terminal
 	test/terminal_echo
+	lib/vfs/lwip
 }
 
 source ${genode_dir}/repos/base/run/platform_drv.inc
@@ -62,8 +63,11 @@ set config {
 		<provides> <service name="Terminal"/> </provides>
 		<config>
 			<policy label_prefix="test-terminal_echo" port="8888"/>
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log"/>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<dir name="socket"> <lwip/> </dir>
+			</vfs>
+			<libc stdout="/dev/log" socket="/socket"/>
 		</config>
 	</start>
 	<start name="test-terminal_echo">
@@ -86,9 +90,10 @@ install_config $config
 set boot_modules {
 	core ld.lib.so init timer
 	nic_drv
-	libc.lib.so pthread.lib.so lxip.lib.so libc_pipe.lib.so
+	libc.lib.so pthread.lib.so libc_pipe.lib.so
 	tcp_terminal
 	test-terminal_echo
+	vfs_lwip.lib.so
 }
 
 # platform-specific modules

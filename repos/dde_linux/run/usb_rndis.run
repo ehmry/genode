@@ -13,6 +13,7 @@ set build_components {
 	drivers/timer drivers/usb
 	server/tcp_terminal
 	test/terminal_echo
+	lib/vfs/lwip
 }
 
 proc gpio_drv { } { if {[have_spec rpi] && [have_spec hw]}  { return hw_gpio_drv }
@@ -66,8 +67,11 @@ set config {
 		<provides> <service name="Terminal"/> </provides>
 		<config>
 			<policy label_prefix="test-terminal_echo" port="8888"/>
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log"/>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<dir name="socket"> <lwip/> </dir>
+			</vfs>
+			<libc stdout="/dev/log" socket="/socket"/>
 		</config>
 		<route>
 			<any-service> <parent/> <any-child/> </any-service>
@@ -100,7 +104,7 @@ install_config $config
 # generic modules
 set boot_modules {
 	core ld.lib.so init timer usb_drv
-	libc.lib.so libc_pipe.lib.so lwip.lib.so pthread.lib.so
+	libc.lib.so libc_pipe.lib.so vfs_lwip.lib.so pthread.lib.so
 	tcp_terminal
 	test-terminal_echo
 }
