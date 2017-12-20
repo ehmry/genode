@@ -67,9 +67,6 @@ Plugin *Plugin_registry::get_plugin_for_rename(const char *oldpath, const char *
 Plugin *Plugin_registry::get_plugin_for_rmdir(const char *path) {
 	GET_PLUGIN_FOR(rmdir, path) }
 
-Plugin *Plugin_registry::get_plugin_for_socket(int domain, int type, int protocol) {
-	GET_PLUGIN_FOR(socket, domain, type, protocol) }
-
 
 Plugin *Plugin_registry::get_plugin_for_stat(const char *path, struct stat *) {
 	GET_PLUGIN_FOR(stat, path) }
