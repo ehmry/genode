@@ -34,7 +34,7 @@ struct Bind_failed       : Genode::Exception { };
 struct Read_port_attr_failed : Genode::Exception { };
 
 
-void Libc::Component::construct(Libc::Env & env)
+static void serve(Libc::Env & env)
 {
 	/* create socket */
 	int s = socket(AF_INET, SOCK_DGRAM, 0 );
@@ -78,3 +78,6 @@ void Libc::Component::construct(Libc::Env & env)
 		}
 	}
 }
+
+void Libc::Component::construct(Libc::Env & env) {
+	with_libc([&env] () { serve(env); }); }
