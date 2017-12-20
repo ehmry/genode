@@ -6,8 +6,8 @@ set build_components {
 	core init
 	drivers/timer drivers/nic
 	server/nic_bridge
-	test/lwip/http_srv_static
-	test/lwip/http_clnt
+	test/http_srv
+	test/http_clnt
 
 }
 
@@ -55,24 +55,25 @@ append config {
 		<resource name="RAM" quantum="24M"/>
 		<provides><service name="Nic"/></provides>
 		<config>
-			<policy label_prefix="test-lwip_httpsrv_static" ip_addr="10.0.2.55"/>
+			<policy label_prefix="test-httpsrv" ip_addr="10.0.2.55"/>
 		</config>
 		<route>
 			<service name="Nic"> <child name="nic_drv"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 	</start>
-	<start name="test-lwip_httpsrv_static">
+	<start name="test-httpsrv">
 		<resource name="RAM" quantum="32M"/>
 		<route>
 			<service name="Nic"> <child name="nic_bridge"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 		<config port="80">
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"
-			      ip_addr="10.0.2.55" netmask="255.255.255.0"
-			      gateway="10.0.2.1"/>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<dir name="socket"> <lwip ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/> </dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
 		</config>
 	</start>
 	<start name="test-http_clnt">
@@ -82,8 +83,11 @@ append config {
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 		<config server_ip="10.0.2.55" server_port="80">
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<dir name="socket"> <lwip ip_addr="10.0.2.56" netmask="255.255.255.0" gateway="10.0.2.1"/> </dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
 		</config>
 	</start>
 </config>}
@@ -103,9 +107,9 @@ append boot_modules {
 	libc.lib.so
 	posix.lib.so
 	libm.lib.so
-	lwip.lib.so
+	vfs_lwip.lib.so
 	test-http_clnt
-	test-lwip_httpsrv_static
+	test-httpsrv
 }
 
 
