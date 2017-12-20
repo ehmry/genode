@@ -19,17 +19,18 @@
 
 #include <lwip/genode_init.h>
 
-namespace Lwip {
-
 extern "C" {
-
 /* LwIP includes */
 #include <lwip/timeouts.h>
 #include <lwip/init.h>
 #include <lwip/sys.h>
 #include <arch/cc.h>
 
+/* our abridged copy of string.h */
+#include <string.h>
 }
+
+namespace Lwip {
 
 	static Genode::Allocator *_heap;
 
@@ -39,7 +40,7 @@ extern "C" {
 	struct Sys_timer
 	{
 		void check_timeouts(Genode::Duration) {
-			Lwip::sys_check_timeouts(); }
+			sys_check_timeouts(); }
 
 		Genode::Timeout_scheduler &timer;
 
@@ -94,10 +95,22 @@ extern "C" {
 		return nullptr;
 	}
 
-	Lwip::u32_t sys_now(void) {
+	u32_t sys_now(void) {
 		return Lwip::_sys_timer->timer.curr_time().trunc_to_plain_ms().value; }
 
 	void genode_memcpy(void * dst, const void *src, unsigned long size) {
 		Genode::memcpy(dst, src, size); }
+
+	int memcmp(const void *b1, const void *b2, ::size_t len) {
+		return Genode::memcmp(b1, b2, len); }
+
+	int strcmp(const char *s1, const char *s2)
+	{
+		size_t len = Genode::min(Genode::strlen(s1), Genode::strlen(s2));
+		return Genode::strcmp(s1, s2, len);
+	}
+
+	int strncmp(const char *s1, const char *s2, size_t len) {
+		return Genode::strcmp(s1, s2, len); }
 
 }
