@@ -98,12 +98,6 @@ bool Plugin::supports_select(int, fd_set *, fd_set *,
 }
 
 
-bool Plugin::supports_socket(int, int, int)
-{
-	return false;
-}
-
-
 bool Plugin::supports_stat(const char*)
 {
 	return false;
@@ -144,16 +138,12 @@ ret_type Plugin::name args \
  */
 DUMMY(File_descriptor *, 0, dup,    (File_descriptor *));
 DUMMY(File_descriptor *, 0, open,   (const char *, int));
-DUMMY(File_descriptor *, 0, socket, (int, int, int));
-DUMMY(File_descriptor *, 0, accept, (File_descriptor *, struct sockaddr *, socklen_t *));
 
 
 /*
  * Functions taking a file descriptor as first argument
  */
-DUMMY(int,     -1, bind,          (File_descriptor *, const struct sockaddr *, socklen_t));
 DUMMY(int,     -1, close,         (File_descriptor *));
-DUMMY(int,     -1, connect,       (File_descriptor *, const struct sockaddr *, socklen_t));
 DUMMY(int,     -1, dup2,          (File_descriptor *, File_descriptor *new_fd));
 DUMMY(int,     -1, fstatfs,       (File_descriptor *, struct statfs *));
 DUMMY(int,     -1, fcntl,         (File_descriptor *, int cmd, long arg));
@@ -161,20 +151,9 @@ DUMMY(int,     -1, fstat,         (File_descriptor *, struct stat *));
 DUMMY(int,     -1, fsync,         (File_descriptor *));
 DUMMY(int,     -1, ftruncate,     (File_descriptor *, ::off_t));
 DUMMY(ssize_t, -1, getdirentries, (File_descriptor *, char *, ::size_t, ::off_t *));
-DUMMY(int,     -1, getpeername,   (File_descriptor *, struct sockaddr *, socklen_t *));
-DUMMY(int,     -1, getsockname,   (File_descriptor *, struct sockaddr *, socklen_t *));
-DUMMY(int,     -1, getsockopt,    (File_descriptor *, int, int, void *, socklen_t *));
 DUMMY(int,     -1, ioctl,         (File_descriptor *, int, char*));
-DUMMY(int,     -1, listen,        (File_descriptor *, int));
 DUMMY(::off_t, -1, lseek,         (File_descriptor *, ::off_t, int));
 DUMMY(ssize_t, -1, read,          (File_descriptor *, void *, ::size_t));
-DUMMY(ssize_t, -1, recv,          (File_descriptor *, void *, ::size_t, int));
-DUMMY(ssize_t, -1, recvfrom,      (File_descriptor *, void *, ::size_t, int, struct sockaddr *, socklen_t *));
-DUMMY(ssize_t, -1, recvmsg,       (File_descriptor *, struct msghdr *, int));
-DUMMY(ssize_t, -1, send,          (File_descriptor *, const void *, ::size_t, int));
-DUMMY(ssize_t, -1, sendto,        (File_descriptor *, const void *, ::size_t, int, const struct sockaddr *, socklen_t));
-DUMMY(int,     -1, setsockopt,    (File_descriptor *, int, int, const void *, socklen_t));
-DUMMY(int,     -1, shutdown,      (File_descriptor *, int));
 DUMMY(ssize_t, -1, write,         (File_descriptor *, const void *, ::size_t));
 
 
