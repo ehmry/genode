@@ -24,7 +24,7 @@ proc nic_drv_build { } {
 proc gpio_drv_build { } { if {[gpio_drv] != ""} { return drivers/gpio } }
 
 set targets "core init drivers/timer server/nic_router server/nic_bridge
-             test/lwip/http_srv_static test/lwip/http_clnt test/lwip/udp
+             test/http_srv_static test/http_clnt test/udp lib/vfs/lwip
              [nic_drv_build] [gpio_drv_build] [platform_drv_build_components]"
 
 proc gpio_drv_config { } {
@@ -64,12 +64,12 @@ proc nic_drv_config { } {
 }
 
 proc client_bin { prot } {
-	if {$prot == "udp"}  { return "test-lwip-udp-client" }
+	if {$prot == "udp"}  { return "test-udp-client" }
 	if {$prot == "http"} { return "test-http_clnt" } }
 
 proc server_bin { prot } {
-	if {$prot == "udp"}  { return "test-lwip-udp-server" }
-	if {$prot == "http"} { return "test-lwip_httpsrv_static" } }
+	if {$prot == "udp"}  { return "test-udp-server" }
+	if {$prot == "http"} { return "test-httpsrv_static" } }
 
 proc client_config { prot index ip_addr gateway netmask nic srv_port srv_ip } {
 	append result {
@@ -81,9 +81,13 @@ proc client_config { prot index ip_addr gateway netmask nic srv_port srv_ip } {
 				<any-service> <parent/> <any-child/> </any-service>
 			</route>
 			<config server_ip="} $srv_ip {" server_port="} $srv_port {">
-				<vfs> <dir name="dev"> <log/> </dir> </vfs>
-				<libc stdout="/dev/log" stderr="/dev/log" ip_addr="} $ip_addr {"
-				      gateway="} $gateway {" netmask="} $netmask {"/>
+				<vfs>
+					<dir name="dev"> <log/> </dir>
+					<dir name="socket">
+						<lwip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/>
+					</dir>
+				</vfs>
+				<libc stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
 			</config>
 		</start>}
 	return $result
@@ -99,9 +103,13 @@ proc server_config { prot index ip_addr gateway netmask nic port } {
 				<any-service> <parent/> <any-child/> </any-service>
 			</route>
 			<config port="} $port {">
-				<vfs> <dir name="dev"> <log/> </dir> </vfs>
-				<libc stdout="/dev/log" stderr="/dev/log" ip_addr="} $ip_addr {"
-				      gateway="} $gateway {" netmask="} $netmask {"/>
+				<vfs>
+					<dir name="dev"> <log/> </dir>
+					<dir name="socket">
+						<lwip ip_addr="} $ip_addr {" gateway="} $gateway {" netmask="} $netmask {"/>
+					</dir>
+				</vfs>
+				<libc stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
 			</config>
 		</start>}
 	return $result
@@ -109,7 +117,7 @@ proc server_config { prot index ip_addr gateway netmask nic port } {
 
 set boot_modules "
 	core init timer nic_router nic_bridge ld.lib.so libc.lib.so libm.lib.so
-	lwip.lib.so posix.lib.so [client_bin udp] [server_bin udp]
+	vfs_lwip.lib.so posix.lib.so [client_bin udp] [server_bin udp]
 	[client_bin http] [server_bin http] [nic_drv_binary] [gpio_drv]
 	[platform_drv_boot_modules]"
 

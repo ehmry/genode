@@ -73,25 +73,17 @@ struct Initialization_failed {};
 		throw Initialization_failed(); \
 	}
 
-void Libc::Component::construct(Libc::Env & env)
+void serve(Libc::Env & env)
 {
 	using namespace Genode;
 	using Address  = Genode::String<16>;
 
 	unsigned port = 0;
 
-	Address ip_addr_str;
-	Address netmask_str;
-	Address gateway_str;
 
 	Attached_rom_dataspace config(env, "config");
 	Xml_node libc_node = env.libc_config();
-	libc_node.attribute("ip_addr").value(&ip_addr_str);
-	libc_node.attribute("netmask").value(&netmask_str);
-	libc_node.attribute("gateway").value(&gateway_str);
 	config.xml().attribute("port").value(&port);
-
-	log("static network interface: ip=", ip_addr_str, " nm=", netmask_str, " gw=", gateway_str);
 
 	log("Create new socket ...");
 
@@ -102,9 +94,8 @@ void Libc::Component::construct(Libc::Env & env)
 	static Response response(
 		"HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n"
 		"<html><head></head><body>"
-		"<h1>HTTP server at %s:%u</h1>"
-		"<p>This is a small test page.</body></html>",
-		ip_addr_str.string(), port);
+		"<h1>HTTP server</h1>"
+		"<p>This is a small test page.</body></html>");
 
 	log("Now, I will bind ...");
 
@@ -131,4 +122,9 @@ void Libc::Component::construct(Libc::Env & env)
 		http_server_serve(client, response);
 		close(client);
 	}
+}
+
+void Libc::Component::construct(Libc::Env &env)
+{
+	with_libc([&env] () { serve(env); });
 }

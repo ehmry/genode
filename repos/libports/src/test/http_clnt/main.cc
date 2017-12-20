@@ -33,7 +33,7 @@ extern "C" {
  * and sends as much 'http get' requests as possible,
  * printing out the response.
  */
-void Libc::Component::construct(Libc::Env &env)
+static void client(Libc::Env &env)
 {
 	using namespace Genode;
 	using Address = Genode::String<16>;
@@ -115,3 +115,6 @@ void Libc::Component::construct(Libc::Env &env)
 
 	log("Test done");
 }
+
+void Libc::Component::construct(Libc::Env &env) {
+	with_libc([&env] () { client(env); }); }
