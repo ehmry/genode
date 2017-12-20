@@ -37,8 +37,6 @@ namespace Noux {
 	void init_process_exited(int exit) { init_child = 0; exit_value = exit; }
 }
 
-extern void init_network();
-
 
 Noux::Io_receptor_registry * Noux::io_receptor_registry()
 {
@@ -247,8 +245,6 @@ struct Noux::Main
 
 	User_info _user_info { _config.xml() };
 
-	bool _network_initialized = (init_network(), true);
-
 	Signal_handler<Main> _destruct_handler {
 		_env.ep(), *this, &Main::_handle_destruct };
 
@@ -293,7 +289,8 @@ struct Noux::Main
 	                          _env.pd_session_cap(),
 	                          _parent_services,
 	                          false,
-	                          _destruct_queue };
+	                          _destruct_queue,
+	                          _config.xml() };
 
 	Constructible<Terminal::Connection> _terminal;
 
