@@ -174,10 +174,7 @@ interface.
 LXIP
 ####
 
-LXIP is a port of the Linux TCP/IP stack to Genode. It is build as a shared
-library named 'lxip.lib.so'. The IP stack can be interfaced using Genode's
-version of 'libc' by linking your application to 'lxip_libc' plugin in your
-'target.mk' file.
+LXIP is a port of the Linux TCP/IP stack to a Genode VFS plugin.
 
 WIFI
 ####
