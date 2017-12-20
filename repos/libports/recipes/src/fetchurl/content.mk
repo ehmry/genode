@@ -1,30 +1,6 @@
 MIRROR_FROM_REP_DIR := src/app/fetchurl
 
-#
-# Copy of lwIP ingredients
-#
-MIRROR_FROM_REP_DIR += include/libc-plugin \
-                       src/lib/libc_lwip \
-                       src/lib/libc_lwip_nic_dhcp \
-                       lib/mk/lwip.mk \
-                       lib/mk/libc_lwip.mk \
-                       lib/mk/libc_lwip_nic_dhcp.mk \
-                       lib/import/import-lwip.mk
-
-
-LWIP_PORT_DIR := $(call port_dir,$(REP_DIR)/ports/lwip)
-
-content: $(MIRROR_FROM_REP_DIR) LICENSE include/lwip src/lib/lwip
-
-include/lwip:
-	mkdir -p $@
-	cp -r $(LWIP_PORT_DIR)/include/lwip/* $@
-	cp -r $(REP_DIR)/include/lwip/* $@
-
-src/lib/lwip:
-	mkdir -p $@
-	cp -r $(LWIP_PORT_DIR)/src/lib/lwip/* $@
-	cp -r $(REP_DIR)/src/lib/lwip/* $@
+content: $(MIRROR_FROM_REP_DIR) LICENSE
 
 $(MIRROR_FROM_REP_DIR):
 	$(mirror_from_rep_dir)
