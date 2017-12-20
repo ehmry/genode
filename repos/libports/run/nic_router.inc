@@ -24,7 +24,7 @@ proc nic_drv_build { } {
 proc gpio_drv_build { } { if {[gpio_drv] != ""} { return drivers/gpio } }
 
 set targets "core init drivers/timer server/nic_router server/nic_bridge
-             test/http_srv_static test/http_clnt test/udp lib/vfs/lwip
+             test/http_srv test/http_clnt test/udp lib/vfs/lwip
              [nic_drv_build] [gpio_drv_build] [platform_drv_build_components]"
 
 proc gpio_drv_config { } {
@@ -69,7 +69,7 @@ proc client_bin { prot } {
 
 proc server_bin { prot } {
 	if {$prot == "udp"}  { return "test-udp-server" }
-	if {$prot == "http"} { return "test-httpsrv_static" } }
+	if {$prot == "http"} { return "test-httpsrv" } }
 
 proc client_config { prot index ip_addr gateway netmask nic srv_port srv_ip } {
 	append result {
