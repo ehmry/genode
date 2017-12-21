@@ -351,7 +351,7 @@ if {[have_include "power_on/qemu"]} {
 }
 
 # give the TCP/IP stack some time to settle down
-sleep 3
+sleep 8
 
 # start netperf client connecting to netperf server running native on Genode
 foreach netperf_test $netperf_tests {
