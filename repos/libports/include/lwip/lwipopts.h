@@ -30,84 +30,39 @@ extern "C" {
 #define NO_SYS 1
 #define SYS_LIGHTWEIGHT_PROT 0
 
-/*
-   -----------------------------------------------
-   ---------- Platform specific locking ----------
-   -----------------------------------------------
-*/
+#define LWIP_DNS                    1  /* DNS support */
+#define LWIP_DHCP                   1  /* DHCP support */
+#define LWIP_SOCKET                 0  /* LwIP socket API */
+#define LWIP_NETIF_LOOPBACK         1  /* Looping back to same address? */
+#define LWIP_STATS                  0  /* disable stating */
+#define LWIP_TCP_TIMESTAMPS         1
+#define LWIP_WND_SCALE              1  /* enable window scaling */
+#define TCP_RCV_SCALE               2  /* receive scale factor IETF RFC 1323 */
 
-void genode_memcpy(void * dst, const void *src, unsigned long size);
-#define MEMCPY(dst,src,len)             genode_memcpy(dst,src,len)
+#define LWIP_NETIF_STATUS_CALLBACK  1  /* callback function used for interface changes */
+#define LWIP_NETIF_LINK_CALLBACK    1  /* callback function used for link-state changes */
 
+/***********************************
+ ** Checksum calculation settings **
+ ***********************************/
 
-/*
-   ------------------------------------
-   ---------- Memory options ----------
-   ------------------------------------
-*/
+/* checksum calculation for outgoing packets can be disabled if the hardware supports it */
+#define LWIP_CHECKSUM_ON_COPY       1  /* calculate checksum during memcpy */
+
+/*********************
+ ** Memory settings **
+ *********************/
 
 #define MEM_LIBC_MALLOC             1
-/* Try disabling MEMP_MEM_MALLOC and check speed */
 #define MEMP_MEM_MALLOC             1
 /* MEM_ALIGNMENT > 4 e.g. for x86_64 are not supported, see Genode issue #817 */
 #define MEM_ALIGNMENT               4
 
-/* arch/cc.h overrides malloc symbols */
+#define DEFAULT_ACCEPTMBOX_SIZE   128
+#define TCPIP_MBOX_SIZE           128
 
-/* Pools are reported to be faster */
-#define MEM_USE_POOLS                   0
-#define MEMP_USE_CUSTOM_POOLS           0
-
-/*
-   ------------------------------------------------
-   ---------- Internal Memory Pool Sizes ----------
-   ------------------------------------------------
-*/
-
-#define MEMP_NUM_TCP_PCB           128
-
-#define PBUF_POOL_SIZE                  96
-
-
-/*
-   ---------------------------------
-   ---------- ARP options ----------
-   ---------------------------------
-*/
-
-#define LWIP_ARP                        1
-
-
-/*
-   ----------------------------------
-   ---------- DHCP options ----------
-   ----------------------------------
-*/
-
-#define LWIP_DHCP                       1
-#define LWIP_DHCP_CHECK_LINK_UP         1
-
-
-/*
-   ----------------------------------
-   ---------- DNS options -----------
-   ----------------------------------
-*/
-
-#define LWIP_DNS                        1
-
-
-/*
-   ---------------------------------
-   ---------- TCP options ----------
-   ---------------------------------
-*/
-
-#define TCP_MSS                         1460
-#define TCP_WND                         (96 * TCP_MSS)
-#define LWIP_WND_SCALE                  1
-#define TCP_RCV_SCALE                   2
-#define LWIP_TCP_TIMESTAMPS             1
+#define TCP_MSS                  1460
+#define TCP_WND                     (96 * TCP_MSS)
 
 /*
  * The window scale option (http://tools.ietf.org/html/rfc1323) patch of lwIP
@@ -120,27 +75,45 @@ void genode_memcpy(void * dst, const void *src, unsigned long size);
 
 #define TCP_SND_QUEUELEN            ((32 * (TCP_SND_BUF) + (TCP_MSS - 1))/(TCP_MSS))
 
+#define PBUF_POOL_SIZE             96
+
+#define MEMP_NUM_SYS_TIMEOUT        16
+#define MEMP_NUM_TCP_PCB           128
+
+void genode_memcpy(void * dst, const void *src, unsigned long size);
+#define MEMCPY(dst,src,len)             genode_memcpy(dst,src,len)
+
+/********************
+ ** Debug settings **
+ ********************/
+
+/* #define LWIP_DEBUG */
+/* #define DHCP_DEBUG      LWIP_DBG_ON */
+/* #define ETHARP_DEBUG    LWIP_DBG_ON */
+/* #define NETIF_DEBUG     LWIP_DBG_ON */
+/* #define PBUF_DEBUG      LWIP_DBG_ON */
+/* #define API_LIB_DEBUG   LWIP_DBG_ON */
+/* #define API_MSG_DEBUG   LWIP_DBG_ON */
+/* #define SOCKETS_DEBUG   LWIP_DBG_ON */
+/* #define ICMP_DEBUG      LWIP_DBG_ON */
+/* #define INET_DEBUG      LWIP_DBG_ON */
+/* #define IP_DEBUG        LWIP_DBG_ON */
+/* #define IP_REASS_DEBUG  LWIP_DBG_ON */
+/* #define RAW_DEBUG       LWIP_DBG_ON */
+/* #define MEM_DEBUG       LWIP_DBG_ON */
+/* #define MEMP_DEBUG      LWIP_DBG_ON */
+/* #define SYS_DEBUG       LWIP_DBG_ON */
+/* #define TCP_DEBUG       LWIP_DBG_ON */
+
 
 /*
-   ------------------------------------------------
-   ---------- Network Interfaces options ----------
-   ------------------------------------------------
+   ----------------------------------
+   ---------- DHCP options ----------
+   ----------------------------------
 */
 
-#define LWIP_NETIF_API                  0
-#define LWIP_NETIF_STATUS_CALLBACK      1
-#define LWIP_NETIF_LINK_CALLBACK        1
-#define LWIP_NETIF_LOOPBACK             1
+#define LWIP_DHCP_CHECK_LINK_UP         1
 
-
-/*
-   ------------------------------------
-   ---------- Thread options ----------
-   ------------------------------------
-*/
-
-#define TCPIP_MBOX_SIZE                 128
-#define DEFAULT_ACCEPTMBOX_SIZE         128
 
 /*
    ----------------------------------------------
@@ -149,34 +122,6 @@ void genode_memcpy(void * dst, const void *src, unsigned long size);
 */
 /* no Netconn API */
 #define LWIP_NETCONN                    0
-
-
-/*
-   ------------------------------------
-   ---------- Socket options ----------
-   ------------------------------------
-*/
-
-/* no libc compatibility support, that is handled by vfs_lwip */
-#define LWIP_SOCKET                     0
-
-
-/*
-   ----------------------------------------
-   ---------- Statistics options ----------
-   ----------------------------------------
-*/
-
-#define LWIP_STATS                      0
-
-/*
-   --------------------------------------
-   ---------- Checksum options ----------
-   --------------------------------------
-*/
-
-/* checksum calculation for outgoing packets can be disabled if the hardware supports it */
-#define LWIP_CHECKSUM_ON_COPY           1
 
 
 /*
