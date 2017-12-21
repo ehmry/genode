@@ -388,7 +388,7 @@ static void nic_netif_status_callback(struct netif *netif)
 		if (IP_IS_V6_VAL(netif->ip_addr)) {
 			Genode::log("lwIP Nic interface up"
 			            ", address=",(char const*)ip6addr_ntoa(netif_ip6_addr(netif, 0)));
-		} else {
+		} else if (!ip4_addr_isany(netif_ip4_addr(netif))) {
 			typedef Genode::String<IPADDR_STRLEN_MAX> Str;
 			Str address((char const*)ip4addr_ntoa(netif_ip4_addr(netif)));
 			Str netmask((char const*)ip4addr_ntoa(netif_ip4_netmask(netif)));
