@@ -1,6 +1,9 @@
 SHARED_LIB = yes
 LIBS       = libc blit
 
+# Link to Mesa so it is pulled in when EGL is dynamically loaded.
+LIBS += mesa
+
 include $(REP_DIR)/lib/mk/mesa-common.inc
 
 SRC_C = \
