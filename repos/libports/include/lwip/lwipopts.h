@@ -36,11 +36,16 @@ extern "C" {
 #define LWIP_NETIF_LOOPBACK         1  /* Looping back to same address? */
 #define LWIP_STATS                  0  /* disable stating */
 #define LWIP_TCP_TIMESTAMPS         1
-#define LWIP_WND_SCALE              1  /* enable window scaling */
-#define TCP_RCV_SCALE               2  /* receive scale factor IETF RFC 1323 */
+#define TCP_MSS                         1460
+#define TCP_WND                     (32 * TCP_MSS)
+#define TCP_SND_BUF                 (32 * TCP_MSS)
+#define LWIP_WND_SCALE                  3
+#define TCP_RCV_SCALE                   2
+#define TCP_SND_QUEUELEN                ((8 * (TCP_SND_BUF) + (TCP_MSS - 1))/(TCP_MSS))
 
 #define LWIP_NETIF_STATUS_CALLBACK  1  /* callback function used for interface changes */
 #define LWIP_NETIF_LINK_CALLBACK    1  /* callback function used for link-state changes */
+
 
 /***********************************
  ** Checksum calculation settings **
@@ -57,23 +62,6 @@ extern "C" {
 #define MEMP_MEM_MALLOC             1
 /* MEM_ALIGNMENT > 4 e.g. for x86_64 are not supported, see Genode issue #817 */
 #define MEM_ALIGNMENT               4
-
-#define DEFAULT_ACCEPTMBOX_SIZE   128
-#define TCPIP_MBOX_SIZE           128
-
-#define TCP_MSS                  1460
-#define TCP_WND                     (96 * TCP_MSS)
-
-/*
- * The window scale option (http://tools.ietf.org/html/rfc1323) patch of lwIP
- * definitely works solely for the receive window, not for the send window.
- * Setting the send window size to the maximum of an 16bit value, 65535,
- * or multiple of it (x * 65536 - 1) results in the same performance.
- * Everything else decrease performance.
- */
-#define TCP_SND_BUF                 (65535)
-
-#define TCP_SND_QUEUELEN            ((32 * (TCP_SND_BUF) + (TCP_MSS - 1))/(TCP_MSS))
 
 #define PBUF_POOL_SIZE             96
 
