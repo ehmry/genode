@@ -1,0 +1,124 @@
+#
+# \brief  Test of TCP streaming
+# \author Emery Hemingway
+# \date   2018-01-02
+#
+
+set build_components {
+	core init
+	drivers/nic
+	drivers/timer
+	lib/vfs/lwip
+	test/tcp_stream
+	server/nic_bridge
+}
+
+source ${genode_dir}/repos/base/run/platform_drv.inc
+append_platform_drv_build_components
+
+build $build_components
+
+create_boot_directory
+
+append config {
+<config verbose="yes">
+	<parent-provides>
+		<service name="CPU"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="IRQ"/>
+		<service name="LOG"/>
+		<service name="PD"/>
+		<service name="RAM"/>
+		<service name="RM"/>
+		<service name="ROM"/>
+	</parent-provides>
+	<default caps="100"/>
+	<default-route>
+		<service name="Nic"> <child name="nic_bridge"/> </service>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>}
+
+append_platform_drv_config
+
+append config {
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
+	<start name="nic_drv">
+		<binary name="} [nic_drv_binary] {"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides> <service name="Nic"/> </provides>
+	</start>
+	<start name="nic_bridge">
+		<resource name="RAM" quantum="4M"/>
+		<provides> <service name="Nic"/> </provides>
+		<config>
+			<policy label_prefix="server" ip_addr="10.0.2.55"/>
+			<policy label_prefix="client" ip_addr="10.0.2.56"/>
+		</config>
+		<route>
+			<service name="Nic"> <child name="nic_drv"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="server" caps="256">
+		<binary name="test-tcp_stream"/>
+		<resource name="RAM" quantum="8M"/>
+		<config>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<dir name="socket">
+					<lwip ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/>
+				</dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
+			<arg value="server"/>
+			<arg value="-s"/>
+			<arg value="10.0.2.55"/>
+			<arg value="7"/>
+		</config>
+	</start>
+	<start name="client" caps="256">
+		<binary name="test-tcp_stream"/>
+		<resource name="RAM" quantum="8M"/>
+		<config>
+			<vfs>
+				<dir name="dev"> <log/> </dir>
+				<dir name="socket">
+					<lwip ip_addr="10.0.2.56" netmask="255.255.255.0" gateway="10.0.2.1"/>
+				</dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
+			<arg value="client"/>
+			<arg value="-c"/>
+			<arg value="10.0.2.55"/>
+			<arg value="7"/>
+		</config>
+	</start>
+</config>
+}
+
+install_config $config
+
+# generic modules
+append boot_modules {
+	core init ld.lib.so
+	libc.lib.so
+	libm.lib.so
+	nic_bridge
+	posix.lib.so
+	test-tcp_stream
+	timer
+	vfs_lwip.lib.so
+} [nic_drv_binary] { }
+
+# platform-specific modules
+append_platform_drv_boot_modules
+
+build_boot_image $boot_modules
+
+append qemu_args " -nographic -net nic,model=e1000 -net user"
+
+run_genode_until forever
