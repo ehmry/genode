@@ -632,7 +632,7 @@ class Lwip::Udp_socket_dir final :
 			case Type::DATA: {
 				file_size remain = count;
 				while (remain) {
-					pbuf *buf = pbuf_alloc(PBUF_RAW, remain, PBUF_POOL);
+					pbuf *buf = pbuf_alloc(PBUF_RAW, remain, PBUF_RAM);
 					pbuf_take(buf, src, buf->tot_len);
 
 					err_t err = udp_sendto(_pcb, buf, &_to_addr, _to_port);
@@ -1430,24 +1430,11 @@ class Lwip::File_system final : public Vfs::File_system
 			if ((vfs_handle->status_flags() & OPEN_MODE_ACCMODE) == OPEN_MODE_RDONLY)
 				return Write_result::WRITE_ERR_INVALID;
 
-			/*
-			if ((!vfs_handle) ||
-			    ((vfs_handle->status_flags() & OPEN_MODE_ACCMODE) == OPEN_MODE_RDONLY)) {
-				return Write_result::WRITE_ERR_INVALID;
-				return;
-			}
-			 */
-
 			if (Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle)) {
 				if (handle->socket) {
 					return handle->socket->write(*handle, src, count, out_count);
-				} else {
-					Genode::error(*handle, " has no socket");
 				}
-			} else {
-				Genode::error("handle not casted to Lwip_handle");
 			}
-			Genode::error("write failed");
 			return Write_result::WRITE_ERR_INVALID;
 		}
 
