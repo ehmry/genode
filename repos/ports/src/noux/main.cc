@@ -315,6 +315,24 @@ struct Noux::Main
 	{
 		log("--- noux started ---");
 
+		auto const service_fn = [&] (Xml_node const &service) {
+			try {
+				Genode::String<64> name;
+				service.attribute("name").value(&name);
+				new (_heap)
+					Noux::Parent_service(_parent_services, name.string());
+			} catch (...) {
+				Genode::error("invalid service provides ", service);
+				throw;
+			}
+		};
+
+		auto const provides_fn = [&] (Xml_node const &provides) {
+			provides.for_each_sub_node("service", service_fn); };
+
+		/* add additional parent services when configured */
+		_config.xml().for_each_sub_node("parent-provides", provides_fn);
+
 		_init_child.add_io_channel(_channel_0, 0);
 		_init_child.add_io_channel(_channel_1, 1);
 		_init_child.add_io_channel(_channel_2, 2);
