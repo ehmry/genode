@@ -16,6 +16,8 @@ CC_OPT  += -DHAVE_CONFIG_H -DGENODE_BUILD
 
 CC_WARN = -Wall -Wno-unused
 
+CC_CXX_WARN_STRICT =
+
 vpath timer.cc $(PRG_DIR)
 vpath %.c      $(NETPERF_DIR)/src
 
