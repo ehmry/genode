@@ -52,9 +52,9 @@ extern "C" {
 		 */
 		struct nic_netif_pbuf
 		{
-			struct pbuf_custom p;
-			Nic_netif *netif;
-			Nic::Packet_descriptor packet;
+			struct pbuf_custom p { };
+			Nic_netif *netif = nullptr;
+			Nic::Packet_descriptor packet { };
 		};
 
 		static void nic_netif_pbuf_free(pbuf *p);
@@ -83,9 +83,11 @@ class Lwip::Nic_netif
 		Nic::Packet_allocator _nic_tx_alloc;
 		Nic::Connection _nic;
 
-		struct netif _netif;
+		struct netif _netif { };
 
-		ip_addr_t ip, nm, gw;
+		ip_addr_t ip { };
+		ip_addr_t nm { };
+		ip_addr_t gw { };
 
 		Genode::Io_signal_handler<Nic_netif> _link_state_handler;
 		Genode::Io_signal_handler<Nic_netif> _rx_packet_handler;
@@ -242,6 +244,8 @@ class Lwip::Nic_netif
 				&_netif, nic_netif_status_callback);
 			nic_netif_status_callback(&_netif);
 		}
+
+		virtual ~Nic_netif() { }
 
 		/**
 		* Status callback to override in subclass
