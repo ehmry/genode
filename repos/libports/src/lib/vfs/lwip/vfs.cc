@@ -63,8 +63,9 @@ extern "C" {
 	class Socket_dir;
 	class Udp_socket_dir;
 	class Tcp_socket_dir;
-	typedef Genode::List<Udp_socket_dir> Udp_socket_dir_list;
-	typedef Genode::List<Tcp_socket_dir> Tcp_socket_dir_list;
+
+	#define Udp_socket_dir_list Genode::List<Udp_socket_dir>
+	#define Tcp_socket_dir_list Genode::List<Tcp_socket_dir>
 
 	struct Protocol_dir;
 	template <typename, typename> class Protocol_dir_impl;
@@ -78,7 +79,8 @@ extern "C" {
 
 	struct Lwip_new_handle;
 	struct Lwip_handle;
-	typedef Genode::List<Lwip_handle> Lwip_handle_list;
+
+	#define Lwip_handle_list List<Lwip_handle>
 
 	class File_system;
 
@@ -114,8 +116,18 @@ struct Lwip::Lwip_new_handle final : Vfs::Vfs_handle
 };
 
 
-struct Lwip::Lwip_handle final : Vfs::Vfs_handle, Lwip_handle_list::Element
+struct Lwip::Lwip_handle final : Vfs::Vfs_handle, private Lwip_handle_list::Element
 {
+	friend class Lwip_handle_list;
+	friend class Lwip_handle_list::Element;
+	using Lwip_handle_list::Element::next;
+
+	/*
+	  * Noncopyable
+	 */
+	Lwip_handle(Lwip_handle const &);
+	Lwip_handle &operator = (Lwip_handle const &);
+
 	enum Type {
 		ACCEPT, BIND, CONNECT, DATA,
 		LISTEN, LOCAL, REMOTE, INVALID
@@ -150,6 +162,10 @@ struct Lwip::Lwip_handle final : Vfs::Vfs_handle, Lwip_handle_list::Element
 
 struct Lwip::Socket_dir
 {
+		friend class Lwip_handle;
+		friend class Lwip_handle_list;
+		friend class Lwip_handle_list::Element;
+
 		typedef Genode::String<8> Name;
 
 		static Name name_from_num(unsigned num)
@@ -166,11 +182,11 @@ struct Lwip::Socket_dir
 		Name     const _name { name_from_num(_num) };
 
 		/* lists of handles opened at this socket */
-		Lwip_handle_list accept_handles;
-		Lwip_handle_list   bind_handles;
-		Lwip_handle_list   data_handles;
-		Lwip_handle_list listen_handles;
-		Lwip_handle_list remote_handles;
+		Lwip_handle_list accept_handles { };
+		Lwip_handle_list   bind_handles { };
+		Lwip_handle_list   data_handles { };
+		Lwip_handle_list listen_handles { };
+		Lwip_handle_list remote_handles { };
 
 		enum State {
 			NEW,
@@ -184,6 +200,8 @@ struct Lwip::Socket_dir
 
 		Socket_dir(unsigned num, Genode::Allocator &alloc, Vfs::Io_response_handler &io_handler)
 		: alloc(alloc), io_handler(io_handler), _num(num) { };
+
+		virtual ~Socket_dir() { }
 
 		Name const &name() const { return _name; }
 
@@ -288,6 +306,8 @@ struct Lwip::Protocol_dir
 	                         Vfs_handle **out_handle,
 	                         Allocator   &alloc) = 0;
 	virtual Unlink_result unlink(char const *path) = 0;
+
+	virtual ~Protocol_dir() { }
 };
 
 
@@ -300,9 +320,15 @@ class Lwip::Protocol_dir_impl final : public Protocol_dir
 		Vfs::Io_response_handler &_io_handler;
 		Genode::Entrypoint       &_ep;
 
-		Genode::List<SOCKET_DIR> _socket_dirs;
+		Genode::List<SOCKET_DIR> _socket_dirs { };
 
 	public:
+
+		friend class Genode::List<SOCKET_DIR>;
+		friend class Genode::List<SOCKET_DIR>::Element;
+
+		friend class Tcp_socket_dir;
+		friend class Udp_socket_dir;
 
 		Protocol_dir_impl(Genode::Allocator        &alloc,
 		                  Vfs::Io_response_handler &io_handler,
@@ -462,9 +488,15 @@ namespace Lwip {
 
 class Lwip::Udp_socket_dir final :
 	public Socket_dir,
-	public Udp_socket_dir_list::Element
+	private Udp_socket_dir_list::Element
 {
 	private:
+	
+		/*
+		  * Noncopyable
+		 */
+		Udp_socket_dir(Udp_socket_dir const &);
+		Udp_socket_dir &operator = (Udp_socket_dir const &);
 
 		/* TODO: optimize packet queue metadata allocator */
 		Genode::Allocator &_alloc;
@@ -487,18 +519,22 @@ class Lwip::Udp_socket_dir final :
 		Genode::Tslab<Packet, sizeof(Packet)*64> _packet_slab { &_alloc };
 
 		/* Queue of received UDP packets */
-		Genode::Fifo<Packet> _packet_queue;
+		Genode::Fifo<Packet> _packet_queue { };
 
 		/* destination addressing */
-		ip_addr_t _to_addr;
+		ip_addr_t _to_addr { };
 		u16_t     _to_port = 0;
 
 	public:
 
-		Udp_socket_dir(unsigned num, Udp_proto_dir &proto_dir,
+		friend class Udp_socket_dir_list;
+		friend class Udp_socket_dir_list::Element;
+		using Udp_socket_dir_list::Element::next;
+
+		Udp_socket_dir(unsigned num, Udp_proto_dir &,
 		               Genode::Allocator &alloc,
 		               Vfs::Io_response_handler &io_handler,
-		               Genode::Entrypoint &ep)
+		               Genode::Entrypoint &)
 		: Socket_dir(num, alloc, io_handler), _alloc(alloc)
 		{
 			ip_addr_set_zero(&_to_addr);
@@ -507,7 +543,7 @@ class Lwip::Udp_socket_dir final :
 			udp_recv(_pcb, udp_recv_callback, this);
 		}
 
-		~Udp_socket_dir()
+		virtual ~Udp_socket_dir()
 		{
 			udp_remove(_pcb);
 			_pcb = NULL;
@@ -720,15 +756,21 @@ class Lwip::Udp_socket_dir final :
  *********/
 
 class Lwip::Tcp_socket_dir final :
-	public Socket_dir,
-	public Tcp_socket_dir_list::Element
+	public  Socket_dir,
+	private Tcp_socket_dir_list::Element
 {
 	private:
+
+		/*
+		  * Noncopyable
+		 */
+		Tcp_socket_dir(Tcp_socket_dir const &);
+		Tcp_socket_dir &operator = (Tcp_socket_dir const &);
 
 		Tcp_proto_dir       &_proto_dir;
 		Genode::Allocator   &_alloc;
 		Genode::Entrypoint  &_ep;
-		Tcp_socket_dir_list  _pending;
+		Tcp_socket_dir_list  _pending { };
 		tcp_pcb             *_pcb;
 
 		/* queue of received data */
@@ -736,6 +778,10 @@ class Lwip::Tcp_socket_dir final :
 		u16_t _recv_off  = 0;
 
 	public:
+
+		friend class Tcp_socket_dir_list;
+		friend class Tcp_socket_dir_list::Element;
+		using Tcp_socket_dir_list::Element::next;
 
 		State state = NEW;
 
@@ -793,7 +839,7 @@ class Lwip::Tcp_socket_dir final :
 		/**
 		 * Accept new connection from callback
 		 */
-		err_t accept(struct tcp_pcb *newpcb, err_t err)
+		err_t accept(struct tcp_pcb *newpcb, err_t)
 		{
 			try {
 				/*
@@ -1164,7 +1210,7 @@ namespace Lwip {
 	extern "C" {
 
 static
-void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
+void udp_recv_callback(void *arg, struct udp_pcb*, struct pbuf *p, const ip_addr_t *addr, u16_t port)
 {
 	if (!arg) return;
 
@@ -1174,7 +1220,7 @@ void udp_recv_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_
 
 
 static
-err_t tcp_connect_callback(void *arg, struct tcp_pcb *pcb, err_t err)
+err_t tcp_connect_callback(void *arg, struct tcp_pcb*, err_t)
 {
 	if (!arg) return ERR_ARG;
 
@@ -1197,7 +1243,7 @@ err_t tcp_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 
 
 static
-err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
+err_t tcp_recv_callback(void *arg, struct tcp_pcb*, struct pbuf *p, err_t)
 {
 	if (!arg) return ERR_ARG;
 
@@ -1214,7 +1260,7 @@ err_t tcp_recv_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t e
 
 /*
 static
-err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len)
+err_t tcp_sent_callback(void *arg, struct tcp_pcb*, u16_t len)
 {
 	if (!arg) return ERR_ARG;
 
@@ -1227,7 +1273,7 @@ err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len)
 
 
 static
-void tcp_err_callback(void *arg, err_t err)
+void tcp_err_callback(void *arg, err_t)
 {
 	if (!arg) return;
 
@@ -1469,8 +1515,7 @@ class Lwip::File_system final : public Vfs::File_system
 			return false;
 		}
 
-		bool check_unblock(Vfs_handle *vfs_handle,
-		                           bool rd, bool wr, bool ex)
+		bool check_unblock(Vfs_handle*, bool, bool, bool)
 		{
 			Genode::error("VFS lwIP: ",__func__," not implemented");
 			return true;
@@ -1493,17 +1538,17 @@ class Lwip::File_system final : public Vfs::File_system
 		 ** File system stubs **
 		 ***********************/
 
-		Rename_result rename(char const *from, char const *to) override {
+		Rename_result rename(char const *, char const *) override {
 			return RENAME_ERR_NO_PERM; }
 
-		file_size num_dirent(char const *path) override {
+		file_size num_dirent(char const *) override {
 			return 0; }
 
-		Dataspace_capability dataspace(char const *path) override {
+		Dataspace_capability dataspace(char const *) override {
 			return Dataspace_capability(); }
-		void release(char const *path, Dataspace_capability) override { };
+		void release(char const *, Dataspace_capability) override { };
 
-		Ftruncate_result ftruncate(Vfs_handle *vfs_handle, file_size) override
+		Ftruncate_result ftruncate(Vfs_handle *, file_size) override
 		{
 			/* report ok because libc always executes ftruncate() when opening rw */
 			return FTRUNCATE_OK;
@@ -1517,7 +1562,7 @@ extern "C" Vfs::File_system_factory *vfs_file_system_factory(void)
 {
 	struct Factory : Vfs::File_system_factory
 	{
-		Genode::Constructible<Timer::Connection> timer;
+		Genode::Constructible<Timer::Connection> timer { };
 
 		Vfs::File_system *create(Genode::Env &env,
 		                         Genode::Allocator &alloc,
