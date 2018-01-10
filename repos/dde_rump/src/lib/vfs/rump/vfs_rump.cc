@@ -60,32 +60,38 @@ class Vfs::Rump_file_system : public File_system
 
 		typedef Genode::Path<MAX_PATH_LEN> Path;
 
+		struct Fd_guard
+		{
+			int const fd;
+			Fd_guard(int n) : fd(n) { }
+			~Fd_guard() { rump_sys_close(fd); }
+		};
+
 		Genode::Env &_env;
 		Io_response_handler &_io_handler;
 
 		struct Rump_vfs_dir_handle;
 		struct Rump_watch_handle;
 		typedef Genode::List<Rump_watch_handle> Rump_watch_handles;
-		Rump_watch_handles _watchers;
+		Rump_watch_handles _watchers { };
 
 		struct Rump_vfs_file_handle;
 		typedef Genode::List<Rump_vfs_file_handle> Rump_vfs_file_handles;
-		Rump_vfs_file_handles _file_handles;
+		Rump_vfs_file_handles _file_handles { };
 
 		struct Rump_vfs_handle : public Vfs_handle
 		{
 			using Vfs_handle::Vfs_handle;
 
-			virtual Read_result read(char *buf, file_size buf_size,
-			                         file_size seek_offset, file_size &out_count)
+			virtual Read_result read(char *, file_size,
+			                         file_size, file_size&)
 			{
 				Genode::error("Rump_vfs_handle::read() called");
 				return READ_ERR_INVALID;
 			}
 
-			virtual Write_result write(char const *buf, file_size buf_size,
-			                           file_size seek_offset,
-			                           file_size &out_count)
+			virtual Write_result write(char const *, file_size,
+			                           file_size, file_size&)
 			{
 				Genode::error("Rump_vfs_handle::write() called");
 				return WRITE_ERR_INVALID;
@@ -287,7 +293,7 @@ class Vfs::Rump_file_system : public File_system
 				}
 
 				Write_result write(char const *buf, file_size buf_size,
-				                   file_size seek_offset,
+				                   file_size /*seek_offset*/,
 				                   file_size &out_count) override
 				{
 					rump_sys_unlink(_path.base());
@@ -304,12 +310,12 @@ class Vfs::Rump_file_system : public File_system
 
 		struct Rump_watch_handle : Vfs_watch_handle, Rump_watch_handles::Element
 		{
-			int fd, kq;
+			int const fd, kq;
 
 			Rump_watch_handle(Vfs::File_system &fs,
 			                  Allocator        &alloc,
 			                  int              &fd)
-			: Vfs_watch_handle(fs, alloc), fd(fd)
+			: Vfs_watch_handle(fs, alloc), fd(fd), kq(rump_sys_kqueue())
 			{
 				/* XXX: registering each open file seems expensive */
 				struct kevent ev;
@@ -318,7 +324,6 @@ class Vfs::Rump_file_system : public File_system
 				       EV_ADD|EV_ENABLE|EV_CLEAR,
 				       NOTE_DELETE|NOTE_WRITE|NOTE_RENAME,
 				       0, 0);
-				kq = rump_sys_kqueue();
 				rump_sys_kevent(kq, &ev, 1, NULL, 0, &nullts);
 			}
 
@@ -341,7 +346,7 @@ class Vfs::Rump_file_system : public File_system
 		 */
 		struct fs_args
 		{
-			char *fspec;
+			char *fspec = nullptr;
 			char  pad[150];
 
 			fs_args() { Genode::memset(pad, 0, sizeof(pad)); }
@@ -426,6 +431,8 @@ class Vfs::Rump_file_system : public File_system
 			int fd = rump_sys_open(path, O_RDONLY);
 			if (fd == -1) return Genode::Dataspace_capability();
 
+			Fd_guard guard(fd);
+
 			struct stat s;
 			if (rump_sys_lstat(path, &s) != 0) return Genode::Dataspace_capability();
 			size_t const ds_size = s.st_size;
@@ -440,7 +447,8 @@ class Vfs::Rump_file_system : public File_system
 				enum { CHUNK_SIZE = 16U << 10 };
 
 				for (size_t i = 0; i < ds_size;) {
-					ssize_t n = rump_sys_read(fd, &local_addr[i], min(ds_size-i, CHUNK_SIZE));
+					ssize_t n = rump_sys_read(fd, &local_addr[i],
+					                          min(ds_size-i, (size_t)CHUNK_SIZE));
 					if (n == -1)
 						throw n;
 					i += n;
@@ -452,11 +460,11 @@ class Vfs::Rump_file_system : public File_system
 					_env.rm().detach(local_addr);
 				_env.ram().free(ds_cap);
 			}
-			rump_sys_close(fd);
+
 			return ds_cap;
 		}
 
-		void release(char const *path,
+		void release(char const *,
 		             Genode::Dataspace_capability ds_cap) override
 		{
 			if (ds_cap.valid())
@@ -470,6 +478,8 @@ class Vfs::Rump_file_system : public File_system
 			int fd = rump_sys_open(*path ? path : "/", O_RDONLY | O_DIRECTORY);
 			if (fd == -1)
 				return 0;
+
+			Fd_guard guard(fd);
 
 			rump_sys_lseek(fd, 0, SEEK_SET);
 
@@ -488,7 +498,6 @@ class Vfs::Rump_file_system : public File_system
 				}
 			} while(bytes);
 
-			rump_sys_close(fd);
 			return n;
 		}
 
@@ -549,6 +558,7 @@ class Vfs::Rump_file_system : public File_system
 				case EEXIST:       return OPENDIR_ERR_NODE_ALREADY_EXISTS;
 				case ENOSPC:       return OPENDIR_ERR_NO_SPACE;
 				default:
+					Genode::error(__func__,"(",path,") ", errno);
 					return OPENDIR_ERR_PERMISSION_DENIED;
 				}
 
@@ -563,6 +573,7 @@ class Vfs::Rump_file_system : public File_system
 			case EEXIST:       return OPENDIR_ERR_NODE_ALREADY_EXISTS;
 			case ENOSPC:       return OPENDIR_ERR_NO_SPACE;
 			default:
+				Genode::error(__func__,"(",path,") ", errno);
 				return OPENDIR_ERR_PERMISSION_DENIED;
 			}
 
@@ -584,6 +595,7 @@ class Vfs::Rump_file_system : public File_system
 				case EACCES:       return OPENLINK_ERR_PERMISSION_DENIED;
 				case ENAMETOOLONG: return OPENLINK_ERR_NAME_TOO_LONG;
 				default:
+					Genode::error(__func__,"(",path,") ", errno);
 					return OPENLINK_ERR_PERMISSION_DENIED;
 				}
 
@@ -594,6 +606,7 @@ class Vfs::Rump_file_system : public File_system
 			if (rump_sys_readlink(path, &dummy, sizeof(dummy)) == -1) switch(errno) {
 				case ENOENT: return OPENLINK_ERR_LOOKUP_FAILED;
 				default:
+					Genode::error(__func__,"(",path,") ", errno);
 					return OPENLINK_ERR_PERMISSION_DENIED;
 			}
 
@@ -689,6 +702,7 @@ class Vfs::Rump_file_system : public File_system
 
 		void close(Vfs_watch_handle *vfs_handle) override
 		{
+			Genode::error("close watch handle");
 			auto *watch_handle =
 				static_cast<Rump_watch_handle *>(vfs_handle);
 			destroy(watch_handle->alloc(), watch_handle);
@@ -761,7 +775,7 @@ class Rump_factory : public Vfs::File_system_factory
 
 	public:
 
-		Rump_factory(Genode::Env &env, Genode::Allocator &alloc)
+		Rump_factory(Genode::Env &env, Genode::Allocator &/*alloc*/)
 		: _timer(env, "rump-sync"),
 		  _sync_handler(env.ep(), *this, &Rump_factory::_sync)
 		{
