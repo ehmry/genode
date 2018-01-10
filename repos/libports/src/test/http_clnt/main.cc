@@ -89,8 +89,8 @@ static void client(Libc::Env &env)
 		static const char *http_get_request =
 			"GET / HTTP/1.0\r\nHost: localhost:80\r\n\r\n";
 
-		unsigned long bytes = send(s, (char*)http_get_request,
-		                                Genode::strlen(http_get_request), 0);
+		int bytes = send(s, (char*)http_get_request,
+		                   Genode::strlen(http_get_request), 0);
 		if ( bytes < 0 ) {
 			error("couldn't send request ...");
 			close(s);
