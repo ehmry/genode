@@ -34,6 +34,9 @@ extern "C" {
 	struct Drive;
 	struct Platform
 	{
+		Platform(Platform const &);
+		Platform &operator = (Platform const &);
+
 		Genode::Env &env;
 		Genode::Allocator &alloc;
 		Genode::Allocator_avl tx_alloc { &alloc };
@@ -58,9 +61,9 @@ extern "C" {
 
 	struct Drive : Block::Connection
 	{
-		Block::sector_t block_count;
-		Genode::size_t  block_size;
-		Block::Session::Operations ops;
+		Block::sector_t block_count= 0;
+		Genode::size_t  block_size = 0;
+		Block::Session::Operations ops { };
 
 		Drive(Platform &platform, char const *label)
 		: Block::Connection(platform.env, &platform.tx_alloc, 128*1024, label)
