@@ -626,6 +626,9 @@ class Vfs::Dir_file_system : public File_system
 					switch (r) {
 					case OPENDIR_OK:
 						break;
+					case OPEN_ERR_OUT_OF_RAM:
+					case OPEN_ERR_OUT_OF_CAPS:
+						return r;
 					case OPENDIR_ERR_LOOKUP_FAILED:
 					default:
 						continue;
@@ -636,8 +639,14 @@ class Vfs::Dir_file_system : public File_system
 							dir_vfs_handle.subdir_handle_registry, *sub_dir_handle);
 				}
 			}
-			catch (Genode::Out_of_ram)  { return OPENDIR_ERR_OUT_OF_RAM; }
-			catch (Genode::Out_of_caps) { return OPENDIR_ERR_OUT_OF_CAPS; }
+			catch (Genode::Out_of_ram)  {
+				Genode::warning("VFS directory caught Out_of_ram, potential memory leak!");
+				return OPENDIR_ERR_OUT_OF_RAM;
+			}
+			catch (Genode::Out_of_caps) {
+				Genode::warning("VFS directory caught Out_of_caps, potential memory leak!");
+				return OPENDIR_ERR_OUT_OF_CAPS;
+			}
 
 			return OPENDIR_OK;
 		}
