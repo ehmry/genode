@@ -830,10 +830,11 @@ class Rump_factory : public Vfs::File_system_factory
 			/* increase open file limit */
 			struct rlimit rlim { ~0U, ~0U };
 			if (rump_sys_getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
-				Genode::log("increase Rump open file limit from ",
-				            rlim.rlim_cur, " to ", rlim.rlim_max);
 				rlim.rlim_cur = rlim.rlim_max;
-				rump_sys_setrlimit(RLIMIT_NOFILE, &rlim);
+				if (rump_sys_setrlimit(RLIMIT_NOFILE, &rlim) == 0) {
+					Genode::log("increased Rump open file limit from ",
+					            rlim.rlim_cur, " to ", rlim.rlim_max);
+				}
 			}
 
 			/* start syncing */
