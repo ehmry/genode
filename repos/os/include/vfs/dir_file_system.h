@@ -571,8 +571,12 @@ class Vfs::Dir_file_system : public File_system
 			 * are subjected to the stacked file-system layout.
 			 */
 			if (directory(path)) {
-				*out_handle = new (alloc) Vfs_handle(*this, *this, alloc, 0);
-				return OPEN_OK;
+				try {
+					*out_handle = new (alloc) Vfs_handle(*this, *this, alloc, 0);
+					return OPEN_OK;
+				}
+				catch (Genode::Out_of_ram)  { return OPEN_ERR_OUT_OF_RAM; }
+				catch (Genode::Out_of_caps) { return OPEN_ERR_OUT_OF_CAPS; }
 			}
 
 			/*
@@ -589,8 +593,12 @@ class Vfs::Dir_file_system : public File_system
 
 			/* path equals directory name */
 			if (strlen(path) == 0) {
-				*out_handle = new (alloc) Vfs_handle(*this, *this, alloc, 0);
-				return OPEN_OK;
+				try {
+					*out_handle = new (alloc) Vfs_handle(*this, *this, alloc, 0);
+					return OPEN_OK;
+				}
+				catch (Genode::Out_of_ram)  { return OPEN_ERR_OUT_OF_RAM; }
+				catch (Genode::Out_of_caps) { return OPEN_ERR_OUT_OF_CAPS; }
 			}
 
 			/* path refers to any of our sub file systems */
@@ -665,8 +673,13 @@ class Vfs::Dir_file_system : public File_system
 				 * only, VFS root additionally calls 'open_composite_dirs' in order to
 				 * open its file systems
 				 */
-				Dir_vfs_handle *root_handle = new (alloc)
-					Dir_vfs_handle(*this, *this, alloc, path);
+				Dir_vfs_handle *root_handle;
+				try {
+					root_handle = new (alloc)
+						Dir_vfs_handle(*this, *this, alloc, path);
+				}
+				catch (Genode::Out_of_ram)  { return OPENDIR_ERR_OUT_OF_RAM; }
+				catch (Genode::Out_of_caps) { return OPENDIR_ERR_OUT_OF_CAPS; }
 
 				/* the VFS root may contain more file systems */
 				if (_vfs_root)
@@ -707,8 +720,13 @@ class Vfs::Dir_file_system : public File_system
 					return opendir_result;
 			}
 
-			Dir_vfs_handle *dir_vfs_handle = new (alloc)
-				Dir_vfs_handle(*this, *this, alloc, path);
+			Dir_vfs_handle *dir_vfs_handle;
+			try {
+				dir_vfs_handle = new (alloc)
+					Dir_vfs_handle(*this, *this, alloc, path);
+			}
+			catch (Genode::Out_of_ram)  { return OPENDIR_ERR_OUT_OF_RAM; }
+			catch (Genode::Out_of_caps) { return OPENDIR_ERR_OUT_OF_CAPS; }
 
 			/* path equals "/" (for reading the name of this directory) */
 			if (strlen(sub_path) == 0)
