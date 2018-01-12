@@ -71,8 +71,12 @@ namespace File_system {
 	typedef Genode::uint64_t seek_off_t;
 	typedef Genode::uint64_t file_size_t;
 
-	typedef Genode::Out_of_ram  Out_of_ram;
-	typedef Genode::Out_of_caps Out_of_caps;
+	/*
+	 * Resource exhaustion at the session is
+	 * distinct from local exhaustion exceptions.
+	 */
+	struct Out_of_ram  : Genode::Exception { };
+	struct Out_of_caps : Genode::Exception { };
 
 	class Packet_descriptor;
 
