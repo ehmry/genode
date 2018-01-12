@@ -31,6 +31,7 @@ extern "C" {
 #include <sys/param.h>
 #include <sys/event.h>
 #include <sys/time.h>
+#include <sys/resource.h>
 #include <rump/rump.h>
 #include <rump/rump_syscalls.h>
 }
@@ -825,6 +826,15 @@ class Rump_factory : public Vfs::File_system_factory
 
 			/* set all bits but the stickies */
 			rump_sys_umask(S_ISUID|S_ISGID|S_ISVTX);
+
+			/* increase open file limit */
+			struct rlimit rlim { ~0U, ~0U };
+			if (rump_sys_getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
+				Genode::log("increase Rump open file limit from ",
+				            rlim.rlim_cur, " to ", rlim.rlim_max);
+				rlim.rlim_cur = rlim.rlim_max;
+				rump_sys_setrlimit(RLIMIT_NOFILE, &rlim);
+			}
 
 			/* start syncing */
 			enum { TEN_SEC = 10*1000*1000 };
