@@ -132,7 +132,11 @@ struct Vfs::Directory_service : Interface
 		return WATCH_ERR_STATIC;
 	}
 
-	virtual void close(Vfs_watch_handle *) { };
+	virtual void close(Vfs_watch_handle *)
+	{
+		Genode::error("stub 'close(Vfs_watch_handle *)' must not be called!");
+		throw ~0;
+	};
 
 	/**********
 	 ** Stat **

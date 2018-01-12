@@ -730,6 +730,12 @@ class Vfs::Dir_file_system : public File_system
 			               path, openlink_fn);
 		}
 
+		void close(Vfs_handle *handle) override
+		{
+			if (handle && (&handle->ds() == this))
+				destroy(handle->alloc(), handle);
+		}
+
 		Watch_result watch(char const      *path,
 		                   Vfs_watch_handle **handle,
 		                   Allocator        &alloc) override
@@ -759,9 +765,9 @@ class Vfs::Dir_file_system : public File_system
 			return r;
 		}
 
-		void close(Vfs_handle *handle) override
+		void close(Vfs_watch_handle *handle) override
 		{
-			if (handle && (&handle->ds() == this))
+			if (handle && (&handle->fs() == this))
 				destroy(handle->alloc(), handle);
 		}
 
