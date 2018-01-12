@@ -830,8 +830,8 @@ class Rump_factory : public Vfs::File_system_factory
 			if (rump_sys_getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
 				rlim.rlim_cur = rlim.rlim_max;
 				if (rump_sys_setrlimit(RLIMIT_NOFILE, &rlim) == 0) {
-					Genode::log("increased Rump open file limit to ",
-					            rlim.rlim_max);
+					Genode::log("increased Rump open file"
+					            " limit to ", rlim.rlim_max);
 				}
 			}
 
