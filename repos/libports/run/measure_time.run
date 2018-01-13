@@ -8,7 +8,7 @@
 # Build
 #
 
-build { app/time test/libc }
+build { app/log_duration test/libc }
 
 create_boot_directory
 
@@ -38,15 +38,19 @@ set config {
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Timer"/> </provides>
 	</start>
-	<start name="time">
+	<start name="test-libc">
 		<resource name="RAM" quantum="512M"/>
+		<route> <any-service> <any-child/> <parent/> </any-service> </route>
 		<config>
-			<start name="test-libc">
-				<config>
-					<vfs> <ram/> <dir name="dev"> <log/> </dir> </vfs>
-					<libc stdout="/dev/log" stderr="/dev/log"/>
-				</config>
-			</start>
+			<vfs> <ram/> <dir name="dev"> <log/> </dir> </vfs>
+			<libc stdout="/dev/log" stderr="/dev/log"/>
+		</config>
+	</start>
+	<start name="log_duration">
+		<resource name="RAM" quantum="24M"/>
+		<provides> <service name="LOG"/> </provides>
+		<config>
+			<default-policy pattern="Malloc: check really large allocation"/>
 		</config>
 	</start>
 </config>
@@ -59,8 +63,9 @@ install_config $config
 #
 
 build_boot_image {
-	time
+	log_duration
 	libc.lib.so libm.lib.so posix.lib.so
+	pcre.lib.so
 	test-libc
 }
 
@@ -69,6 +74,6 @@ build_boot_image {
 #
 
 append qemu_args "  -nographic "
-run_genode_until {.*child "time" exited with exit value 0.*} 30
+run_genode_until forever
 
 # vi: set ft=tcl :
