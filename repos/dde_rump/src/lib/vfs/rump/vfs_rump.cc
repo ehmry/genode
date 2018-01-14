@@ -723,8 +723,6 @@ class Vfs::Rump_file_system : public File_system
 					Rump_watch_handle(*this, alloc, fd);
 				_watchers.insert(watch_handle);
 				*handle = watch_handle;
-				Genode::log("rump watch opened at ", (Genode::Hex)(Genode::addr_t)this);
-				Genode::log("rump watch stored ", (Genode::Hex)(Genode::addr_t)&((*handle)->fs()));
 				return WATCH_OK;
 			} catch (Genode::Out_of_ram) {
 				rump_sys_close(fd);
@@ -832,8 +830,8 @@ class Rump_factory : public Vfs::File_system_factory
 			if (rump_sys_getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
 				rlim.rlim_cur = rlim.rlim_max;
 				if (rump_sys_setrlimit(RLIMIT_NOFILE, &rlim) == 0) {
-					Genode::log("increased Rump open file limit from ",
-					            rlim.rlim_cur, " to ", rlim.rlim_max);
+					Genode::log("increased Rump open file limit to ",
+					            rlim.rlim_max);
 				}
 			}
 
