@@ -147,10 +147,10 @@ void Rom_to_file::Main::_handle_update()
 			} catch (No_space) {
 				error("file system out of space");
 
-			} catch (Out_of_ram) {
+			} catch (::File_system::Out_of_ram) {
 				error("server ran out of RAM");
 
-			} catch (Out_of_caps) {
+			} catch (::File_system::Out_of_caps) {
 				error("server ran out of caps");
 
 			} catch (Invalid_name) {
