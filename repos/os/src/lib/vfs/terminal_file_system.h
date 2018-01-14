@@ -177,6 +177,41 @@ class Vfs::Terminal_file_system : public Single_file_system
 		{
 			_terminal.read_avail_sigh(sigh);
 		}
+
+		Ioctl_result ioctl(Vfs_handle *, Ioctl_opcode opcode, Ioctl_arg,
+		                   Ioctl_out &out) override
+		{
+			(void)out;
+
+			using namespace Genode;
+
+			switch (opcode) {
+			case Vfs::File_io_service::IOCTL_OP_TIOCGWINSZ:
+				{
+					Terminal::Session::Size size = _terminal.size();
+					out.tiocgwinsz.rows    = size.lines();
+					out.tiocgwinsz.columns = size.columns();
+					return IOCTL_OK;
+				}
+
+			case Vfs::File_io_service::IOCTL_OP_TIOCSETAF:
+				{
+					warning(__func__, ": OP_TIOCSETAF not implemented");
+					return IOCTL_OK;
+				}
+/*
+
+			case Vfs::File_io_service::IOCTL_OP_TIOCSETAW:
+				{
+					warning(__func__, ": OP_TIOCSETAW not implemented");
+					return IOCTL_OK;
+				}
+*/
+			default:
+				warning("invalid ioctl request ", (int)opcode);
+				return IOCTL_ERR_INVALID;
+		};
+	}
 };
 
 #endif /* _INCLUDE__VFS__TERMINAL_FILE_SYSTEM_H_ */
