@@ -107,7 +107,7 @@ set build_components {
 	server/tcp_terminal drivers/nic
 	lib/libc_noux
 	lib/vfs/lwip
-	noux/minimal
+	noux
 }
 
 #

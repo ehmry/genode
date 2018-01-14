@@ -5,7 +5,7 @@ if { ![have_spec foc] && ![have_spec nova] &&
 }
 
 set build_components {
-	core init drivers/timer noux/minimal lib/libc_noux
+	core init drivers/timer noux lib/libc_noux
 	drivers/input
 	server/terminal server/ram_fs
 	server/log_terminal

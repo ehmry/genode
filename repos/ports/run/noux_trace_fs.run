@@ -23,7 +23,7 @@ proc use_usb_input { } { return [expr ![have_spec ps2] && [have_spec usb]] }
 #exec rm -rf noux-pkg/bash bin/bash
 
 set build_components {
-	core init drivers/timer noux/minimal lib/libc_noux
+	core init drivers/timer noux lib/libc_noux
 	drivers/framebuffer drivers/input
 	server/terminal server/ram_fs server/trace_fs
 	test/libports/ncurses
