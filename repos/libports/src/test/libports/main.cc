@@ -13,4 +13,4 @@
 
 #include <libc/component.h>
 
-void Libc::Component::construct(Libc::Env &env) { }
+void Libc::Component::construct(Libc::Env &) { }
