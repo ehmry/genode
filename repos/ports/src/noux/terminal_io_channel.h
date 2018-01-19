@@ -184,13 +184,13 @@ struct Noux::Terminal_io_channel : Io_channel
 		case Vfs::File_io_service::IOCTL_OP_TIOCSETAF:
 			{
 				warning(__func__, ": OP_TIOCSETAF not implemented");
-				return false;
+				return true;
 			}
 
 		case Vfs::File_io_service::IOCTL_OP_TIOCSETAW:
 			{
 				warning(__func__, ": OP_TIOCSETAW not implemented");
-				return false;
+				return true;
 			}
 
 		default:
