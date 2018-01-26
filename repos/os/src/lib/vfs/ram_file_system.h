@@ -615,7 +615,7 @@ class Vfs::Ram_file_system : public Vfs::File_system
 			}
 
 			try {
-				*handle = new (alloc) Ram_vfs_handle(*this, alloc, mode, *file);
+				*handle = new (alloc) Vfs_ram::Handle(*this, alloc, mode, *file);
 				return OPEN_OK;
 			} catch (Genode::Out_of_ram) {
 				if (create) {
@@ -671,8 +671,8 @@ class Vfs::Ram_file_system : public Vfs::File_system
 			}
 
 			try {
-				*handle = new (alloc) Ram_vfs_handle(*this, alloc,
-				                                     Ram_vfs_handle::STATUS_RDONLY,
+				*handle = new (alloc) Vfs_ram::Handle(*this, alloc,
+				                                     Vfs_handle::STATUS_RDONLY,
 				                                     *dir);
 				return OPENDIR_OK;
 			} catch (Genode::Out_of_ram) {
@@ -730,9 +730,8 @@ class Vfs::Ram_file_system : public Vfs::File_system
 			}
 
 			try {
-				*handle = new (alloc) Ram_vfs_handle(*this, alloc,
-				                                     Ram_vfs_handle::STATUS_RDWR,
-				                                     *link);
+				*handle = new (alloc) Vfs_ram::Handle(
+					*this, alloc, Vfs_handle::STATUS_RDWR, *link);
 				return OPENLINK_OK;
 			} catch (Genode::Out_of_ram) {
 				if (create) {
