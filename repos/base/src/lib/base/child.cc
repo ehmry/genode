@@ -11,8 +11,12 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
+/* Genode includes */
 #include <base/child.h>
 #include <base/quota_transfer.h>
+
+/* base-internal includes */
+#include <base/internal/child_policy.h>
 
 using namespace Genode;
 
@@ -788,7 +792,8 @@ void Child::close_all_sessions()
 
 	_initial_thread.destruct();
 
-	_cpu._connection.destruct();
+	if (KERNEL_SUPPORTS_EAGER_CHILD_DESTRUCTION)
+		_cpu._connection.destruct();
 
 	/*
 	 * Purge the meta data about any dangling sessions provided by the child to
