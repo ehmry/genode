@@ -17,7 +17,6 @@
 /* base includes */
 #include <util/avl_tree.h>
 #include <base/lock.h>
-#include <util/construct_at.h>
 
 /* base-internal includes */
 #include <base/internal/capability_space.h>
@@ -194,7 +193,7 @@ class Genode::Capability_space_sel4
 			if (_caps_data[_index(data)].rpc_obj_key().valid())
 				_tree.remove(static_cast<Tree_managed_data *>(&data));
 
-			construct_at<Tree_managed_data>(&_caps_data[_index(data)]);
+			_caps_data[_index(data)] = Tree_managed_data();
 		}
 
 	public:
@@ -219,7 +218,7 @@ class Genode::Capability_space_sel4
 
 			Lock::Guard guard(_lock);
 
-			construct_at<Tree_managed_data>(&_caps_data[sel], args...);
+			_caps_data[sel] = Tree_managed_data(args...);
 
 			if (_caps_data[sel].rpc_obj_key().valid())
 				_tree.insert(&_caps_data[sel]);

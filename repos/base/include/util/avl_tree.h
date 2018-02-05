@@ -15,7 +15,6 @@
 #define _INCLUDE__UTIL__AVL_TREE_H_
 
 #include <util/misc_math.h>
-#include <util/noncopyable.h>
 
 namespace Genode {
 	
@@ -25,7 +24,7 @@ namespace Genode {
 }
 
 
-class Genode::Avl_node_base : Noncopyable
+class Genode::Avl_node_base
 {
 	protected:
 
@@ -59,11 +58,9 @@ class Genode::Avl_node_base : Noncopyable
 			virtual void recompute(Avl_node_base *) { }
 		};
 
-		struct {
-			Avl_node_base *_child[2];  /* left and right subtrees */
-			Avl_node_base *_parent;    /* parent of subtree       */
-			unsigned char  _depth;     /* depth of subtree        */
-		};
+		Avl_node_base *_child[2];  /* left and right subtrees */
+		Avl_node_base *_parent;    /* parent of subtree       */
+		unsigned char  _depth;     /* depth of subtree        */
 
 	public:
 
