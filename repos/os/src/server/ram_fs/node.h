@@ -26,6 +26,9 @@ namespace Ram_fs {
 	class Node;
 	class File;
 	class Symlink;
+	struct Watcher;
+
+	typedef File_system::Open_node<Node> Open_node;
 }
 
 
@@ -124,7 +127,23 @@ class Ram_fs::Node : public  File_system::Node_base,
 			Genode::error(__PRETTY_FUNCTION__, " called on a non-directory node");
 		}
 
+};
 
+struct Ram_fs::Watcher : Open_node, File_system::Listener
+{
+	typedef File_system::Session_rpc_object::Tx::Sink Sink;
+
+	Watcher(Ram_fs::Node &node,
+	        Genode::Id_space<File_system::Node> &id_space,
+	        Sink &sink)
+	:
+		Open_node(node.weak_ptr(), id_space),
+		File_system::Listener(sink,
+		                      File_system::Node_handle{id().value},
+		                      node.curr_version())
+	{
+		node.add_listener(this);
+	}
 };
 
 #endif /* _INCLUDE__RAM_FS__NODE_H_ */
