@@ -262,7 +262,8 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 			_file_path(file_path),
 			_file_ds(env.ram(), env.rm(), 0) /* realloc later */
 		{
-			/* do not read the file until requested by the client */
+			try { _open_watch_handle(); }
+			catch (Watch_failed) { }
 		}
 
 		/**
