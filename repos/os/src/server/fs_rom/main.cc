@@ -136,10 +136,9 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 					}
 					catch (File_system::Lookup_failed) { }
 					catch (File_system::Unavailable) { }
-					if (watch_path == "/") {
-						Genode::error("'", _file_path, "' is unwatchable");
+
+					if (watch_path == "/")
 						throw Watch_failed();
-					}
 					watch_path.strip_last_element();
 
 					/* keep looping, but only directories will be opened */
@@ -162,17 +161,14 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 			_watching_file = false;
 		}
 
-		/**
-		 * Initialize '_file_ds' dataspace with file content
-		 */
-		void _update_dataspace()
-		{
-			/*
-			 * On each repeated call of this function, the dataspace is
-			 * replaced with a new one that contains the most current file
-			 * content.
-			 */
+		enum { UPDATE_OR_REPLACE = false, UPDATE_ONLY = true };
 
+		/**
+		 * Fill dataspace with file content, return true if the
+		 * current dataspace is reused.
+		 */
+		bool _read_dataspace(bool update_only)
+		{
 			using namespace File_system;
 
 			Genode::Path<PATH_MAX_LEN> dir_path(_file_path);
@@ -190,23 +186,27 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 			Handle_guard file_guard(_fs, _file_handle);
 			/* ...but only for the lifetime of this procedure */
 
-			size_t const file_size = _fs.status(_file_handle).size;
+			_file_seek = 0;
+			_file_size = _fs.status(_file_handle).size;
 
-			/* allocate new RAM dataspace according to file size */
-			if (file_size > 0) {
+			if (_file_size > _file_ds.size()) {
+				/* allocate new RAM dataspace according to file size */
+				if (update_only)
+					return false;
+
 				try {
-					_file_seek = 0;
-					_file_ds.realloc(&_env.ram(), file_size);
-					_file_size = file_size;
+					_file_ds.realloc(&_env.ram(), _file_size);
 				} catch (...) {
 					error("failed to allocate memory for ", _file_path);
-					return;
+					return false;
 				}
+			} else {
+				memset(_file_ds.local_addr<char>(), 0x00, _file_ds.size());
 			}
 
 			/* omit read if file is empty */
 			if (_file_size == 0)
-				return;
+				return false;
 
 			/* read content from file */
 			Tx_source &source = *_fs.tx();
@@ -234,12 +234,45 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 				while (_file_seek == orig_file_seek)
 					_env.ep().wait_and_dispatch_one_io_signal();
 			}
+
+			_handed_out_version = _curr_version;
+			return true;
+		}
+
+		bool _try_read_dataspace(bool update_only)
+		{
+			using namespace File_system;
+
+			try { _open_watch_handle(); }
+			catch (Watch_failed) { }
+
+			try { return _read_dataspace(update_only); }
+			catch (Lookup_failed)     { log(_file_path, " ROM file is missing"); }
+			catch (Invalid_handle)    { error(_file_path, ": invalid_handle"); }
+			catch (Invalid_name)      { error(_file_path, ": invalid_name"); }
+			catch (Permission_denied) { error(_file_path, ": permission_denied"); }
+			catch (...)               { error(_file_path, ": unhandled error"); };
+
+			return false;
 		}
 
 		void _notify_client_about_new_version()
 		{
-			if (_sigh.valid() && _curr_version.value != _handed_out_version.value)
-				Signal_transmitter(_sigh).submit();
+			using namespace File_system;
+
+			if (_sigh.valid() && _curr_version.value != _handed_out_version.value) {
+
+				/* notify if the file is not empty */
+				try {
+					Node_handle file = _fs.node(_file_path.base());
+					Handle_guard g(_fs, file);
+					_file_size = _fs.status(file).size;
+				}
+				catch (...) { _file_size = 0; }
+
+				if (_file_size > 0)
+					Signal_transmitter(_sigh).submit();
+			}
 		}
 
 	public:
@@ -281,20 +314,14 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 		{
 			using namespace File_system;
 
-			try { _update_dataspace(); }
-			catch (Invalid_handle)    { error(_file_path, ": Invalid_handle"); }
-			catch (Invalid_name)      { error(_file_path, ": invalid_name"); }
-			catch (Lookup_failed)     { error(_file_path, ": lookup_failed"); }
-			catch (Permission_denied) { error(_file_path, ": Permission_denied"); }
-			catch (...)               { error(_file_path, ": unhandled error"); };
+			_try_read_dataspace(UPDATE_OR_REPLACE);
 
-			/* always server a valid, even empty, dataspace */
+			/* always serve a valid, even empty, dataspace */
 			if (_file_ds.size() < 1) {
 				_file_ds.realloc(&_env.ram(), 1);
 			}
 
 			Dataspace_capability ds = _file_ds.cap();
-			_handed_out_version = _curr_version;
 			return static_cap_cast<Rom_dataspace>(ds);
 		}
 
@@ -305,12 +332,16 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 			if (_sigh.valid()) {
 				try { _open_watch_handle(); }
 				catch (Watch_failed) { }
-			} else {
-				_close_watch_handle();
 			}
 
 			_notify_client_about_new_version();
 		}
+
+		/**
+		 * Update the current dataspace content
+		 */
+		bool update() override {
+			return _try_read_dataspace(UPDATE_ONLY); }
 
 		/**
 		 * If packet corresponds to this session then process and return true.
