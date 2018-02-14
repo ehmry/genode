@@ -101,7 +101,7 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 		 */
 		struct Version { unsigned value; };
 		Version _curr_version       { 0 };
-		Version _handed_out_version { ~0UL };
+		Version _handed_out_version { ~0U };
 
 		/**
 		 * Track if the session file or a directory is being watched
