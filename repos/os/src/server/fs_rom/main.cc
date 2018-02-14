@@ -356,13 +356,15 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 				if (!(packet.handle() == *_watch_handle))
 					return false;
 
+				if (!_watching_file) {
+					/* try and get closer to the file */
+					_open_watch_handle();
+				}
+
 				if (_watching_file) {
 					/* notify the client of the change */
 					_curr_version = Version { _curr_version.value + 1 };
 					_notify_client_about_new_version();
-				} else {
-					/* try and get closer to the file */
-					_open_watch_handle();
 				}
 				return true;
 
