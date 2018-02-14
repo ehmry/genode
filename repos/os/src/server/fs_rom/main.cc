@@ -74,7 +74,7 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 		/**
 		 * Handle of associated file opened during read loop
 		 */
-		File_system::File_handle _file_handle { ~0U };
+		File_system::File_handle _file_handle { ~0UL };
 
 		/**
 		 * Size of current version of the file
@@ -101,7 +101,7 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>,
 		 */
 		struct Version { unsigned value; };
 		Version _curr_version       { 0 };
-		Version _handed_out_version { ~0U };
+		Version _handed_out_version { ~0UL };
 
 		/**
 		 * Track if the session file or a directory is being watched
