@@ -557,10 +557,7 @@ class Vfs::Lxip_connect_file : public Vfs::Lxip_file
 			case Lxip::Protocol_dir::TYPE_STREAM: {
 
 				int res = _sock.ops->connect(&_sock, (sockaddr *)addr, sizeof(addr_storage), 0);
-
-				Genode::error(__func__, ": ", res);
-
-				switch (res) {
+				if (res != 0) switch (res) {
 				case Lxip::Io_result::LINUX_EINPROGRESS:
 					_connecting = true;
 					return -1;
@@ -579,8 +576,7 @@ class Vfs::Lxip_connect_file : public Vfs::Lxip_file
 					break;
 
 				default:
-					if (res != 0) return -1;
-					break;
+					return -1;
 				}
 				break;
 			}
