@@ -1,0 +1,85 @@
+LICENSE   := BSD
+VERSION   := 1.6.8
+DOWNLOADS := unbound.archive
+
+URL(unbound) := http://www.unbound.net/downloads/unbound-$(VERSION).tar.gz
+SHA(unbound) := 492737be9647c26ee39d4d198f2755062803b412
+SIG(unbound) := ${URL(unbound)}.asc
+DIR(unbound) := src/app/unbound
+
+DIRS := include/libunbound
+DIR_CONTENT(include/libunbound) := src/app/unbound/libunbound/unbound*.h
+
+default: \
+	src/app/unbound/config.h \
+	src/app/unbound/dnscrypt/dnscrypt_config.h \
+	src/app/unbound/dnstap/dnstap_config.h \
+
+src/app/unbound/config.h: src/app/unbound/config.h.in
+	@$(MSG_GENERATE)$(notdir $@)
+	$(VERBOSE)echo "#include <stdlib.h>" > $@
+	$(VERBOSE)echo "#include <time.h>" >> $@
+	$(VERBOSE)sed \
+		-e 's|undef HAVE_GMTIME_R|define HAVE_GMTIME_R 1|' \
+		-e 's|undef USE_MINI_EVENT|define USE_MINI_EVENT 1|' \
+		-e 's|undef HAVE_CTIME_R|define HAVE_CTIME_R 1|' \
+		-e 's|undef HAVE_SYS_SOCKET_H|define HAVE_SYS_SOCKET_H 1|' \
+		-e 's|undef HAVE_ARPA_INET_H|define HAVE_ARPA_INET_H 1|' \
+		-e 's|undef HAVE_STRSEP|define HAVE_STRSEP 1|' \
+		-e 's|undef HAVE_STRLCAT|define HAVE_STRLCAT 1|' \
+		-e 's|undef HAVE_NETDB_H|define HAVE_NETDB_H 1|' \
+		-e 's|undef HAVE_GETADDRINFO|define HAVE_GETADDRINFO 1|' \
+		-e 's|undef HAVE_STRLCPY|define HAVE_STRLCPY 1|' \
+		-e 's|undef HAVE_SNPRINTF|define HAVE_SNPRINTF 1|' \
+		-e 's|undef HAVE_MEMMOVE|define HAVE_MEMMOVE 1|' \
+		-e 's|undef CONFIGFILE|define CONFIGFILE "unbound.conf"|' \
+		-e 's|undef HAVE_ARPA_INET_H|define HAVE_ARPA_INET_H 1|' \
+		-e 's|undef HAVE_ARPA_INET_H|define HAVE_ARPA_INET_H 1|' \
+		-e 's|undef HAVE_DECL_INET_NTOP|define HAVE_DECL_INET_NTOP 1|' \
+		-e 's|undef HAVE_DECL_INET_PTON|define HAVE_DECL_INET_PTON 1|' \
+		-e 's|undef HAVE_FSYNC|define HAVE_FSYNC 1|' \
+		-e 's|undef HAVE_INET_ATON|define HAVE_INET_ATON 1|' \
+		-e 's|undef HAVE_INET_NTOP|define HAVE_INET_NTOP 1|' \
+		-e 's|undef HAVE_INET_PTON|define HAVE_INET_PTON 1|' \
+		-e 's|undef HAVE_ISBLANK|define HAVE_ISBLANK 1|' \
+		-e 's|undef HAVE_NETINET_IN_H|define HAVE_NETINET_IN_H 1|' \
+		-e 's|undef HAVE_OPENSSL_BN_H|define HAVE_OPENSSL_BN_H 1|' \
+		-e 's|undef HAVE_OPENSSL_DH_H|define HAVE_OPENSSL_DH_H 1|' \
+		-e 's|undef HAVE_OPENSSL_ERR_H|define HAVE_OPENSSL_ERR_H 1|' \
+		-e 's|undef HAVE_OPENSSL_RAND_H|define HAVE_OPENSSL_RAND_H 1|' \
+		-e 's|undef HAVE_OPENSSL_SSL_H|define HAVE_OPENSSL_SSL_H 1|' \
+		-e 's|undef HAVE_RANDOM|define HAVE_RANDOM 1|' \
+		-e 's|undef HAVE_SRANDOM|define HAVE_SRANDOM 1|' \
+		-e 's|undef HAVE_SSL$$|define HAVE_SSL 1|' \
+		-e 's|undef HAVE_STDLIB_H|define HAVE_STDLIB_H 1|' \
+		-e 's|undef HAVE_SYS_WAIT_H|define HAVE_SYS_WAIT_H 1|' \
+		-e 's|undef HAVE_TIME_H|define HAVE_TIME_H 1|' \
+		-e 's|undef MAXSYSLOGMSGLEN|define MAXSYSLOGMSGLEN 256|' \
+		-e 's|undef PACKAGE_BUGREPORT|define PACKAGE_BUGREPORT "unbound-bugs@nlnetlabs.nl"|' \
+		-e 's|undef PACKAGE_NAME|define PACKAGE_NAME "unbound"|' \
+		-e 's|undef PACKAGE_STRING|define PACKAGE_STRING "unbound $(VERSION)"|' \
+		-e 's|undef PACKAGE_VERSION|define PACKAGE_VERSION "$(VERSION)"|' \
+		-e 's|undef PIDFILE|define PIDFILE "/unbound.pid"|' \
+		-e 's|undef ROOT_ANCHOR_FILE|define ROOT_ANCHOR_FILE "root.key"|' \
+		-e 's|undef ROOT_CERT_FILE|define ROOT_CERT_FILE "icannbundle.pem"|' \
+		-e 's|undef RUN_DIR|define RUN_DIR "/"|' \
+		-e 's|undef SHARE_DIR|define SHARE_DIR "/"|' \
+		-e 's|undef UB_USERNAME|define UB_USERNAME "unbound"|' \
+		$< >> $@
+	$(VERBOSE)echo "#define HAVE_STRUCT_SOCKADDR_STORAGE" >> $@
+	$(VERBOSE)echo "#define HAVE_STRUCT_IN6_ADDR" >> $@
+	$(VERBOSE)echo "#define HAVE_STRUCT_SOCKADDR_IN6" >> $@
+	$(VERBOSE)echo "#define HAVE_STRUCT_ADDRINFO" >> $@
+	$(VERBOSE)echo "#define RETSIGTYPE void" >> $@
+
+src/app/unbound/dnscrypt/dnscrypt_config.h: src/app/unbound/dnscrypt/dnscrypt_config.h.in
+	@$(MSG_GENERATE)$(notdir $@)
+	$(VERBOSE)sed -e 's|@ENABLE_DNSCRYPT@|0|' $< > $@
+
+src/app/unbound/dnstap/dnstap_config.h: src/app/unbound/dnstap/dnstap_config.h.in
+	@$(MSG_GENERATE)$(notdir $@)
+	$(VERBOSE)sed -e 's|@ENABLE_DNSTAP@|0|' $< > $@
+
+src/app/unbound/config.h.in: $(DOWNLOADS)
+src/app/unbound/dnscrypt/dnscrypt_config.h.in: $(DOWNLOADS)
+src/app/unbound/dnscrypt/dnstap_config.h.in: $(DOWNLOADS)
