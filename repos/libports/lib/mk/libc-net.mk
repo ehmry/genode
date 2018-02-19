@@ -13,7 +13,7 @@ SRC_C += getnameinfo.c name6.c
 SRC_C += gethostnamadr.c gethostbydns.c gethostbyht.c map_v4v6.c
 
 # needed for getprotobyname()
-SRC_C += getprotoent.c getprotoname.c
+SRC_C += getprotoent.c getprotoname.c getproto.c
 
 # defines in6addr_any
 SRC_C += vars.c

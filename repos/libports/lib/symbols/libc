@@ -273,8 +273,12 @@ getpid W
 getppid W
 getpriority W
 getprogname W
-getprotobyname T
 getprotobyname_r T
+getprotobyname T
+getprotobynumber T
+getprotoent T
+setprotoent T
+endprotoent T
 getpwent W
 getpwnam W
 getpwuid W
