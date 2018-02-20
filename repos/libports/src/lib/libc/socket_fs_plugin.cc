@@ -701,31 +701,6 @@ extern "C" int socket_fs_getsockopt(int libc_fd, int level, int optname,
 }
 
 
-extern "C" int socket_fs_setsockopt(int libc_fd, int level, int optname,
-                                    void const *optval, socklen_t optlen)
-{
-	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
-	if (!fd) return Errno(EBADF);
-
-	Socket_fs::Context *context = dynamic_cast<Socket_fs::Context *>(fd->context);
-	if (!context) return Errno(ENOTSOCK);
-
-	if (!optval) return Errno(EFAULT);
-
-	switch (level) {
-	case SOL_SOCKET:
-		switch (optname) {
-		case SO_REUSEADDR:
-			Genode::log("setsockopt: SO_REUSEADDR not yet implemented - always true");
-			return 0;
-		default: return Errno(ENOPROTOOPT);
-		}
-
-	default: return Errno(EINVAL);
-	}
-}
-
-
 extern "C" int socket_fs_shutdown(int libc_fd, int how)
 {
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
