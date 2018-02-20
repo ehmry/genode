@@ -31,7 +31,7 @@ edns-subnet/edns-subnet.c edns-subnet/subnetmod.c \
 edns-subnet/addrtree.c edns-subnet/subnet-whitelist.c \
 cachedb/cachedb.c respip/respip.c
 
-SRC_C += $(notdir $(SRC_C_COMMON)) reallocarray.c
+SRC_C += $(notdir $(SRC_C_COMMON)) genode_reallocarray.c genode_signal.c
 
 SRC_C_COMMON_DIRS := $(addprefix $(UNBOUND_SRC_DIR)/,$(sort $(dir $(SRC_C_COMMON))))
 

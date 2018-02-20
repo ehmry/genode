@@ -1,5 +1,5 @@
 TARGET = unbound
-LIBS += posix libssl lib-unbound unbound-common unbound-sldns
+LIBS += posix libssl lib-unbound unbound-common unbound-sldns libc_pipe
 
 UNBOUND_PORT_DIR := $(call select_from_ports,unbound)
 UNBOUND_SRC_DIR := $(UNBOUND_PORT_DIR)/src/app/unbound
