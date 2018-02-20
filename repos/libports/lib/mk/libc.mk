@@ -11,7 +11,7 @@ LIBS  += base vfs
 # Back end
 #
 SRC_CC = atexit.cc dummies.cc rlimit.cc sysctl.cc \
-         issetugid.cc errno.cc gai_strerror.cc time.cc \
+         issetugid.cc errno.cc time.cc \
          malloc.cc progname.cc fd_alloc.cc file_operations.cc \
          plugin.cc plugin_registry.cc select.cc exit.cc environ.cc nanosleep.cc \
          pread_pwrite.cc readv_writev.cc poll.cc \

@@ -21,6 +21,9 @@ SRC_C += vars.c
 # b64_ntop
 SRC_C += base64.c
 
+# gai_strerror
+SRC_C += gai_strerror.c
+
 include $(REP_DIR)/lib/mk/libc-common.inc
 
 INC_DIR += $(LIBC_REP_DIR)/include/libc
