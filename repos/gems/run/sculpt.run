@@ -113,7 +113,7 @@ install_config {
 				<rom name="numlock_remap.config"/>
 				<rom name="vimrc"/>
 				<rom name="wlan.config"/>
-				<rom name="installation"/>
+				<rom name="default_installation" as="installation"/>
 				<dir name="leitzentrale">
 					<rom name="leitzentrale.config" as="config"/>
 				</dir>
@@ -502,7 +502,7 @@ proc current_pkg { pkg } { return $pkg/[_current_depot_archive_version pkg $pkg]
 #
 set pkgs_to_install { sculpt-installation }
 
-set fd [open [run_dir]/genode/installation w]
+set fd [open [run_dir]/genode/default_installation w]
 puts $fd "<installation arch=\"[depot_spec]\">"
 foreach pkg $pkgs_to_install {
 	puts $fd " <archive path=\"[depot_user]/pkg/[current_pkg $pkg]\" source=\"false\"/>" }
