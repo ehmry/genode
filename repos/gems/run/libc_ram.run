@@ -1,0 +1,63 @@
+
+create_boot_directory
+
+install_config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="IRQ"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<default caps="200"/>
+
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
+
+	<start name="alloc_logger">
+		<resource name="RAM" quantum="400M"/>
+		<config>
+	<start name="test-libc">
+		<config>
+			<vfs> <dir name="dev"> <log/> </dir> </vfs>
+			<libc stdout="/dev/log"/>
+		</config>
+	</start>
+		</config>
+	</start>
+</config>
+}
+
+build "core init drivers/timer app/alloc_logger test/libc"
+
+build_boot_image {
+	core init timer alloc_logger test-libc
+	ld.lib.so libc.lib.so libm.lib.so posix.lib.so
+}
+
+append qemu_args " -nographic  "
+
+run_genode_until "child .* exited with exit value 0.*\n" 10
+
+regexp ".init -> alloc_logger. .*\n" $output ram_log_output
+
+set ram_log_output [ string map {"\[init -> alloc_logger\] " ""} $ram_log_output ]
+
+set datadir var/data/ram_alloc
+file mkdir $datadir
+set datafile $datadir/[run_name].out
+
+set fd [open $datafile w]
+puts $fd $ram_log_output
+close $fd
+
+puts "\nRAM allocation data written to $ram_log_output"

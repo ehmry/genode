@@ -1,0 +1,12 @@
+# RAM alloc Gnuplot script
+
+set term x11
+
+set style data lines
+
+set xtics
+set ytics
+set logscale y 2
+set xlabel "Child lifetime"
+set ylabel "RAM Allocation"
+set format y "%.2fB"
