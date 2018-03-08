@@ -1,0 +1,32 @@
+#
+# \brief  IOzone data plotting
+# \author Emery Hemingway
+# \date   2017-07-27
+#
+
+set gnuplot_cmd  [check_installed gnuplot]
+
+set datadir var/data/ram_alloc
+set datafiles [glob $datadir/*.out]
+
+#
+# Spawn Gnuplot and feed it commands thru stdio
+#
+set timeout -1
+spawn $gnuplot_cmd
+
+send "load \"${genode_dir}/repos/gems/run/ram_alloc.dem\"\n"
+
+set title "RAM Allocations"
+
+
+send "clear\n"
+send "set title \"$title\"\n"
+send "plot "
+foreach datafile $datafiles {
+	set name [lindex [split [lindex [split $datafile /] end] . ] 0]
+
+	send "\"$datafile\" title \"$name\", \n"
+}
+
+expect "nothing"
