@@ -2,7 +2,7 @@
 create_boot_directory
 
 install_config {
-<config>
+<config verbose="yes">
 	<parent-provides>
 		<service name="ROM"/>
 		<service name="IRQ"/>
@@ -24,20 +24,30 @@ install_config {
 	</start>
 
 	<start name="alloc_logger">
+		<resource name="RAM" quantum="2M"/>
+		<provides>
+			<service name="PD"/>
+			<service name="CPU"/>
+		</provides>
+	</start>
+
+	<start name="test-libc" >
 		<resource name="RAM" quantum="400M"/>
-		<config>
-	<start name="test-libc">
 		<config>
 			<vfs> <dir name="dev"> <log/> </dir> </vfs>
 			<libc stdout="/dev/log"/>
 		</config>
+		<route>
+			<service name="CPU">
+				<child name="alloc_logger"/> </service>
+			<any-service> <any-child/> <parent/> </any-service>
+		</route>
 	</start>
-		</config>
-	</start>
+
 </config>
 }
 
-build "core init drivers/timer app/alloc_logger test/libc"
+build "core init drivers/timer server/alloc_logger test/libc"
 
 build_boot_image {
 	core init timer alloc_logger test-libc
