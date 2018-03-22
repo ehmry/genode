@@ -765,7 +765,7 @@ class Platform::Session_component : public Genode::Rpc_object<Session>
 				return;
 
 			try {
-				addr_t const function = device->config().bus_number() * 32 +
+				addr_t const function = device->config().bus_number() * 32 * 8 +
 				                        device->config().device_number() * 8 +
 				                        device->config().function_number();
 				addr_t const base_ecam = Dataspace_client(_pciconf.cap()).phys_addr();
