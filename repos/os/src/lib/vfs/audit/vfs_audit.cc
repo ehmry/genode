@@ -70,10 +70,11 @@ class Vfs_audit::File_system : public Vfs::File_system
 
 		Absolute_path const _audit_path;
 
-/**
- * Macro to get a pointer to a temporary value
- */
-#define EXPAND(path) Absolute_path(path+1, _audit_path.string()).string()
+		/**
+		 * Expand a path to lay within the audit path
+		 */
+		inline Absolute_path _expand(char const *path) {
+			return Absolute_path(path+1, _audit_path.string()); }
 
 		struct Handle final : Vfs_handle
 		{
@@ -123,13 +124,13 @@ class Vfs_audit::File_system : public Vfs::File_system
 		Genode::Dataspace_capability dataspace(const char *path) override
 		{
 			_log(__func__, " ", path);
-			return _root_dir.dataspace(EXPAND(path));
+			return _root_dir.dataspace(_expand(path).string());
 		}
 
 		void release(char const *path, Dataspace_capability ds) override
 		{
 			_log(__func__, " ", path);
-			return _root_dir.release(EXPAND(path), ds);
+			return _root_dir.release(_expand(path).string(), ds);
 		}
 
 		Open_result open(const char *path, unsigned int mode, Vfs::Vfs_handle **out, Genode::Allocator &alloc) override
@@ -142,7 +143,7 @@ class Vfs_audit::File_system : public Vfs::File_system
 			catch (Genode::Out_of_caps) { return OPEN_ERR_OUT_OF_CAPS; }
 
 			Open_result r = _root_dir.open(
-				EXPAND(path), mode, &local_handle->audit, alloc);
+				_expand(path).string(), mode, &local_handle->audit, alloc);
 
 			if (r == OPEN_OK)
 				*out = local_handle;
@@ -162,7 +163,7 @@ class Vfs_audit::File_system : public Vfs::File_system
 			catch (Genode::Out_of_caps) { return OPENDIR_ERR_OUT_OF_CAPS; }
 
 			Opendir_result r = _root_dir.opendir(
-				EXPAND(path), create, &local_handle->audit, alloc);
+				_expand(path).string(), create, &local_handle->audit, alloc);
 
 			if (r == OPENDIR_OK)
 				*out = local_handle;
@@ -184,34 +185,34 @@ class Vfs_audit::File_system : public Vfs::File_system
 		Stat_result stat(const char *path, Vfs::Directory_service::Stat &buf) override
 		{
 			_log(__func__, " ", path);
-			return _root_dir.stat(EXPAND(path), buf);
+			return _root_dir.stat(_expand(path).string(), buf);
 		}
 
 		Unlink_result unlink(const char *path) override
 		{
 			_log(__func__, " ", path);
-			return _root_dir.unlink(EXPAND(path));
+			return _root_dir.unlink(_expand(path).string());
 		}
 
 		Rename_result rename(const char *from , const char *to) override
 		{
 			_log(__func__, " ", from, " ", to);
-			return _root_dir.rename(EXPAND(from), EXPAND(to));
+			return _root_dir.rename(_expand(from).string(), _expand(to).string());
 		}
 
 		file_size num_dirent(const char *path) override
 		{
-			return _root_dir.num_dirent(EXPAND(path));
+			return _root_dir.num_dirent(_expand(path).string());
 		}
 
 		bool directory(char const *path) override
 		{
-			return _root_dir.directory(EXPAND(path));
+			return _root_dir.directory(_expand(path).string());
 		}
 
 		const char* leaf_path(const char *path) override
 		{
-			return _root_dir.leaf_path(EXPAND(path));
+			return _root_dir.leaf_path(_expand(path).string());
 		}
 
 		/**********************
