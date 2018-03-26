@@ -1,5 +1,5 @@
 #
-# \brief  IOzone data plotting
+# \brief  RAM allocation data plotting
 # \author Emery Hemingway
 # \date   2017-07-27
 #
@@ -19,14 +19,13 @@ send "load \"${genode_dir}/repos/gems/run/ram_alloc.dem\"\n"
 
 set title "RAM Allocations"
 
-
 send "clear\n"
-send "set title \"$title\"\n"
-send "plot "
 foreach datafile $datafiles {
-	set name [lindex [split [lindex [split $datafile /] end] . ] 0]
+	set name [string map {_ " "} [lindex [split [lindex [split $datafile /] end] . ] 0]]
+	send "set title \"$name\"\n"
 
-	send "\"$datafile\" title \"$name\", \n"
+	send "plot \"$datafile\" with boxes\n"
+	send "\npause mouse button1 \"Press the left mouse button to continue\"\n"
 }
 
 expect "nothing"

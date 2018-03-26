@@ -2,11 +2,18 @@
 
 set term x11
 
-set style data lines
+set grid
 
-set xtics
-set ytics
-set logscale y 2
+set style fill solid 0.5 border -1
+set ytics format '%.0b%BB'
+set xtics format '%.3fs'
+
+
+set ytics add (\
+	"1MiB" 1048576, "2MiB" 2097152, "4MiB" 4194304, \
+	"8MiB" 8388608, "16MiB" 16777216, "32MiB" 33554432, "64MiB" 67108864, \
+	"128MiB" 134217728, "256MiB" 268435456, "512MiB" 536870912, "1GiB" 1073741824 \
+)
+
 set xlabel "Child lifetime"
 set ylabel "RAM Allocation"
-set format y "%.2fB"

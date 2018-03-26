@@ -56,6 +56,9 @@ struct Alloc_logger::Pd_session_component : Rpc_object<Pd_session>
 
 	size_t _alloced = 0;
 
+	float _elapsed_s() {
+		return _timer.elapsed_ms() / 1000.0; }
+
 
 	/*****************************
 	 ** Ram_allocator interface **
@@ -65,14 +68,14 @@ struct Alloc_logger::Pd_session_component : Rpc_object<Pd_session>
 	                               Cache_attribute cached) override
 	{
 		_alloced += size;
-		log(_timer.elapsed_ms(), " ", _alloced);
+		log(_elapsed_s(), " ", _alloced);
 		return _pd.alloc(size, cached);
 	}
 
 	void free(Ram_dataspace_capability ds) override
 	{
 		_alloced -= _pd.dataspace_size(ds);
-		log(_timer.elapsed_ms(), " ", _alloced);
+		log(_elapsed_s(), " ", _alloced);
 		_pd.free(ds);
 	}
 
