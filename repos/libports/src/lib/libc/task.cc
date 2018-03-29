@@ -393,7 +393,12 @@ struct Libc::Kernel
 		bool    _dispatch_pending_io_signals = false;
 
 		Genode::Thread &_myself { *Genode::Thread::myself() };
+
 		addr_t _kernel_stack = Thread::mystack().top;
+
+		void *_user_stack = {
+			_myself.alloc_secondary_stack(_myself.name().string(),
+			                              Component::stack_size()) };
 
 		void (*_original_suspended_callback)() = nullptr;
 
@@ -614,10 +619,7 @@ struct Libc::Kernel
 			if (!_setjmp(_kernel_context)) {
 				/* _setjmp() returned directly -> switch to user stack and call application code */
 				_state = USER;
-				void *user_stack = _myself.alloc_secondary_stack(
-					_myself.name().string(), Component::stack_size());
-
-				call_func(user_stack, (void *)_user_entry, (void *)this);
+				call_func(_user_stack, (void *)_user_entry, (void *)this);
 
 				/* never reached */
 			}
