@@ -6,7 +6,7 @@
  */
 
 /*
- * Copyright (C) 2016-2017 Genode Labs GmbH
+ * Copyright (C) 2016-2018 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -393,10 +393,7 @@ struct Libc::Kernel
 		bool    _dispatch_pending_io_signals = false;
 
 		Genode::Thread &_myself { *Genode::Thread::myself() };
-
-		void *_user_stack = {
-			_myself.alloc_secondary_stack(_myself.name().string(),
-			                              Component::stack_size()) };
+		addr_t _kernel_stack = Thread::mystack().top;
 
 		void (*_original_suspended_callback)() = nullptr;
 
@@ -546,8 +543,8 @@ struct Libc::Kernel
 		unsigned long _suspend_main(Suspend_functor &check,
 		                            unsigned long timeout_ms)
 		{
-			/* check if we're running on the user context */
-			if (Thread::myself()->mystack().top != (Genode::addr_t)_user_stack) {
+			/* check that we're not running on libc kernel context */
+			if (Thread::mystack().top == _kernel_stack) {
 				error("libc suspend() called from non-user context (",
 				      __builtin_return_address(0), ") - aborting");
 				exit(1);
@@ -617,7 +614,10 @@ struct Libc::Kernel
 			if (!_setjmp(_kernel_context)) {
 				/* _setjmp() returned directly -> switch to user stack and call application code */
 				_state = USER;
-				call_func(_user_stack, (void *)_user_entry, (void *)this);
+				void *user_stack = _myself.alloc_secondary_stack(
+					_myself.name().string(), Component::stack_size());
+
+				call_func(user_stack, (void *)_user_entry, (void *)this);
 
 				/* never reached */
 			}
