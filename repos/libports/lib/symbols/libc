@@ -910,6 +910,11 @@ _CurrentRuneLocale D 8
 __isinff T
 __isinfl T
 
+#
+# Genode extensions
+#
+malloc_exec T
+free_exec T
 
 #
 # Public interface between Genode-component code and the libc runtime

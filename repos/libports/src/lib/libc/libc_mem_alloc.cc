@@ -174,3 +174,17 @@ Libc::Mem_alloc *Libc::mem_alloc(bool executable)
 
 	return executable ? _libc_mem_alloc_rwx : _libc_mem_alloc_rw;
 }
+
+
+extern "C" void *malloc_exec(::size_t size)
+{
+	enum { EXEC = true, PAGE_SHIFT = 12 };
+	return Libc::mem_alloc(EXEC)->alloc(size, PAGE_SHIFT);
+}
+
+
+extern "C" void free_exec(void *ptr)
+{
+	enum { EXEC = true };
+	return Libc::mem_alloc(EXEC)->free(ptr);
+}
