@@ -17,12 +17,14 @@
 #include <os/surface.h>
 #include <input/event.h>
 #include <os/static_root.h>
+#include <base/heap.h>
 #include <base/attached_rom_dataspace.h>
 #include <base/component.h>
 
 namespace Nit_fb {
 
 	struct Main;
+	struct Initial_size;
 
 	using Genode::Static_root;
 	using Genode::Signal_handler;
@@ -76,11 +78,47 @@ struct View_updater : Genode::Interface
 };
 
 
+struct Nit_fb::Initial_size
+{
+	long const _width  { 0 };
+	long const _height { 0 };
+
+	bool   set { false };
+	bool fixed { false };
+
+	Initial_size(Genode::Xml_node config)
+	:
+		_width (config.attribute_value("initial_width",  0L)),
+		_height(config.attribute_value("initial_height", 0L))
+	{ }
+
+	unsigned width(Framebuffer::Mode const &mode) const
+	{
+		if (_width > 0) return _width;
+		if (_width < 0) return mode.width() + _width;
+		return mode.width();
+	}
+
+	unsigned height(Framebuffer::Mode const &mode) const
+	{
+		if (_height > 0) return _height;
+		if (_height < 0) return mode.height() + _height;
+		return mode.height();
+	}
+
+	bool valid() const { return _width != 0 && _height != 0; }
+
+};
+
+
 /*****************************
  ** Virtualized framebuffer **
  *****************************/
 
-namespace Framebuffer { struct Session_component; }
+namespace Framebuffer {
+	struct Session_component;
+	struct Root_component;
+}
 
 
 struct Framebuffer::Session_component : Genode::Rpc_object<Framebuffer::Session>
@@ -171,6 +209,10 @@ struct Framebuffer::Session_component : Genode::Rpc_object<Framebuffer::Session>
 		return Nitpicker::Area(_active_mode.width(), _active_mode.height());
 	}
 
+	void client_mode(Mode mode)
+	{
+		_next_mode = mode;
+	}
 
 	/************************************
 	 ** Framebuffer::Session interface **
@@ -230,6 +272,46 @@ struct Framebuffer::Session_component : Genode::Rpc_object<Framebuffer::Session>
 };
 
 
+class Framebuffer::Root_component :
+	public Genode::Root_component<Session_component, Genode::Single_client>
+{
+	private:
+
+		Session_component &_session_component;
+
+		Nit_fb::Initial_size const &_initial_size;
+
+	protected:
+
+		Session_component *_create_session(const char *args) override
+		{
+			using namespace Genode;
+
+			unsigned width  = Arg_string::find_arg(args, "fb_width").ulong_value(0);
+			unsigned height = Arg_string::find_arg(args, "fb_height").ulong_value(0);
+			unsigned depth  = Arg_string::find_arg(args, "fb_mode").ulong_value(16);
+
+			if (depth != 16) throw Service_denied();
+
+			if (!_initial_size.fixed && width > 0 && height > 0) {
+				Mode mode(width, height, Framebuffer::Mode::RGB565);
+				_session_component.client_mode(mode);
+			}
+			return &_session_component;
+		}
+
+		void _destroy_session(Session_component*) override { }
+	public:
+
+		Root_component(Genode::Env &env, Genode::Allocator &alloc,
+		               Framebuffer::Session_component &session,
+		               Nit_fb::Initial_size const &initial_size)
+		: Genode::Root_component<Session_component, Genode::Single_client>(env.ep(), alloc),
+		  _session_component(session), _initial_size(initial_size)
+		{ }
+};
+
+
 /******************
  ** Main program **
  ******************/
@@ -252,36 +334,7 @@ struct Nit_fb::Main : View_updater
 
 	Genode::Attached_dataspace input_ds { env.rm(), nitpicker.input()->dataspace() };
 
-	struct Initial_size
-	{
-		long const _width  { 0 };
-		long const _height { 0 };
-
-		bool set { false };
-
-		Initial_size(Genode::Xml_node config)
-		:
-			_width (config.attribute_value("initial_width",  0L)),
-			_height(config.attribute_value("initial_height", 0L))
-		{ }
-
-		unsigned width(Framebuffer::Mode const &mode) const
-		{
-			if (_width > 0) return _width;
-			if (_width < 0) return mode.width() + _width;
-			return mode.width();
-		}
-
-		unsigned height(Framebuffer::Mode const &mode) const
-		{
-			if (_height > 0) return _height;
-			if (_height < 0) return mode.height() + _height;
-			return mode.height();
-		}
-
-		bool valid() const { return _width != 0 && _height != 0; }
-
-	} _initial_size { config_rom.xml() };
+	Initial_size _initial_size { config_rom.xml() };
 
 	Framebuffer::Mode _initial_mode()
 	{
@@ -300,7 +353,14 @@ struct Nit_fb::Main : View_updater
 	 * Attach root interfaces to the entry point
 	 */
 	Static_root<Input::Session>       input_root { env.ep().manage(input_session) };
-	Static_root<Framebuffer::Session> fb_root    { env.ep().manage(fb_session) };
+
+	/*
+	 * TODO: just process the session_requests ROM for arguments,
+	 * no need for Root_components.
+	 */
+	Genode::Heap _heap { env.pd(), env.rm() };
+
+	Framebuffer::Root_component fb_root { env, _heap, fb_session, _initial_size };
 
 	/**
 	 * View_updater interface
@@ -348,6 +408,10 @@ struct Nit_fb::Main : View_updater
 
 		bool const attr = config.has_attribute("width") ||
 		                  config.has_attribute("height");
+
+		/* the size is fixed if there is explicit configuration*/
+		_initial_size.fixed = attr;
+
 		if (_initial_size.valid() && attr) {
 			Genode::warning("setting both inital and normal attributes not "
 			                " supported, ignore initial size");
