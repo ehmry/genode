@@ -17,6 +17,7 @@
 #include <os/surface.h>
 #include <input/event.h>
 #include <os/static_root.h>
+#include <base/heap.h>
 #include <base/attached_rom_dataspace.h>
 #include <base/component.h>
 
@@ -80,7 +81,10 @@ struct View_updater : Genode::Interface
  ** Virtualized framebuffer **
  *****************************/
 
-namespace Framebuffer { struct Session_component; }
+namespace Framebuffer {
+	struct Session_component;
+	struct Root_component;
+}
 
 
 struct Framebuffer::Session_component : Genode::Rpc_object<Framebuffer::Session>
@@ -171,6 +175,10 @@ struct Framebuffer::Session_component : Genode::Rpc_object<Framebuffer::Session>
 		return Nitpicker::Area(_active_mode.width(), _active_mode.height());
 	}
 
+	void client_mode(Mode mode)
+	{
+		_next_mode = mode;
+	}
 
 	/************************************
 	 ** Framebuffer::Session interface **
@@ -227,6 +235,43 @@ struct Framebuffer::Session_component : Genode::Rpc_object<Framebuffer::Session>
 
 		_nit_fb.sync_sigh(sigh);
 	}
+};
+
+
+class Framebuffer::Root_component :
+	public Genode::Root_component<Session_component, Genode::Single_client>
+{
+	private:
+
+		Session_component &_session_component;
+
+	protected:
+
+		Session_component *_create_session(const char *args) override
+		{
+			using namespace Genode;
+
+			unsigned width  = Arg_string::find_arg(args, "fb_width").ulong_value(0);
+			unsigned height = Arg_string::find_arg(args, "fb_height").ulong_value(0);
+			unsigned depth  = Arg_string::find_arg(args, "fb_mode").ulong_value(16);
+
+			if (depth != 16) throw Service_denied();
+
+			if (width > 0 && height > 0) {
+				Mode mode(width, height, Framebuffer::Mode::RGB565);
+				_session_component.client_mode(mode);
+			}
+			return &_session_component;
+		}
+
+		void _destroy_session(Session_component*) override { }
+	public:
+
+		Root_component(Genode::Env &env, Genode::Allocator &alloc,
+		               Framebuffer::Session_component &session)
+		: Genode::Root_component<Session_component, Genode::Single_client>(env.ep(), alloc),
+		  _session_component(session)
+		{ }
 };
 
 
@@ -300,7 +345,14 @@ struct Nit_fb::Main : View_updater
 	 * Attach root interfaces to the entry point
 	 */
 	Static_root<Input::Session>       input_root { env.ep().manage(input_session) };
-	Static_root<Framebuffer::Session> fb_root    { env.ep().manage(fb_session) };
+
+	/*
+	 * TODO: just process the session_requests ROM for arguments,
+	 * no need for Root_components.
+	 */
+	Genode::Heap _heap { env.pd(), env.rm() };
+
+	Framebuffer::Root_component fb_root { env, _heap, fb_session };
 
 	/**
 	 * View_updater interface
