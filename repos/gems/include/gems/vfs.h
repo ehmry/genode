@@ -21,12 +21,50 @@
 #include <vfs/file_system_factory.h>
 
 namespace Genode {
+	struct Vfs_trivial_env;
 	struct Directory;
 	struct Root_directory;
 	struct File;
 	struct Readonly_file;
 	struct File_content;
 }
+
+
+class Genode::Vfs_trivial_env : public Vfs::Env
+{
+	private:
+
+		Genode::Env       &_env;
+		Genode::Allocator &_alloc;
+
+		struct Io_response_dummy : Vfs::Io_response_handler {
+			void handle_io_response(Vfs::Vfs_handle::Context*) override { }
+		} _io_dummy { };
+
+		struct Watch_response_dummy : Vfs::Watch_response_handler {
+			void handle_watch_response(Vfs::Vfs_watch_handle::Context*) override { }
+		} _watch_dummy { };
+
+		Vfs::Global_file_system_factory _fs_factory { _alloc };
+
+		Vfs::Dir_file_system _root_dir;
+
+	public:
+
+		Vfs_trivial_env(Genode::Env &env,
+		                Genode::Allocator &alloc,
+		                Genode::Xml_node config)
+		: _env(env), _alloc(alloc),
+		  _root_dir(*this, config, _fs_factory)
+		{ }
+
+		Genode::Env &env()            override { return _env; }
+		Genode::Allocator &alloc()    override { return _alloc; }
+		Vfs::File_system &root_dir()  override { return _root_dir; }
+
+		Vfs::Io_response_handler &io_handler()       override { return _io_dummy; }
+		Vfs::Watch_response_handler &watch_handler() override { return _watch_dummy; }
+};
 
 
 struct Genode::Directory : Noncopyable, Interface
@@ -70,6 +108,13 @@ struct Genode::Directory : Noncopyable, Interface
 
 		typedef String<256> Path;
 
+		static Path join(Path const &x, Path const &y)
+		{
+			char const *p = y.string();
+			while (*p == '/') ++p;
+			return Path(x, "/", p);
+		}
+
 	private:
 
 		/*
@@ -110,7 +155,7 @@ struct Genode::Directory : Noncopyable, Interface
 			 * Ignore return value as the validity of the result is can be
 			 * checked by the caller via 'stat.mode != 0'.
 			 */
-			_nonconst_fs().stat(Path(_path, "/", rel_path).string(), stat);
+			_nonconst_fs().stat(join(_path, rel_path).string(), stat);
 			return stat;
 		}
 
@@ -124,9 +169,14 @@ struct Genode::Directory : Noncopyable, Interface
 		 *
 		 * \throw Open_failed
 		 */
-		Directory(Vfs::File_system &fs, Entrypoint &ep, Allocator &alloc)
-		: _path(""), _fs(fs), _ep(ep), _alloc(alloc)
-		{ }
+		Directory(Vfs::Env &vfs_env)
+		: _path(""), _fs(vfs_env.root_dir()),
+		  _ep(vfs_env.env().ep()), _alloc(vfs_env.alloc())
+		{
+			if (_fs.opendir("/", false, &_handle, _alloc) !=
+			    Vfs::Directory_service::OPENDIR_OK)
+				throw Nonexistent_directory();
+		}
 
 		/**
 		 * Open sub directory
@@ -134,7 +184,7 @@ struct Genode::Directory : Noncopyable, Interface
 		 * \throw Nonexistent_directory
 		 */
 		Directory(Directory const &other, Path const &rel_path)
-		: _path(other._path, "/", rel_path), _fs(other._fs), _ep(other._ep),
+		: _path(join(other._path, rel_path)), _fs(other._fs), _ep(other._ep),
 		  _alloc(other._alloc)
 		{
 			if (_fs.opendir(_path.string(), false, &_handle, _alloc) !=
@@ -212,29 +262,24 @@ struct Genode::Directory : Noncopyable, Interface
 		Vfs::file_size file_size(Path const &rel_path) const
 		{
 			Vfs::Directory_service::Stat stat = _stat(rel_path);
+
 			if (!(stat.mode & Vfs::Directory_service::STAT_MODE_FILE))
 				throw Nonexistent_file();
-
 			return stat.size;
 		}
 };
 
 
-struct Genode::Root_directory : public  Vfs::Io_response_handler,
-                                private Vfs::Global_file_system_factory,
-                                private Vfs::Dir_file_system,
-                                public  Directory
+struct Genode::Root_directory : public Vfs_trivial_env,
+                                public Directory
 {
-	void handle_io_response(Vfs::Vfs_handle::Context*) override { }
-
-	Root_directory(Env &env, Allocator &alloc, Xml_node config)
+	Root_directory(Genode::Env &env, Allocator &alloc, Xml_node config)
 	:
-		Vfs::Global_file_system_factory(alloc),
-		Vfs::Dir_file_system(env, alloc, config, *this, *this),
-		Directory(*this, env.ep(), alloc)
+		Vfs_trivial_env(env, alloc, config),
+		Directory((Vfs_trivial_env&)*this)
 	{ }
 
-	void apply_config(Xml_node config) { Vfs::Dir_file_system::apply_config(config); }
+	void apply_config(Xml_node config) { root_dir().apply_config(config); }
 };
 
 
@@ -306,7 +351,7 @@ class Genode::Readonly_file : public File
 		: _ep(_mutable(dir)._ep)
 		{
 			_open(_mutable(dir)._fs, _mutable(dir)._alloc,
-			      Path(dir._path, "/", rel_path));
+			      Directory::join(dir._path, rel_path));
 		}
 
 		~Readonly_file() { _handle->ds().close(_handle); }
