@@ -17,54 +17,17 @@
 /* Genode includes */
 #include <base/env.h>
 #include <base/allocator.h>
+#include <vfs/simple_env.h>
 #include <vfs/dir_file_system.h>
 #include <vfs/file_system_factory.h>
 
 namespace Genode {
-	struct Vfs_trivial_env;
 	struct Directory;
 	struct Root_directory;
 	struct File;
 	struct Readonly_file;
 	struct File_content;
 }
-
-
-class Genode::Vfs_trivial_env : public Vfs::Env
-{
-	private:
-
-		Genode::Env       &_env;
-		Genode::Allocator &_alloc;
-
-		struct Io_response_dummy : Vfs::Io_response_handler {
-			void handle_io_response(Vfs::Vfs_handle::Context*) override { }
-		} _io_dummy { };
-
-		struct Watch_response_dummy : Vfs::Watch_response_handler {
-			void handle_watch_response(Vfs::Vfs_watch_handle::Context*) override { }
-		} _watch_dummy { };
-
-		Vfs::Global_file_system_factory _fs_factory { _alloc };
-
-		Vfs::Dir_file_system _root_dir;
-
-	public:
-
-		Vfs_trivial_env(Genode::Env &env,
-		                Genode::Allocator &alloc,
-		                Genode::Xml_node config)
-		: _env(env), _alloc(alloc),
-		  _root_dir(*this, config, _fs_factory)
-		{ }
-
-		Genode::Env &env()            override { return _env; }
-		Genode::Allocator &alloc()    override { return _alloc; }
-		Vfs::File_system &root_dir()  override { return _root_dir; }
-
-		Vfs::Io_response_handler &io_handler()       override { return _io_dummy; }
-		Vfs::Watch_response_handler &watch_handler() override { return _watch_dummy; }
-};
 
 
 struct Genode::Directory : Noncopyable, Interface
@@ -270,12 +233,12 @@ struct Genode::Directory : Noncopyable, Interface
 };
 
 
-struct Genode::Root_directory : public Vfs_trivial_env,
+struct Genode::Root_directory : public Vfs::Simple_env,
                                 public Directory
 {
 	Root_directory(Genode::Env &env, Allocator &alloc, Xml_node config)
 	:
-		Vfs_trivial_env(env, alloc, config),
+		Vfs::Simple_env(env, alloc, config),
 		Directory((Vfs_trivial_env&)*this)
 	{ }
 
