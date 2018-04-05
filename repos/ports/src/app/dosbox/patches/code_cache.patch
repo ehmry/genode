@@ -1,0 +1,41 @@
+--- contrib/dosbox-svn-3837/src/cpu/core_dynrec/cache.h.orig	2018-04-04 21:25:08.307242738 +0200
++++ contrib/dosbox-svn-3837/src/cpu/core_dynrec/cache.h		2018-04-04 21:29:12.992247564 +0200
+@@ -16,6 +16,9 @@
+  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+  */
+ 
++#ifndef WIN32
++#include <sys/mman.h>
++#endif
+ 
+ class CodePageHandlerDynRec;	// forward
+ 
+@@ -591,12 +594,17 @@
+ 			if (!cache_code_start_ptr)
+ 				cache_code_start_ptr=(Bit8u*)malloc(CACHE_TOTAL+CACHE_MAXSIZE+PAGESIZE_TEMP-1+PAGESIZE_TEMP);
+ #else
+-			cache_code_start_ptr=(Bit8u*)malloc(CACHE_TOTAL+CACHE_MAXSIZE+PAGESIZE_TEMP-1+PAGESIZE_TEMP);
++			cache_code_start_ptr=(Bit8u*)mmap(0,
++			                                  CACHE_TOTAL+CACHE_MAXSIZE+PAGESIZE_TEMP-1+PAGESIZE_TEMP,
++			                                  PROT_READ|PROT_WRITE|PROT_EXEC,
++			                                  MAP_ANON, -1, 0);
++
++
+ #endif
+ 			if(!cache_code_start_ptr) E_Exit("Allocating dynamic cache failed");
+ 
+ 			// align the cache at a page boundary
+-			cache_code=(Bit8u*)(((long)cache_code_start_ptr + PAGESIZE_TEMP-1) & ~(PAGESIZE_TEMP-1)); //MEM LEAK. store old pointer if you want to free it.
++			cache_code=(Bit8u*)(((Bitu)cache_code_start_ptr + PAGESIZE_TEMP-1) & ~(PAGESIZE_TEMP-1));//Bitu is same size as a pointer.
+ 
+ 			cache_code_link_blocks=cache_code;
+ 			cache_code=cache_code+PAGESIZE_TEMP;
+@@ -656,7 +664,7 @@
+ 	if (cache_code_start_ptr != NULL) {
+ 		### care: under windows VirtualFree() has to be used if
+ 		###       VirtualAlloc was used for memory allocation
+-		free(cache_code_start_ptr);
++		munmap(cache_code_start_ptr, CACHE_TOTAL+CACHE_MAXSIZE+PAGESIZE_TEMP-1+PAGESIZE_TEMP);
+ 		cache_code_start_ptr = NULL;
+ 	}
+ 	cache_code = NULL;
