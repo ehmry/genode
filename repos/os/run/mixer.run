@@ -39,7 +39,8 @@ set config  {
 		<default-route>
 			<service name="Audio_out"> <child name="mixer"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
-		</default-route>}
+		</default-route>
+		<default caps="128"/>}
 
 append_platform_drv_config
 
@@ -119,8 +120,11 @@ append config {
 		</start>
 
 		<start name="mixer">
-			<resource name="RAM" quantum="1M"/>
-			<provides><service name="Audio_out"/></provides>
+			<resource name="RAM" quantum="2M"/>
+			<provides>
+				<service name="Audio_in"/>
+				<service name="Audio_out"/>
+			</provides>
 			<configfile name="mixer.config"/>
 			<route>
 				<service name="Audio_out"> <child name="audio_drv"/> </service>

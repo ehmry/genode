@@ -2,14 +2,15 @@
  * \brief  Audio_out Mixer
  * \author Sebastian Sumpf
  * \author Josef Soentgen
+ * \author Emery Hemingway
  * \date   2012-12-20
  *
  * The mixer implements the audio session on the server side. For each channel
  * (currently 'left' and 'right' only) it supports multiple client sessions and
- * mixes all input sessions into a single client audio output session.
+ * mixes all input sessions down to a single audio input service.
  *
  *
- * There is a session list (Mixer::Session_channel) for each output channel that
+ * There is a session space (Mixer::Session_channel) for each output channel that
  * contains multiple input sessions (Audio_out::Session_elem). For every packet
  * in the output queue the mixer sums the corresponding packets from all input
  * sessions up. The volume level of an input packet is applied in a linear way
@@ -17,27 +18,30 @@
  */
 
 /*
- * Copyright (C) 2009-2017 Genode Labs GmbH
+ * Copyright (C) 2009-2018 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
  */
 
+#include <base/debug.h>
+
 /* Genode includes */
+#include <os/session_requests.h>
 #include <mixer/channel.h>
 #include <os/reporter.h>
 #include <root/component.h>
 #include <util/retry.h>
 #include <util/string.h>
 #include <util/xml_node.h>
-#include <audio_out_session/connection.h>
+#include <audio_in_session/capability.h>
+#include <audio_in_session/rpc_object.h>
 #include <audio_out_session/rpc_object.h>
 #include <timer_session/connection.h>
 #include <base/attached_rom_dataspace.h>
 #include <base/heap.h>
 #include <base/component.h>
 #include <base/log.h>
-
 
 typedef Mixer::Channel Channel;
 
@@ -47,11 +51,13 @@ enum {
 	RIGHT        = Channel::Number::RIGHT,
 	MAX_CHANNELS = Channel::Number::MAX_CHANNELS,
 	MAX_VOLUME   = Channel::Volume_level::MAX,
+	MAX_CHANNEL_NAME_LEN = 16,
+	INVALID_ID           = ~0UL,
 };
 
 
 static struct Names {
-	 char const    *name;
+	char const      *name;
 	Channel::Number  number;
 } names[] = {
 	{ "left",        (Channel::Number)LEFT },
@@ -88,15 +94,33 @@ static void for_each_index(int max_index, FUNC const &func) {
 	for (int i = 0; i < max_index; i++) func(i); }
 
 
+/****************************************************
+ ** Audio_in session implementation (mixer output) **
+ ****************************************************/
+
+namespace Audio_in { struct Session_component; }
+
+struct Audio_in::Session_component final : Audio_in::Session_rpc_object
+{
+	Genode::Parent::Server::Id id { INVALID_ID };
+
+	Genode::Session_label label { };
+
+	Session_component(Genode::Env &env, Genode::Signal_context_capability data_cap)
+	: Audio_in::Session_rpc_object(env, data_cap) { }
+};
+
+
 namespace Audio_out
 {
 	class Session_elem;
+	typedef Genode::Id_space<Session_elem> Session_space;
+	typedef Session_space Session_channel;
+	typedef Session_space::Id Session_id;
+
 	class Session_component;
 	class Root;
 	class Mixer;
-
-	enum { MAX_CHANNEL_NAME_LEN = 16, MAX_LABEL_LEN = 128 };
-	typedef Genode::String<MAX_LABEL_LEN> Label;
 }
 
 
@@ -106,21 +130,26 @@ namespace Audio_out
  * It is part of the Audio_out::Session_component implementation but since
  * it is also used by the mixer we defined it here.
  */
-struct Audio_out::Session_elem : Audio_out::Session_rpc_object,
-                                 private Genode::List<Audio_out::Session_elem>::Element
+struct Audio_out::Session_elem : Audio_out::Session_rpc_object
 {
-	friend class Genode::List<Audio_out::Session_elem>;
+	Session_space::Element const session_elem;
+	Session_space::Element const channel_elem;
 
-	using Genode::List<Session_elem>::Element::next;
+	Genode::Session_label const label;
 
-	Label           label;
 	Channel::Number number { Channel::INVALID };
 	float           volume { 0.f };
 	bool            muted  { true };
 
 	Session_elem(Genode::Env & env,
-	             char const *label, Genode::Signal_context_capability data_cap)
-	: Session_rpc_object(env, data_cap), label(label) { }
+	             Session_space &session_space, Session_space &channel_space,
+	             Session_id &id, Genode::Session_label const &label,
+	             Genode::Signal_context_capability data_cap)
+	: Session_rpc_object(env, data_cap),
+	  session_elem(*this, session_space, id),
+	  channel_elem(*this, channel_space, id),
+	  label(label)
+	{ }
 
 	Packet *get_packet(unsigned offset) {
 		return stream()->get(stream()->pos() + offset); }
@@ -159,12 +188,24 @@ class Audio_out::Mixer
 		Genode::Reconstructible<Verbose> _verbose { _config_rom.xml() };
 
 		/*
-		 * Mixer output Audio_out connection
+		 * Signal handlers
 		 */
-		Connection  _left  { env, "left",  false, true };
-		Connection  _right { env, "right", false, false };
-		Connection *_out[MAX_CHANNELS];
-		float       _out_volume[MAX_CHANNELS];
+		Genode::Signal_handler<Audio_out::Mixer> _handler
+			{ env.ep(), *this, &Audio_out::Mixer::_handle };
+
+		Genode::Signal_handler<Audio_out::Mixer> _handler_config
+			{ env.ep(), *this, &Audio_out::Mixer::_handle_config_update  };
+
+		Genode::Signal_context_capability _data_cap { };
+
+		/*
+		 * Audio_in RPC objects for mixer output
+		 */
+		Audio_in::Session_component _left  { env, _data_cap };
+		Audio_in::Session_component _right { env, _data_cap };
+
+		Audio_in::Session_component *_out[MAX_CHANNELS];
+		float                        _out_volume[MAX_CHANNELS];
 
 		/*
 		 * Default settings used as fallback for new sessions
@@ -179,26 +220,16 @@ class Audio_out::Mixer
 		struct Remix_all { };
 
 		/**
-		 * A channel contains multiple session components
+		 * A channel is a space of multiple session components
 		 */
-		struct Session_channel : public Genode::List<Session_elem>
-		{
-			void insert(Session_elem *session) { List<Session_elem>::insert(session); }
-			void remove(Session_elem *session) { List<Session_elem>::remove(session); }
-
-			template <typename FUNC> void for_each_session(FUNC const &func)
-			{
-				for (Session_elem *elem = List<Session_elem>::first(); elem;
-				     elem = elem->next()) func(*elem);
-			}
-		} _channels[MAX_CHANNELS];
+		Session_space _channels[MAX_CHANNELS];
 
 		/**
 		 * Helper method for walking over session in a channel
 		 */
 		template <typename FUNC> void _for_each_channel(FUNC const &func)
 		{
-			for (int i = LEFT; i < MAX_CHANNELS; i++)
+			for (int i = LEFT; i < (int)MAX_CHANNELS; i++)
 				func((Channel::Number)i, &_channels[i]);
 		}
 
@@ -227,7 +258,7 @@ class Audio_out::Mixer
 
 						xml.node("channel", [&] () {
 							xml.attribute("type",  "output");
-							xml.attribute("label", "master");
+							xml.attribute("label",  _out[i]->label);
 							xml.attribute("name",   name);
 							xml.attribute("number", (int)num);
 							xml.attribute("volume", (int)vol);
@@ -237,7 +268,7 @@ class Audio_out::Mixer
 
 					/* input channels */
 					_for_each_channel([&] (Channel::Number num, Session_channel *sc) {
-						sc->for_each_session([&] (Session_elem const &session) {
+						sc->for_each<Session_elem&>([&] (Session_elem const &session) {
 							char const * const name = string_from_number(num);
 							int const           vol = (int)(MAX_VOLUME * session.volume);
 
@@ -264,7 +295,7 @@ class Audio_out::Mixer
 		{
 			bool active = false;
 			_for_each_channel([&] (Channel::Number, Session_channel *sc) {
-				sc->for_each_session([&] (Session_elem const &session) {
+				sc->for_each<Session_elem&>([&] (Session_elem const &session) {
 					active |= session.active();
 				});
 			});
@@ -299,7 +330,7 @@ class Audio_out::Mixer
 		{
 			for_each_index(MAX_CHANNELS, [&] (int i) {
 				unsigned const pos = _out[i]->stream()->pos();
-				_channels[i].for_each_session([&] (Session_elem &session) {
+				_channels[i].for_each<Session_elem&>([&] (Session_elem &session) {
 					_advance_session(&session, pos);
 				});
 			});
@@ -310,8 +341,8 @@ class Audio_out::Mixer
 		 *
 		 * Packets are mixed in a linear way with min/max clipping.
 		 */
-		void _mix_packet(Packet *out, Packet *in, bool clear,
-		                 float const out_vol, float const vol)
+		void _mix_packet(Audio_in::Packet *out, Audio_out::Packet *in,
+		                 bool clear, float const out_vol, float const vol)
 		{
 			if (clear) {
 				for_each_index(Audio_out::PERIOD, [&] (int const i) {
@@ -342,9 +373,9 @@ class Audio_out::Mixer
 		 */
 		bool _mix_channel(bool remix, Channel::Number nr, unsigned out_pos, unsigned offset)
 		{
-			Stream  * const    stream  = _out[nr]->stream();
-			Packet  * const    out     = stream->get(out_pos + offset);
-			Session_channel * const sc = &_channels[nr];
+			Audio_in::Stream * const stream  = _out[nr]->stream();
+			Audio_in::Packet * const out     = stream->get(out_pos + offset);
+			Session_channel  * const sc      = &_channels[nr];
 
 			float const out_vol  = _out_volume[nr];
 
@@ -358,7 +389,7 @@ class Audio_out::Mixer
 				 * session to one output packet.
 				 */
 				[&] {
-					sc->for_each_session([&] (Session_elem &session) {
+					sc->for_each<Session_elem&>([&] (Session_elem &session) {
 						if (session.stopped() || session.muted || session.volume < 0.01f)
 							return;
 
@@ -411,8 +442,8 @@ class Audio_out::Mixer
 				/* all channels mixed, submit to output queue */
 				if (mix_one)
 					for_each_index(MAX_CHANNELS, [&] (int const j) {
-						Packet *p = _out[j]->stream()->get(pos[j] + i);
-						_out[j]->submit(p);
+						Audio_in::Packet *p = _out[j]->stream()->get(pos[j] + i);
+						_out[j]->stream()->submit(p);
 					});
 			});
 		}
@@ -484,7 +515,7 @@ class Audio_out::Mixer
 					if (ch.type == Channel::Type::INPUT) {
 						_for_each_channel([&] (Channel::Number, Session_channel *sc) {
 
-							sc->for_each_session([&] (Session_elem &session) {
+							sc->for_each<Session_elem&>([&] (Session_elem &session) {
 								if (session.number != ch.number) return;
 								if (session.label != ch.label) return;
 
@@ -533,15 +564,6 @@ class Audio_out::Mixer
 			_mix(true);
 		}
 
-		/*
-		 * Signal handlers
-		 */
-		Genode::Signal_handler<Audio_out::Mixer> _handler
-			{ env.ep(), *this, &Audio_out::Mixer::_handle };
-
-		Genode::Signal_handler<Audio_out::Mixer> _handler_config
-			{ env.ep(), *this, &Audio_out::Mixer::_handle_config_update  };
-
 	public:
 
 		/**
@@ -559,6 +581,46 @@ class Audio_out::Mixer
 
 			_config_rom.sigh(_handler_config);
 			_handle_config_update();
+		}
+
+		/**
+		 * Deliver an Audio_in capability for an output channel
+		 *
+		 * \throw Service_denied
+		 */
+		void deliver_output(Genode::Env &env,
+		                    Genode::Parent::Server::Id id,
+		                    Genode::Session_label const &label,
+		                    Channel::Number channel)
+		{
+			/* assert the channel is valid and not acquired */
+			if ((Channel::Number)MAX_CHANNELS < channel
+			 || _out[channel]->id.value != INVALID_ID)
+				throw Genode::Service_denied();
+
+			Audio_in::Session_component &session = *_out[channel];
+
+			Audio_in::Session_capability cap = env.ep().manage(session);
+			session.id = id;
+			session.label = label;
+			env.parent().deliver_session_cap(id, cap);
+		}
+
+		/**
+		 * Dissolve the Audio_in RPC object for an output channel
+		 */
+		void close_output(Genode::Env &env, Genode::Parent::Server::Id id)
+		{
+			/* lookup id to channel */
+			for_each_index(MAX_CHANNELS, [&] (int channel) {
+				if (_out[channel]->id == id) {
+					Audio_in::Session_component &session = *_out[channel];
+					env.ep().dissolve(session);
+					session.id.value = INVALID_ID;
+					session.label = Genode::Session_label();
+					env.parent().session_response(id, Genode::Parent::SESSION_CLOSED);
+				}
+			});
 		}
 
 		/**
@@ -600,7 +662,6 @@ class Audio_out::Mixer
 				    "muted: ",     session.muted);
 			}
 
-			_channels[ch].insert(&session);
 			_report_channels();
 		}
 
@@ -615,8 +676,12 @@ class Audio_out::Mixer
 				    "nr: ", (int)ch);
 			}
 
-			_channels[ch].remove(&session);
 			_report_channels();
+		}
+		
+		Session_space &channel_space(Channel::Number n)
+		{
+			return _channels[n];
 		}
 
 		/**
@@ -635,7 +700,7 @@ class Audio_out::Mixer
  ** Audio_out session implementation **
  **************************************/
 
-class Audio_out::Session_component : public Audio_out::Session_elem
+class Audio_out::Session_component final : public Audio_out::Session_elem
 {
 	private:
 
@@ -643,11 +708,13 @@ class Audio_out::Session_component : public Audio_out::Session_elem
 
 	public:
 
-		Session_component(Genode::Env     &env,
-		                  char const      *label,
-		                  Channel::Number  number,
-		                  Mixer           &mixer)
-		: Session_elem(env, label, mixer.sig_cap()), _mixer(mixer)
+		Session_component(Genode::Env &env,
+		                  Session_space  &sessions, Session_id id,
+		                  Genode::Session_label const &label,
+		                  Channel::Number number, Mixer &mixer)
+		: Session_elem(env, sessions, mixer.channel_space(number),
+		               id, label, mixer.sig_cap()),
+		  _mixer(mixer)
 		{
 			Session_elem::number = number;
 			_mixer.add_session(Session_elem::number, *this);
@@ -687,45 +754,7 @@ class Audio_out::Root : public Audio_out::Root_component
 		Mixer       &_mixer;
 		int          _sessions = { 0 };
 
-		Session_component *_create_session(const char *args)
-		{
-			using namespace Genode;
-
-			/*
-			 * We only want to have the last part of the lable,
-			 * e.g. 'client -> ' => 'client'.
-			 */
-			Session_label const session_label = label_from_args(args);
-			Session_label const label         = session_label.prefix();
-
-			char channel_name[MAX_CHANNEL_NAME_LEN];
-			Arg_string::find_arg(args, "channel").string(channel_name,
-			                                             sizeof(channel_name),
-			                                             "left");
-
-			size_t ram_quota =
-				Arg_string::find_arg(args, "ram_quota").ulong_value(0);
-
-			size_t session_size = align_addr(sizeof(Session_component), 12);
-
-			if ((ram_quota < session_size) ||
-			    (sizeof(Stream) > ram_quota - session_size)) {
-				Genode::error("insufficient 'ram_quota', got ", ram_quota, ", "
-				              "need ", sizeof(Stream) + session_size);
-				throw Insufficient_ram_quota();
-			}
-
-			Channel::Number ch = number_from_string(channel_name);
-			if (ch == Channel::Number::INVALID)
-				throw Genode::Service_denied();
-
-			Session_component *session = new (md_alloc())
-				Session_component(_env, label.string(), (Channel::Number)ch, _mixer);
-
-			if (++_sessions == 1) _mixer.start();
-			return session;
-
-		}
+		Session_component *_create_session(const char *) { return nullptr; }
 
 		void _destroy_session(Session_component *session)
 		{
@@ -748,18 +777,108 @@ class Audio_out::Root : public Audio_out::Root_component
 
 namespace Mixer { struct Main; }
 
-struct Mixer::Main
+struct Mixer::Main : Genode::Session_requests_handler
 {
 	Genode::Env &env;
 
-	Genode::Sliced_heap heap { env.ram(), env.rm() };
+	Genode::Sliced_heap md_alloc { env.ram(), env.rm() };
 
-	Audio_out::Mixer mixer = { env };
-	Audio_out::Root  root  = { env, mixer, heap };
+	Audio_out::Mixer mixer   { env };
 
-	Main(Genode::Env &env) : env(env)
+	Audio_out::Session_space input_sessions { };
+
+	static Channel::Number channel_from_args(char const *args)
 	{
-		env.parent().announce(env.ep().manage(root));
+		char channel_name[MAX_CHANNEL_NAME_LEN];
+		Genode::Arg_string::find_arg(args, "channel")
+			.string(channel_name, sizeof(channel_name), "left");
+		return number_from_string(channel_name);
+	}
+
+	void process_session_requests() override
+	{
+		using namespace Genode;
+
+		auto const close_fn = [&] (Parent::Server::Id id) -> bool
+		{
+			Audio_out::Session_id input_id { id.value };
+
+			bool done = false;
+			auto const destroy_input = [&] (Audio_out::Session_component &session)
+			{
+				PDBG("destroy session for ", session.label);
+				env.ep().dissolve(session);
+				destroy(md_alloc, &session);
+				done = true;
+			};
+
+			input_sessions.apply<Audio_out::Session_component&>(input_id, destroy_input);
+			if (!done)
+				mixer.close_output(env, id);
+			return true;
+		};
+
+		auto const create_output_fn = [&]
+			(Parent::Server::Id id, Session_state::Args const &args)
+		{
+			Channel::Number channel = channel_from_args(args.string());
+			if (channel == Channel::Number::INVALID)
+				throw Genode::Service_denied();
+			Session_label label = label_from_args(args.string());
+
+			mixer.deliver_output(env, id, label, channel);
+		};
+
+		auto const create_input_fn = [&]
+			(Parent::Server::Id id, Session_state::Args const &_args)
+		{
+			using namespace Audio_out;
+
+			char const *args = _args.string();
+
+			/*
+			 * We only want to have the last part of the label,
+			 * e.g. 'client -> ' => 'client'.
+			 */
+			Session_label const session_label = label_from_args(args);
+			Session_label const label         = session_label.prefix();
+
+			size_t ram_quota =
+				Arg_string::find_arg(args, "ram_quota").ulong_value(0);
+
+			size_t session_size = align_addr(sizeof(Session_component), 12);
+
+			if ((ram_quota < session_size) ||
+			    (sizeof(Stream) > ram_quota - session_size)) {
+				Genode::error("insufficient 'ram_quota', got ", ram_quota, ", "
+				              "need ", sizeof(Stream) + session_size);
+				throw Insufficient_ram_quota();
+			}
+
+			Channel::Number ch = channel_from_args(args);
+			if (ch == Channel::Number::INVALID)
+				throw Genode::Service_denied();
+
+			Session_component *session = new (md_alloc)
+				Session_component(env, input_sessions, Session_id{id.value},
+				                  label, ch, mixer);
+
+			//if (++input_sessions == 1) mixer.start();
+			PDBG("created session for ", label);
+			env.parent().deliver_session_cap(id, env.ep().manage(*session));
+		};
+
+		Session_requests_handler::apply_close(close_fn);
+		Session_requests_handler::apply_create("Audio_in",  create_output_fn);
+		Session_requests_handler::apply_create("Audio_out", create_input_fn);
+	}
+
+	Main(Genode::Env &env)
+	: Genode::Session_requests_handler(env), env(env)
+	{
+		env.parent().announce("Audio_out");
+
+		process_session_requests();
 	}
 };
 
