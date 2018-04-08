@@ -73,10 +73,12 @@ class Audio_in::Packet
 		 */
 		void content(float *data, Genode::size_t samples)
 		{
-			Genode::memcpy(_data, data, (samples > PERIOD ? PERIOD : samples) * SAMPLE_SIZE);
+			using namespace Genode;
+
+			memcpy(_data, data, (samples > PERIOD ? (size_t)PERIOD : samples) * SAMPLE_SIZE);
 
 			if (samples < PERIOD)
-				Genode::memset(data + samples, 0, (PERIOD - samples) * SAMPLE_SIZE);
+				memset(data + samples, 0, (PERIOD - samples) * SAMPLE_SIZE);
 		}
 
 		/**
@@ -265,7 +267,7 @@ class Audio_in::Session : public Genode::Session
 {
 	protected:
 
-		Stream *_stream;
+		Stream *_stream = nullptr;
 
 	public:
 

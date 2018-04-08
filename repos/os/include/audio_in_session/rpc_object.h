@@ -32,8 +32,8 @@ class Audio_in::Session_rpc_object : public Genode::Rpc_object<Audio_in::Session
 		Genode::Attached_ram_dataspace _ds; /* contains Audio_in stream */
 
 		Genode::Signal_context_capability _data_cap;
-		Genode::Signal_context_capability _progress_cap;
-		Genode::Signal_context_capability _overrun_cap;
+		Genode::Signal_context_capability _progress_cap { };
+		Genode::Signal_context_capability _overrun_cap  { };
 
 		bool _stopped; /* state */
 
