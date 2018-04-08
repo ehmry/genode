@@ -29,8 +29,8 @@ namespace Audio_in {
 
 struct Audio_in::Signal
 {
-	Genode::Signal_receiver           recv;
-	Genode::Signal_context            context;
+	Genode::Signal_receiver           recv    { };
+	Genode::Signal_context            context { };
 	Genode::Signal_context_capability cap;
 
 	Signal() : cap(recv.manage(&context)) { }
@@ -46,7 +46,7 @@ class Audio_in::Session_client : public Genode::Rpc_client<Session>
 
 		Genode::Attached_dataspace _shared_ds;
 
-		Signal _progress;
+		Signal _progress { };
 
 		Genode::Signal_transmitter _data_avail;
 
