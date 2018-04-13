@@ -19,7 +19,10 @@ set -e
 # config
 #
 
-head_size="8MiB"
+GRUB2_DIR=/tmp/tmp.genode_grub2/32_pc.git/binary
+GRUB2_INSTALL=$GRUB2_DIR/sbin/grub-install
+
+head_size_kib=576
  head_img="grub2-head.img"
 
 # generate image file
@@ -27,34 +30,56 @@ if [ -f $head_img ]; then
 	echo "$head_img exists. Exiting..."
 	exit 1
 fi
-fallocate -l $head_size $head_img
+fallocate -l ${head_size_kib}kiB $head_img
 
 # prepare label and partition table
-parted="parted -s $head_img -- unit MiB"
+parted="parted -a none -s $head_img -- "
 
-$parted "mklabel msdos"
-$parted "mkpart primary ext2 1MiB -1s"
+let "bios_boot_fs = 34  *     512 / 512" # fs == firstsector
+let "bios_boot_ls = $bios_boot_fs + 64"  # ls == lastsector
+let "grub2_fs     = $bios_boot_ls + 1"
+let "grub2_ls     = 528 * 1024 / 512 - $bios_boot_fs"
+let "genode_fs    = $grub2_ls + 1"
+let "genode_ls    = $head_size_kib * 1024 / 512 - $bios_boot_fs"
 
-# loop image as disk (loop0) and partition 1 (loop1)
+$parted "mklabel gpt"
+$parted "mkpart BIOSBOOT fat32 ${bios_boot_fs}s ${bios_boot_ls}s  set 1 bios_grub on"
+$parted "mkpart GRUB2    fat32 ${grub2_fs}s     ${grub2_ls}s      set 2 boot on"
+$parted "mkpart GENODE   fat32 ${genode_fs}s    ${genode_ls}s"
+
+#
+# loop image as disk (loop0), partition 2 (loop2) and partition 3 (loop 3)
+#
+let "grub2_offset  = $grub2_fs * 512"
+let "grub2_size    = ($grub2_ls - $grub2_fs) * 512"
+let "genode_offset = $genode_fs * 512"
+let "genode_size   = ($genode_ls - $genode_fs) * 512"
+
 sudo losetup /dev/loop0 $head_img
-sudo losetup /dev/loop1 $head_img -o 1MiB
+sudo losetup /dev/loop2 $head_img -o $grub2_offset  --sizelimit $grub2_size
+sudo losetup /dev/loop3 $head_img -o $genode_offset --sizelimit $genode_size
 
-# initialize ext2 on partition
-sudo mkfs.ext2 /dev/loop1 -L GENODE -q -T default
+# initialize partitions
+sudo mkfs.vfat /dev/loop2 -n GRUB2
+sudo mkfs.vfat /dev/loop3 -n GENODE
 
 # install GRUB2
-mnt=$(mktemp -d)
+mnt_grub2=$(mktemp -d)
+mnt_genode=$(mktemp -d)
 
-sudo mount /dev/loop1 $mnt
+sudo mount /dev/loop2 $mnt_grub2
+sudo mount /dev/loop3 $mnt_genode
 
-sudo grub-install --root-directory=$mnt --no-floppy \
-                  --modules="biosdisk part_msdos ext2" /dev/loop0
+sudo $GRUB2_INSTALL --root-directory=$mnt_grub2 --no-floppy \
+                    --target i386-pc \
+                    --install-modules="configfile multiboot multiboot2 gzio ext2" \
+                    --modules="biosdisk part_gpt" /dev/loop0
 
 # generate GRUB2 configuration
 cfg=$(mktemp)
 
 cat > $cfg <<EOF
-set prefix=(hd0,msdos1)/boot/grub
+set root=(hd0,3)
 
 insmod normal
 
@@ -64,11 +89,28 @@ terminal_output console
 configfile /boot/grub/grub.cfg
 EOF
 
-sudo cp $cfg $mnt/boot/grub/grub.cfg
+sudo cp $cfg $mnt_grub2/boot/grub/grub.cfg
+
+cat > $cfg <<EOF
+insmod normal
+
+terminal_input console
+terminal_output console
+
+menuentry 'Genode on ???' {
+ multiboot2 /boot/bender
+}
+EOF
+
+sudo mkdir -p $mnt_genode/boot/grub
+sudo cp $cfg $mnt_genode/boot/grub/grub.cfg
 
 # cleanup
 rm $cfg
-sudo umount $mnt
-rm -r $mnt
-sudo losetup -d /dev/loop1
+sudo umount $mnt_grub2
+sudo umount $mnt_genode
+rm -r $mnt_grub2
+rm -r $mnt_genode
+sudo losetup -d /dev/loop3
+sudo losetup -d /dev/loop2
 sudo losetup -d /dev/loop0
