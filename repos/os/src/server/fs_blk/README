@@ -1,0 +1,11 @@
+Fs_blk serves an image from a file system server over a Block session.
+Only one session is served at a time. Configuration is straightforward;
+images are not writeable by default.
+
+! <config>
+!   <default-policy file="/image.raw" block_size="512" writeable="yes"/>
+! </config>
+
+! <config>
+!   <default-policy file="/image.iso" block_size="2048"/>
+! </config>

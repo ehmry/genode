@@ -1,0 +1,3 @@
+TARGET = fs_blk
+SRC_CC = main.cc
+LIBS = base

@@ -68,12 +68,15 @@ struct Main
 				throw Read_request_failed(); }
 
 			char const *rom_src = rom.local_addr<char>() + i * blk_sz;
-			if (strcmp(rom_src, src.packet_content(pkt), rom.size())) {
+			if (memcmp(rom_src, src.packet_content(pkt), blk_sz*REQ_PARALLEL)) {
 				throw Files_differ(); }
 
 			src.release_packet(pkt);
 		}
+		block.sync();
+
 		log("--- ROM Block test finished ---");
+		env.parent().exit(0);
 	}
 };
 
