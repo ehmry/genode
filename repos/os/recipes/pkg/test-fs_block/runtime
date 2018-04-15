@@ -1,0 +1,53 @@
+<runtime ram="32M" caps="1000" binary="init">
+
+	<events>
+		<timeout meaning="failed" sec="20" />
+		<log meaning="succeeded">--- ROM Block test finished ---</log>
+		<log meaning="failed">Error: </log>
+	</events>
+
+	<content>
+		<rom label="fs_block"/>
+		<rom label="ld.lib.so"/>
+		<rom label="test-rom_block"/>
+		<rom label="vfs"/>
+		<rom label="vfs.lib.so"/>
+	</content>
+
+	<config>
+		<parent-provides>
+			<service name="ROM"/>
+			<service name="PD"/>
+			<service name="RM"/>
+			<service name="CPU"/>
+			<service name="LOG"/>
+		</parent-provides>
+		<default-route>
+			<any-service>  <any-child/> <parent/></any-service>
+		</default-route>
+		<default caps="100"/>
+		<start name="vfs">
+			<resource name="RAM" quantum="1M"/>
+			<provides> <service name="File_system"/> </provides>
+			<config>
+				<vfs>
+					<dir name="rom">
+						<rom name="init"/>
+					</dir>
+				</vfs>
+				<policy label_prefix="fs_block" root="/"/>
+			</config>
+		</start>
+		<start name="fs_block">
+			<resource name="RAM" quantum="3M"/>
+			<provides><service name="Block"/></provides>
+			<config>
+				<default-policy file="/rom/init" block_size="512"/>
+			</config>
+		</start>
+		<start name="test-rom_block">
+			<resource name="RAM" quantum="3M"/>
+			<config file="init"/>
+		</start>
+	</config>
+</runtime>
