@@ -1,0 +1,54 @@
+#
+# \brief  Test for 'fs_blk' service
+# \author Emery Hemingway
+# \date   2015-09-25
+#
+
+build "core init server/vfs server/fs_blk test/rom_blk"
+
+create_boot_directory
+
+install_config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+	</parent-provides>
+	<default-route>
+		<any-service>  <any-child/> <parent/></any-service>
+	</default-route>
+	<default caps="128"/>
+	<start name="vfs">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="File_system"/> </provides>
+		<config>
+			<vfs>
+				<dir name="rom">
+					<rom name="init"/>
+				</dir>
+			</vfs>
+			<policy label_prefix="fs_blk" root="/"/>
+		</config>
+	</start>
+	<start name="fs_blk">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Block"/></provides>
+		<config>
+			<default-policy file="/rom/init" block_size="512"/>
+		</config>
+	</start>
+	<start name="test-rom_blk">
+		<resource name="RAM" quantum="3M"/>
+		<config file="init"/>
+	</start>
+</config>
+}
+
+build_boot_image "core init ld.lib.so vfs fs_blk test-rom_blk"
+
+append qemu_args "-m 64 -nographic "
+
+run_genode_until "--- ROM Block test finished ---" 10
