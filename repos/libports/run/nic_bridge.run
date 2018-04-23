@@ -100,7 +100,7 @@ append boot_modules {
 	timer } [nic_drv_binary] {
 	nic_bridge
 	ld.lib.so
-	libc.lib.so
+	libc.lib.so vfs.lib.so
 	posix.lib.so
 	libm.lib.so
 	lwip.lib.so
