@@ -274,7 +274,7 @@ bool Noux::Child::syscall(Noux::Session::Syscall sc)
 				Execve_child_env child_env(_sysio.execve_in.filename,
 					                       _sysio.execve_in.args,
 					                       _sysio.execve_in.env,
-					                       _root_dir, _vfs_io_waiter_registry,
+					                       _root_dir, _env.ep(),
 					                       _env.ram(), _env.rm(), _heap);
 
 				_parent_execve.execve_child(*this,

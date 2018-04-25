@@ -89,7 +89,7 @@ class Noux::Child_env
 		void _process_binary_name_and_args(char const *binary_name,
 		                                   char const *args,
 		                                   Vfs::File_system &root_dir,
-		                                   Vfs_io_waiter_registry &vfs_io_waiter_registry,
+		                                   Genode::Entrypoint &ep,
 		                                   Ram_session &ram,
 		                                   Region_map &rm,
 		                                   Allocator &alloc)
@@ -105,8 +105,7 @@ class Noux::Child_env
 			 * exist.
 			 */
 			Reconstructible<Vfs_dataspace> binary_ds {
-				root_dir, vfs_io_waiter_registry,
-				binary_name, ram, rm, alloc
+				root_dir, ep, binary_name, ram, rm, alloc
 			};
 
 			if (!binary_ds->ds.valid())
@@ -190,9 +189,8 @@ class Noux::Child_env
 			if (binary_size == 0)
 				throw Binary_is_not_executable();
 
-			binary_ds.construct(root_dir, vfs_io_waiter_registry,
-			                    _binary_name, ram,
-			                    rm, alloc);
+			binary_ds.construct(
+				root_dir, ep, _binary_name, ram, rm, alloc);
 
 			if (!binary_ds->ds.valid())
 				throw Binary_is_not_executable();
@@ -211,15 +209,14 @@ class Noux::Child_env
 		Child_env(char const *binary_name,
 		          char const *args, Sysio::Env env,
 		          Vfs::File_system &root_dir,
-		          Vfs_io_waiter_registry &vfs_io_waiter_registry,
+		          Entrypoint &ep,
 		          Ram_session &ram,
 		          Region_map &rm,
 		          Allocator &alloc)
 		{
 			_process_env(env);
 			_process_binary_name_and_args(binary_name, args, root_dir,
-			                              vfs_io_waiter_registry,
-			                              ram, rm, alloc);
+			                              ep, ram, rm, alloc);
 		}
 
 		char const *binary_name() const { return _binary_name; }
