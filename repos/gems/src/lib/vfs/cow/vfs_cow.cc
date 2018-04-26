@@ -68,7 +68,7 @@ class Vfs_cow::File_system : public Vfs::File_system
 				_mkdirs(parent);
 				_root_dir.opendir(path.string(), true, &dir_handle, _alloc);
 			}
-			if (dir_handle) dir_handle->ds().close(dir_handle);
+			if (dir_handle) dir_handle->close();
 		}
 
 		bool _copy(Absolute_path const &from, Absolute_path const &to)
@@ -80,19 +80,14 @@ class Vfs_cow::File_system : public Vfs::File_system
 				from.string(), OPEN_MODE_RDONLY, &roh, _alloc);
 			if (!roh)
 				return false;
+			Vfs_handle::Guard rog(roh);
 
 			_root_dir.open(
 				to.string(), OPEN_MODE_WRONLY|OPEN_MODE_CREATE, &rwh, _alloc);
 
-			if (!rwh) {
-				roh->ds().close(roh);
+			if (!rwh)
 				return false;
-			}
-
-			if (!roh || !rwh)
-			{
-				return false;
-			}
+			Vfs_handle::Guard rwg(rwh);
 
 			char buf[1<<14];
 			Stat sb { };
@@ -103,10 +98,8 @@ class Vfs_cow::File_system : public Vfs::File_system
 				file_size rn = 0;
 				file_size wn = 0;
 
-				while (!roh->fs().queue_read(roh, sizeof(buf))) {
-					warning("COW: blocking for replication...");
+				while (!roh->fs().queue_read(roh, sizeof(buf)))
 					_ep.wait_and_dispatch_one_io_signal();
-				}
 
 				Read_result rres  = roh->fs().complete_read(
 					roh, buf, sizeof(buf), rn);
@@ -132,14 +125,17 @@ class Vfs_cow::File_system : public Vfs::File_system
 				remain -= wn;
 			}
 
-			roh->ds().close(roh);
-			rwh->ds().close(rwh);
-			bool res = (remain == 0);
-			if (res)
+			if (remain == 0) {
+				while (!rwh->fs().queue_sync(rwh)
+					_ep.wait_and_dispatch_one_io_signal();
+				while (rwh->fs().complete_sync(rwh) == SYNC_QUEUED)
+					_ep.wait_and_dispatch_one_io_signal();
+
 				log("COW: replicated from ", from, " to ", to);
-			else
-				error("COW: replication from ", from, " to ", to, " failed");
-			return res;
+				return true;
+			}
+			error("COW: replication from ", from, " to ", to, " failed");
+			return false;
 		}
 
 		struct Cow_dir_handle : Vfs::Vfs_handle
@@ -158,8 +154,8 @@ class Vfs_cow::File_system : public Vfs::File_system
 
 			~Cow_dir_handle()
 			{
-				ro.ds().close(&ro);
-				rw.ds().close(&rw);
+				ro.close();
+				rw.close();
 			}
 
 			/**
@@ -254,16 +250,22 @@ class Vfs_cow::File_system : public Vfs::File_system
 				}
 			}
 
-			Open_result rw_res = _root_dir.open(
+			Open_result res = _root_dir.open(
 				rw_path.string(), mode, out, alloc);
 
-			if (rw_res == OPEN_ERR_UNACCESSIBLE) {
-				_copy(ro_path, rw_path);
-				rw_res = _root_dir.open(
-					rw_path.string(), mode, out, alloc);
+			if (res == OPEN_ERR_UNACCESSIBLE) {
+				if (_copy(ro_path, rw_path)) {
+					res = _root_dir.open(
+						rw_path.string(), mode, out, alloc);
+				} else {
+					if (mode & OPEN_MODE_WRONLY)
+						error("opening '", path, "' read-only");
+					res = _root_dir.open(
+						ro_path.string(), mode ^ OPEN_MODE_WRONLY, out, alloc);
+				}
 			}
 
-			return rw_res;
+			return res;
 		}
 
 		Opendir_result opendir(char const *path, bool create,
@@ -301,7 +303,7 @@ class Vfs_cow::File_system : public Vfs::File_system
 					rw_path.string(), false, &rwh, alloc);
 
 				if (res != OPENDIR_OK) {
-					roh->ds().close(roh);
+					roh->close();
 					return res;
 				}
 
