@@ -8,7 +8,6 @@ proc current_pkg { pkg } { return $pkg/[_current_depot_archive_version pkg $pkg]
 import_from_depot genodelabs/src/[base_src] \
                   genodelabs/src/report_rom \
                   genodelabs/src/fs_rom \
-                  genodelabs/src/ram_fs \
                   genodelabs/src/vfs \
                   genodelabs/src/init \
                   genodelabs/src/ipxe_nic_drv \
@@ -75,9 +74,13 @@ append config {
 		<resource name="RAM" quantum="4M"/>
 		<provides> <service name="File_system"/> </provides>
 		<config>
-			<vfs> <tar name="depot.tar"/> </vfs>
-			<policy label="depot_query -> depot" root="/" />
-			<policy label="fs_rom -> "           root="/" />
+			<vfs>
+				<dir name="depot"> <tar name="depot.tar"/> </dir>
+				<dir name="tmp"> <ram/> </dir>
+			</vfs>
+			<policy label="depot_query -> depot" root="/depot" />
+			<policy label="fs_rom -> "           root="/depot" />
+			<default-policy root="/tmp" writeable="yes"/>
 		</config>
 	</start>
 
@@ -101,14 +104,6 @@ append config {
 			<service name="Report"> <child name="report_rom"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
-	</start>
-
-	<start name="ram_fs">
-		<resource name="RAM" quantum="8M"/>
-		<provides> <service name="File_system"/> </provides>
-		<config>
-			<default-policy root="/" writeable="yes"/>
-		</config>
 	</start>
 
 	<start name="depot_deploy">
@@ -145,6 +140,7 @@ append config {
 					<service name="RM"> <parent/> </service>
 					<service name="Rtc"> <parent/> </service>
 					<service name="Nic"> <parent/> </service>
+					<service name="File_system"> <parent/> </service>
 				</route>
 			</start>
 
@@ -167,7 +163,7 @@ append config {
 			<service name="ROM" label="config"> <child name="report_rom"/> </service>
 			<service name="ROM">   <child name="fs_rom"/> </service>
 			<service name="Timer"> <child name="timer"/>  </service>
-			<service name="File_system"> <child name="ram_fs"/> </service>
+			<service name="File_system"> <child name="vfs"/> </service>
 			<service name="Nic"> <child name="nic_drv"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
