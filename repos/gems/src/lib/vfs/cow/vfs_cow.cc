@@ -174,10 +174,10 @@ class Vfs_cow::File_system : public Vfs::File_system
 
 				/* read from RW directory first */
 				if (index < rw_dirents) {
-					rw.seek(index);
+					rw.seek(sizeof(Dirent)*(index));
 					fn(rw);
 				} else {
-					ro.seek(index - rw_dirents);
+					ro.seek(sizeof(Dirent)*(index - rw_dirents));
 					fn(ro);
 				}
 			}
