@@ -18,6 +18,7 @@
 
 int main(int argc, char **argv)
 {
+	int exit_value = 0;
 	struct addrinfo hints;
 	char ipstr[INET6_ADDRSTRLEN];
 
@@ -31,6 +32,7 @@ int main(int argc, char **argv)
 		memset(&hints, 0x00, sizeof(hints));
 		hints.ai_family = AF_UNSPEC;
 
+		++exit_value;
 		res = getaddrinfo(arg, NULL, &hints, &info);
 		if (res != 0) {
 			printf("getaddrinfo error: %d\n", res);
@@ -52,12 +54,12 @@ int main(int argc, char **argv)
 
 			inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
 			printf("%s: %s\n", arg, ipstr);
-
+			--exit_value;
 			break;
 		}
 
 		freeaddrinfo(info);
 	}
 
-	return 0;
+	return exit_value;
 }
