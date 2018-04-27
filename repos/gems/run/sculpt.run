@@ -53,6 +53,7 @@ install_config {
 		<config period_ms="60000"/>
 	</start>
 
+<!--
 	<start name="trace_subject_reporter" >
 		<resource name="RAM" quantum="24M"/>
 		<route>
@@ -62,6 +63,7 @@ install_config {
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 	</start>
+	-->
 
 	<start name="report_rom">
 		<binary name="report_rom"/>
@@ -298,7 +300,7 @@ install_config {
 				<if>
 					<has_value input="leitzentrale_enabled" value="yes" />
 					<then>
-						<attribute name="label" value="leitzentrale -> control_fader -> "/>
+						<attribute name="label" value="leitzentrale -> fader -> "/>
 					</then>
 					<else>
 						<if>
@@ -392,11 +394,11 @@ install_config {
 				<child name="report_rom"/> </service>
 			<service name="Nitpicker"> <child name="nitpicker"/> </service>
 			<service name="Timer"> <child name="timer"/> </service>
-			<service name="File_system" label="control_noux -> config">
+			<service name="File_system" label="config">
 				<child name="config_fs" label="rw"/> </service>
-			<service name="File_system" label="control_noux -> report">
+			<service name="File_system" label="report">
 				<child name="report_fs" label="ro"/> </service>
-			<service name="File_system" label="log_noux -> report">
+			<service name="File_system" label="report">
 				<child name="report_fs" label="ro"/> </service>
 			<any-service> <parent/> </any-service>
 		</route>
