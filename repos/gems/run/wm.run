@@ -148,8 +148,8 @@ set fd [open [run_dir]/genode/focus w]
 puts $fd "<focus label=\"wm -> wm -> \"/>"
 close $fd
 
-build { server/nitpicker server/wm test/nitpicker }
+build { app/decorator app/floating_window_layouter server/nitpicker server/wm test/nitpicker }
 
-build_boot_image { nitpicker wm testnit }
+build_boot_image { decorator floating_window_layouter nitpicker wm testnit }
 
 run_genode_until forever
