@@ -383,7 +383,7 @@ install_config {
 		<binary name="init"/>
 		<resource name="RAM" quantum="128M"/>
 		<route>
-			<service name="LOG"> <child name="log"/> </service>
+			<!-- <service name="LOG"> <child name="log"/> </service> -->
 			<service name="ROM" label="config">
 				<child name="leitzentrale_config"/> </service>
 			<service name="ROM" label_last="vimrc">
@@ -442,7 +442,7 @@ install_config {
 			<service name="Report" label="focus"> <child name="report_rom"/> </service>
 			<service name="Report"> <child name="fs_report"/> </service>
 			<service name="LOG" label="unlogged"> <parent/> </service>
-			<service name="LOG"> <child name="log"/> </service>
+			<!-- <service name="LOG"> <child name="log"/> </service> -->
 			<service name="Rtc"> <child name="rtc_drv"/> </service>
 			<service name="IO_MEM"  label_prefix="acpica"> <parent/> </service>
 			<service name="IO_PORT" label_prefix="acpica"> <parent/> </service>
