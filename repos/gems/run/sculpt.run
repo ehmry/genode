@@ -58,7 +58,7 @@ install_config {
 		<resource name="RAM" quantum="24M"/>
 		<route>
 			<service name="ROM" label="config">
-				<child name="config_rom" label="trace_subject_reporter.config"/> </service>
+				<child name="config_fs_rom" label="trace_subject_reporter.config"/> </service>
 			<service name="Report"> <child name="report_rom"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
@@ -162,17 +162,27 @@ install_config {
 				<inline name="system">} [config_system_content] {
 				</inline>
 			</content>
-			<policy label="config_rom -> " root="/" />
+			<policy label="config_fs_rom -> " root="/" />
 			<policy label="rw" root="/" writeable="yes" />
 		</config>
 	</start>
 
-	<start name="config_rom">
+	<start name="config_fs_rom">
 		<binary name="fs_rom"/>
 		<resource name="RAM" quantum="10M"/>
 		<provides> <service name="ROM"/> </provides>
 		<route>
 			<service name="File_system"> <child name="config_fs"/> </service>
+			<any-service> <parent/> </any-service>
+		</route>
+	</start>
+
+	<start name="report_fs_rom">
+		<binary name="fs_rom"/>
+		<resource name="RAM" quantum="3M"/>
+		<provides> <service name="ROM"/> </provides>
+		<route>
+			<service name="File_system"> <child name="report_fs"/> </service>
 			<any-service> <parent/> </any-service>
 		</route>
 	</start>
@@ -184,10 +194,12 @@ install_config {
 		<config>
 			<content>
 				<inline name="log">### start ###</inline>
+				<dir name="runtime"> <inline name="state"><empty/></inline> </dir>
 			</content>
-			<policy label="fs_report -> "    root="/" writeable="yes" />
-			<policy label="log_terminal -> " root="/" writeable="yes" />
-			<policy label="ro" root="/" />
+			<policy label="fs_report -> "     root="/" writeable="yes"/>
+			<policy label="log_terminal -> "  root="/" writeable="yes"/>
+			<policy label="report_fs_rom -> " root="/"/>
+			<policy label="ro"                root="/"/>
 		</config>
 	</start>
 
@@ -244,15 +256,15 @@ install_config {
 		<route>
 			<service name="LOG"> <child name="log"/> </service>
 			<service name="ROM" label="config">
-				<child name="config_rom" label="drivers/config"/> </service>
-			<service name="ROM" label="input_filter.config">  <child name="config_rom"/> </service>
-			<service name="ROM" label="numlock_remap.config"> <child name="config_rom"/> </service>
-			<service name="ROM" label_suffix=".chargen">      <child name="config_rom"/> </service>
-			<service name="ROM" label_suffix=".remap">        <child name="config_rom"/> </service>
+				<child name="config_fs_rom" label="drivers/config"/> </service>
+			<service name="ROM" label="input_filter.config">  <child name="config_fs_rom"/> </service>
+			<service name="ROM" label="numlock_remap.config"> <child name="config_fs_rom"/> </service>
+			<service name="ROM" label_suffix=".chargen">      <child name="config_fs_rom"/> </service>
+			<service name="ROM" label_suffix=".remap">        <child name="config_fs_rom"/> </service>
 			<service name="ROM" label="capslock"> <child name="report_rom"/> </service>
 			<service name="ROM" label="numlock">  <child name="report_rom"/> </service>
-			<service name="ROM" label="system">   <child name="config_rom"/> </service>
-			<service name="ROM" label_suffix="fb_drv.config"> <child name="config_rom"/> </service>
+			<service name="ROM" label="system">   <child name="config_fs_rom"/> </service>
+			<service name="ROM" label_suffix="fb_drv.config"> <child name="config_fs_rom"/> </service>
 			<service name="Timer"> <child name="timer"/> </service>
 			<service name="Report"> <child name="fs_report"/> </service>
 			<any-service> <parent/> </any-service>
@@ -271,7 +283,7 @@ install_config {
 		<provides><service name="Nitpicker"/></provides>
 		<route>
 			<service name="ROM" label="config">
-				<child name="config_rom" label="nitpicker.config"/> </service>
+				<child name="config_fs_rom" label="nitpicker.config"/> </service>
 			<service name="ROM" label="focus">
 				<child name="nit_focus"/> </service>
 			<service name="Report" label="keystate">
@@ -374,22 +386,24 @@ install_config {
 			<service name="ROM" label="leitzentrale"> <child name="report_rom"/> </service>
 			<service name="ROM" label="reset">        <child name="report_rom"/> </service>
 			<service name="ROM" label="config">
-				<child name="config_rom" label="leitzentrale/config"/> </service>
+				<child name="config_fs_rom" label="leitzentrale/config"/> </service>
 			<any-service> <parent/> </any-service>
 		</route>
 	</start>
 
-	<start name="leitzentrale" caps="2000" priority="-2">
+	<start name="leitzentrale" caps="4000" priority="-2">
 		<binary name="init"/>
 		<resource name="RAM" quantum="128M"/>
 		<route>
 			<!-- <service name="LOG"> <child name="log"/> </service> -->
 			<service name="ROM" label="config">
 				<child name="leitzentrale_config"/> </service>
-			<service name="ROM" label_last="vimrc">
-				<child name="config_rom"/> </service>
-			<service name="ROM" label_last="fonts.config">
-				<child name="config_rom"/> </service>
+			<service name="ROM" label_prefix="report -> ">
+				<child name="report_fs_rom"/> </service>
+			<service name="ROM" label_prefix="manager -> report -> ">
+				<child name="report_fs_rom"/> </service>
+			<service name="ROM" label_prefix="config -> ">
+				<child name="config_fs_rom"/> </service>
 			<service name="ROM" label="trace_subjects">
 				<child name="report_rom"/> </service>
 			<service name="Nitpicker"> <child name="nitpicker"/> </service>
@@ -414,13 +428,13 @@ install_config {
 		<resource name="RAM" quantum="12G"/>
 		<route>
 			<service name="ROM" label="config">
-				<child name="config_rom" label="runtime/config"/> </service>
+				<child name="config_fs_rom" label="runtime/config"/> </service>
 			<service name="ROM" label_prefix="config -> ">
-				<child name="config_rom"/> </service>
+				<child name="config_fs_rom"/> </service>
 			<service name="ROM" label_suffix="-> vimrc">
-				<child name="config_rom" label="vimrc"/> </service>
+				<child name="config_fs_rom" label="vimrc"/> </service>
 			<service name="ROM" label="system">
-				<child name="config_rom"/> </service>
+				<child name="config_fs_rom"/> </service>
 			<service name="ROM" label="capslock">
 				<child name="report_rom"/> </service>
 			<service name="ROM" label="clicked">
@@ -703,6 +717,8 @@ close $fd
 # Create boot image
 #
 
-append boot_modules { }
+build { app/sculpt_manager }
+
+append boot_modules { sculpt_manager }
 
 build_boot_image $boot_modules
