@@ -195,7 +195,16 @@ class Vfs_cow::File_system : public Vfs::File_system
 			_ep(vfs_env.env().ep()),
 			_ro_root_path(_config_path(config, "ro")),
 			_rw_root_path(_config_path(config, "rw"))
-		{ }
+		{
+			if (!_root_dir.directory(_ro_root_path.string())
+			 || !_root_dir.directory(_rw_root_path.string())) {
+				if (!_root_dir.directory(_ro_root_path.string()))
+					error("missing COW read-only root '", _ro_root_path, "'");
+				if (!_root_dir.directory(_rw_root_path.string()))
+					error("missing COW read-write root '", _rw_root_path, "'");
+				throw Exception();
+			}
+		}
 
 		const char* type() override { return "cow"; }
 
