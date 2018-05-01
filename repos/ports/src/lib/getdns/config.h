@@ -1,5 +1,5 @@
-//#define ANCHOR_DEBUG 1
-//#define DAEMON_DEBUG 1
+#define ANCHOR_DEBUG 1
+#define DAEMON_DEBUG 1
 #define DNSSEC_ROADBLOCK_AVOIDANCE 1
 #define DRAFT_RRTYPES 1
 #define EDNS_COOKIES 1
@@ -26,15 +26,17 @@
 #define HAVE_DLFCN_H 1
 #define HAVE_ENDIAN_H 1
 #define HAVE_ENGINE_LOAD_CRYPTODEV 1
-#define HAVE_EVP_DSS1 1
-#define HAVE_EVP_MD5 1
-#define HAVE_EVP_PKEY_BASE_ID 1
-#define HAVE_EVP_PKEY_KEYGEN 1
-#define HAVE_EVP_SHA1 1
-#define HAVE_EVP_SHA224 1
-#define HAVE_EVP_SHA256 1
-#define HAVE_EVP_SHA384 1
-#define HAVE_EVP_SHA512 1
+#define HAVE_EVP_DIGESTVERIFY
+#define HAVE_EVP_DSS1
+#define HAVE_EVP_MD5
+#define HAVE_EVP_MD_CTX_NEW
+#define HAVE_EVP_PKEY_BASE_ID
+#define HAVE_EVP_PKEY_KEYGEN
+#define HAVE_EVP_SHA1
+#define HAVE_EVP_SHA224
+#define HAVE_EVP_SHA256
+#define HAVE_EVP_SHA384
+#define HAVE_EVP_SHA512
 #define HAVE_FCNTL 1
 #define HAVE_FIPS_MODE 1
 #define HAVE_GETADDRINFO 1
@@ -97,16 +99,16 @@
 #define PACKAGE_TARNAME "getdns"
 #define PACKAGE_URL "https://getdnsapi.net"
 #define PACKAGE_VERSION "1.4.0"
-//#define REQ_DEBUG 1
+#define REQ_DEBUG 1
 #define RETSIGTYPE void
 //#define SCHED_DEBUG 1
-//#define SEC_DEBUG 1
-//#define SERVER_DEBUG 1
+#define SEC_DEBUG 1
+#define SERVER_DEBUG 1
 #define STDC_HEADERS 1
 #define STRPTIME_WORKS 1
 #define STUBBY_PACKAGE "stubby"
 #define STUBBY_PACKAGE_STRING ""
-//#define STUB_DEBUG 1
+#define STUB_DEBUG 1
 #define STUB_NATIVE_DNSSEC 1
 #define SYSCONFDIR sysconfdir
 #define TRUST_ANCHOR_FILE "/getdns-root.key"

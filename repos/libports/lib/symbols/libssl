@@ -5,7 +5,7 @@ BIO_new_ssl_connect T
 BIO_ssl_copy_session_id T
 BIO_ssl_shutdown T
 DTLSv1_client_method T
-DTLSv1_enc_data D 112
+DTLSv1_enc_data D 136
 DTLSv1_method T
 DTLSv1_server_method T
 ERR_load_SSL_strings T
@@ -267,7 +267,7 @@ SSLv2_client_method T
 SSLv2_method T
 SSLv2_server_method T
 SSLv3_client_method T
-SSLv3_enc_data D 112
+SSLv3_enc_data D 136
 SSLv3_method T
 SSLv3_server_method T
 TLSv1_1_client_method T
@@ -277,7 +277,7 @@ TLSv1_2_client_method T
 TLSv1_2_method T
 TLSv1_2_server_method T
 TLSv1_client_method T
-TLSv1_enc_data D 112
+TLSv1_enc_data D 136
 TLSv1_method T
 TLSv1_server_method T
 d2i_SSL_SESSION T
@@ -332,7 +332,7 @@ dtls1_set_message_header T
 dtls1_shutdown T
 dtls1_start_timer T
 dtls1_stop_timer T
-dtls1_version_str R 41
+dtls1_version_str R 43
 dtls1_write_app_data_bytes T
 dtls1_write_bytes T
 i2d_SSL_SESSION T
@@ -468,8 +468,8 @@ ssl3_setup_key_block T
 ssl3_setup_read_buffer T
 ssl3_setup_write_buffer T
 ssl3_shutdown T
-ssl3_undef_enc_method D 112
-ssl3_version_str R 40
+ssl3_undef_enc_method D 136
+ssl3_version_str R 42
 ssl3_write T
 ssl3_write_bytes T
 ssl3_write_pending T
@@ -555,4 +555,4 @@ tls1_process_heartbeat T
 tls1_process_sigalgs T
 tls1_process_ticket T
 tls1_setup_key_block T
-tls1_version_str R 40
+tls1_version_str R 42

@@ -91,7 +91,7 @@ SRC_C_engine   = eng_err.c eng_lib.c eng_list.c eng_init.c \
                  eng_all.c tb_rsa.c tb_dsa.c tb_ecdsa.c tb_dh.c \
                  tb_ecdh.c tb_rand.c tb_store.c tb_cipher.c \
                  tb_digest.c tb_pkmeth.c tb_asnmth.c eng_openssl.c \
-                 eng_cnf.c eng_dyn.c eng_cryptodev.c eng_rsax.c \
+                 eng_cnf.c eng_dyn.c eng_cryptodev.c \
                  eng_rdrand.c
 SRC_C_err      = err.c err_all.c err_prn.c
 
@@ -108,8 +108,8 @@ SRC_C_evp      = encode.c digest.c evp_cnf.c evp_enc.c evp_key.c evp_acnf.c \
                  evp_err.c e_null.c c_all.c c_allc.c c_alld.c \
                  evp_lib.c bio_ok.c evp_pkey.c evp_pbe.c p5_crpt.c \
                  p5_crpt2.c e_old.c pmeth_lib.c pmeth_fn.c pmeth_gn.c \
-                 m_sigver.c evp_fips.c e_aes_cbc_hmac_sha1.c \
-                 e_rc4_hmac_md5.c
+                 m_sigver.c e_aes_cbc_hmac_sha1.c \
+                 e_rc4_hmac_md5.c e_aes_cbc_hmac_sha256.c
 
 SRC_C_hmac     = hmac.c hm_ameth.c hm_pmeth.c
 SRC_C_idea     = i_cbc.c i_cfb64.c i_ecb.c i_ofb64.c i_skey.c
@@ -171,7 +171,7 @@ SRC_C_x509v3   = v3_bcons.c v3_bitst.c v3_conf.c v3_extku.c \
                  v3_pmaps.c v3_pcons.c v3_ncons.c v3_pcia.c \
                  v3_pci.c pcy_cache.c pcy_node.c pcy_data.c \
                  pcy_map.c pcy_tree.c pcy_lib.c v3_asid.c \
-                 v3_addr.c
+                 v3_addr.c v3_scts.c
 
 SRC_DIR = aes asn1 bf bio bn buffer camellia cast cmac cms comp conf des dh \
           dsa dso ec ecdh ecdsa engine err evp hmac idea krb5 lhash md2 md4 md5 \
@@ -180,8 +180,10 @@ SRC_DIR = aes asn1 bf bio bn buffer camellia cast cmac cms comp conf des dh \
 
 SRC_C += $(foreach dir,$(SRC_DIR),$(addprefix $(dir)/,$(SRC_C_$(dir))))
 
+INC_DIR += $(LIBCRYPTO_DIR)/include
 INC_DIR += $(LIBCRYPTO_DIR)/asn1
 INC_DIR += $(LIBCRYPTO_DIR)/evp
+INC_DIR += $(LIBCRYPTO_DIR)/aes
 INC_DIR += $(LIBCRYPTO_DIR)/modes
 INC_DIR += $(LIBCRYPTO_DIR)
 INC_DIR += $(LIBCRYPTO_DIR)/../

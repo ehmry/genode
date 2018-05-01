@@ -107,6 +107,8 @@ append config {
 					<lxip ip_addr="10.0.53.2" netmask="255.255.255.0" gateway="10.0.53.1"/>
 				</dir>
 <inline name="stubby.yaml">
+dns_transport_list:
+  - GETDNS_TRANSPORT_TLS
 listen_addresses:
   - 10.0.53.2
 </inline>
