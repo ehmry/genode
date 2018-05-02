@@ -167,7 +167,9 @@ lappend_if [have_spec gpio] boot_modules [gpio_drv]
 
 build_boot_image $boot_modules
 
-append qemu_args " -smp 4,cores=4 "
+append qemu_args " -nographic "
+
+if {[have_spec x86]} { append qemu_args " -smp 4,cores=4 " }
 
 set done_string ""
 for {set i 50} {$i <= 100} {incr i 1} {
