@@ -38,9 +38,11 @@ append config {
 		<config>
 			<content>
 				<dir name="test-fs_report">
-					<inline name="devices">
-						<devices version="initial"/>
-					</inline>
+					<dir name="subdir">
+						<inline name="devices">
+							<devices version="initial"/>
+						</inline>
+					</dir>
 				</dir>
 			</content>
 			<policy label_prefix="fs_report -> " root="/" writeable="yes"/>
@@ -65,9 +67,9 @@ append config {
 		<resource name="RAM" quantum="4M"/>
 		<config/>
 		<route>
-			<service name="ROM"    label="devices"> <child name="fs_rom"/> </service>
+			<service name="ROM"    label="subdir/devices"> <child name="fs_rom"/> </service>
 			<service name="ROM"    label="focus">   <child name="fs_rom"/> </service>
-			<service name="Report" label="devices"> <child name="fs_report"/> </service>
+			<service name="Report" label="subdir -> devices"> <child name="fs_report"/> </service>
 			<service name="Report" label="focus">   <child name="fs_report"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>

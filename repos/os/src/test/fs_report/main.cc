@@ -55,14 +55,14 @@ struct Test::Main
 	void _handle_init()
 	{
 		log("(1) check initial content of \"devices\" ROM");
-		_devices_rom.construct(_env, "devices");
+		_devices_rom.construct(_env, "subdir/devices");
 		if (_devices_rom->xml().attribute_value("version", Version()) != "initial") {
 			error("ROM does not contain expected initial conent");
 			throw Exception();
 		}
 
 		log("(2) issue new \"devices\" report before installing a ROM signal handler");
-		_devices_reporter.construct(_env, "devices");
+		_devices_reporter.construct(_env, "subdir -> devices");
 		_devices_reporter->enabled(true);
 		_report(*_devices_reporter, "version 2");
 
