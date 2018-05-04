@@ -62,7 +62,7 @@ struct Test::Main
 		}
 
 		log("(2) issue new \"devices\" report before installing a ROM signal handler");
-		_devices_reporter.construct(_env, "subdir -> devices");
+		_devices_reporter.construct(_env, "devices", "subdir -> devices");
 		_devices_reporter->enabled(true);
 		_report(*_devices_reporter, "version 2");
 
