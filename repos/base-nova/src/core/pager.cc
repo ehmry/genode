@@ -156,6 +156,7 @@ void Pager_object::_page_fault_handler(addr_t pager_obj)
 	obj->_state.thread.trapno = PT_SEL_PAGE_FAULT;
 
 	obj->_state.block();
+	obj->_state.block_pause_sm();
 
 	obj->_state_lock.unlock();
 
