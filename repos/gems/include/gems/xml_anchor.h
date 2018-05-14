@@ -66,6 +66,13 @@ class Anchor
 
 			Genode::warning("unsupported anchor attribute value");
 		}
+
+		Anchor& operator=(Anchor const &other)
+		{
+			horizontal = other.horizontal;
+			vertical = other.vertical;
+			return *this;
+		}
 };
 
 #endif /* _INCLUDE__GEMS__XML_ANCHOR_H_ */
