@@ -82,7 +82,7 @@ install_config {
 		<binary name="report_rom"/>
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Report"/> <service name="ROM"/> </provides>
-		<config verbose="yes">
+		<config verbose="no">
 			<policy label="depot_deploy -> blueprint" report="depot_query -> blueprint"/>
 			<policy label="depot_query -> query"      report="depot_deploy -> query"/>
 			<policy label="dynamic -> config"         report="depot_deploy -> init.config"/>
@@ -100,6 +100,7 @@ install_config {
 	</start>
 
 	<start name="fs_rom">
+		<binary name="static_fs_rom"/>
 		<resource name="RAM" quantum="50M"/>
 		<provides> <service name="ROM"/> </provides>
 		<route>
@@ -223,7 +224,7 @@ install_config {
 
 </config>}
 
-build { app/depot_query app/depot_deploy }
+build { app/depot_query app/depot_deploy server/static_fs_rom }
 
 file copy -force [genode_dir]/repos/gems/run/sculpt/fonts.config [run_dir]/genode/
 
@@ -234,7 +235,7 @@ set fd [open [run_dir]/genode/focus w]
 puts $fd "<focus label=\"dynamic -> wm -> wm -> \"/>"
 close $fd
 
-build_boot_image { depot_query depot_deploy }
+build_boot_image { depot_query depot_deploy static_fs_rom }
 
 run_genode_until forever
 
