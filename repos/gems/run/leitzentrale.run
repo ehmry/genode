@@ -205,10 +205,10 @@ install_config {
 	</start>
 
 	<start name="ahci-1">
-		<binary name="ram_blk"/>
-		<resource name="RAM" quantum="10M"/>
-		<config file="ahci-1.img" size="8M" block_size="512"/>
+		<binary name="lx_block"/>
+		<resource name="RAM" quantum="2M"/>
 		<provides> <service name="Block"/> </provides>
+		<config file="ahci-1.img" block_size="512" writeable="yes"/>
 	</start>
 
 	<start name="ahci-2">
@@ -292,9 +292,9 @@ proc install_rom_module { name content } {
 }
 
 # generate disk image with GPT partition table
-proc ahci_1_img { } { return "[run_dir]/genode/ahci-1.img" }
+proc ahci_1_img { } { return "bin/ahci-1.img" }
 
-catch { exec dd if=/dev/zero of=[ahci_1_img] bs=1M count=2 }
+catch { exec dd if=/dev/zero of=[ahci_1_img] bs=1M count=10 }
 exec parted -a none -s [ahci_1_img] -- mklabel gpt \
                                        mkpart BOOT   fat32  256s 1023s \
                                        mkpart GRUB   fat32 1024s 1279s \
@@ -317,9 +317,9 @@ install_rom_module usb_active_config {
 	<raw> <policy label_suffix="usb-1-2" class="storage"/> </raw>
 </config>}
 
-build { app/menu_view app/sculpt_manager }
+build { server/lx_block app/menu_view app/sculpt_manager }
 
-build_boot_image { menu_view sculpt_manager }
+build_boot_image { lx_block menu_view sculpt_manager ahci-1.img }
 
 if {[have_spec linux]} {
 	set max_fds [exec bash -c "ulimit -n"]
