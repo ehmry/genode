@@ -27,6 +27,7 @@ void Sculpt_manager::gen_wifi_drv_start_content(Xml_generator &xml)
 
 	xml.node("config", [&] () {
 		xml.attribute("connected_scan_interval", "0");
+		xml.attribute("use_11n", "no");
 
 		xml.node("vfs", [&] () {
 			gen_named_node(xml, "dir", "dev", [&] () {
