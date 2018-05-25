@@ -255,19 +255,22 @@ struct Linker::Elf_file : File
 	 */
 	void load_segment_rw(Elf::Phdr const &p, int nr)
 	{
-		void  *src = env.rm().attach(rom_cap, 0, p.p_offset);
+		enum { PAGE_SIZE = 4 << 10 };
+
+		Attached_dataspace rom(env.rm(), rom_cap);
+
+		char const *src = rom.local_addr<char const>()+p.p_offset;
 		addr_t dst = p.p_vaddr + reloc_base;
+		size_t dst_realign = dst % PAGE_SIZE;
 
-		ram_cap[nr] = env.ram().alloc(p.p_memsz);
-		Region_map::r()->attach_at(ram_cap[nr], dst);
+		ram_cap[nr] = env.ram().alloc(p.p_memsz + dst_realign);
+		Region_map::r()->attach_at(ram_cap[nr], dst - dst_realign);
 
-		memcpy((void*)dst, src, p.p_filesz);
+		memcpy((char *)dst, src, p.p_filesz);
 
 		/* clear if file size < memory size */
 		if (p.p_filesz < p.p_memsz)
 			memset((void *)(dst + p.p_filesz), 0, p.p_memsz - p.p_filesz);
-
-		env.rm().detach(src);
 	}
 
 	/**
