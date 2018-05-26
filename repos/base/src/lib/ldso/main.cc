@@ -503,18 +503,30 @@ bool Linker::Object::needs_static_construction()
 Object &Linker::load(Env &env, Allocator &md_alloc, char const *path,
                      Dependency &dep, Keep keep)
 {
+	typedef String<64> Name;
+	Name name(path);
+
+	try {
+		Attached_rom_dataspace config(env, "config");
+		config.xml().for_each_sub_node("ld_map", [&] (Xml_node node) {
+			auto from = node.attribute_value("from", Name());
+			if (from == name) {
+				auto to = node.attribute_value("to", Name());
+				if (to != "")
+					name = to;
+			}
+		});
+
+	} catch (Rom_connection::Rom_connection_failed) { }
+
+
 	for (Object *e = Elf_object::obj_list()->head(); e; e = e->next_obj()) {
-
-		if (verbose_loading)
-			log("LOAD: ", Linker::file(path), " == ", e->name());
-
-		if (!strcmp(Linker::file(path), e->name())) {
+		if (!strcmp(Linker::file(name.string()), e->name())) {
 			e->load();
 			return *e;
 		}
 	}
-
-	return *new (md_alloc) Elf_object(env, md_alloc, path, dep, keep);
+	return *new (md_alloc) Elf_object(env, md_alloc, name.string(), dep, keep);
 }
 
 
