@@ -98,6 +98,11 @@ void Sculpt::Gui::_generate_config(Xml_generator &xml) const
 		gen_parent_service<::File_system::Session>(xml);
 	});
 
+	xml.node("resource", [&] () {
+		xml.attribute("name", "RAM");
+		xml.attribute("preserve", "1M");
+	 });
+
 	xml.node("start", [&] () {
 		_gen_menu_view_start_content(xml, "menu_view", Point(0, 0)); });
 }
