@@ -27,7 +27,6 @@
 #include <base/debug.h>
 
 /* Genode includes */
-#include <os/session_requests.h>
 #include <mixer/channel.h>
 #include <os/reporter.h>
 #include <root/component.h>
@@ -43,6 +42,9 @@
 #include <base/component.h>
 #include <base/log.h>
 
+/* local includes */
+#include "session_requests.h"
+
 typedef Mixer::Channel Channel;
 
 
@@ -55,6 +57,7 @@ enum {
 	INVALID_ID           = ~0UL,
 };
 
+using namespace Genode;
 
 static struct Names {
 	char const      *name;
@@ -595,8 +598,10 @@ class Audio_out::Mixer
 		{
 			/* assert the channel is valid and not acquired */
 			if ((Channel::Number)MAX_CHANNELS < channel
-			 || _out[channel]->id.value != INVALID_ID)
+			 || _out[channel]->id.value != INVALID_ID) {
+				error("failed to assert  assert the channel is valid and not acquired");
 				throw Genode::Service_denied();
+			}
 
 			Audio_in::Session_component &session = *_out[channel];
 
@@ -775,9 +780,12 @@ class Audio_out::Root : public Audio_out::Root_component
  ** Component **
  ***************/
 
-namespace Mixer { struct Main; }
+namespace Mixer {
+	using namespace Genode;
+	struct Main;
+}
 
-struct Mixer::Main : Genode::Session_requests_handler
+struct Mixer::Main : Genode::Session_request_handler
 {
 	Genode::Env &env;
 
@@ -787,64 +795,51 @@ struct Mixer::Main : Genode::Session_requests_handler
 
 	Audio_out::Session_space input_sessions { };
 
-	static Channel::Number channel_from_args(char const *args)
+	Genode::Session_requests_rom session_requests { env, *this };
+
+	static Channel::Number channel_from_args(Session_state::Args const &args)
 	{
 		char channel_name[MAX_CHANNEL_NAME_LEN];
-		Genode::Arg_string::find_arg(args, "channel")
+		Genode::Arg_string::find_arg(args.string(), "channel")
 			.string(channel_name, sizeof(channel_name), "left");
+		PDBG((char const*)channel_name);
 		return number_from_string(channel_name);
 	}
 
-	void process_session_requests() override
+	/**
+	 * Create new sessions
+	 */
+	void handle_session_create(Session_state::Name const &name,
+	                           Parent::Server::Id id,
+	                           Session_state::Args const &args) override
 	{
-		using namespace Genode;
+		PDBG(name, " ", args);
 
-		auto const close_fn = [&] (Parent::Server::Id id) -> bool
-		{
-			Audio_out::Session_id input_id { id.value };
-
-			bool done = false;
-			auto const destroy_input = [&] (Audio_out::Session_component &session)
-			{
-				PDBG("destroy session for ", session.label);
-				env.ep().dissolve(session);
-				destroy(md_alloc, &session);
-				done = true;
-			};
-
-			input_sessions.apply<Audio_out::Session_component&>(input_id, destroy_input);
-			if (!done)
-				mixer.close_output(env, id);
-			return true;
-		};
-
-		auto const create_output_fn = [&]
-			(Parent::Server::Id id, Session_state::Args const &args)
-		{
-			Channel::Number channel = channel_from_args(args.string());
-			if (channel == Channel::Number::INVALID)
+		if (name == "Audio_out") {
+			Channel::Number channel = channel_from_args(args);
+			if (channel == Channel::Number::INVALID) {
+				error("invalid channel from ", args);
 				throw Genode::Service_denied();
+			}
 			Session_label label = label_from_args(args.string());
 
 			mixer.deliver_output(env, id, label, channel);
-		};
+		}
 
-		auto const create_input_fn = [&]
-			(Parent::Server::Id id, Session_state::Args const &_args)
-		{
+		else
+
+		if (name == "Audio_in") {
 			using namespace Audio_out;
-
-			char const *args = _args.string();
 
 			/*
 			 * We only want to have the last part of the label,
 			 * e.g. 'client -> ' => 'client'.
 			 */
-			Session_label const session_label = label_from_args(args);
+			Session_label const session_label = label_from_args(args.string());
 			Session_label const label         = session_label.prefix();
 
 			size_t ram_quota =
-				Arg_string::find_arg(args, "ram_quota").ulong_value(0);
+				Arg_string::find_arg(args.string(), "ram_quota").ulong_value(0);
 
 			size_t session_size = align_addr(sizeof(Session_component), 12);
 
@@ -856,29 +851,47 @@ struct Mixer::Main : Genode::Session_requests_handler
 			}
 
 			Channel::Number ch = channel_from_args(args);
-			if (ch == Channel::Number::INVALID)
+			if (ch == Channel::Number::INVALID) {
+				PDBG("invalid Audio_in channel from ", args);
 				throw Genode::Service_denied();
+			}
 
 			Session_component *session = new (md_alloc)
 				Session_component(env, input_sessions, Session_id{id.value},
 				                  label, ch, mixer);
 
 			//if (++input_sessions == 1) mixer.start();
-			PDBG("created session for ", label);
 			env.parent().deliver_session_cap(id, env.ep().manage(*session));
 		};
-
-		Session_requests_handler::apply_close(close_fn);
-		Session_requests_handler::apply_create("Audio_in",  create_output_fn);
-		Session_requests_handler::apply_create("Audio_out", create_input_fn);
 	}
 
+	void handle_session_close(Parent::Server::Id id) override
+	{
+		Audio_out::Session_id input_id { id.value };
+
+		bool done = false;
+		auto const destroy_input = [&] (Audio_out::Session_component &session)
+		{
+			PDBG("destroy session for ", session.label);
+			env.ep().dissolve(session);
+			destroy(md_alloc, &session);
+			done = true;
+		};
+
+		input_sessions.apply<Audio_out::Session_component&>(input_id, destroy_input);
+		if (!done)
+			mixer.close_output(env, id);
+	}
+
+
 	Main(Genode::Env &env)
-	: Genode::Session_requests_handler(env), env(env)
+	: env(env)
 	{
 		env.parent().announce("Audio_out");
+		env.parent().announce("Audio_in");
 
-		process_session_requests();
+		/* process any requests that have already queued */
+		session_requests.process();
 	}
 };
 
