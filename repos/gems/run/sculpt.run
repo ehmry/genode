@@ -622,8 +622,8 @@ close $fd
 # Create boot image
 #
 
-build { app/sculpt_manager }
+build { server/fs_report server/fs_rom app/sculpt_manager }
 
-append boot_modules { sculpt_manager }
+append boot_modules { fs_report fs_rom sculpt_manager }
 
 build_boot_image $boot_modules
