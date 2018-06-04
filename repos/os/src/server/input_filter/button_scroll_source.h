@@ -92,7 +92,7 @@ class Input_filter::Button_scroll_source : public Source, Source::Sink
 			bool handle_deactivation(Input::Event const &event)
 			{
 				if (event.key_release(_button)) {
-					bool const emit_press_release = (_state == BUTTON_PRESSED);
+					bool const emit_press_release = (_state != IDLE);
 					_state = IDLE;
 					_accumulated_motion = 0;
 					return emit_press_release;
