@@ -6,7 +6,7 @@ proc kernel_files { } { return hypervisor }
 proc kernel_output { } { return "novga serial" }
 
 proc run_boot_string { } {
-	return "Bender: Hello World."
+	return "Hypervisor reports "
 }
 
 
