@@ -23,7 +23,7 @@
 
 namespace Audio_in {
 	struct Signal;
-	struct Session_client;
+	class Session_client;
 }
 
 
@@ -46,6 +46,8 @@ class Audio_in::Session_client : public Genode::Rpc_client<Session>
 
 		Genode::Attached_dataspace _shared_ds;
 
+		Stream_source &_stream = *_shared_ds.local_addr<Stream_source>();
+
 		Signal _progress { };
 
 		Genode::Signal_transmitter _data_avail;
@@ -66,11 +68,11 @@ class Audio_in::Session_client : public Genode::Rpc_client<Session>
 		  _shared_ds(rm, call<Rpc_dataspace>()),
 		  _data_avail(call<Rpc_data_avail_sigh>())
 		{
-			_stream = _shared_ds.local_addr<Stream>();
-
 			if (progress_signal)
 				progress_sigh(_progress.cap);
 		}
+
+		Stream_source &stream() const { return _stream; }
 
 
 		/*************
@@ -96,7 +98,7 @@ class Audio_in::Session_client : public Genode::Rpc_client<Session>
 			call<Rpc_start>();
 
 			/* reset tail pointer */
-			stream()->reset();
+			stream().reset();
 		}
 
 		void stop() { call<Rpc_stop>();  }

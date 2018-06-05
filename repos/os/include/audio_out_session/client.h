@@ -44,6 +44,8 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 
 		Genode::Attached_dataspace _shared_ds;
 
+		Stream_sink &_stream = *_shared_ds.local_addr<Stream_sink>();
+
 		Signal _progress { };
 		Signal _alloc    { };
 
@@ -67,8 +69,6 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 		  _shared_ds(rm, call<Rpc_dataspace>()),
 		  _data_avail(call<Rpc_data_avail_sigh>())
 		{
-			_stream = _shared_ds.local_addr<Stream>();
-
 			if (progress_signal)
 				progress_sigh(_progress.cap);
 
@@ -76,6 +76,7 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 				alloc_sigh(_alloc.cap);
 		}
 
+		Stream_sink &stream() { return _stream; }
 
 		/*************
 		 ** Signals **
@@ -100,7 +101,7 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 			call<Rpc_start>();
 
 			/* reset tail pointer */
-			stream()->reset();
+			_stream.reset();
 		}
 
 		void stop() { call<Rpc_stop>();  }
@@ -146,9 +147,9 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 		 */
 		void submit(Packet *packet)
 		{
-			bool empty = stream()->empty();
+			bool empty = _stream.empty();
 
-			packet->_submit();
+			_stream.submit(packet);
 			if (empty)
 				_data_avail.submit();
 		}

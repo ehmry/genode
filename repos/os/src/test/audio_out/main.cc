@@ -97,16 +97,16 @@ class Track : public Thread
 					Packet *p[CHN_CNT];
 					while (1)
 						try {
-							p[0] = _audio_out[0]->stream()->alloc();
+							p[0] = _audio_out[0]->stream().next();
 							break;
-						} catch (Audio_out::Stream::Alloc_failed) {
+						} catch (Audio::Stream::Alloc_failed) {
 							_audio_out[0]->wait_for_alloc();
 						}
 
-					unsigned pos = _audio_out[0]->stream()->packet_position(p[0]);
+					unsigned pos = _audio_out[0]->stream().packet_position(p[0]);
 					/* sync other channels with first one */
 					for (int chn = 1; chn < CHN_CNT; ++chn)
-						p[chn] = _audio_out[chn]->stream()->get(pos);
+						p[chn] = _audio_out[chn]->stream().get(pos);
 
 					/* copy channel contents into sessions */
 					float *content = (float *)(_base + offset);
@@ -123,7 +123,7 @@ class Track : public Thread
 
 					if (verbose)
 						log(_name, " submit packet ",
-						    _audio_out[0]->stream()->packet_position((p[0])));
+						    _audio_out[0]->stream().packet_position((p[0])));
 
 					for (int i = 0; i < CHN_CNT; i++)
 						_audio_out[i]->submit(p[i]);

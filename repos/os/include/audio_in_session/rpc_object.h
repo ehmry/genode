@@ -1,11 +1,12 @@
 /*
  * \brief  Server-side Audio_in session interface
  * \author Josef Soentgen
+ * \author Emery Hemingway
  * \date   2015-05-08
  */
 
 /*
- * Copyright (C) 2015-2017 Genode Labs GmbH
+ * Copyright (C) 2015-2018 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -17,7 +18,7 @@
 /* Genode includes */
 #include <base/env.h>
 #include <base/rpc_server.h>
-#include <base/attached_ram_dataspace.h>
+#include <audio/buffer.h>
 #include <audio_in_session/audio_in_session.h>
 
 
@@ -29,7 +30,7 @@ class Audio_in::Session_rpc_object : public Genode::Rpc_object<Audio_in::Session
 {
 	protected:
 
-		Genode::Attached_ram_dataspace _ds; /* contains Audio_in stream */
+		Audio::Stream_buffer &_buffer;
 
 		Genode::Signal_context_capability _data_cap;
 		Genode::Signal_context_capability _progress_cap { };
@@ -39,13 +40,13 @@ class Audio_in::Session_rpc_object : public Genode::Rpc_object<Audio_in::Session
 
 	public:
 
-		Session_rpc_object(Genode::Env &env, Genode::Signal_context_capability data_cap)
+		Session_rpc_object(Audio::Stream_buffer &buffer,
+		                   Genode::Signal_context_capability data_cap)
 		:
-			_ds(env.ram(), env.rm(), sizeof(Stream)),
-			_data_cap(data_cap), _stopped(true)
-		{
-			_stream = _ds.local_addr<Stream>();
-		}
+			_buffer(buffer), _data_cap(data_cap), _stopped(true)
+		{ }
+
+		Stream_sink &stream() { return _buffer.stream_sink(); }
 
 
 		/**************
@@ -69,7 +70,8 @@ class Audio_in::Session_rpc_object : public Genode::Rpc_object<Audio_in::Session
 		void start() { _stopped = false; }
 		void stop()  { _stopped = true; }
 
-		Genode::Dataspace_capability dataspace() { return _ds.cap(); }
+		Genode::Dataspace_capability dataspace() {
+			return _buffer.cap(); }
 
 
 		/**********************************
