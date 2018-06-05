@@ -189,7 +189,8 @@ class Init::State_reporter : public Report_update_trigger
 
 		void trigger_immediate_report_update() override
 		{
-			Signal_transmitter(_immediate_handler).submit();
+			if (_report_delay_ms)
+				Signal_transmitter(_immediate_handler).submit();
 		}
 };
 
