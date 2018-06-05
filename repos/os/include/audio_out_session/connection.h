@@ -28,16 +28,16 @@ struct Audio_out::Connection : Genode::Connection<Session>, Audio_out::Session_c
 	 *
 	 * \noapi
 	 */
-	Genode::Capability<Audio_out::Session> _session(Genode::Parent &parent, char const *channel)
+	Genode::Capability<Audio_out::Session> _session(Genode::Parent &parent, char const *label)
 	{
-		return session(parent, "ram_quota=%ld, cap_quota=%ld, channel=\"%s\"",
-		               2*4096 + 2048 + sizeof(Stream), CAP_QUOTA, channel);
+		return session(parent, "ram_quota=%ld, cap_quota=%ld, label=\"%s\"",
+		               2*4096 + 2048 + sizeof(Stream), CAP_QUOTA, label);
 	}
 
 	/**
 	 * Constructor
 	 *
-	 * \param channel          channel identifier (e.g., "front left")
+	 * \param label          channel identifier (e.g., "front left")
 	 * \param alloc_signal     install 'alloc_signal', the client may then use
 	 *                         'wait_for_alloc' when the stream is full
 	 * \param progress_signal  install progress signal, the client may then
@@ -45,27 +45,12 @@ struct Audio_out::Connection : Genode::Connection<Session>, Audio_out::Session_c
 	 *                         server processed one or more packets
 	 */
 	Connection(Genode::Env &env,
-	           char const  *channel,
+	           char const  *label,
 	           bool         alloc_signal = true,
 	           bool         progress_signal = false)
 	:
-		Genode::Connection<Session>(env, _session(env.parent(), channel)),
+		Genode::Connection<Session>(env, _session(env.parent(), label)),
 		Session_client(env.rm(), cap(), alloc_signal, progress_signal)
-	{ }
-
-	/**
-	 * Constructor
-	 *
-	 * \noapi
-	 * \deprecated  Use the constructor with 'Env &' as first
-	 *              argument instead
-	 */
-	Connection(const char *channel,
-	           bool        alloc_signal = true,
-	           bool        progress_signal = false) __attribute__((deprecated))
-	:
-		Genode::Connection<Session>(_session(*Genode::env_deprecated()->parent(), channel)),
-		Session_client(*Genode::env_deprecated()->rm_session(), cap(), alloc_signal, progress_signal)
 	{ }
 };
 

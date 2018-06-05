@@ -52,13 +52,13 @@ class Audio_in::Session_rpc_object : public Genode::Rpc_object<Audio_in::Session
 		 ** Signals  **
 		 **************/
 
-		void progress_sigh(Genode::Signal_context_capability sigh) {
+		void progress_sigh(Genode::Signal_context_capability sigh) override {
 			_progress_cap = sigh; }
 
-		void overrun_sigh(Genode::Signal_context_capability sigh) {
+		void overrun_sigh(Genode::Signal_context_capability sigh) override {
 			_overrun_cap = sigh; }
 
-		Genode::Signal_context_capability data_avail_sigh() {
+		Genode::Signal_context_capability data_avail_sigh() override {
 			return _data_cap; }
 
 

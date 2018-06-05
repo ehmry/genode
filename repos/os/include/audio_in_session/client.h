@@ -77,14 +77,14 @@ class Audio_in::Session_client : public Genode::Rpc_client<Session>
 		 ** Signals **
 		 *************/
 
-		void progress_sigh(Genode::Signal_context_capability sigh) {
+		 void progress_sigh(Genode::Signal_context_capability sigh) override {
 			call<Rpc_progress_sigh>(sigh); }
 
-		void overrun_sigh(Genode::Signal_context_capability sigh) {
+		void overrun_sigh(Genode::Signal_context_capability sigh) override {
 			call<Rpc_overrun_sigh>(sigh); }
 
-		Genode::Signal_context_capability data_avail_sigh() {
-			return Genode::Signal_context_capability(); }
+		Genode::Signal_context_capability data_avail_sigh() override {
+			return call<Rpc_data_avail_sigh>(); }
 
 
 		/***********************
