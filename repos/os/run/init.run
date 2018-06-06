@@ -1478,5 +1478,5 @@ build_boot_image $boot_modules
 
 append qemu_args " -nographic "
 
-run_genode_until {.*child "test-init" exited with exit value 0.*} 180
+run_genode_until {.*child "test-init" exited with exit value 0.*} 200
 
