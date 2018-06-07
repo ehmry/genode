@@ -49,7 +49,7 @@ class Playback::Out
 
 		void _play_silence()
 		{
-			static short silence[Audio_in::PERIOD * Playback::MAX_CHANNELS] = { 0 };
+			static short silence[Audio::PERIOD * Playback::MAX_CHANNELS] = { 0 };
 
 			int err = Audio::play(silence, sizeof(silence));
 			if (err && err != 35) {
@@ -62,19 +62,19 @@ class Playback::Out
 		 */
 		void _play_packet()
 		{
-			Stream *left  =  _left.stream();
-			Stream *right = _right.stream();
+			auto &left  =  _left.stream();
+			auto &right = _right.stream();
 
-			auto const pos = left->pos();
+			auto const pos = left.play_pos();
 
-			Packet *p_left  =  left->get(pos);
-			Packet *p_right = right->get(pos);
+			Packet *p_left  =  left.get(pos);
+			Packet *p_right = right.get(pos);
 
 			if (p_left->valid() && p_right->valid()) {
 				/* convert float to S16LE */
-				static short data[Audio_in::PERIOD * Playback::MAX_CHANNELS];
+				static short data[Audio::PERIOD * Playback::MAX_CHANNELS];
 
-				for (int i = 0; i < Audio_in::PERIOD * Playback::MAX_CHANNELS; i += 2) {
+				for (unsigned i = 0; i < Audio::PERIOD * Playback::MAX_CHANNELS; i += 2) {
 					data[i] = p_left->content()[i / 2] * 32767;
 					data[i + 1] = p_right->content()[i / 2] * 32767;
 				}
@@ -88,8 +88,8 @@ class Playback::Out
 				_play_silence();
 			}
 
-			 left->increment_position();
-			right->increment_position();
+			 left.increment_position();
+			right.increment_position();
 		}
 
 	public:
@@ -136,10 +136,10 @@ class Recording::In
 					return;
 			}
 
-			Stream *stream = _audio_out.stream();
+			auto &stream = _audio_out.stream();
 
 			// XXX: next or alloc?
-			Packet *p = stream->next();
+			Packet *p = stream.next();
 
 			float const scale = 32768.0f * 2;
 
