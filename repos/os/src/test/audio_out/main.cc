@@ -27,7 +27,7 @@ using Filename = Genode::String<64>;
 using namespace Genode;
 using namespace Audio_out;
 
-static constexpr bool const verbose = true;
+static constexpr bool const verbose = false;
 static constexpr char const * channel_names[2] = { "front left", "front right" };
 
 
@@ -74,6 +74,48 @@ class Track : public Thread
 			start();
 		}
 
+		void playback()
+		{
+			size_t offset = 0;
+			while (offset < _size) {
+				bool block_for_underrun = true;
+
+				/*
+				 * The current chunk (in number of frames of one channel)
+				 * is the size of the period except at the end of the
+				 * file.
+				 */
+				size_t chunk = (offset + PERIOD_FSIZE > _size)
+				               ? (_size - offset) / CHN_CNT / FRAME_SIZE
+				               : PERIOD;
+				int pos = _audio_out[0]->stream().record_pos();
+				for (int i = 0; i < CHN_CNT; ++i) {
+					_audio_out[i]->stream().record(pos, [&] (Audio::Packet &pkt) {
+						/* copy channel contents into sessions */
+						float *content = (float *)(_base + offset);
+						for (unsigned c = 0; c < CHN_CNT * chunk; c += CHN_CNT)
+							for (int i = 0; i < CHN_CNT; ++i)
+									pkt.content()[c / 2] = content[c + i];
+
+						/* handle last packet gracefully */
+						if (chunk < PERIOD) {
+							for (int i = 0; i < CHN_CNT; ++i)
+								memset(pkt.content() + chunk,
+							 	      0, PERIOD_CSIZE - FRAME_SIZE * chunk);
+						}
+
+						block_for_underrun = false;
+					});
+				}
+
+				if (block_for_underrun) {
+					_underrun_receiver.wait_for_signal();
+				} else {
+					offset += PERIOD_FSIZE;
+				}
+			}
+		}
+
 		void entry()
 		{
 			if (verbose)
@@ -85,54 +127,7 @@ class Track : public Thread
 
 			unsigned cnt = 0;
 			while (1) {
-					PDBG("block for underrun");
-					_underrun_receiver.block_for_signal();
-
-				for (size_t offset = 0, cnt = 1;
-				     offset < _size;
-				     offset += PERIOD_FSIZE, ++cnt) {
-
-					/*
-					 * The current chunk (in number of frames of one channel)
-					 * is the size of the period except at the end of the
-					 * file.
-					 */
-					size_t chunk = (offset + PERIOD_FSIZE > _size)
-					               ? (_size - offset) / CHN_CNT / FRAME_SIZE
-					               : PERIOD;
-
-					Packet *p[CHN_CNT];
-
-					p[0] = _audio_out[0]->stream().next();
-
-					unsigned pos = _audio_out[0]->stream().packet_position(p[0]);
-					/* sync other channels with first one */
-					for (int chn = 1; chn < CHN_CNT; ++chn)
-						p[chn] = _audio_out[chn]->stream().get(pos);
-
-					/* copy channel contents into sessions */
-					float *content = (float *)(_base + offset);
-					for (unsigned c = 0; c < CHN_CNT * chunk; c += CHN_CNT)
-						for (int i = 0; i < CHN_CNT; ++i)
-							p[i]->content()[c / 2] = content[c + i];
-
-					/* handle last packet gracefully */
-					if (chunk < PERIOD) {
-						for (int i = 0; i < CHN_CNT; ++i)
-							memset(p[i]->content() + chunk,
-							       0, PERIOD_CSIZE - FRAME_SIZE * chunk);
-					}
-
-					if (verbose)
-						log(_name, " submit packet ",
-						    _audio_out[0]->stream().packet_position((p[0])));
-
-					for (int i = 0; i < CHN_CNT; i++) {
-						p[i]->recorded();
-						_audio_out[i]->stream().increment_position();
-					}
-				}
-
+				playback();
 				log("played '", _name, "' ", ++cnt, " time(s)");
 			}
 		}

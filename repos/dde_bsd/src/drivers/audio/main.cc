@@ -45,6 +45,15 @@ class Playback::Out
 		Audio_in::Connection _left;
 		Audio_in::Connection _right;
 
+		Genode::Signal_handler<Playback::Out> _reset_handler;
+
+		Signal_context_capability _underrun_cap { };
+
+		void _reset()
+		{
+			_underrun_cap = _left.underrun_sigh();
+		}
+
 		Genode::Signal_handler<Playback::Out> _notify_handler;
 
 		void _play_silence()
@@ -62,44 +71,49 @@ class Playback::Out
 		 */
 		void _play_packet()
 		{
-			auto &left  =  _left.stream();
-			auto &right = _right.stream();
+			auto const pos = _left.stream().play_pos();
+			int played = 0;
 
-			auto const pos = left.play_pos();
+			/* convert float to S16LE */
+			static short data[Audio::PERIOD * Playback::MAX_CHANNELS];
 
-			Packet *p_left  =  left.get(pos);
-			Packet *p_right = right.get(pos);
-
-			if (p_left->valid() && p_right->valid()) {
-				/* convert float to S16LE */
-				static short data[Audio::PERIOD * Playback::MAX_CHANNELS];
-
-				for (unsigned i = 0; i < Audio::PERIOD * Playback::MAX_CHANNELS; i += 2) {
-					data[i] = p_left->content()[i / 2] * 32767;
-					data[i + 1] = p_right->content()[i / 2] * 32767;
+			_left.stream().play(pos, [&] (Audio::Packet &p_left) {
+				for (unsigned i = 0; i < Audio::PERIOD * Playback::MAX_CHANNELS; i += Playback::MAX_CHANNELS) {
+					data[i] = p_left.content()[i / 2] * 32767;
 				}
+				++played;
+			});
 
-				/* send to driver */
+			_right.stream().play(pos, [&] (Audio::Packet &p_right) {
+				for (unsigned i = 0; i < Audio::PERIOD * Playback::MAX_CHANNELS; i += Playback::MAX_CHANNELS) {
+					data[i+1] = p_right.content()[i / 2] * 32767;
+				}
+				++played;
+			});
+
+			if (_left.stream().queued() < Audio::UNDERRUN_THRESHOLD)
+				Genode::Signal_transmitter(_underrun_cap).submit();
+
+			/* send to driver */
+			if (played == Playback::MAX_CHANNELS) {
 				if (int err = Audio::play(data, sizeof(data))) {
 					Genode::warning("Error ", err, " during playback");
 				}
-
 			} else {
 				_play_silence();
 			}
-
-			 left.increment_position();
-			right.increment_position();
 		}
 
 	public:
 
 		Out(Genode::Env &env)
 		:
-			_left(env, "left",   false),
-			_right(env, "right", false),
+			_left(env, "left"),
+			_right(env, "right"),
+			_reset_handler(env.ep(), *this, &Playback::Out::_reset),
 			_notify_handler(env.ep(), *this, &Playback::Out::_play_packet)
 		{
+			_reset();
 			_left.start();
 			_right.start();
 			/* play a silence packet to get the driver running */
@@ -130,33 +144,29 @@ class Recording::In
 		{
 			static short data[2 * Audio_out::PERIOD];
 			if (int err = Audio::record(data, sizeof(data))) {
-					if (err && err != 35) {
-						Genode::warning("Error ", err, " during recording");
-					}
-					return;
+				if (err && err != 35) {
+					Genode::warning("Error ", err, " during recording");
+				}
+				return;
 			}
 
-			auto &stream = _audio_out.stream();
+			unsigned pos = _audio_out.stream().record_pos();
+			_audio_out.stream().record(pos, [&] (Audio::Packet &pkt) {
+				float const scale = 32768.0f * 2;
 
-			// XXX: next or alloc?
-			Packet *p = stream.next();
-
-			float const scale = 32768.0f * 2;
-
-			float * const content = p->content();
-			for (int i = 0; i < 2*(int)Audio_out::PERIOD; i += 2) {
-				float sample = data[i] + data[i+1];
-				content[i/2] = sample / scale;
-			}
-
-			_audio_out.submit(p);
+				float * const content = pkt.content();
+				for (int i = 0; i < 2*(int)Audio_out::PERIOD; i += 2) {
+					float sample = data[i] + data[i+1];
+					content[i/2] = sample / scale;
+				}
+			});
 		}
 
 	public:
 
 		In(Genode::Env &env)
 		:
-			_audio_out(env, "center", false, false),
+			_audio_out(env, "center"),
 			_notify_handler(env.ep(), *this, &Recording::In::_record_packet)
 		{
 			_audio_out.start();

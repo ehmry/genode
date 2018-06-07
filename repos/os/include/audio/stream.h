@@ -175,16 +175,12 @@ class Audio::Stream
 			return !valid;
 		}
 
-		bool underrun() const
+		int queued() const
 		{
 			int gap = _record_pos < _play_pos
-				? _record_pos-_play_pos+QUEUE_SIZE
+				? _record_pos+QUEUE_SIZE-_play_pos
 				: _record_pos-_play_pos;
-			PDBG("P:", _play_pos, " R:", _record_pos, " gap ", gap);
-
-			if (gap < UNDERRUN_THRESHOLD)
-				Genode::error("UNDERRUN");
-			return gap < UNDERRUN_THRESHOLD;
+			return gap;
 		}
 };
 
@@ -194,19 +190,15 @@ class Audio::Stream
  */
 struct Audio::Stream_source : Stream
 {
-	/**
-	 * Retrieve next packet for given packet
-	 *
-	 * \param packet  preceding packet
-	 *
-	 * \return  Successor of packet or successor of current
-	 *          plackbackposition if 'packet' is zero
-	 */
-	Packet *next(Packet *packet = nullptr)
+	template <typename PROC>
+	void play(int pos, PROC const &proc)
 	{
-		Packet *p = get(
-			(packet ? packet_position(packet) : play_pos()) + 1);
-		return p->_active ? p : nullptr;
+		Packet &p = *get(pos);
+		if (p._active) {
+			proc(p);
+			p._active = false;
+			_play_pos = (pos+1) % QUEUE_SIZE;
+		}
 	}
 
 	/**
@@ -231,19 +223,15 @@ struct Audio::Stream_sink : Stream
 {
 	friend class Stream;
 
-	/**
-	 * Retrieve next packet for given packet
-	 *
-	 * \param packet  preceding packet
-	 *
-	 * \return  Successor of packet or successor of current
-	 *           position if 'packet' is zero
-	 */
-	Packet *next(Packet *packet = nullptr)
+	template <typename PROC>
+	void record(int pos, PROC const &proc)
 	{
-		Packet *p = get(
-			(packet ? packet_position(packet) : record_pos()) + 1);
-		return p->_active ? nullptr : p;
+		Packet &p = *get(pos);
+		if (!p._active) {
+			proc(p);
+			p._active = true;
+			_record_pos = (pos+1) % QUEUE_SIZE;
+		}
 	}
 
 	/**
