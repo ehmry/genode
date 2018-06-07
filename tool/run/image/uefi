@@ -39,7 +39,7 @@ proc run_image { {unused ""} } {
 
 	exec cat [run_dir].header [run_dir].partition > [run_dir].img
 
-	exec parted -a none -s [run_dir].img -- mklabel gpt mkpart ESP fat32 34s [expr $disk_size * 1024 * 1024 / 512]s set 1 boot on
+	exec -ignorestderr parted -a none -s [run_dir].img -- mklabel gpt mkpart ESP fat32 34s [expr $disk_size * 1024 * 1024 / 512]s set 1 boot on
 
 	exec rm -f [run_dir].header [run_dir].partition
 }
