@@ -16,16 +16,19 @@
 
 /* Genode includes */
 #include <os/static_root.h>
-#include <audio_in_session/rpc_object.h>
-#include <audio_out_session/rpc_object.h>
+#include <audio_in_session/audio_in_session.h>
+#include <audio_out_session/audio_out_session.h>
 #include <audio/buffer.h>
 #include <timer_session/connection.h>
 #include <base/attached_ram_dataspace.h>
+#include <base/rpc_server.h>
 #include <base/component.h>
 
+using namespace Genode;
+
 namespace Patch {
-	using namespace Genode;
 	using namespace Audio;
+	struct State;
 	struct Main;
 }
 
@@ -33,25 +36,98 @@ namespace Audio_in  { class Session_component; }
 namespace Audio_out { class Session_component; }
 
 
-class Audio_in::Session_component : public Audio_in::Session_rpc_object
+struct Patch::State
 {
-	public:
+	Audio::Stream_buffer buffer;
 
-		Session_component(Audio::Stream_buffer &buffer,
-		                  Genode::Signal_context_capability data_cap)
-		: Session_rpc_object(buffer, data_cap)
-		{ }
+	Genode::Signal_context_capability      overrun_cap { };
+	Genode::Signal_context_capability     underrun_cap { };
+	Genode::Signal_context_capability source_reset_cap { };
+	Genode::Signal_context_capability   sink_reset_cap { };
+
+	State(Genode::Env &env) : buffer(env.pd(), env.rm()) { }
 };
 
 
-class Audio_out::Session_component : public Audio_out::Session_rpc_object
+class Audio_in::Session_component :
+	public Genode::Rpc_object<Audio_in::Session, Session_component>
 {
+	private:
+
+		Patch::State &_common_state;
+
+		bool _stopped = true; /* state */
+
 	public:
 
-		Session_component(Audio::Stream_buffer &buffer,
-		                  Genode::Signal_context_capability data_cap)
-		: Session_rpc_object(buffer, data_cap)
+		Session_component(Patch::State &state)
+		:
+			_common_state(state)
 		{ }
+
+
+		/**************
+		 ** Signals  **
+		 **************/
+
+		Genode::Signal_context_capability underrun_sigh() override { PDBG();
+			return _common_state.underrun_cap; }
+
+		void reset_sigh(Genode::Signal_context_capability sigh) override { PDBG();
+			_common_state.sink_reset_cap = sigh; }
+
+		/***********************
+		 ** Session interface **
+		 ***********************/
+
+		void start() override { PDBG(); _stopped = false; }
+		void stop()  override { PDBG(); _stopped = true; }
+
+		Genode::Dataspace_capability dataspace() { PDBG();
+			return _common_state.buffer.cap(); }
+};
+
+
+class Audio_out::Session_component :
+	public Genode::Rpc_object<Audio_out::Session, Session_component>
+{
+	private:
+
+		Patch::State &_common_state;
+
+		bool _stopped = true; /* state */
+
+	public:
+
+		Session_component(Patch::State &state)
+		:
+			_common_state(state)
+		{ }
+
+
+		/**************
+		 ** Signals  **
+		 **************/
+
+		void underrun_sigh(Signal_context_capability sigh) override
+		{ PDBG();
+			_common_state.underrun_cap = sigh;
+			if (_common_state.sink_reset_cap.valid())
+				Signal_transmitter(_common_state.sink_reset_cap).submit();
+		}
+
+		void reset_sigh(Signal_context_capability sigh) override { PDBG();
+			_common_state.source_reset_cap = sigh; }
+
+		/***********************
+		 ** Session interface **
+		 ***********************/
+
+		void start() override { PDBG(); _stopped = false; }
+		void stop()  override { PDBG(); _stopped = true; }
+
+		Genode::Dataspace_capability dataspace() { PDBG();
+			return _common_state.buffer.cap(); }
 };
 
 
@@ -59,13 +135,11 @@ struct Patch::Main
 {
 	Genode::Env &env;
 
-	Audio::Stream_buffer buffer { env.pd(), env.rm() };
+	Patch::State state { env };
 
-	Audio_in::Session_component audio_in_component
-		{ buffer, Genode::Signal_context_capability() };
+	Audio_in::Session_component audio_in_component { state };
 
-	Audio_out::Session_component audio_out_component
-		{ buffer, Genode::Signal_context_capability() };
+	Audio_out::Session_component audio_out_component { state };
 
 	Static_root<Audio_in::Session> audio_in_root
 		{ env.ep().manage(audio_in_component) };
