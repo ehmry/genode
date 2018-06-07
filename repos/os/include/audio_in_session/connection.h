@@ -41,10 +41,10 @@ struct Audio_in::Connection : Genode::Connection<Session>, Audio_in::Session_cli
 	 *                         call 'wait_for_progress', which is sent when the
 	 *                         server processed one or more packets
 	 */
-	Connection(Genode::Env &env, char const *label, bool progress_signal = false)
+	Connection(Genode::Env &env, char const *label)
 	:
 		Genode::Connection<Session>(env, _session(env.parent(), label)),
-		Session_client(env.rm(), cap(), progress_signal)
+		Session_client(env.rm(), cap())
 	{ }
 };
 

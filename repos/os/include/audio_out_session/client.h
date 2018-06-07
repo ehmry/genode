@@ -25,19 +25,6 @@ namespace Audio_out {
 }
 
 
-struct Audio_out::Signal
-{
-	Genode::Signal_receiver           recv    { };
-	Genode::Signal_context            context { };
-	Genode::Signal_context_capability cap;
-
-	Signal() : cap(recv.manage(&context)) { }
-	~Signal() { recv.dissolve(&context); }
-
-	void wait() { recv.wait_for_signal(); }
-};
-
-
 class Audio_out::Session_client : public Genode::Rpc_client<Session>
 {
 	private:
@@ -45,11 +32,6 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 		Genode::Attached_dataspace _shared_ds;
 
 		Stream_sink &_stream = *_shared_ds.local_addr<Stream_sink>();
-
-		Signal _progress { };
-		Signal _alloc    { };
-
-		Genode::Signal_transmitter _data_avail;
 
 	public:
 
@@ -62,19 +44,11 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 		 * \param progress_signal  true, install 'progress_signal' receiver
 		 */
 		Session_client(Genode::Region_map &rm,
-		               Genode::Capability<Session> session,
-		               bool alloc_signal, bool progress_signal)
+		               Genode::Capability<Session> session)
 		:
 		  Genode::Rpc_client<Session>(session),
-		  _shared_ds(rm, call<Rpc_dataspace>()),
-		  _data_avail(call<Rpc_data_avail_sigh>())
-		{
-			if (progress_signal)
-				progress_sigh(_progress.cap);
-
-			if (alloc_signal)
-				alloc_sigh(_alloc.cap);
-		}
+		  _shared_ds(rm, call<Rpc_dataspace>())
+		{ }
 
 		Stream_sink &stream() { return _stream; }
 
@@ -82,15 +56,11 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 		 ** Signals **
 		 *************/
 
-		void progress_sigh(Genode::Signal_context_capability sigh) {
-			call<Rpc_progress_sigh>(sigh); }
+		void underrun_sigh(Genode::Signal_context_capability sigh) override {
+			call<Rpc_underrun_sigh>(sigh); }
 
-		void alloc_sigh(Genode::Signal_context_capability sigh) {
-			call<Rpc_alloc_sigh>(sigh); }
-
-		Genode::Signal_context_capability data_avail_sigh() {
-			return Genode::Signal_context_capability(); }
-
+		void reset_sigh(Genode::Signal_context_capability sigh) override {
+			call<Rpc_reset_sigh>(sigh); }
 
 		/***********************
 		 ** Session interface **
@@ -105,54 +75,6 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 		}
 
 		void stop() { call<Rpc_stop>();  }
-
-
-		/**********************************
-		 ** Session interface extensions **
-		 **********************************/
-
-		/**
-		 * Wait for progress signal
-		 */
-		void wait_for_progress()
-		{
-			if (!_progress.cap.valid()) {
-				Genode::warning("Progress signal is not installed, will not block "
-				                "(enable in 'Audio_out::Connection')");
-				return;
-			}
-
-			_progress.wait();
-		}
-
-		/**
-		 * Wait for allocation signal
-		 *
-		 * This can be used when the 'Stream' is full and the application wants
-		 * to block until the stream has free elements again.
-		 */
-		void wait_for_alloc()
-		{ 
-			if (!_alloc.cap.valid()) {
-				Genode::warning("Alloc signal is not installed, will not block "
-				                "(enable in 'Audio_out::Connection')");
-				return;
-			}
-
-			_alloc.wait();
-		}
-
-		/**
-		 * Submit a packet
-		 */
-		void submit(Packet *packet)
-		{
-			bool empty = _stream.empty();
-
-			_stream.submit(packet);
-			if (empty)
-				_data_avail.submit();
-		}
 };
 
 #endif /* _INCLUDE__AUDIO_OUT_SESSION__CLIENT_H_ */

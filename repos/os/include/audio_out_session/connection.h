@@ -45,12 +45,10 @@ struct Audio_out::Connection : Genode::Connection<Session>, Audio_out::Session_c
 	 *                         server processed one or more packets
 	 */
 	Connection(Genode::Env &env,
-	           char const  *label,
-	           bool         alloc_signal = true,
-	           bool         progress_signal = false)
+	           char const  *label)
 	:
 		Genode::Connection<Session>(env, _session(env.parent(), label)),
-		Session_client(env.rm(), cap(), alloc_signal, progress_signal)
+		Session_client(env.rm(), cap())
 	{ }
 };
 

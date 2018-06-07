@@ -78,36 +78,31 @@ struct Audio_out::Session : Genode::Session
 		 *************/
 
 		/**
-		 * The 'progress' signal is sent from the server to the client if a
-		 * packet has been played.
+		 * The 'underrun' signal is sent from the server to the client if the
+		 * number of packets in a queue falls below a threshold. The
+		 * recommended threshold is Audio::UNDERRUN_THRESHOLD.
 		 *
 		 * See: client.h, connection.h
 		 */
-		virtual void progress_sigh(Genode::Signal_context_capability sigh) = 0;
+		virtual void underrun_sigh(Genode::Signal_context_capability sigh) = 0;
 
 		/**
-		 * The 'alloc' signal is sent from the server to the client when the
-		 * stream queue leaves the 'full' state.
-		 *
-		 * See: client.h, connection.h
+		 * The 'reset' signal is sent from the server to the client if
+		 * the sesion must undergo a reset due to a logical or
+		 * physical reconfiguration. To handle this signal a
+		 * client must reinstall its signal handlers and
+		 * call 'start' to continue.
 		 */
-		virtual void alloc_sigh(Genode::Signal_context_capability sigh)    = 0;
-		
-		/**
-		 * The 'data_avail' signal is sent from the client to the server if the
-		 * stream queue leaves the 'empty' state.
-		 */
-		virtual Genode::Signal_context_capability data_avail_sigh()        = 0;
+		virtual void reset_sigh(Genode::Signal_context_capability sigh) = 0;
 
 		GENODE_RPC(Rpc_start, void, start);
 		GENODE_RPC(Rpc_stop, void, stop);
 		GENODE_RPC(Rpc_dataspace, Genode::Dataspace_capability, dataspace);
-		GENODE_RPC(Rpc_progress_sigh, void, progress_sigh, Genode::Signal_context_capability);
-		GENODE_RPC(Rpc_alloc_sigh, void, alloc_sigh, Genode::Signal_context_capability);
-		GENODE_RPC(Rpc_data_avail_sigh, Genode::Signal_context_capability, data_avail_sigh);
+		GENODE_RPC(Rpc_underrun_sigh, void, underrun_sigh, Genode::Signal_context_capability);
+		GENODE_RPC(Rpc_reset_sigh, void, underrun_sigh, Genode::Signal_context_capability);
 
-		GENODE_RPC_INTERFACE(Rpc_start, Rpc_stop, Rpc_dataspace, Rpc_progress_sigh,
-		                     Rpc_alloc_sigh, Rpc_data_avail_sigh);
+		GENODE_RPC_INTERFACE(Rpc_start, Rpc_stop, Rpc_dataspace,
+		                     Rpc_underrun_sigh, Rpc_reset_sigh);
 };
 
 #endif /* _INCLUDE__AUDIO_OUT_SESSION__AUDIO_OUT_SESSION_H_ */

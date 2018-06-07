@@ -35,6 +35,7 @@ class Audio_in::Session_rpc_object : public Genode::Rpc_object<Audio_in::Session
 		Genode::Signal_context_capability _data_cap;
 		Genode::Signal_context_capability _progress_cap { };
 		Genode::Signal_context_capability _overrun_cap  { };
+		Genode::Signal_context_capability _reset_cap  { };
 
 		bool _stopped; /* state */
 
@@ -58,6 +59,9 @@ class Audio_in::Session_rpc_object : public Genode::Rpc_object<Audio_in::Session
 
 		void overrun_sigh(Genode::Signal_context_capability sigh) override {
 			_overrun_cap = sigh; }
+
+		void reset_sigh(Genode::Signal_context_capability sigh) override {
+			_reset_cap = sigh; }
 
 		Genode::Signal_context_capability data_avail_sigh() override {
 			return _data_cap; }
@@ -94,6 +98,15 @@ class Audio_in::Session_rpc_object : public Genode::Rpc_object<Audio_in::Session
 		{
 			if (_overrun_cap.valid())
 				Genode::Signal_transmitter(_overrun_cap).submit();
+		}
+
+		/**
+		 * Send 'reset' signal
+		 */
+		void send_reset()
+		{
+			if (_reset_cap.valid())
+				Genode::Signal_transmitter(_reset_cap).submit();
 		}
 
 		/**

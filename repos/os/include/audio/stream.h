@@ -25,6 +25,8 @@
 #ifndef _INCLUDE__AUDIO__STREAM_H_
 #define _INCLUDE__AUDIO__STREAM_H_
 
+#include <base/debug.h>
+
 namespace Audio {
 	class Packet;
 	class Stream;
@@ -35,7 +37,8 @@ namespace Audio {
 		QUEUE_SIZE  = 431,            /* buffer queue size (~5s) */
 		SAMPLE_RATE = 48000,
 		SAMPLE_SIZE = sizeof(float),
-		OVERRUN_THRESHOLD = QUEUE_SIZE >> 3
+		UNDERRUN_THRESHOLD = QUEUE_SIZE >> 3,
+		OVERRUN_THRESHOLD = QUEUE_SIZE - UNDERRUN_THRESHOLD
 			/* standard threshold for sending overrun signals */
 	};
 
@@ -48,20 +51,21 @@ namespace Audio {
  */
 class Audio::Packet
 {
-	private:
+	friend class Stream;
+	friend class Stream_sink;
+	friend class Stream_source;
 
-		friend class Stream_sink;
+	protected:
 
-		bool  _valid;
-		bool  _wait_for_record;
 		float _data[PERIOD];
-
-		void _submit() { _valid = true; _wait_for_record = true; }
-		void _alloc() { _wait_for_record = false; _valid = false; }
+		bool  _active = false;
 
 	public:
 
-		Packet() : _valid(false), _wait_for_record(false) { }
+		Packet() { }
+
+		void recorded() { _active = true; }
+		void played() { _active = false; }
 
 		/**
 		 * Copy data into packet, if there are less frames given than 'PERIOD',
@@ -87,41 +91,7 @@ class Audio::Packet
 		 */
 		float *content() { return _data; }
 
-		/**
-		 * Record state
-		 *
-		 * \return  true if the packet has been recorded; false otherwise
-		 */
-		bool recorded() const { return !_wait_for_record; }
-
-		/**
-		 * Valid state
-		 *
-		 * The valid state of a packet describes that the packet has been
-		 * processed by the server even though it may not have been played back
-		 * if the packet is invalid. For example, if a server is a filter, the
-		 * audio may not have been processed by the output driver.
-		 *
-		 * \return  true if packet has *not* been processed yet; false otherwise
-		 */
-		bool valid() const { return _valid; }
-
 		Genode::size_t size() const { return sizeof(_data); }
-
-
-		/**********************************************
-		 ** Intended to be called by the server side **
-		 **********************************************/
-
-		/**
-		 * Invalidate packet, thus marking it as processed
-		 */
-		void invalidate() { _valid = false; }
-
-		/**
-		 * Mark a packet as recorded
-		 */
-		void mark_as_recorded() { _wait_for_record = false; }
 };
 
 
@@ -142,10 +112,10 @@ class Audio::Stream
 
 	private:
 
+		Packet    _buf[QUEUE_SIZE]; /* packet queue */
+
 		Genode::uint32_t  _record_pos { 0 }; /* current record (server) position */
 		Genode::uint32_t  _play_pos   { 0 }; /* current playback (client) position */
-
-		Packet    _buf[QUEUE_SIZE]; /* packet queue */
 
 	public:
 
@@ -175,7 +145,6 @@ class Audio::Stream
 		 */
 		void reset() { _play_pos = _record_pos; }
 
-
 		/**
 		 * Retrieves the position of a given packet in the stream queue
 		 *
@@ -201,9 +170,21 @@ class Audio::Stream
 		{
 			bool valid = false;
 			for (int i = 0; i < QUEUE_SIZE; i++)
-				valid |= _buf[i].valid();
+				valid |= _buf[i]._active;
 
 			return !valid;
+		}
+
+		bool underrun() const
+		{
+			int gap = _record_pos < _play_pos
+				? _record_pos-_play_pos+QUEUE_SIZE
+				: _record_pos-_play_pos;
+			PDBG("P:", _play_pos, " R:", _record_pos, " gap ", gap);
+
+			if (gap < UNDERRUN_THRESHOLD)
+				Genode::error("UNDERRUN");
+			return gap < UNDERRUN_THRESHOLD;
 		}
 };
 
@@ -221,11 +202,11 @@ struct Audio::Stream_source : Stream
 	 * \return  Successor of packet or successor of current
 	 *          plackbackposition if 'packet' is zero
 	 */
-	Packet *next(Packet *packet)
+	Packet *next(Packet *packet = nullptr)
 	{
-		return packet
-			? get(packet_position(packet) + 1)
-			: get(play_pos() + 1);
+		Packet *p = get(
+			(packet ? packet_position(packet) : play_pos()) + 1);
+		return p->_active ? p : nullptr;
 	}
 
 	/**
@@ -260,9 +241,9 @@ struct Audio::Stream_sink : Stream
 	 */
 	Packet *next(Packet *packet = nullptr)
 	{
-		return packet
-			? get(packet_position(packet) + 1)
-			: get(_record_pos + 1);
+		Packet *p = get(
+			(packet ? packet_position(packet) : record_pos()) + 1);
+		return p->_active ? nullptr : p;
 	}
 
 	/**
@@ -277,11 +258,6 @@ struct Audio::Stream_sink : Stream
 	 */
 	void increment_position() {
 		_record_pos = (_record_pos + 1) % QUEUE_SIZE; }
-
-	/**
-	 * Submit a packet to the packet queue
-	 */
-	void submit(Packet *p) { p->_submit(); }
 };
 
 #endif /* _INCLUDE__AUDIO__STREAM_H_ */

@@ -35,6 +35,7 @@ class Audio_out::Session_rpc_object : public Genode::Rpc_object<Audio_out::Sessi
 		Genode::Signal_transmitter     _alloc    { };
 
 		Genode::Signal_context_capability _data_cap;
+		Genode::Signal_context_capability _reset_cap { };
 
 		bool _stopped;       /* state */
 		bool _progress_sigh; /* progress signal on/off */
@@ -56,28 +57,33 @@ class Audio_out::Session_rpc_object : public Genode::Rpc_object<Audio_out::Sessi
 		 ** Signals  **
 		 **************/
 
-		void progress_sigh(Genode::Signal_context_capability sigh)
+		void progress_sigh(Genode::Signal_context_capability sigh) override
 		{
 			_progress.context(sigh);
 			_progress_sigh = true;
 		}
 
+		void underrun_sigh(Genode::Signal_context_capability) override { }
+
 		Genode::Signal_context_capability data_avail_sigh() {
 			return _data_cap; }
 
-		void alloc_sigh(Genode::Signal_context_capability sigh)
+		void alloc_sigh(Genode::Signal_context_capability sigh) override
 		{
 			_alloc.context(sigh);
 			_alloc_sigh = true;
 		}
+
+		void reset_sigh(Genode::Signal_context_capability sigh) override {
+			_reset_cap = sigh; }
 
 
 		/***********************
 		 ** Session interface **
 		 ***********************/
 
-		void start() { _stopped = false; }
-		void stop()  { _stopped = true; }
+		void start() override { _stopped = false; }
+		void stop()  override { _stopped = true; }
 
 		Genode::Dataspace_capability dataspace() { return _buffer.cap(); }
 
@@ -102,6 +108,15 @@ class Audio_out::Session_rpc_object : public Genode::Rpc_object<Audio_out::Sessi
 		{
 			if (_alloc_sigh)
 				_alloc.submit();
+		}
+
+		/**
+		 * Send 'reset' signal
+		 */
+		void send_reset()
+		{
+			if (_reset_cap.valid())
+				Genode::Signal_transmitter(_reset_cap).submit();
 		}
 
 		/**
