@@ -27,7 +27,7 @@ using Filename = Genode::String<64>;
 using namespace Genode;
 using namespace Audio_out;
 
-static constexpr bool const verbose = false;
+static constexpr bool const verbose = true;
 static constexpr char const * channel_names[2] = { "front left", "front right" };
 
 
@@ -42,7 +42,7 @@ class Track : public Thread
 		Track &operator = (Track const &);
 
 		enum {
-			CHN_CNT      = 2,                      /* number of channels */
+			CHN_CNT      = 1,                      /* number of channels */
 			FRAME_SIZE   = sizeof(float),
 			PERIOD_CSIZE = FRAME_SIZE * PERIOD,    /* size of channel packet (bytes) */
 			PERIOD_FSIZE = CHN_CNT * PERIOD_CSIZE, /* size of period in file (bytes) */
@@ -50,6 +50,10 @@ class Track : public Thread
 
 		Env & _env;
 		Constructible<Audio_out::Connection> _audio_out[CHN_CNT];
+
+		Signal_context _underrun_context { };
+		Signal_receiver _underrun_receiver { };
+		Signal_context_capability _underrun_cap = _underrun_receiver.manage(&_underrun_context);
 
 		Filename const & _name;
 
@@ -62,9 +66,10 @@ class Track : public Thread
 		Track(Env & env, Filename const & name)
 		: Thread(env, "track", sizeof(size_t)*2048), _env(env), _name(name)
 		{
-			/* allocation signal for first channel only */
 			for (int i = 0; i < CHN_CNT; ++i)
-				_audio_out[i].construct(env, channel_names[i], i == 0);
+				_audio_out[i].construct(env, channel_names[i]);
+
+			_audio_out[0]->underrun_sigh(_underrun_cap);
 
 			start();
 		}
@@ -80,6 +85,8 @@ class Track : public Thread
 
 			unsigned cnt = 0;
 			while (1) {
+					PDBG("block for underrun");
+					_underrun_receiver.block_for_signal();
 
 				for (size_t offset = 0, cnt = 1;
 				     offset < _size;
@@ -95,13 +102,8 @@ class Track : public Thread
 					               : PERIOD;
 
 					Packet *p[CHN_CNT];
-					while (1)
-						try {
-							p[0] = _audio_out[0]->stream().next();
-							break;
-						} catch (Audio::Stream::Alloc_failed) {
-							_audio_out[0]->wait_for_alloc();
-						}
+
+					p[0] = _audio_out[0]->stream().next();
 
 					unsigned pos = _audio_out[0]->stream().packet_position(p[0]);
 					/* sync other channels with first one */
@@ -125,8 +127,10 @@ class Track : public Thread
 						log(_name, " submit packet ",
 						    _audio_out[0]->stream().packet_position((p[0])));
 
-					for (int i = 0; i < CHN_CNT; i++)
-						_audio_out[i]->submit(p[i]);
+					for (int i = 0; i < CHN_CNT; i++) {
+						p[i]->recorded();
+						_audio_out[i]->stream().increment_position();
+					}
 				}
 
 				log("played '", _name, "' ", ++cnt, " time(s)");
