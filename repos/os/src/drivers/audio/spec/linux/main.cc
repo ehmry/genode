@@ -51,12 +51,12 @@ class Playback::Out
 
 		void _play_packet()
 		{
-			Stream *left  =  _left.stream();
-			Stream *right = _right.stream();
+			Stream_source left  =  _left.stream();
+			Stream_source right = _right.stream();
 
-			auto const pos = left->pos();
-			Packet *p_left  =  left->get(pos);
-			Packet *p_right = right->get(pos);
+			auto const pos = left.play_pos();
+			Packet *p_left  =  left.get(pos);
+			Packet *p_right = right.get(pos);
 
 			/* convert float to S16LE */
 			static short data[2 * PERIOD];
@@ -76,8 +76,8 @@ class Playback::Out
 				}
 			}
 
-			 left->increment_position();
-			right->increment_position();
+			 left.increment_position();
+			right.increment_position();
 		}
 
 		Genode::Signal_handler<Out> _progress_handler {
