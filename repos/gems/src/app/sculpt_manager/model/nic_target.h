@@ -26,20 +26,28 @@ struct Sculpt::Nic_target : Noncopyable
 	bool manual()  const { return policy == MANUAL; }
 	bool managed() const { return policy == MANAGED; }
 
-	enum Type { OFF, LOCAL, WIRED, WIFI };
+	/*
+	 * The 'UNDEFINED' state is used solely at the startup when neither a
+	 * managed or manual policy is known. Once a manually managed 'nic_router'
+	 * config is provided, it takes precedence over the 'UNDEFINED' managed
+	 * state.
+	 */
+	enum Type { UNDEFINED, OFF, LOCAL, WIRED, WIFI };
 
 	/**
 	 * Interactive selection by the user, used when managed policy is in effect
 	 */
-	Type managed_type { OFF };
+	Type managed_type { UNDEFINED };
 
 	/**
 	 * Selection by the manually-provided NIC-router configuration
 	 */
-	Type manual_type { OFF };
+	Type manual_type { UNDEFINED };
 
 	/**
 	 * Return currently active NIC target type
+	 *
+	 * This method never returns 'UNDEFINED'.
 	 */
 	Type type() const
 	{
@@ -50,7 +58,9 @@ struct Sculpt::Nic_target : Noncopyable
 		if (managed_type == OFF)
 			return OFF;
 
-		return manual() ? manual_type : managed_type;
+		Type const result = manual() ? manual_type : managed_type;
+
+		return (result == UNDEFINED) ? OFF : result;
 	}
 
 	bool local() const { return type() == LOCAL; }
