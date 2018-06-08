@@ -52,29 +52,15 @@ class Audio_out::Session_client : public Genode::Rpc_client<Session>
 
 		Stream_sink &stream() { return _stream; }
 
-		/*************
-		 ** Signals **
-		 *************/
-
-		void underrun_sigh(Genode::Signal_context_capability sigh) override {
-			call<Rpc_underrun_sigh>(sigh); }
-
-		void reset_sigh(Genode::Signal_context_capability sigh) override {
-			call<Rpc_reset_sigh>(sigh); }
-
 		/***********************
 		 ** Session interface **
 		 ***********************/
 
-		void start()
-		{
-			call<Rpc_start>();
+		void start() override {
+			call<Rpc_start>(); }
 
-			/* reset tail pointer */
-			_stream.reset();
-		}
-
-		void stop() { call<Rpc_stop>();  }
+		void underrun_sigh(Genode::Signal_context_capability sigh) override {
+			call<Rpc_underrun_sigh>(sigh); }
 };
 
 #endif /* _INCLUDE__AUDIO_OUT_SESSION__CLIENT_H_ */

@@ -39,51 +39,38 @@ namespace Audio_in {
  */
 struct Audio_in::Session : Genode::Session
 {
-		/**
-		 * \noapi
-		 */
-		static const char *service_name() { return "Audio_in"; }
+	/**
+	 * \noapi
+	 */
+	static const char *service_name() { return "Audio_in"; }
 
-		enum { CAP_QUOTA = 4 };
+	enum { CAP_QUOTA = 4 };
 
-		/**
-		 * Start recording (alloc and submit packets after calling 'start')
-		 */
-		virtual void start() = 0;
+	/**
+	 * The 'start' signal is sent from the server to the client if
+	 * the client should begin playback.
+	 */
+	virtual void start_sigh(Genode::Signal_context_capability sigh) = 0;
 
-		/**
-		 * Stop recording
-		 */
-		virtual void stop() = 0;
+	/**
+	 * The 'reset' signal is sent from the server to the client if
+	 * the client should refresh its underrun signal capablity.
+	 */
+	virtual void reset_sigh(Genode::Signal_context_capability sigh) = 0;
 
+	/**
+	 * The 'underrun' signal is sent from the client to the server when
+	 * the number of packets in a queue falls below a threshold.
+	 * The recommended threshold is as Audio::UNDERRUN_THRESHOLD.
+	 */
+	virtual Genode::Signal_context_capability underrun_sigh() = 0;
 
-		/*************
-		 ** Signals **
-		 *************/
+	GENODE_RPC(Rpc_dataspace, Genode::Dataspace_capability, dataspace);
+	GENODE_RPC(Rpc_start_sigh, void, start_sigh, Genode::Signal_context_capability);
+	GENODE_RPC(Rpc_reset_sigh, void, reset_sigh, Genode::Signal_context_capability);
+	GENODE_RPC(Rpc_underrun_sigh, Genode::Signal_context_capability, underrun_sigh);
 
-		/**
-		 * The 'underrun' signal is sent from the client to the server when
-		 * the number of packets in a queue falls below a threshold.
-		 * The recommended threshold is as Audio::UNDERRUN_THRESHOLD.
-		 */
-		virtual Genode::Signal_context_capability underrun_sigh() = 0;
-
-		/**
-		 * The 'reset' signal is sent from the server to the client if
-		 * the sesion must undergo a reset due to a logical or physical
-		 * reconfiguration. To handle this signal a client must
-		 * reconfigure all other signal and call 'start' to continue.
-		 */
-		virtual void reset_sigh(Genode::Signal_context_capability sigh) = 0;
-
-		GENODE_RPC(Rpc_start, void, start);
-		GENODE_RPC(Rpc_stop, void, stop);
-		GENODE_RPC(Rpc_dataspace, Genode::Dataspace_capability, dataspace);
-		GENODE_RPC(Rpc_underrun_sigh, Genode::Signal_context_capability, underrun_sigh);
-		GENODE_RPC(Rpc_reset_sigh, void, reset_sigh, Genode::Signal_context_capability);
-
-		GENODE_RPC_INTERFACE(Rpc_start, Rpc_stop, Rpc_dataspace,
-		                     Rpc_underrun_sigh, Rpc_reset_sigh);
+	GENODE_RPC_INTERFACE(Rpc_dataspace, Rpc_start_sigh, Rpc_reset_sigh, Rpc_underrun_sigh);
 };
 
 #endif /* _INCLUDE__AUDIO_IN_SESSION__AUDIO_IN_SESSION_H_ */

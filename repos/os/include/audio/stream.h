@@ -112,10 +112,10 @@ class Audio::Stream
 
 	private:
 
-		Packet    _buf[QUEUE_SIZE]; /* packet queue */
-
 		Genode::uint32_t  _record_pos { 0 }; /* current record (server) position */
 		Genode::uint32_t  _play_pos   { 0 }; /* current playback (client) position */
+
+		Packet    _buf[QUEUE_SIZE]; /* packet queue */
 
 	public:
 
@@ -213,6 +213,17 @@ struct Audio::Stream_source : Stream
 	 */
 	void increment_position() {
 		_play_pos = (_play_pos + 1) % QUEUE_SIZE; }
+
+	/* position the play position on the first unplayed packet */
+	void seek()
+	{
+		unsigned pos = _record_pos;
+		for (unsigned i = 0; i < QUEUE_SIZE; ++i) {
+			pos = (pos+1) % QUEUE_SIZE;
+			if (_buf[pos]._active)
+				break;
+		}
+	}
 };
 
 
@@ -246,6 +257,17 @@ struct Audio::Stream_sink : Stream
 	 */
 	void increment_position() {
 		_record_pos = (_record_pos + 1) % QUEUE_SIZE; }
+
+	/* position the play position on the first unrecorded packet */
+	void seek()
+	{
+		unsigned pos = _play_pos;
+		for (unsigned i = 0; i < QUEUE_SIZE; ++i) {
+			pos = (pos+1) % QUEUE_SIZE;
+			if (!_buf[pos]._active)
+				break;
+		}
+	}
 };
 
 #endif /* _INCLUDE__AUDIO__STREAM_H_ */

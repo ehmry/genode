@@ -53,30 +53,19 @@ class Audio_in::Session_client : public Genode::Rpc_client<Session>
 		Stream_source &stream() const { return _stream; }
 
 
-		/*************
-		 ** Signals **
-		 *************/
-
-		Genode::Signal_context_capability underrun_sigh() override {
-			return call<Rpc_underrun_sigh>(); }
-
-		void reset_sigh(Genode::Signal_context_capability sigh) override {
-			call<Rpc_reset_sigh>(sigh); }
-
-
 		/***********************
 		 ** Session interface **
 		 ***********************/
 
-		void start()
-		{
-			call<Rpc_start>();
+		void start_sigh(Genode::Signal_context_capability sigh) override {
+			call<Rpc_start_sigh>(sigh); }
 
-			/* reset tail pointer */
-			stream().reset();
-		}
+		void reset_sigh(Genode::Signal_context_capability sigh) override {
+			call<Rpc_reset_sigh>(sigh); }
 
-		void stop() { call<Rpc_stop>(); }
+		Genode::Signal_context_capability underrun_sigh() override {
+			return call<Rpc_underrun_sigh>(); }
+
 };
 
 #endif /* _INCLUDE__AUDIO_IN_SESSION__CLIENT_H_ */
