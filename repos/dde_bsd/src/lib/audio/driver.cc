@@ -383,20 +383,20 @@ static bool configure_audio_device(Genode::Env &env, dev_t dev, Genode::Xml_node
 	using namespace Audio;
 
 	/* configure the device according to our Audio_out session settings */
-	ai.play.sample_rate = Audio_out::SAMPLE_RATE;
-	ai.play.channels    = Audio_out::MAX_CHANNELS;
+	ai.play.sample_rate = Audio::SAMPLE_RATE;
+	ai.play.channels    = Playback::MAX_CHANNELS;
 	ai.play.encoding    = AUDIO_ENCODING_SLINEAR_LE;
-	ai.play.block_size  = Audio_out::MAX_CHANNELS * sizeof(short) * Audio_out::PERIOD;
+	ai.play.block_size  = Playback::MAX_CHANNELS * sizeof(short) * Audio::PERIOD;
 
 	/* Configure the device according to our Audio_in session settings
 	 *
-	 * We use Audio_out::MAX_CHANNELS here because the backend provides us
+	 * We use Record::MAX_CHANNELS here because the backend provides us
 	 * with two channels that we will mix to one in the front end for now.
 	 */
-	ai.record.sample_rate = Audio_in::SAMPLE_RATE;
-	ai.record.channels    = Audio_out::MAX_CHANNELS;
+	ai.record.sample_rate = Audio::SAMPLE_RATE;
+	ai.record.channels    = Recording::MAX_CHANNELS;
 	ai.record.encoding    = AUDIO_ENCODING_SLINEAR_LE;
-	ai.record.block_size  = Audio_out::MAX_CHANNELS * sizeof(short) * Audio_in::PERIOD;
+	ai.record.block_size  = Recording::MAX_CHANNELS * sizeof(short) * Audio::PERIOD;
 
 	err = audioioctl(adev, AUDIO_SETINFO, (char*)&ai, 0, 0);
 	if (err)
