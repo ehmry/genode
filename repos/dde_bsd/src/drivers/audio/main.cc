@@ -45,12 +45,24 @@ class Playback::Out
 		Audio_in::Connection _left;
 		Audio_in::Connection _right;
 
+		Genode::Signal_handler<Playback::Out> _start_handler;
 		Genode::Signal_handler<Playback::Out> _reset_handler;
 
 		Signal_context_capability _underrun_cap { };
 
+		void _start()
+		{
+			_left.stream().seek();
+
+			unsigned q = _left.stream().queued();
+			if (!q || q == Audio::UNDERRUN_THRESHOLD)
+				Genode::Signal_transmitter(_underrun_cap).submit();
+		}
+
 		void _reset()
 		{
+			_left.start_sigh(_start_handler);
+			_left.reset_sigh(_reset_handler);
 			_underrun_cap = _left.underrun_sigh();
 		}
 
@@ -91,7 +103,8 @@ class Playback::Out
 				++played;
 			});
 
-			if (_left.stream().queued() < Audio::UNDERRUN_THRESHOLD)
+			unsigned q = _left.stream().queued();
+			if (!q || q == Audio::UNDERRUN_THRESHOLD)
 				Genode::Signal_transmitter(_underrun_cap).submit();
 
 			/* send to driver */
@@ -110,12 +123,12 @@ class Playback::Out
 		:
 			_left(env, "left"),
 			_right(env, "right"),
+			_start_handler(env.ep(), *this, &Playback::Out::_start),
 			_reset_handler(env.ep(), *this, &Playback::Out::_reset),
 			_notify_handler(env.ep(), *this, &Playback::Out::_play_packet)
 		{
 			_reset();
-			_left.start();
-			_right.start();
+
 			/* play a silence packet to get the driver running */
 			_play_silence();
 		}
@@ -169,8 +182,8 @@ class Recording::In
 			_audio_out(env, "center"),
 			_notify_handler(env.ep(), *this, &Recording::In::_record_packet)
 		{
-			_audio_out.start();
 			_record_packet();
+			_audio_out.start();
 		}
 
 		Signal_context_capability sigh() { return _notify_handler; }
