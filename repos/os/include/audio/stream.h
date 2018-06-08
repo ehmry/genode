@@ -120,11 +120,6 @@ class Audio::Stream
 	public:
 
 		/**
-		 * Exceptions
-		 */
-		class Alloc_failed { };
-
-		/**
 		 * Current record position
 		 *
 		 * \return  record position
