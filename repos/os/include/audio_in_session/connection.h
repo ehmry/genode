@@ -28,10 +28,10 @@ struct Audio_in::Connection : Genode::Connection<Session>, Audio_in::Session_cli
 	 *
 	 * \noapi
 	 */
-	Genode::Capability<Audio_in::Session> _session(Genode::Parent &parent, char const *channel)
+	Genode::Capability<Audio_in::Session> _session(Genode::Parent &parent, char const *label)
 	{
-		return session(parent, "ram_quota=%ld, cap_quota=%ld, channel=\"%s\"",
-		               10*1024 + sizeof(Stream), CAP_QUOTA, channel);
+		return session(parent, "ram_quota=%ld, cap_quota=%ld, label=\"%s\"",
+		               10*1024 + sizeof(Stream), CAP_QUOTA, label);
 	}
 
 	/**
@@ -41,10 +41,10 @@ struct Audio_in::Connection : Genode::Connection<Session>, Audio_in::Session_cli
 	 *                         call 'wait_for_progress', which is sent when the
 	 *                         server processed one or more packets
 	 */
-	Connection(Genode::Env &env, char const *channel, bool progress_signal = false)
+	Connection(Genode::Env &env, char const *label)
 	:
-		Genode::Connection<Session>(env, _session(env.parent(), channel)),
-		Session_client(env.rm(), cap(), progress_signal)
+		Genode::Connection<Session>(env, _session(env.parent(), label)),
+		Session_client(env.rm(), cap())
 	{ }
 };
 

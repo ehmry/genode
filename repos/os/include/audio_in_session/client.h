@@ -23,21 +23,8 @@
 
 namespace Audio_in {
 	struct Signal;
-	struct Session_client;
+	class Session_client;
 }
-
-
-struct Audio_in::Signal
-{
-	Genode::Signal_receiver           recv;
-	Genode::Signal_context            context;
-	Genode::Signal_context_capability cap;
-
-	Signal() : cap(recv.manage(&context)) { }
-	~Signal() { recv.dissolve(&context); }
-
-	void wait() { recv.wait_for_signal(); }
-};
 
 
 class Audio_in::Session_client : public Genode::Rpc_client<Session>
@@ -46,9 +33,7 @@ class Audio_in::Session_client : public Genode::Rpc_client<Session>
 
 		Genode::Attached_dataspace _shared_ds;
 
-		Signal _progress;
-
-		Genode::Signal_transmitter _data_avail;
+		Stream_source &_stream = *_shared_ds.local_addr<Stream_source>();
 
 	public:
 
@@ -59,66 +44,28 @@ class Audio_in::Session_client : public Genode::Rpc_client<Session>
 		 * \param progress_signal  true, install 'progress_signal' receiver
 		 */
 		Session_client(Genode::Region_map &rm,
-		               Genode::Capability<Session> session,
-		               bool progress_signal)
+		               Genode::Capability<Session> session)
 		:
 		  Genode::Rpc_client<Session>(session),
-		  _shared_ds(rm, call<Rpc_dataspace>()),
-		  _data_avail(call<Rpc_data_avail_sigh>())
-		{
-			_stream = _shared_ds.local_addr<Stream>();
+		  _shared_ds(rm, call<Rpc_dataspace>())
+		{ }
 
-			if (progress_signal)
-				progress_sigh(_progress.cap);
-		}
-
-
-		/*************
-		 ** Signals **
-		 *************/
-
-		void progress_sigh(Genode::Signal_context_capability sigh) {
-			call<Rpc_progress_sigh>(sigh); }
-
-		void overrun_sigh(Genode::Signal_context_capability sigh) {
-			call<Rpc_overrun_sigh>(sigh); }
-
-		Genode::Signal_context_capability data_avail_sigh() {
-			return Genode::Signal_context_capability(); }
+		Stream_source &stream() const { return _stream; }
 
 
 		/***********************
 		 ** Session interface **
 		 ***********************/
 
-		void start()
-		{
-			call<Rpc_start>();
+		void start_sigh(Genode::Signal_context_capability sigh) override {
+			call<Rpc_start_sigh>(sigh); }
 
-			/* reset tail pointer */
-			stream()->reset();
-		}
+		void reset_sigh(Genode::Signal_context_capability sigh) override {
+			call<Rpc_reset_sigh>(sigh); }
 
-		void stop() { call<Rpc_stop>();  }
+		Genode::Signal_context_capability underrun_sigh() override {
+			return call<Rpc_underrun_sigh>(); }
 
-
-		/**********************************
-		 ** Session interface extensions **
-		 **********************************/
-
-		/**
-		 * Wait for progress signal
-		 */
-		void wait_for_progress()
-		{
-			if (!_progress.cap.valid()) {
-				Genode::warning("Progress signal is not installed, will not block "
-				                "(enable in 'Audio_in::Connection')");
-				return;
-			}
-
-			_progress.wait();
-		}
 };
 
 #endif /* _INCLUDE__AUDIO_IN_SESSION__CLIENT_H_ */
