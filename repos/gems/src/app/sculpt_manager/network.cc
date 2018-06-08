@@ -166,7 +166,6 @@ void Sculpt::Network::_handle_nic_router_config(Xml_node config)
 	if (_nic_target.manual()) {
 
 		/* obtain uplink information from configuration */
-		Nic_target::Type target = Nic_target::LOCAL;
 		target = Nic_target::LOCAL;
 
 		if (!config.has_sub_node("domain"))
