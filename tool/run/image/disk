@@ -9,6 +9,11 @@ source [genode_dir]/tool/run/grub2.inc
 
 proc image_disk_size { } { return [get_cmd_arg --image-disk-size 0] }
 
+#
+# Disable parted heuristics for Apple to prevent error messages
+#
+set ::env(PARTED_GPT_APPLE) 0
+
 
 ##
 # Create disk image with the content of the run directory
