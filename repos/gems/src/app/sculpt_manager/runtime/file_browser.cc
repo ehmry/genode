@@ -43,10 +43,7 @@ void Sculpt::gen_nit_fb_start(Xml_generator &xml, Rom_name const &name)
 		gen_service_node<Input::Session>(xml, [&] () {});
 	});
 
-	xml.node("config", [&] () {
-		xml.attribute("initial_width",  "600");
-		xml.attribute("initial_height", "500");
-	});
+	xml.node("config", [&] () { });
 
 	xml.node("route", [&] () {
 		gen_parent_rom_route(xml, "nit_fb");
