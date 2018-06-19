@@ -1,0 +1,124 @@
+#
+# Build
+#
+
+set build_components {
+	core init
+	drivers/timer drivers/input drivers/nic
+	server/nic_bridge
+        test/libc_msg_peek
+	test/lwip/http_clnt
+
+}
+
+source ${genode_dir}/repos/base/run/platform_drv.inc
+append_platform_drv_build_components
+
+build $build_components
+
+create_boot_directory
+
+#
+# Generate config
+#
+
+append config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="IRQ"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+        </default-route>
+        <default caps="200"/>
+}
+
+append_platform_drv_config
+
+append config {
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="nic_drv">
+		<binary name="} [nic_drv_binary] {"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="Nic"/></provides>
+	</start>
+	<start name="nic_bridge">
+		<resource name="RAM" quantum="24M"/>
+		<provides><service name="Nic"/></provides>
+		<config>
+			<policy label_prefix="test-libc_msg_peek" ip_addr="10.0.2.55"/>
+		</config>
+		<route>
+			<service name="Nic"> <child name="nic_drv"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+        <start name="test-libc_msg_peek">
+            <resource name="RAM" quantum="8M"/>
+            <config>
+                <libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log"
+                    ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/>
+            </config>
+            <route>
+                <service name="Nic"> <child name="nic_bridge"/> </service>
+                <any-service> <parent/> <any-child/> </any-service>
+            </route>
+        </start>
+	<start name="test-http_clnt">
+		<resource name="RAM" quantum="32M"/>
+		<route>
+			<service name="Nic"> <child name="nic_bridge"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+		<config server_ip="10.0.2.55" server_port="80">
+			<vfs> <dir name="dev"> <log/> </dir> </vfs>
+			<libc stdout="/dev/log" stderr="/dev/log"/>
+		</config>
+	</start>
+</config>}
+
+install_config $config
+
+#
+# Boot modules
+#
+
+# generic modules
+append boot_modules {
+	core init
+	timer } [nic_drv_binary] {
+	nic_bridge
+	ld.lib.so
+	libc.lib.so vfs.lib.so
+	lwip_legacy.lib.so
+	test-http_clnt
+        test-libc_msg_peek
+}
+
+
+# platform-specific modules
+lappend_if [have_spec linux] boot_modules fb_sdl
+
+append_platform_drv_boot_modules
+
+build_boot_image $boot_modules
+
+
+append_if [have_spec x86]     qemu_args " -net nic,model=e1000 "
+append_if [have_spec lan9118] qemu_args " -net nic,model=lan9118 "
+
+append qemu_args " -net user "
+append qemu_args " -nographic -serial mon:stdio "
+
+run_genode_until forever
