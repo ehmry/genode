@@ -128,6 +128,7 @@ namespace Vfs {
 	class Lxip_listen_file;
 	class Lxip_local_file;
 	class Lxip_remote_file;
+	class Lxip_peek_file;
 
 	class Lxip_socket_dir;
 	struct Lxip_socket_handle;
@@ -470,6 +471,49 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 			if (ret == -EAGAIN)
 				throw Would_block();
 			return ret;
+		}
+};
+
+
+class Vfs::Lxip_peek_file : public Vfs::Lxip_file
+{
+	public:
+
+		Lxip_peek_file(Lxip::Socket_dir &p, Linux::socket &s)
+		: Lxip_file(p, s, "peek") { }
+
+		/********************
+		 ** File interface **
+		 ********************/
+
+		bool poll(bool trigger_io_response,
+		          Vfs::Vfs_handle::Context *context) override
+		{
+			/* can always peek */
+			return true;
+		}
+
+		Lxip::ssize_t write(Lxip_vfs_file_handle&,
+		                    char const *, Genode::size_t,
+		                    file_size) override
+		{
+			return -1;
+		}
+
+		Lxip::ssize_t read(Lxip_vfs_file_handle &,
+		                   char *dst, Genode::size_t len,
+		                   file_size /* ignored */) override
+		{
+			using namespace Linux;
+
+			if (!_sock_valid()) return -1;
+
+			iovec iov { dst, len };
+
+			msghdr msg = create_msghdr(nullptr, 0, len, &iov);
+
+			Lxip::ssize_t ret = _sock.ops->recvmsg(&_sock, &msg, len, MSG_DONTWAIT|MSG_PEEK);
+			return Genode::min(0, ret);
 		}
 };
 
@@ -870,7 +914,8 @@ class Vfs::Lxip_socket_dir final : public Lxip::Socket_dir
 
 		enum {
 			ACCEPT_NODE, BIND_NODE, CONNECT_NODE,
-			DATA_NODE, LOCAL_NODE, LISTEN_NODE, REMOTE_NODE,
+			DATA_NODE, PEEK_NODE,
+			LOCAL_NODE, LISTEN_NODE, REMOTE_NODE,
 			ACCEPT_SOCKET_NODE,
 			MAX_FILES
 		};
@@ -897,6 +942,7 @@ class Vfs::Lxip_socket_dir final : public Lxip::Socket_dir
 		Lxip_bind_file    _bind_file    { *this, _sock };
 		Lxip_connect_file _connect_file { *this, _sock };
 		Lxip_data_file    _data_file    { *this, _sock };
+		Lxip_data_file    _peek_file    { *this, _sock };
 		Lxip_listen_file  _listen_file  { *this, _sock };
 		Lxip_local_file   _local_file   { *this, _sock };
 		Lxip_remote_file  _remote_file  { *this, _sock };
@@ -935,6 +981,7 @@ class Vfs::Lxip_socket_dir final : public Lxip::Socket_dir
 			_files[BIND_NODE]    = &_bind_file;
 			_files[CONNECT_NODE] = &_connect_file;
 			_files[DATA_NODE]    = &_data_file;
+			_files[PEEK_NODE]    = &_data_file;
 			_files[LOCAL_NODE]   = &_local_file;
 			_files[REMOTE_NODE]  = &_remote_file;
 		}
@@ -945,6 +992,7 @@ class Vfs::Lxip_socket_dir final : public Lxip::Socket_dir
 			_bind_file.dissolve_handles();
 			_connect_file.dissolve_handles();
 			_data_file.dissolve_handles();
+			_peek_file.dissolve_handles();
 			_listen_file.dissolve_handles();
 			_local_file.dissolve_handles();
 			_remote_file.dissolve_handles();
