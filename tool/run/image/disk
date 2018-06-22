@@ -15,13 +15,12 @@ proc image_disk_size { } { return [get_cmd_arg --image-disk-size 0] }
 #
 proc run_image { {unused ""} } {
 
-set sgdisk [installed_command sgdisk]
+	set sgdisk [installed_command sgdisk]
 
 	# make copy of template grub2 header image
 	exec cp [get_grub2_dir]/boot/grub2-head.img [run_dir].header
 
 	# remove template partition
-<<<<<<< HEAD
 	exec $sgdisk --delete=3 [run_dir].header
 
 	# calculate size of grub2 header and the size of Genode scenario
@@ -36,7 +35,7 @@ set sgdisk [installed_command sgdisk]
 
 	# setup partition with content
 	exec dd if=/dev/zero of=[run_dir].partition bs=1k count=$disk_size_kb 2>/dev/null
-	exec mkfs.ext2 -L GENODE -q -T default [run_dir].partition
+	exec [installed_command mkfs.ext2] -L GENODE -q -T default [run_dir].partition
 
 	# copy content to disk image
 	foreach file [exec find [run_dir]] {
@@ -46,7 +45,7 @@ set sgdisk [installed_command sgdisk]
 		}
 
 		if {[file isdirectory $file]} {
-			exec e2mkdir [run_dir].partition:$filename
+			exec [installed_command e2mkdir] [run_dir].partition:$filename
 		} else {
 			exec [installed_command e2cp] $file [run_dir].partition:$filename
 		}
