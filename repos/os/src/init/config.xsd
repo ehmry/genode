@@ -75,6 +75,7 @@
       <xs:attribute name="child_ram" type="xs:string" />
       <xs:attribute name="init_caps" type="xs:string" />
       <xs:attribute name="init_ram" type="xs:string" />
+      <xs:attribute name="delay_ms" type="xs:int" />
      </xs:complexType>
     </xs:element> <!-- "report" -->
 
