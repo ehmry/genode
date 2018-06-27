@@ -40,31 +40,63 @@ namespace Input {
 	struct Touch           { Touch_id id; float x, y; };
 	struct Touch_release   { Touch_id id; };
 
-	class Event;
+	struct Event_base;
+	class  Event;
 }
 
-
-class Input::Event
+/**
+ * Definition of event data layout, use Input::Event whenever possible.
+ */
+struct Input::Event_base
 {
-	private:
-
-		enum Type { INVALID, PRESS, RELEASE, REL_MOTION, ABS_MOTION, WHEEL,
+	enum Type { INVALID, PRESS, RELEASE, REL_MOTION, ABS_MOTION, WHEEL,
 		            FOCUS_ENTER, FOCUS_LEAVE, HOVER_LEAVE, TOUCH, TOUCH_RELEASE };
 
-		Type _type = INVALID;
+	Type _type = INVALID;
 
-		struct Attr
-		{
-			union {
-				Press_char      press;
-				Release         release;
-				Wheel           wheel;
-				Absolute_motion abs_motion;
-				Relative_motion rel_motion;
-				Touch           touch;
-				Touch_release   touch_release;
-			};
-		} _attr { };
+	struct Attr
+	{
+		union {
+			Press_char      press;
+			Release         release;
+			Wheel           wheel;
+			Absolute_motion abs_motion;
+			Relative_motion rel_motion;
+			Touch           touch;
+			Touch_release   touch_release;
+		};
+	} _attr { };
+
+	/**
+	 * Default constructor creates an invalid event
+	 *
+	 * This constructor can be used for creating an array of events.
+	 */
+	Event_base() { }
+
+	/*
+	 * Constructors for creating input events of various types
+	 *
+	 * These constructors can be used implicitly for the given attribute
+	 * types for assignments or for passing an event as return value.
+	 */
+	Event_base(Press_char      arg) : _type(PRESS)         { _attr.press = arg; }
+	Event_base(Press           arg) : Event_base(Press_char{arg.key, Codepoint{INVALID}}) { }
+	Event_base(Release         arg) : _type(RELEASE)       { _attr.release = arg; }
+	Event_base(Relative_motion arg) : _type(REL_MOTION)    { _attr.rel_motion = arg; }
+	Event_base(Absolute_motion arg) : _type(ABS_MOTION)    { _attr.abs_motion = arg; }
+	Event_base(Wheel           arg) : _type(WHEEL)         { _attr.wheel = arg; }
+	Event_base(Focus_enter)         : _type(FOCUS_ENTER)   { }
+	Event_base(Focus_leave)         : _type(FOCUS_LEAVE)   { }
+	Event_base(Hover_leave)         : _type(HOVER_LEAVE)   { }
+	Event_base(Touch           arg) : _type(TOUCH)         { _attr.touch = arg; }
+	Event_base(Touch_release   arg) : _type(TOUCH_RELEASE) { _attr.touch_release = arg; }
+};
+
+
+class Input::Event : private Input::Event_base
+{
+	private:
 
 		static bool _valid(Keycode key) { return key > KEY_RESERVED && key < KEY_MAX; }
 
@@ -76,31 +108,8 @@ class Input::Event
 
 	public:
 
-		/**
-		 * Default constructor creates an invalid event
-		 *
-		 * This constructor can be used for creating an array of events.
-		 */
-		Event() { }
-
-		/*
-		 * Constructors for creating input events of various types
-		 *
-		 * These constructors can be used implicitly for the given attribute
-		 * types for assignments or for passing an event as return value.
-		 */
-		Event(Press_char      arg) : _type(PRESS)         { _attr.press = arg; }
-		Event(Press           arg) : Event(Press_char{arg.key, Codepoint{INVALID}}) { }
-		Event(Release         arg) : _type(RELEASE)       { _attr.release = arg; }
-		Event(Relative_motion arg) : _type(REL_MOTION)    { _attr.rel_motion = arg; }
-		Event(Absolute_motion arg) : _type(ABS_MOTION)    { _attr.abs_motion = arg; }
-		Event(Wheel           arg) : _type(WHEEL)         { _attr.wheel = arg; }
-		Event(Focus_enter)         : _type(FOCUS_ENTER)   { }
-		Event(Focus_leave)         : _type(FOCUS_LEAVE)   { }
-		Event(Hover_leave)         : _type(HOVER_LEAVE)   { }
-		Event(Touch           arg) : _type(TOUCH)         { _attr.touch = arg; }
-		Event(Touch_release   arg) : _type(TOUCH_RELEASE) { _attr.touch_release = arg; }
-
+		using Input::Event_base::Type;
+		using Event_base::Event_base;
 
 		/************************************
 		 ** Methods for handling the event **
