@@ -231,12 +231,8 @@ class Vfs_cow::File_system : public Vfs::File_system
 			auto rw_path = _rw_path(path);
 
 			if (mode & OPEN_MODE_CREATE) {
-				if (_leaf(ro_path)) {
-					return OPEN_ERR_EXISTS;
-				} else {
-					return _root_dir.open(
-						rw_path.string(), mode, out, alloc);
-				}
+				return _root_dir.open(
+					rw_path.string(), mode, out, alloc);
 			}
 
 			Open_result rw_res = _root_dir.open(
