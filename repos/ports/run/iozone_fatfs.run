@@ -1,6 +1,6 @@
 set test_name fatfs
 
-set mkfs_cmd  [check_installed mkfs.vfat]
+set mkfs_cmd  [installed_command mkfs.vfat]
 set mkfs_opts "-F32"
 
 set test_build_components "lib/vfs/fatfs"

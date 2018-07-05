@@ -4,7 +4,7 @@
 # \date   2017-07-27
 #
 
-set gnuplot_cmd  [check_installed gnuplot]
+set gnuplot_cmd  [installed_command gnuplot]
 
 set datadir var/data/iozone
 set datafiles [glob $datadir/*.out]

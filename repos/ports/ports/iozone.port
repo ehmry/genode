@@ -3,7 +3,7 @@ VERSION   = 3.465
 DOWNLOADS = iozone.archive
 
 URL(iozone) = http://iozone.org/src/current/iozone3_465.tar
-SHA(iozone) = 68c51309ad24e04b4a1f0bf6be3c1c6f37faef38
+SHA(iozone) = 2e3d72916e7d7340a7c505fc0c3d28553fcc5ff2daf41d811368e55bd4e6a293
 DIR(iozone) = src/app/iozone
 
 PATCHES   = src/app/iozone/patch

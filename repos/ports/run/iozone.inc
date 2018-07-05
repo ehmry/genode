@@ -98,9 +98,12 @@ set config {
 append config $test_vfs_config
 
 append config {
-				<dir name="dev"> <log/> </dir>
+				<dir name="dev">
+					<log/>
+					<inline name="rtc">2000-01-01 00:00</inline>
+				</dir>
 			</vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc"/>
 			<arg value="iozone"/>
 			<arg value="-a"/>
 }
@@ -184,7 +187,7 @@ install_config $config
 # Boot modules
 #
 
-append boot_modules { libc.lib.so libm.lib.so posix.lib.so iozone }
+append boot_modules { libc.lib.so libm.lib.so posix.lib.so vfs.lib.so iozone }
 
 lappend boot_modules {*}$test_boot_modules
 

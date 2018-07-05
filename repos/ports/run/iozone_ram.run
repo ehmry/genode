@@ -44,9 +44,12 @@ set config {
 		<config>
 			<vfs>
 				<ram/>
-				<dir name="dev"> <log/> </dir>
+				<dir name="dev">
+					<log/>
+					<inline name="rtc">2000-01-01 00:00</inline>
+				</dir>
 			</vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc"/>
 			<arg value="iozone"/>
 			<arg value="-a"/>
 			<arg value="-g"/> <arg value="65536"/>
@@ -71,7 +74,7 @@ install_config $config
 #
 
 build_boot_image {
-	libc.lib.so libm.lib.so posix.lib.so
+	libc.lib.so libm.lib.so posix.lib.so vfs.lib.so
 	iozone
 }
 
