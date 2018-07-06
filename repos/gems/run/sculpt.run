@@ -365,7 +365,7 @@ install_config {
 		<resource name="RAM" quantum="128M"/>
 		<provides> <service name="Nitpicker"/> </provides>
 		<route>
-			<service name="LOG"> <child name="log"/> </service>
+			<!-- <service name="LOG"> <child name="log"/> </service> -->
 			<service name="ROM" label="config">
 				<child name="leitzentrale_config"/> </service>
 			<service name="ROM" label_prefix="report -> ">
