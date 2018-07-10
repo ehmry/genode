@@ -740,8 +740,8 @@ close $fd
 # Create boot image
 #
 
-build { lib/ld init app/sculpt_manager }
+build { lib/ld init app/sculpt_manager server/cached_fs_rom }
 
-append boot_modules { ld.lib.so init sculpt_manager }
+append boot_modules { ld.lib.so init sculpt_manager cached_fs_rom }
 
 build_boot_image $boot_modules
