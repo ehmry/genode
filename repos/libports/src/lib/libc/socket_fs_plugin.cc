@@ -763,6 +763,9 @@ extern "C" int socket_fs_setsockopt(int libc_fd, int level, int optname,
 		case SO_REUSEADDR:
 			/* not yet implemented - always return true */
 			return 0;
+		case SO_LINGER: /* linger on close if data present */
+			/* not yet implemented - always return true */
+			return 0;
 		default: return Errno(ENOPROTOOPT);
 		}
 
