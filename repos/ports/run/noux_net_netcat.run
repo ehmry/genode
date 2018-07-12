@@ -20,9 +20,11 @@ set build_components {
 	drivers/timer
 	server/tcp_terminal
 	server/nic_bridge
+	server/vfs
 	noux lib/libc_noux
 	noux-pkg/netcat
 	lib/vfs/lwip
+	lib/vfs/audit
 }
 
 proc gpio_drv { } { if {[have_spec rpi] && [have_spec hw]}  { return hw_gpio_drv }
@@ -144,17 +146,32 @@ append_if $use_usb_driver config {
 append_platform_drv_config
 
 append config {
+	<start name="vfs" caps="128">
+		<resource name="RAM" quantum="4M"/>
+		<provides>
+			<service name="File_system"/>
+		</provides>
+		<config>
+			<vfs>
+				<dir name="socket"> <lwip dhcp="yes"/> </dir>
+				<dir name="audit"> <audit path="socket"/> </dir>
+			</vfs>
+			<default-policy root="/audit" writeable="yes"/>
+		</config>
+	</start>
+
 	<start name="noux" caps="500">
 		<resource name="RAM" quantum="1G"/>
-		<config>
-			<fstab> <tar name="netcat.tar" at="/"/> </fstab>
+		<config verbose_syscalls="yes" stderr="/log" stdout="/log">
+			<fstab>
+				<log/>
+				<tar name="netcat.tar" at="/"/>
+				<dir name="socket"> <fs/> </dir>
+			</fstab>
 			<start name="/bin/netcat">
 				<arg value="-l"/>
 				<arg value="-p 5555"/>
 			</start>
-			<vfs>
-				<dir name="socket"> <lwip dhcp="yes"/> </dir>
-			</vfs>
 			<libc socket="/socket"/>
 		</config>}
 
@@ -177,7 +194,7 @@ install_config $config
 
 # generic modules
 set boot_modules {
-	core init timer tcp_terminal nic_bridge
+	core init timer tcp_terminal nic_bridge vfs vfs_audit.lib.so
 	ld.lib.so noux libc.lib.so vfs.lib.so libm.lib.so libc_pipe.lib.so pthread.lib.so
 	libc_noux.lib.so vfs_lwip.lib.so netcat.tar posix.lib.so
 }
@@ -227,7 +244,7 @@ if {[have_include "power_on/qemu"]} {
 	spawn socat -u tcp:$serial_ip_addr:8888 OPEN:$noux_output_file,creat,append
 }
 
-sleep 4
+sleep 8
 
 
 puts "--- serial '$serial_ip_addr' noux '$noux_ip_addr'"
@@ -246,7 +263,7 @@ set output [exec cat $noux_output_file]
 puts "\noutput:\n$output\n"
 exec rm $noux_output_file
 
-exec rm -r bin/etc
+#exec rm -r bin/etc
 
 if {![regexp {Hello Genode} $output dummy]} {
 	puts stderr "Error: output not as expected"
