@@ -12,6 +12,7 @@
  */
 
 /* Genode includes */
+#include <os/reporter.h>
 #include <os/path.h>
 #include <file_system_session/connection.h>
 #include <file_system/util.h>
@@ -36,216 +37,213 @@ namespace Cached_fs_rom {
 	typedef Genode::Path<File_system::MAX_PATH_LEN> Path;
 	typedef File_system::Session_client::Tx::Source Tx_source;
 
-	class Rom_file;
-	typedef Genode::Id_space<Rom_file> Rom_files;
+	struct Cached_rom;
+	typedef Genode::Id_space<Cached_rom> Cache_space;
+
+	struct Transfer;
+	typedef Genode::Id_space<Transfer> Transfer_space;
 
 	class Session_component;
-	typedef Genode::Id_space<Session_component> Sessions;
+	typedef Genode::Id_space<Session_component> Session_space;
 
-	struct Packet_handler;
 	struct Main;
 
+	typedef File_system::Session::Tx::Source::Packet_alloc_failed Packet_alloc_failed;
+	typedef File_system::File_handle File_handle;
 }
 
 
-class Cached_fs_rom::Rom_file final
+struct Cached_fs_rom::Cached_rom final
 {
-	private:
+	Cached_rom(Cached_rom const &);
+	Cached_rom &operator = (Cached_rom const &);
 
-		Env &_env;
-		Rm_connection &_rm_connection;
-		File_system::Session &_fs;
+	Genode::Env   &env;
+	Rm_connection &rm_connection;
 
-		Rom_files                         &_roms;
-		Constructible<Rom_files::Element>  _roms_elem { };
+	size_t const file_size;
+
+	/**
+	 * Backing RAM dataspace
+	 */
+	Attached_ram_dataspace ram_ds { env.pd(), env.rm(), file_size };
+
+	/**
+	 * Read-only region map exposed as ROM module to the client
+	 */
+	Region_map_client      rm { rm_connection.create(ram_ds.size()) };
+	Region_map::Local_addr rm_attachment { };
+	Dataspace_capability   rm_ds { };
+
+	Path const path;
+
+	Cache_space::Element cache_elem;
+
+	Transfer *transfer = nullptr;
+
+	/**
+	 * Reference count of cache entry
+	 */
+	int _ref_count = 0;
+
+	Cached_rom(Cache_space   &cache_space,
+	           Env           &env,
+	           Rm_connection &rm,
+	           Path const    &file_path,
+	           size_t         size)
+	:
+		env(env), rm_connection(rm), file_size(size),
+		path(file_path),
+		cache_elem(*this, cache_space)
+	{ }
+
+	/**
+	 * Destructor
+	 */
+	~Cached_rom()
+	{
+		if (rm_attachment)
+			rm.detach(rm_attachment);
+	}
+
+	bool completed() const { return rm_ds.valid(); }
+	bool unused()    const { return (_ref_count < 1); }
+
+	void complete()
+	{
+		/* attach dataspace read-only into region map */
+		enum { OFFSET = 0, LOCAL_ADDR = false, EXEC = true, WRITE = false };
+		rm_attachment = rm.attach(
+			ram_ds.cap(), file_size, OFFSET,
+			LOCAL_ADDR, (addr_t)~0, EXEC, WRITE);
+		rm_ds = rm.dataspace();
+	}
+
+	/**
+	 * Return dataspace with content of file
+	 */
+	Rom_dataspace_capability dataspace() const {
+		return static_cap_cast<Rom_dataspace>(rm_ds); }
+
+	struct Guard
+	{
+		Cached_rom &_rom;
+
+		Guard(Cached_rom &rom) : _rom(rom) {
+			++_rom._ref_count; }
+		~Guard() {
+			--_rom._ref_count; };
+	};
+
+	void report(Reporter::Xml_generator &xml) const
+	{
+		xml.node("cache", [&] () {
+			xml.attribute("path", path.string());
+			xml.attribute("ref", _ref_count);
+			xml.attribute("size", file_size);
+			xml.attribute("ready", completed());
+		});
+	}
+};
+
+
+struct Cached_fs_rom::Transfer final
+{
+		Cached_rom                    &_cached_rom;
+		Cached_rom::Guard              _cache_guard { _cached_rom };
+
+		File_system::Session          &_fs;
+		File_system::File_handle       _handle;
+
+		File_system::file_size_t const _size;
+		File_system::seek_off_t        _seek = 0;
+		File_system::Packet_descriptor _raw_pkt = _alloc_packet();
+		File_system::Packet_guard      _packet_guard { *_fs.tx(), _raw_pkt };
+
+		Transfer_space::Element        _transfer_elem;
 
 		/**
-		 * Name of requested file, interpreted at path into the file system
+		 * Allocate space in the File_system packet buffer
+		 *
+		 * \throw  Packet_alloc_failed
 		 */
-		Path const _file_path;
+		File_system::Packet_descriptor _alloc_packet()
+		{
+			if (!_fs.tx()->ready_to_submit())
+				throw Packet_alloc_failed();
 
-		/**
-		 * Handle of associated file opened during read loop
-		 */
-		Constructible<File_system::File_handle> _file_handle { };
-
-		/**
-		 * Size of file
-		 */
-		File_system::file_size_t _file_size = 0;
-
-		/**
-		 * Read offset of file handle
-		 */
-		File_system::seek_off_t _file_seek = 0;
-
-		/**
-		 * Dataspace to read into
-		 */
-		Attached_ram_dataspace _file_ds { _env.pd(), _env.rm(), (size_t)_file_size };
-
-		/**
-		 * Read-only region map exposed as ROM module to the client
-		 */
-		Region_map_client      _rm { _rm_connection.create(_file_ds.size()) };
-		Region_map::Local_addr _rm_attachment { };
-		Dataspace_capability   _rm_ds { };
-
-		/**
-		 * Packet space used by this session
-		 */
-		File_system::Packet_descriptor _raw_pkt { };
-
-		/**
-		 * Reference count of ROM file, initialize to one and
-		 * decrement after read completes.
-		 */
-		int _ref_count = 1;
+			size_t chunk_size = min(_size, _fs.tx()->bulk_buffer_size()/4);
+			return _fs.tx()->alloc_packet(chunk_size);
+		}
 
 		void _submit_next_packet()
 		{
 			using namespace File_system;
 
-			Tx_source &source = *_fs.tx();
-
-			while (!source.ready_to_submit()) {
-				warning("FS packet queue congestion");
-				_env.ep().wait_and_dispatch_one_io_signal();
-			}
-
 			File_system::Packet_descriptor
-				packet(_raw_pkt, *_file_handle,
-				       File_system::Packet_descriptor::READ,
-				       _raw_pkt.size(), _file_seek);
+			packet(_raw_pkt, _handle,
+			       File_system::Packet_descriptor::READ,
+			       _raw_pkt.size(), _seek);
 
-			source.submit_packet(packet);
-		}
-
-		void _initiate_read()
-		{
-			using namespace File_system;
-
-			Tx_source &source = *_fs.tx();
-
-			size_t chunk_size = min(_file_size, source.bulk_buffer_size()/2);
-
-			/* loop until a packet space is allocated */
-			while (true) {
-				try { _raw_pkt = source.alloc_packet(chunk_size); break; }
-				catch (File_system::Session::Tx::Source::Packet_alloc_failed) {
-					chunk_size = min(_file_size, source.bulk_buffer_size()/4);
-					_env.ep().wait_and_dispatch_one_io_signal();
-				}
-			}
-
-			_submit_next_packet();
+			_fs.tx()->submit_packet(packet);
 		}
 
 	public:
 
 		/**
 		 * Constructor
-		 *
-		 * \param fs        file-system session to read the file from
-		 * \param filename  requested file name
-		 * \param sig_rec   signal receiver used to get notified about changes
-		 *                  within the compound directory (in the case when
-		 *                  the requested file could not be found at session-
-		 *                  creation time)
 		 */
-		Rom_file(Env &env,
-		         Rm_connection &rm,
-		         File_system::Session &fs,
-		         File_system::File_handle handle,
-		         size_t      size,
-		         Rom_files &cache,
-		         Path const &file_path)
+		Transfer(Transfer_space           &space,
+		         Cached_rom               &rom,
+		         File_system::Session     &fs,
+		         File_system::File_handle  file_handle,
+		         size_t                    file_size)
 		:
-			_env(env), _rm_connection(rm), _fs(fs), _roms(cache),
-			_file_path(file_path), _file_size(size)
+			_cached_rom(rom), _fs(fs),
+			_handle(file_handle), _size(file_size),
+			_transfer_elem(*this, space, Transfer_space::Id{_handle.value})
 		{
-			/*
-			 * invert the file handle id to push the element to
-			 * the opposite end of the space
-			 */
-			_roms_elem.construct(*this, _roms, Rom_files::Id{~handle.value});
-			_file_handle.construct(handle);
+			_cached_rom.transfer = this;
 
-			_initiate_read();
+			_submit_next_packet();
 		}
 
-		/**
-		 * Destructor
-		 */
-		~Rom_file()
-		{
-			if (_file_handle.constructed())
-				_fs.close(*_file_handle);
-			_fs.tx()->release_packet(_raw_pkt);
+		Path const &path() const { return _cached_rom.path; }
 
-			if (_rm_attachment)
-				_rm.detach(_rm_attachment);
-		}
-
-		Path const &path() const { return _file_path; }
-
-		bool completed() const { return _rm_ds.valid(); }
-
-		void inc_ref() { ++_ref_count; }
-		void dec_ref() { --_ref_count; }
-
-		bool unused() const { return (_ref_count < 1); }
-
-		bool matches(File_system::Node_handle h) const {
-			return _file_handle.constructed() ? (*_file_handle == h) : false; }
+		bool completed() const { return (_seek >= _size); }
 
 		/**
-		 * Return dataspace with content of file
-		 */
-		Rom_dataspace_capability dataspace() const {
-			return static_cap_cast<Rom_dataspace>(_rm_ds); }
-
-		/**
-		 * Called from the signal handler.
+		 * Called from the packet signal handler.
 		 */
 		void process_packet(File_system::Packet_descriptor const packet)
 		{
-			if (!(packet.handle() == *_file_handle)) {
-				error("packet and handle mismatch");
-				throw ~0;
-			}
+			auto const pkt_seek = packet.position();
 
-			if (packet.position() > _file_seek || _file_seek >= _file_size) {
-				error("bad packet seek position");
-				_file_ds.realloc(&_env.ram(), 0);
-				_file_seek = 0;
-				_file_size = 0;
+			if (pkt_seek > _seek || _seek >= _size) {
+				error("bad packet seek position for ", path());
+				error("packet seek is ", packet.position(), ", file seek is ", _seek, ", file size is ", _size);
+				_seek = _size;
 			} else {
-				size_t const n = min(packet.length(), _file_size - _file_seek);
-				memcpy(_file_ds.local_addr<char>()+_file_seek,
+				size_t const n = min(packet.length(), _size - pkt_seek);
+				memcpy(_cached_rom.ram_ds.local_addr<char>()+pkt_seek,
 				       _fs.tx()->packet_content(packet), n);
-				_file_seek += n;
+				_seek = pkt_seek+n;
 			}
 
-			if (_file_seek >= _file_size) {
-				_fs.tx()->release_packet(_raw_pkt);
-				_fs.close(*_file_handle);
-
-				_file_handle.destruct();
-				_roms_elem.destruct();
-
-				_roms_elem.construct(*this, _roms);
-				--_ref_count;
-
-				/* attach dataspace read-only into region map */
-				enum { OFFSET = 0, LOCAL_ADDR = false, EXEC = true, WRITE = false };
-				_rm_attachment = _rm.attach(
-					_file_ds.cap(), _file_size, OFFSET,
-					LOCAL_ADDR, (addr_t)~0, EXEC, WRITE);
-				_rm_ds = _rm.dataspace();
-			} else {
+			if (completed())
+					_cached_rom.complete();
+			else
 				_submit_next_packet();
-			}
+		}
+
+		void report(Reporter::Xml_generator &xml) const
+		{
+			xml.node("transfer", [&] () {
+				xml.attribute("path", path().string());
+				xml.attribute("pkt_size", _raw_pkt.size());
+				xml.attribute("seek", _seek);
+				xml.attribute("size", _size);
+			});
 		}
 };
 
@@ -254,25 +252,28 @@ class Cached_fs_rom::Session_component final : public  Rpc_object<Rom_session>
 {
 	private:
 
-		Rom_file &_rom_file;
-
-		Sessions::Element _sessions_elem;
+		Cached_rom             &_cached_rom;
+		Cached_rom::Guard       _cache_guard { _cached_rom };
+		Session_space::Element  _sessions_elem;
+		Session_label    const  _label;
 
 	public:
 
-		Session_component(Rom_file &rom_file,
-		                  Sessions &sessions,
-		                  Sessions::Id id)
+		Session_component(Cached_rom &cached_rom,
+		                  Session_space &space, Session_space::Id id,
+		                  Session_label const &label)
 		:
-			_rom_file(rom_file),
-			_sessions_elem(*this, sessions, id)
-		{
-			_rom_file.inc_ref();
-		}
+			_cached_rom(cached_rom),
+			_sessions_elem(*this, space, id),
+			_label(label)
+		{ }
 
-		~Session_component()
+		void report(Reporter::Xml_generator &xml) const
 		{
-			_rom_file.dec_ref();
+			xml.node("session", [&] () {
+				xml.attribute("id", _sessions_elem.id().value);
+				xml.attribute("label", _label.string());
+			});
 		}
 
 		/***************************
@@ -280,9 +281,10 @@ class Cached_fs_rom::Session_component final : public  Rpc_object<Rom_session>
 		 ***************************/
 
 		Rom_dataspace_capability dataspace() override {
-			return _rom_file.dataspace(); }
+			return _cached_rom.dataspace(); }
 
 		void sigh(Signal_context_capability) override { }
+
 		bool update() override { return false; }
 };
 
@@ -291,16 +293,15 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 {
 	Genode::Env &env;
 
+	Reporter reporter { env, "state", "state", 1<<20 };
+
 	Rm_connection rm { env };
 
-	Rom_files rom_cache { };
-	Sessions  rom_sessions { };
+	Cache_space    cache     { };
+	Transfer_space transfers { };
+	Session_space  sessions  { };
 
-	/* Heap for local allocation */
 	Heap heap { env.pd(), env.rm() };
-
-	/* allocate sessions on a simple heap */
-	Sliced_heap sliced_heap { env.pd(), env.rm() };
 
 	Allocator_avl           fs_tx_block_alloc { &heap };
 	File_system::Connection fs { env, fs_tx_block_alloc };
@@ -310,35 +311,33 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 	Io_signal_handler<Main> packet_handler {
 		env.ep(), *this, &Main::handle_packets };
 
-	/**
-	 * Signal handler to disable blocking behavior in 'Expanding_parent_client'
-	 */
-	Signal_handler<Main> resource_handler {
-		env.ep(), *this, &Main::handle_resources };
+	void report_state()
+	{
+		if (!reporter.enabled()) return;
 
-	/**
-	 * Process requests again if parent gives us an upgrade
-	 */
-	void handle_resources() {
-		session_requests.process(); }
+		Reporter::Xml_generator xml(reporter, [&] () {
+			cache.for_each<Cached_rom&>([&] (Cached_rom &rom) {
+				rom.report(xml); });
+			transfers.for_each<Transfer&>([&] (Transfer &transfer) {
+				transfer.report(xml); });
+			sessions.for_each<Session_component&>([&] (Session_component &session) {
+				session.report(xml); });
+		});
+	}
 
 	/**
 	 * Return true when a cache element is freed
 	 */
 	bool cache_evict()
 	{
-		Rom_file *discard = nullptr;
+		Cached_rom *discard = nullptr;
 
-		rom_cache.for_each<Rom_file&>([&] (Rom_file &rf) {
-			if (discard) return;
-			if (rf.unused()) discard = &rf;
-		});
+		cache.for_each<Cached_rom&>([&] (Cached_rom &rom) {
+			if (!discard && rom.unused()) discard = &rom; });
 
-		if (discard) {
+		if (discard)
 			destroy(heap, discard);
-			return true;
-		}
-		return false;
+		return (bool)discard;
 	}
 
 	/**
@@ -403,74 +402,70 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 		 ** Find ROM in cache **
 		 ***********************/
 
+		Session_space::Id  const id { pid.value };
+
 		Session_label const label = label_from_args(args.string());
 		Path          const path(label.last_element().string());
-		Sessions::Id  const id { pid.value };
 
-		Rom_file *rom_file = nullptr;
+		Cached_rom *rom = nullptr;
 
-		/* lookup the Rom_file in the cache */
-		rom_cache.for_each<Rom_file&>([&] (Rom_file &rf) {
-			if (!rom_file && rf.path() == path)
-				rom_file = &rf;
+		/* lookup the ROM in the cache */
+		cache.for_each<Cached_rom&>([&] (Cached_rom &other) {
+			if (!rom && other.path == path)
+				rom = &other;
 		});
 
-		if (!rom_file) {
+		if (!rom) {
 			File_system::File_handle handle = try_open(path);
+			File_system::Handle_guard guard(fs, handle);
 			size_t file_size = fs.status(handle).size;
 
-			/* alloc-or-evict loop */
-			do {
-				try {
-					new (heap)
-						Rom_file(env, rm, fs, handle, file_size, rom_cache, path);
-					/* session is ready when read completes */
-					return;
-				}
-				/*
-				 * There is an assumption that failure to allocate
-				 * will implicitly trigger a resource request to the
-				 * parent. If this behavior changes in the base library
-				 * then this local mechanism cannot be expected to work.
-				 */
-				catch (Quota_guard<Ram_quota>::Limit_exceeded) { }
-				catch (Quota_guard<Cap_quota>::Limit_exceeded) { }
-			} while (cache_evict());
-			/* eviction failed */
-			warning("insufficient resources for '", label, "'"
-			        ", stalling for upgrade");
-			return;
+			if (file_size == 0) {
+				error("unable to serve zero-length file \"", path, "\"");
+				throw Service_denied();
+			}
+
+			while (env.pd().avail_ram().value < file_size || env.pd().avail_caps().value < 8) {
+				/* drop unused cache entries */
+				if (!cache_evict()) break;
+			}
+
+			rom = new (heap) Cached_rom(cache, env, rm, path, file_size);
+			report_state();
 		}
 
-		if (!rom_file->completed())
-			return;
-
-
-		/***************************
-		 ** Create new RPC object **
-		 ***************************/
-
-		try {
-			Session_component *session = new (sliced_heap)
-				Session_component(*rom_file, rom_sessions, id);
+		if (rom->completed()) {
+			/* Create new RPC object */
+			Session_component *session = new (heap)
+				Session_component(*rom, sessions, id, label);
 			env.parent().deliver_session_cap(pid, env.ep().manage(*session));
-		}
+			report_state();
 
-		catch (Sessions::Conflicting_id) {
-			Genode::warning("session request handled twice, ", args);
+		} else if (!rom->transfer) {
+			File_system::File_handle handle = try_open(path);
+
+			try { new (heap) Transfer(transfers, *rom, fs, handle, rom->file_size); }
+			catch (...) {
+				Genode::warning("defer transfer of ", rom->path);
+				/* retry when next pending transfer completes */
+				return;
+			}
+			report_state();
 		}
 	}
 
 	void handle_session_close(Parent::Server::Id pid) override
 	{
-		Sessions::Id id { pid.value };
-		rom_sessions.apply<Session_component&>(
+		Session_space::Id id { pid.value };
+		sessions.apply<Session_component&>(
 			id, [&] (Session_component &session)
 		{
 			env.ep().dissolve(session);
-			destroy(sliced_heap, &session);
+			destroy(heap, &session);
 			env.parent().session_response(pid, Parent::SESSION_CLOSED);
 		});
+
+		report_state();
 	}
 
 	void handle_packets()
@@ -484,12 +479,14 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 			bool stray_pkt = true;
 
 			/* find the appropriate session */
-			rom_cache.apply<Rom_file&>(
-				Rom_files::Id{~(pkt.handle().value)}, [&] (Rom_file &rom)
+			transfers.apply<Transfer&>(
+				Transfer_space::Id{pkt.handle().value}, [&] (Transfer &transfer)
 			{
-				rom.process_packet(pkt);
-				if (rom.completed())
-					session_requests.process();
+				transfer.process_packet(pkt);
+				if (transfer.completed()) {
+					session_requests.schedule();
+					destroy(heap, &transfer);
+				}
 				stray_pkt = false;
 			});
 
@@ -500,12 +497,13 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 
 	Main(Genode::Env &env) : env(env)
 	{
-		env.parent().resource_avail_sigh(resource_handler);
-
 		fs.sigh_ack_avail(packet_handler);
 
 		/* process any requests that have already queued */
-		session_requests.process();
+		session_requests.schedule();
+
+		try { reporter.enabled(true); }
+		catch (...) { log("state report disabled"); }
 	}
 };
 
@@ -514,11 +512,4 @@ void Component::construct(Genode::Env &env)
 {
 	static Cached_fs_rom::Main inst(env);
 	env.parent().announce("ROM");
-
-
-	/**
-	 * XXX This workaround can be removed with the eager creation of the
-	 *     the env log session.
-	 */
-	Genode::log("--- cached_fs_rom ready ---");
 }
