@@ -14,6 +14,9 @@
 #ifndef _INCLUDE__LIBC__SELECT_H_
 #define _INCLUDE__LIBC__SELECT_H_
 
+/* Genode includes */
+#include <util/reconstructible.h>
+
 /* Libc includes */
 #include <sys/select.h> /* for fd_set */
 
