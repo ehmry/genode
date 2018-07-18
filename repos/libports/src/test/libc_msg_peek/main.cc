@@ -11,7 +11,7 @@
 void server()
 {
     struct sockaddr_in server, client;
-    socklen_t clilen;
+    socklen_t clilen = sizeof(client);
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     int connection;
 
@@ -23,11 +23,19 @@ void server()
 
     bind(sock, (struct sockaddr *)&server, sizeof(server));
     listen(sock, 1);
-    connection = accept(sock, (struct sockaddr *)&client, &clilen);
+
+ 	Genode::log("accept");
+   connection = accept(sock, (struct sockaddr *)&client, &clilen);
+   if (connection < 0) {
+      perror("accept failed");
+      exit(connection);
+   }
+	Genode::log("accepted");
 
     char sbuf[2] = {};
     while(recv(connection, sbuf, 1, MSG_PEEK) > 0){
         Genode::log("peek: ", Genode::Cstring(sbuf));
+        recv(connection, sbuf, 1, 0);
     }
 
     close(connection);

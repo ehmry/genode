@@ -6,13 +6,15 @@ set build_components {
 	core init
 	drivers/timer drivers/input drivers/nic
 	server/nic_bridge
-        test/libc_msg_peek
+	test/libc_msg_peek
 	test/lwip/http_clnt
-
 }
 
 source ${genode_dir}/repos/base/run/platform_drv.inc
+source ${genode_dir}/repos/libports/run/vfs_lwip.inc
+
 append_platform_drv_build_components
+append_socket_fs_build_components
 
 build $build_components
 
@@ -47,7 +49,7 @@ append config {
 		<resource name="RAM" quantum="1M"/>
 		<provides><service name="Timer"/></provides>
 	</start>
-	<start name="nic_drv">
+	<start name="nic_drv" ld="no">
 		<binary name="} [nic_drv_binary] {"/>
 		<resource name="RAM" quantum="4M"/>
 		<provides><service name="Nic"/></provides>
@@ -57,6 +59,7 @@ append config {
 		<provides><service name="Nic"/></provides>
 		<config>
 			<policy label_prefix="test-libc_msg_peek" ip_addr="10.0.2.55"/>
+			<policy label_prefix="test-http_clnt" ip_addr="10.0.2.56"/>
 		</config>
 		<route>
 			<service name="Nic"> <child name="nic_drv"/> </service>
@@ -67,8 +70,13 @@ append config {
         <start name="test-libc_msg_peek">
             <resource name="RAM" quantum="8M"/>
             <config>
-                <libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log"
-                    ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/>
+                <libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
+		<vfs>
+			<dir name="dev">
+				<log/> </dir>
+			<dir name="socket">
+				<} [socket_fs_plugin] { ip_addr="10.0.2.55" netmask="255.255.255.0" gateway="10.0.2.1"/> </dir>
+		</vfs>
             </config>
             <route>
                 <service name="Nic"> <child name="nic_bridge"/> </service>
@@ -82,8 +90,13 @@ append config {
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 		<config server_ip="10.0.2.55" server_port="80">
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log" socket="/socket"/>
+			<vfs>
+				<dir name="dev">
+					<log/> </dir>
+				<dir name="socket">
+					<} [socket_fs_plugin] { ip_addr="10.0.2.56" netmask="255.255.255.0" gateway="10.0.2.1"/> </dir>
+			</vfs>
 		</config>
 	</start>
 </config>}
@@ -101,9 +114,8 @@ append boot_modules {
 	nic_bridge
 	ld.lib.so
 	libc.lib.so vfs.lib.so
-	lwip_legacy.lib.so
 	test-http_clnt
-        test-libc_msg_peek
+	test-libc_msg_peek
 }
 
 
@@ -111,6 +123,7 @@ append boot_modules {
 lappend_if [have_spec linux] boot_modules fb_sdl
 
 append_platform_drv_boot_modules
+append_socket_fs_boot_modules
 
 build_boot_image $boot_modules
 
