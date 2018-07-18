@@ -214,6 +214,8 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			}
 		}
 
+		void what_are_you() override { _missing(__func__); }
+
 		void cbt() override { _missing(__func__); }
 
 		void civis() override

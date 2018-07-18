@@ -26,6 +26,10 @@ struct Terminal::Character_screen : Genode::Interface
 {
 	virtual void output(Character c) = 0;
 
+	/**
+	 * Host is querying the VT100 options
+	 */
+	virtual void what_are_you() = 0;
 
 	/*******************
 	 ** VT Operations **
