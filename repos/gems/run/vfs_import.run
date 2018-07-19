@@ -1,4 +1,4 @@
-build { server/vfs lib/vfs/import test/libc }
+build { app/sequence server/vfs lib/vfs/import test/libc }
 
 create_boot_directory
 
@@ -30,27 +30,61 @@ install_config {
 			<resource name="RAM" quantum="1M"/>
 			<provides><service name="Timer"/></provides>
 		</start>
-		<start name="noux" caps="500">
+
+		<start name="vfs">
+			<resource name="RAM" quantum="4M"/>
+			<provides><service name="File_system"/></provides>
+			<config>
+				<vfs> <ram/> </vfs>
+				<default-policy root="/" writeable="yes"/>
+			</config>
+		</start>
+
+		<start name="test" caps="500">
+			<binary name="sequence"/>
 			<resource name="RAM" quantum="1G"/>
-			<config stdin="/dev/null" stdout="/dev/log" stderr="/dev/log">
-				<fstab>
-					<dir name="dev"> <log/> <null/> </dir>
-					<ram/>
-					<import>
-						<dir name="bin">
-							<symlink name="sh" target="bash"/>
-						</dir>
-						<tar name="coreutils.tar" />
-					</import>
-				</fstab>
-				<start name="/bin/ls"> <arg value="-Rla"/> </start>
+			<config>
+				<start name="true" caps="500">
+					<binary name="noux"/>
+					<config stdin="/dev/null" stdout="/dev/log" stderr="/dev/log">
+						<fstab>
+							<dir name="fs"> <fs/> </dir>
+							<dir name="dev"> <log/> <null/> </dir>
+							<ram/>
+							<import overwrite="yes">
+								<tar name="coreutils.tar" />
+								<dir name="fs">
+									<symlink name="link" target="test"/>
+									<inline name="test">Hello world!</inline>
+								</dir>
+							</import>
+						</fstab>
+						<start name="/bin/true"> </start>
+					</config>
+				</start>
+
+				<start name="cat" caps="500">
+					<binary name="noux"/>
+					<config stdin="/dev/null" stdout="/dev/log" stderr="/dev/log">
+						<fstab>
+							<dir name="fs"> <fs writeable="no"/> </dir>
+							<dir name="dev"> <log/> <null/> </dir>
+							<ram/>
+							<import>
+								<tar name="coreutils.tar" />
+							</import>
+						</fstab>
+						<start name="/bin/cat"> <arg value="/fs/link"/> </start>
+					</config>
+				</start>
+
 			</config>
 		</start>
 	</config>
 }
 
-build_boot_image { vfs_import.lib.so libc.lib.so vfs vfs.lib.so }
+build_boot_image { vfs_import.lib.so libc.lib.so vfs vfs.lib.so sequence }
 
 append qemu_args " -nographic -serial mon:stdio "
 
-run_genode_until {child "noux" exited.*\n} 30
+run_genode_until {Hello world!} 30

@@ -17,10 +17,42 @@
 
 namespace Vfs_import {
 	using namespace Vfs;
+	class Flush_guard;
 	class File_system;
 	using Genode::Directory;
 	using Genode::Root_directory;
 }
+
+
+/**
+ * Utility to flush or sync a handle upon
+ * leaving scope. Use with caution, syncing
+ * may block for I/O signals.
+ */
+class Vfs_import::Flush_guard
+{
+	private:
+
+		Genode::Entrypoint &_ep;
+		Vfs_handle         &_handle;
+
+	public:
+
+		Flush_guard(Vfs::Env &env, Vfs_handle &handle)
+		: _ep(env.env().ep()), _handle(handle) { }
+
+		~Flush_guard()
+		{
+			while (true) {
+				if ((_handle.fs().queue_sync(&_handle))
+				 && (_handle.fs().complete_sync(&_handle)
+				  == Vfs::File_io_service::SYNC_OK))
+					break;
+				_ep.wait_and_dispatch_one_io_signal();
+			}
+		}
+};
+
 
 class Vfs_import::File_system : public Vfs::File_system
 {
@@ -34,14 +66,21 @@ class Vfs_import::File_system : public Vfs::File_system
 
 		enum { CREATE_IT = true };
 
-		static void copy_symlink(Vfs::File_system &dst, Root_directory &src,
-		                      Directory::Path const &path,
-		                      Genode::Allocator &alloc)
+		static void copy_symlink(Vfs::Env &env,
+		                         Root_directory &src,
+		                         Directory::Path const &path,
+		                         Genode::Allocator &alloc,
+		                         bool overwrite)
 		{
 			Directory::Path target = src.read_symlink(path);
 
 			Vfs_handle *dst_handle = nullptr;
-			auto res = dst.openlink(path.string(), true, &dst_handle, alloc);
+			auto res = env.root_dir().openlink(
+				path.string(), true, &dst_handle, alloc);
+			if (res == OPENLINK_ERR_NODE_ALREADY_EXISTS && overwrite) {
+				res = env.root_dir().openlink(
+					path.string(), false, &dst_handle, alloc);
+			}
 			if (res != OPENLINK_OK) {
 				if (res != OPENLINK_ERR_NODE_ALREADY_EXISTS)
 					Genode::warning("skipping copy of symlink ", path, ", ", res);
@@ -49,46 +88,63 @@ class Vfs_import::File_system : public Vfs::File_system
 			}
 
 			Vfs_handle::Guard guard(dst_handle);
-			file_size count = target.length();
-			for (;;) {
-				file_size out_count = 0;
-				auto wres = dst_handle->fs().write(
-					dst_handle, target.string(), count, out_count);
+			{
+				Flush_guard flush(env, *dst_handle);
 
-				switch (wres) {
-				case WRITE_ERR_AGAIN:
-				case WRITE_ERR_WOULD_BLOCK:
-					break;
-				default:
-					if (out_count < count) {
-						Genode::error("failed to write symlink ", path, ", ", wres);
-						dst.unlink(path.string());
+				file_size count = target.length();
+				for (;;) {
+					file_size out_count = 0;
+					auto wres = dst_handle->fs().write(
+						dst_handle, target.string(), count, out_count);
+
+					switch (wres) {
+					case WRITE_ERR_AGAIN:
+					case WRITE_ERR_WOULD_BLOCK:
+						break;
+					default:
+						if (out_count < count) {
+							Genode::error("failed to write symlink ", path, ", ", wres);
+							env.root_dir().unlink(path.string());
+						}
+						return;
 					}
-					return;
 				}
 			}
 		}
 
-		static void copy_file(Vfs::File_system &dst, Root_directory &src,
+		static void copy_file(Vfs::Env &env,
+		                      Root_directory &src,
 		                      Directory::Path const &path,
-		                      Genode::Allocator &alloc)
+		                      Genode::Allocator &alloc,
+		                      bool overwrite)
 		{
 			using Genode::Readonly_file;
 
 			Readonly_file src_file(src, path);
 			Vfs_handle *dst_handle = nullptr;
 
-			auto const mode = OPEN_MODE_WRONLY | OPEN_MODE_CREATE;
-			auto res = dst.open(path.string(), mode, &dst_handle, alloc);
+			enum {
+				WRITE  = OPEN_MODE_WRONLY,
+				CREATE = OPEN_MODE_WRONLY | OPEN_MODE_CREATE
+			};
+
+			auto res = env.root_dir().open(
+				path.string(), CREATE , &dst_handle, alloc);
+			if (res == OPEN_ERR_EXISTS && overwrite) {
+				res = env.root_dir().open(
+					path.string(), WRITE, &dst_handle, alloc);
+			}
 			if (res != OPEN_OK) {
-				if (res != OPEN_ERR_EXISTS)
-					Genode::warning("skipping copy of file ", path, ", ", res);
+				Genode::warning("skipping copy of file ", path, ", ", res);
 				return;
 			}
 
+			Vfs_handle::Guard guard(dst_handle);
+
 			{
 				char buf[4096];
-				Vfs_handle::Guard guard(dst_handle);
+				Flush_guard flush(env, *dst_handle);
+
 				Readonly_file::At at { };
 
 				while (true) {
@@ -104,7 +160,7 @@ class Vfs_import::File_system : public Vfs::File_system
 						break;
 					default:
 						Genode::error("failed to write to ", path, ", ", wres);
-						dst.unlink(path.string());
+						env.root_dir().unlink(path.string());
 						return;
 					}
 
@@ -114,13 +170,16 @@ class Vfs_import::File_system : public Vfs::File_system
 			}
 		}
 
-		static void copy_dir(Vfs::File_system &dst, Root_directory &src,
+		static void copy_dir(Vfs::Env &env,
+		                     Root_directory &src,
 		                     Directory::Path const &path,
-		                     Genode::Allocator &alloc)
+		                     Genode::Allocator &alloc,
+		                     bool overwrite)
 		{
 			{
 				Vfs_handle *dir_handle = nullptr;
-				dst.opendir(path.string(), CREATE_IT, &dir_handle, alloc);
+				env.root_dir().opendir(
+					path.string(), CREATE_IT, &dir_handle, alloc);
 				if (dir_handle)
 					dir_handle->close();
 			}
@@ -131,13 +190,13 @@ class Vfs_import::File_system : public Vfs::File_system
 					auto entry_path = Directory::join(path, e.name());
 					switch (e.type()) {
 					case DIRENT_TYPE_FILE:
-						copy_file(dst, src, entry_path, alloc);
+						copy_file(env, src, entry_path, alloc, overwrite);
 						break;
 					case DIRENT_TYPE_DIRECTORY:
-						copy_dir(dst, src, entry_path, alloc);
+						copy_dir(env, src, entry_path, alloc, overwrite);
 						break;
 					case DIRENT_TYPE_SYMLINK:
-						copy_symlink(dst, src, entry_path, alloc);
+						copy_symlink(env, src, entry_path, alloc, overwrite);
 						break;
 					default:
 						Genode::warning("skipping copy of ", e);
@@ -152,8 +211,10 @@ class Vfs_import::File_system : public Vfs::File_system
 		File_system(Vfs::Env &env, Genode::Xml_node config)
 		: _heap(env.env().pd(), env.env().rm())
 		{
+			bool overwrite = config.attribute_value("overwrite", false);
+
 			Root_directory content(env.env(), _heap, config);
-			copy_dir(env.root_dir(), content, Directory::Path(""), _heap);
+			copy_dir(env, content, Directory::Path(""), _heap, overwrite);
 		}
 
 		const char* type() override { return "import"; }
