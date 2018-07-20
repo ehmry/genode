@@ -168,11 +168,6 @@ struct Terminal::Character_screen : Genode::Interface
 	virtual void op() = 0;
 
 	/**
-	 * Quad - 8.3.102
-	 */
-	virtual void quad(int ps = 0) = 0;
-
-	/**
 	 * Restore cursor to position of last save_cursor
 	 */
 	virtual void rc() = 0;
@@ -221,6 +216,11 @@ struct Terminal::Character_screen : Genode::Interface
 	 * Select Graphic Rendition - 8.3.117
 	 */
 	virtual void sgr(int ps = 0) = 0;
+
+	/**
+	 * Set mode 8.3.125
+	 */
+	virtual void sm(int) = 0;
 
 	/**
 	 * Scroll Up - 8.3.147

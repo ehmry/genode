@@ -379,13 +379,13 @@ class Terminal::Decoder
 				case 'C': return (_screen.cuf(), true);
 				case 'D': return (_screen.cub(), true);
 				case 'G': return (_screen.cha(), true);
-				case 'H': return (_screen.quad(), true);
+				case 'H': return (_screen.cup(1,1), true);
 				case 'J': return (_screen.ed(),   true);
 				case 'K': return (_screen.el(),   true);
 				case 'L': return (_screen.il(),  true);
 				case 'M': return (_screen.dl(), true);
 				case 'P': return (_screen.dch(), true);
-				//case 'Z': return (_screen.cbt(),  true);
+				case 'Z': return (_screen.cbt(),  true);
 				case 'm': return _sgr(0);
 				case 'S': return (_screen.su(), true);
 				case 'T': return (_screen.sd(), true);
@@ -419,12 +419,13 @@ class Terminal::Decoder
 			case 'C': return (_screen.cuf(p1), true);
 			case 'D': return (_screen.cub(p1), true);
 			case 'd': return (_screen.vpa(p1), true);
-			//case 'g': return (p1 == 3) && (_screen.tbc(), true);
+			case 'g': return (p1 == 3) && (_screen.tbc(), true);
 			case 'G': return (_screen.cha(p1), true);
+			case 'h': return (_screen.decsm(p1), true);
+			case 'l': return (_screen.decrm(p1), true);
 			case 'J': return (_screen.ed(p1), true);
 			case 'K': return (_screen.el(p1), true);
 			case 'L': return (_screen.il(p1), true);
-			case 'l': return (_screen.rm(p1), true);
 			case 'M': return (_screen.dl(p1), true);
 			case 'm': return _sgr(p1);
 			case 'n': return (_screen.vpb(p1), true);
@@ -433,7 +434,6 @@ class Terminal::Decoder
 			case 'S': return (_screen.su(p1), true);
 			case 'T': return (_screen.sd(p1), true);
 			case 'X': return (_screen.ech(p1), true);
-
 			default: break;
 			}
 			return false;

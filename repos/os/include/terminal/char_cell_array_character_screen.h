@@ -14,6 +14,8 @@
 #ifndef _TERMINAL__CHAR_CELL_ARRAY_CHARACTER_SCREEN_H_
 #define _TERMINAL__CHAR_CELL_ARRAY_CHARACTER_SCREEN_H_
 
+#warning fails for "xmas" test
+
 /* terminal includes */
 #include <terminal/cell_array.h>
 #include <terminal/font_face.h>
@@ -114,9 +116,9 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 				/* if cursor position changed, move cursor */
 				Terminal::Position &new_cursor_pos = cs._cursor_pos;
 				if (old_cursor_pos != new_cursor_pos) {
-
 					cs._char_cell_array.cursor(old_cursor_pos, false, true);
-					cs._char_cell_array.cursor(new_cursor_pos, true,  true);
+					cs._char_cell_array.cursor(
+						new_cursor_pos, cs._cursor_visibility != CURSOR_INVISIBLE,  true);
 				}
 			}
 		};
@@ -180,8 +182,11 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 
 		void output(Terminal::Character c)
 		{
-			Cursor_guard guard(*this);
-			if (c.ascii() > 0x10) {
+			if (_irm == INSERT)
+				_missing("insert mode");
+
+			if (0x1f < c.ascii() && c.ascii() < 0x7f) {
+				Cursor_guard guard(*this);
 				_char_cell_array.set_cell(_cursor_pos.x, _cursor_pos.y,
 				                          Char_cell(c.ascii(), Font_face::REGULAR,
 				                          _color_index, _inverse, _highlight));
@@ -196,7 +201,6 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 
 			case '\n': /* 10 */
 				_line_feed();
-				_carriage_return();
 				break;
 
 			case 8: /* backspace */
@@ -225,7 +229,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 					_carriage_return();
 					_line_feed();
 				} else {
-					_cursor_pos.x = _boundary.width;
+					_cursor_pos.x = _boundary.width-1;
 				}
 			}
 		}
@@ -241,16 +245,19 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 		void civis() override
 		{
 			_cursor_visibility = CURSOR_INVISIBLE;
+			_char_cell_array.cursor(_cursor_pos, false);
 		}
 
 		void cnorm() override
 		{
 			_cursor_visibility = CURSOR_VISIBLE;
+			_char_cell_array.cursor(_cursor_pos, true);
 		}
 
 		void cvvis() override
 		{
 			_cursor_visibility = CURSOR_VERY_VISIBLE;
+			_char_cell_array.cursor(_cursor_pos, true);
 		}
 
 		void csr(int start, int end) override
@@ -317,11 +324,10 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 
 		void dch(int pn) override
 		{
-			#warning does DCH shift the line to the left or the whole screen?
-			pn = Genode::min(pn, _cursor_pos.x);
+			pn = Genode::min(_boundary.width - _cursor_pos.x, pn);
 			for (int x = _cursor_pos.x; x < _boundary.width; ++x) {
-				_char_cell_array.set_cell(x-pn, _cursor_pos.y,
-					_char_cell_array.get_cell(x, _cursor_pos.y));
+				_char_cell_array.set_cell(x, _cursor_pos.y,
+					_char_cell_array.get_cell(x+pn, _cursor_pos.y));
 			}
 			for (int x = _boundary.width - pn; x < _boundary.width; ++x) {
 				_char_cell_array.set_cell(x, _cursor_pos.y, Char_cell());
@@ -340,7 +346,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 		 */
 		void ech(int pn)
 		{
-			int y =  _cursor_pos.y;
+			int y = _cursor_pos.y;
 			int x = _cursor_pos.x;
 
 			do {
@@ -362,21 +368,21 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			switch(ps) {
 
 			case 0:
-				el(0);
-				for (int x = _cursor_pos.x; x <_boundary.width; ++x)
+				for (int x = _cursor_pos.x; x < _boundary.width; ++x)
 					_char_cell_array.set_cell(x, _cursor_pos.y, Char_cell());
-				_char_cell_array.clear(_cursor_pos.y + 1, _region_end);
-				break;
-/*
+				_char_cell_array.clear(_cursor_pos.y + 1, _boundary.height-1);
+				return;
+
 			case 1:
-				_char_cell_array.clear(0, _cursor_pos.y);
-				for (int x = 0; x < _cursor_pos.x; ++x)
+				_char_cell_array.clear(0, _cursor_pos.y-1);
+				for (int x = 0; x <= _cursor_pos.x; ++x)
 					_char_cell_array.set_cell(x, _cursor_pos.y, Char_cell());
-				break;
-*/
+				return;
+
 			case 2:
-				_char_cell_array.clear(_region_start, _region_end);
-				break;
+				_char_cell_array.clear(0, _boundary.height-1);
+				return;
+
 			default:
 				Genode::warning(__func__, " not implemented for ", ps);
 				break;
@@ -389,14 +395,18 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			case 0: /* clear to end of line */
 				for (int x = _cursor_pos.x; x < _boundary.width; ++x)
 					_char_cell_array.set_cell(x, _cursor_pos.y, Char_cell());
-				break;
+				return;
+
 			case 1: /* clear from begining of line */
 				for (int x = 0; x <= _cursor_pos.x; ++x)
 					_char_cell_array.set_cell(x, _cursor_pos.y, Char_cell());
-				break;
+				return;
+
 			case 2:
 				_char_cell_array.clear(_cursor_pos.y, _cursor_pos.y);
-				break;
+				return;
+
+			default: _missing(__func__, ps);
 			}
 		}
 
@@ -415,7 +425,19 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			_tab_size = _cursor_pos.x;
 		}
 
-		void ich(int) override { _missing(__func__); }
+		void ich(int pn) override
+		{
+			pn = Genode::min(_boundary.width - _cursor_pos.x, pn);
+
+			for (int x = _boundary.width-1; _cursor_pos.x+pn < x; --x) {
+				_char_cell_array.set_cell(x, _cursor_pos.y,
+					_char_cell_array.get_cell(x-1, _cursor_pos.y));
+			}
+			for (int i = 0; i < pn; ++i) {
+				_char_cell_array.set_cell(
+					_cursor_pos.x+i, _cursor_pos.y, Char_cell());
+			}
+		}
 
 		void il(int value) override
 		{
@@ -440,28 +462,31 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			_color_index = DEFAULT_COLOR_INDEX | (DEFAULT_COLOR_INDEX_BG << 3);
 		}
 
-		void quad(int ps) override
-		{
-			switch (ps) {
-			case 0: { /* flush to line home position margin */
-				Cursor_guard guard(*this);
-				_cursor_pos.x = 0;
-				break;
-			}
-		
-			default:
-				Genode::warning(__func__, " not implemented for ", ps);
-			}
-		}
-
 		void rm(int ps) override
 		{
 			switch (ps) {
 			case 4: /* INSERTION REPLACEMENT MODE */
 				_irm = REPLACE;
 				break;
+			case 34: /* cursor visibility */
+				return cnorm();
 			default:
-				Genode::warning("resetting ", ps, " not implemented");
+				_missing(__func__, ps);
+				break;
+			}
+		}
+
+		void sm(int ps) override
+		{
+			switch (ps) {
+			case 4: /* INSERTION REPLACEMENT MODE */
+				_irm = INSERT;
+				break;
+			case 34: /* cursor visibility */
+				return civis();
+				break;
+			default:
+				_missing(__func__, ps);
 				break;
 			}
 		}
@@ -524,10 +549,10 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 
 		void tsr(int pn) override
 		{
-			Genode::error("TABULATION STOP REMOVE ", pn, " not implemented");
+			_missing(__func__);
 			/*
 			int x = pn;
-			for (int y = _cursor_pos.y; y < _region_end; ++y) {
+			for (int y = _cursor_pos.y; y < _boundary.height-1; ++y) {
 				for (int i = 0; i < _tab_size; ++i) {
 
 				}
@@ -561,10 +586,14 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 		void decsm(int p1, int p2) override
 		{
 			switch (p1) {
-			case    1: return smkx();
-			case    7: _wrap = false; return;
-			case   25: return cnorm();
-			case 1049: return smcup();
+			case    1: _missing("Application Cursor Keys"); return; //return smkx();
+			//case    7: _wrap = false; return;
+			case   25:
+			case   34: return cnorm(); // Visible Cursor
+			case 1000: return _missing("VT200 mouse tracking");
+			case 1002: return _missing("xterm butten event mouse");
+			case 1003: return _missing("xterm any event mouse");
+			case 1049: return _missing("Alternate Screen (new xterm code)"); //smcup();
 			default: break;
 			}
 			_missing(__func__, p1);
@@ -573,11 +602,14 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 		void decrm(int p1, int p2) override
 		{
 			switch (p1) {
-			case    1: return rmkx();
-			case    7: _wrap = true; return;
-			case   25: return civis();
-			case 1000: return rs2();
-			case 1049: return rmcup();
+			case    1: _missing("Application Cursor Keys"); return; //return rmkx();
+			//case    7: _wrap = true; return;
+			case   25:
+			case   34: return civis();
+			case 1000: return _missing("VT200 mouse tracking"); //rs2();
+			case 1002: return _missing("xterm butten event mouse");
+			case 1003: return _missing("xterm any event mouse");
+			case 1049: return _missing("Alternate Screen (new xterm code)"); //rmcup();
 			default: break;
 			}
 			_missing(__func__, p1);
