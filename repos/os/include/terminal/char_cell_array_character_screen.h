@@ -14,8 +14,6 @@
 #ifndef _TERMINAL__CHAR_CELL_ARRAY_CHARACTER_SCREEN_H_
 #define _TERMINAL__CHAR_CELL_ARRAY_CHARACTER_SCREEN_H_
 
-#warning fails for "xmas" test
-
 /* terminal includes */
 #include <terminal/cell_array.h>
 #include <terminal/font_face.h>
@@ -90,7 +88,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 
 		Irm                    _irm = REPLACE;
 
-		bool                   _wrap = true;
+		bool                   _wrap = false;
 
 		enum { DEFAULT_COLOR_INDEX_BG = 0, DEFAULT_COLOR_INDEX = 7, DEFAULT_TAB_SIZE = 8 };
 
@@ -185,23 +183,18 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			if (_irm == INSERT)
 				_missing("insert mode");
 
-			if (0x1f < c.ascii() && c.ascii() < 0x7f) {
-				Cursor_guard guard(*this);
-				_char_cell_array.set_cell(_cursor_pos.x, _cursor_pos.y,
-				                          Char_cell(c.ascii(), Font_face::REGULAR,
-				                          _color_index, _inverse, _highlight));
-				_cursor_pos.x++;
-			}
-
 			switch (c.ascii()) {
+
+			case '\n': /* 10 */
+				_line_feed();
+				break;
 
 			case '\r': /* 13 */
 				_carriage_return();
 				break;
 
-			case '\n': /* 10 */
-				_line_feed();
-				break;
+			/* 14: shift-out */
+			/* 15: shift-in  */
 
 			case 8: /* backspace */
 				{
@@ -221,10 +214,18 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 				}
 
 			default:
+				if (0x1f < c.ascii() && c.ascii() < 0x7f) {
+					Cursor_guard guard(*this);
+					_char_cell_array.set_cell(_cursor_pos.x, _cursor_pos.y,
+					                          Char_cell(c.ascii(), Font_face::REGULAR,
+					                          _color_index, _inverse, _highlight));
+					_cursor_pos.x++;
+				}
 				break;
 			}
 
 			if (_cursor_pos.x >= _boundary.width) {
+
 				if (_wrap) {
 					_carriage_return();
 					_line_feed();
@@ -587,7 +588,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 		{
 			switch (p1) {
 			case    1: _missing("Application Cursor Keys"); return; //return smkx();
-			//case    7: _wrap = false; return;
+			case    7: _wrap = false; return;
 			case   25:
 			case   34: return cnorm(); // Visible Cursor
 			case 1000: return _missing("VT200 mouse tracking");
@@ -603,7 +604,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 		{
 			switch (p1) {
 			case    1: _missing("Application Cursor Keys"); return; //return rmkx();
-			//case    7: _wrap = true; return;
+			case    7: _wrap = true; return;
 			case   25:
 			case   34: return civis();
 			case 1000: return _missing("VT200 mouse tracking"); //rs2();
@@ -615,15 +616,9 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			_missing(__func__, p1);
 		}
 
-		void scs_g0(int charset) override
-		{
-			#warning SCS G0 missing
-		}
+		void scs_g0(int charset) override { _missing(__func__, charset); }
 
-		void scs_g1(int charset) override
-		{
-			#warning SCS G1 missing
-		}
+		void scs_g1(int charset) override { _missing(__func__, charset); }
 
 		void reverse_index()
 		{
