@@ -64,14 +64,6 @@ class Vfs::Global_file_system_factory : public Vfs::File_system_factory
 		                              Genode::Xml_node config);
 
 		/**
-		 * Return name of factory provided by the shared library
-		 */
-		static char const *_factory_symbol()
-		{
-			return "vfs_file_system_factory";
-		}
-
-		/**
 		 * Return name of VFS node
 		 */
 		Node_name _node_name(Genode::Xml_node node);
@@ -86,14 +78,14 @@ class Vfs::Global_file_system_factory : public Vfs::File_system_factory
 		/**
 		 * \throw Factory_not_available
 		 */
-		Vfs::File_system_factory &_load_factory(Vfs::Env        &env,
+		Vfs::File_system_factory &_load_factory(Genode::Env        &env,
 		                                        Library_name const &lib_name);
 
 		/**
 		 * Try to load external File_system_factory provider
 		 */
-		bool _probe_external_factory(Vfs::Env &env,
-		                             Genode::Xml_node node);
+		bool _probe_external_factory(Genode::Env      &env,
+		                             Genode::Xml_node  node);
 
 	public:
 
@@ -103,6 +95,16 @@ class Vfs::Global_file_system_factory : public Vfs::File_system_factory
 		 * \param alloc  internal factory allocator
 		 */
 		Global_file_system_factory(Genode::Allocator &alloc);
+
+		~Global_file_system_factory();
+
+		/**
+		 * Return name of factory provided by the shared library
+		 */
+		static char const *factory_symbol()
+		{
+			return "vfs_file_system_factory";
+		}
 
 		/**
 		 * File_system_factory interface

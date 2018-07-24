@@ -11,6 +11,8 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
+#include <base/debug.h>
+
 
 /* Genode includes */
 #include <vfs/file_system_factory.h>
@@ -37,6 +39,7 @@ namespace Vfs {
 
 	template <typename> struct Builtin_entry;
 	struct External_entry;
+	struct Plugin_entry;
 }
 
 
@@ -55,6 +58,8 @@ struct Vfs::Global_file_system_factory::Entry_base : Vfs::File_system_factory,
 	Fs_type_name name;
 
 	Entry_base(Fs_type_name const &name) : name(name) { }
+
+	virtual ~Entry_base() { };
 
 	bool matches(Genode::Xml_node node) const {
 		return node.has_type(name.string()); }
@@ -79,6 +84,33 @@ struct Vfs::External_entry : Vfs::Global_file_system_factory::Entry_base
 	               File_system_factory &fs_factory)
 	:
 		Entry_base(name), _fs_factory(fs_factory) { }
+
+	File_system *create(Vfs::Env &env,
+	                    Genode::Xml_node config) override
+	{
+		return _fs_factory.create(env, config);
+	}
+};
+
+
+struct Vfs::Plugin_entry final : Vfs::Global_file_system_factory::Entry_base
+{
+	Genode::Shared_object _so;
+
+	typedef Vfs::File_system_factory *(*Query_fn)();
+	File_system_factory &_fs_factory =
+		*_so.lookup<Query_fn>(Global_file_system_factory::factory_symbol())();
+
+	Plugin_entry(Genode::Env         &env,
+	             Genode::Allocator   &alloc,
+	             Fs_type_name  const &name,
+	             Library_name  const &lib_name)
+	:
+		Entry_base(name),
+		_so(env, alloc, lib_name.string(),
+	        Genode::Shared_object::BIND_LAZY,
+		    Genode::Shared_object::DONT_KEEP)
+	{ }
 
 	File_system *create(Vfs::Env &env,
 	                    Genode::Xml_node config) override
@@ -136,52 +168,18 @@ Library_name Vfs::Global_file_system_factory::_library_name(Node_name const &nod
 
 
 /**
- * \throw Factory_not_available
- */
-Vfs::File_system_factory &Vfs::Global_file_system_factory::_load_factory(Vfs::Env &env,
-                                                                         Library_name const &lib_name)
-{
-	Genode::Shared_object *shared_object = nullptr;
-
-	try {
-		shared_object = new (env.alloc())
-			Genode::Shared_object(env.env(), env.alloc(), lib_name.string(),
-			                      Genode::Shared_object::BIND_LAZY,
-			                      Genode::Shared_object::DONT_KEEP);
-
-		typedef Vfs::File_system_factory *(*Query_fn)();
-
-		Query_fn query_fn = shared_object->lookup<Query_fn>(_factory_symbol());
-
-		return *query_fn();
-
-	} catch (Genode::Shared_object::Invalid_rom_module) {
-		Genode::warning("could not open '", lib_name, "'");
-		throw Factory_not_available();
-
-	} catch (Genode::Shared_object::Invalid_symbol) {
-		Genode::warning("could not find symbol '",
-		                Genode::Cstring(_factory_symbol()),
-		                "' in '", lib_name, "'");
-
-		Genode::destroy(env.alloc(), shared_object);
-		throw Factory_not_available();
-	}
-}
-
-
-/**
  * Try to load external File_system_factory provider
  */
-bool Vfs::Global_file_system_factory::_probe_external_factory(Vfs::Env       &env,
+bool Vfs::Global_file_system_factory::_probe_external_factory(Genode::Env       &env,
                                                               Genode::Xml_node   node)
 {
 	Library_name const lib_name = _library_name(_node_name(node));
 
 	try {
-		_list.insert(new (env.alloc())
-			External_entry(_node_name(node).string(),
-			               _load_factory(env, lib_name)));
+		_list.insert(new (_md_alloc)
+			Plugin_entry(env, _md_alloc,
+			               _node_name(node).string(),
+			               lib_name));
 		return true;
 
 	} catch (Factory_not_available) { return false; }
@@ -203,7 +201,7 @@ Vfs::File_system *Vfs::Global_file_system_factory::create(Vfs::Env         &env,
 
 	try {
 		/* probe for file system implementation available as shared lib */
-		if (_probe_external_factory(env, node)) {
+		if (_probe_external_factory(env.env(), node)) {
 			/* try again with the new file system type loaded */
 			if (Vfs::File_system *fs = _try_create(env, node))
 				return fs;
@@ -243,4 +241,13 @@ Vfs::Global_file_system_factory::Global_file_system_factory(Genode::Allocator &a
 	_add_builtin_fs<Vfs::Rtc_file_system>();
 	_add_builtin_fs<Vfs::Ram_file_system>();
 	_add_builtin_fs<Vfs::Symlink_file_system>();
+}
+
+
+Vfs::Global_file_system_factory::~Global_file_system_factory()
+{
+	for (Entry_base *e = _list.first(); e; e = _list.first()) {
+		_list.remove(e);
+		destroy(_md_alloc, e);
+	}
 }

@@ -22,7 +22,7 @@
 namespace Vfs { class Tar_file_system; }
 
 
-class Vfs::Tar_file_system : public File_system
+class Vfs::Tar_file_system final : public File_system
 {
 	Genode::Env       &_env;
 	Genode::Allocator &_alloc;
@@ -135,22 +135,14 @@ class Vfs::Tar_file_system : public File_system
 
 	class Tar_vfs_handle : public Vfs_handle
 	{
-		private:
-
-			/*
-			 * Noncopyable
-			 */
-			Tar_vfs_handle(Tar_vfs_handle const &);
-			Tar_vfs_handle &operator = (Tar_vfs_handle const &);
-
 		protected:
 
-			Node const *_node;
+			Node const &_node;
 
 		public:
 
 			Tar_vfs_handle(File_system &fs, Allocator &alloc, int status_flags,
-			               Node const *node)
+			               Node const &node)
 			: Vfs_handle(fs, fs, alloc, status_flags), _node(node)
 			{ }
 
@@ -159,21 +151,21 @@ class Vfs::Tar_file_system : public File_system
 	};
 
 
-	struct Tar_vfs_file_handle : Tar_vfs_handle
+	struct Tar_vfs_file_handle final : Tar_vfs_handle
 	{
 		using Tar_vfs_handle::Tar_vfs_handle;
 
 		Read_result read(char *dst, file_size count,
 		                 file_size &out_count) override
 		{
-			file_size const record_size = _node->record->size();
+			file_size const record_size = _node.record->size();
 
 			file_size const record_bytes_left = record_size >= seek()
 			                                  ? record_size  - seek() : 0;
 
 			count = min(record_bytes_left, count);
 
-			char const *data = (char *)_node->record->data() + seek();
+			char const *data = (char *)_node.record->data() + seek();
 
 			memcpy(dst, data, count);
 
@@ -182,7 +174,7 @@ class Vfs::Tar_file_system : public File_system
 		}
 	};
 
-	struct Tar_vfs_dir_handle : Tar_vfs_handle
+	struct Tar_vfs_dir_handle final : Tar_vfs_handle
 	{
 		using Tar_vfs_handle::Tar_vfs_handle;
 
@@ -199,7 +191,7 @@ class Vfs::Tar_file_system : public File_system
 
 			file_offset index = seek() / sizeof(Dirent);
 
-			Node const *node = _node->lookup_child(index);
+			Node const *node = _node.lookup_child(index);
 
 			if (!node)
 				return READ_OK;
@@ -240,14 +232,14 @@ class Vfs::Tar_file_system : public File_system
 		}
 	};
 
-	struct Tar_vfs_symlink_handle : Tar_vfs_handle
+	struct Tar_vfs_symlink_handle final : Tar_vfs_handle
 	{
 		using Tar_vfs_handle::Tar_vfs_handle;
 
 		Read_result read(char *buf, file_size buf_size,
 		                 file_size &out_count) override
 		{
-			Record const *record = _node->record;
+			Record const *record = _node.record;
 
 			file_size const count = min(buf_size, 100ULL);
 
@@ -277,6 +269,15 @@ class Vfs::Tar_file_system : public File_system
 		Record const *record;
 
 		Node(char const *name, Record const *record) : name(name), record(record) { }
+
+		void free_all(Genode::Allocator &alloc)
+		{
+			for (Node *child = first(); child; child = first()) {
+				child->free_all(alloc);
+				remove(child);
+				destroy(alloc, child);
+			}
+		}
 
 		Node *lookup(char const *name)
 		{
@@ -525,6 +526,8 @@ class Vfs::Tar_file_system : public File_system
 			_for_each_tar_record_do(Add_node_action(_alloc, _root_node));
 		}
 
+		~Tar_file_system() { _root_node.free_all(_alloc); }
+
 		/*********************************
 		 ** Directory-service interface **
 		 *********************************/
@@ -650,7 +653,7 @@ class Vfs::Tar_file_system : public File_system
 
 			try {
 				*out_handle = new (alloc)
-					Tar_vfs_file_handle(*this, alloc, 0, node);
+					Tar_vfs_file_handle(*this, alloc, 0, *node);
 				return OPEN_OK;
 			}
 			catch (Genode::Out_of_ram)  { return OPEN_ERR_OUT_OF_RAM; }
@@ -669,7 +672,7 @@ class Vfs::Tar_file_system : public File_system
 
 			try {
 				*out_handle = new (alloc)
-					Tar_vfs_dir_handle(*this, alloc, 0, node);
+					Tar_vfs_dir_handle(*this, alloc, 0, *node);
 				return OPENDIR_OK;
 			}
 			catch (Genode::Out_of_ram)  { return OPENDIR_ERR_OUT_OF_RAM; }
@@ -686,7 +689,7 @@ class Vfs::Tar_file_system : public File_system
 
 			try {
 				*out_handle = new (alloc)
-					Tar_vfs_symlink_handle(*this, alloc, 0, node);
+					Tar_vfs_symlink_handle(*this, alloc, 0, *node);
 				return OPENLINK_OK;
 			}
 			catch (Genode::Out_of_ram)  { return OPENLINK_ERR_OUT_OF_RAM; }

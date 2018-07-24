@@ -25,9 +25,10 @@ namespace Vfs { class Inline_file_system; }
 class Vfs::Inline_file_system : public Single_file_system
 {
 	private:
+		Genode::Allocator &_alloc;
 
-		char const * const _base;
-		file_size    const _size;
+		file_size   const _size;
+		char      * const _base;
 
 		/*
 		 * Noncopyable
@@ -101,12 +102,20 @@ class Vfs::Inline_file_system : public Single_file_system
 
 	public:
 
-		Inline_file_system(Vfs::Env&, Genode::Xml_node config)
+		Inline_file_system(Vfs::Env &env, Genode::Xml_node config)
 		:
 			Single_file_system(NODE_TYPE_FILE, name(), config),
-			_base(config.content_base()),
-			_size(config.content_size())
-		{ }
+			_alloc(env.alloc()),
+			_size(config.content_size()),
+			_base((char*)_alloc.alloc(_size))
+		{
+			Genode::memcpy(_base, config.content_base(), _size);
+		}
+
+		~Inline_file_system()
+		{
+			_alloc.free(_base, _size);
+		}
 
 		static char const *name()   { return "inline"; }
 		char const *type() override { return "inline"; }
