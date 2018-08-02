@@ -413,7 +413,7 @@ void Lwip::Lwip_file_handle::print(Genode::Output &output) const
 {
 	output.out_string(socket->name().string());
 	switch (kind) {
-	
+
 	case Lwip_file_handle::ACCEPT:   output.out_string("/accept"); break;
 	case Lwip_file_handle::BIND:     output.out_string("/bind"); break;
 	case Lwip_file_handle::CONNECT:  output.out_string("/connect"); break;
@@ -658,7 +658,7 @@ class Lwip::Udp_socket_dir final :
 	private Udp_socket_dir_list::Element
 {
 	private:
-	
+
 		/*
 		  * Noncopyable
 		 */
