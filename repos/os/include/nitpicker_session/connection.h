@@ -34,6 +34,7 @@ class Nitpicker::Connection : public Genode::Connection<Session>,
 
 		Framebuffer::Session_client _framebuffer;
 		Input::Session_client       _input;
+		Genode::Pd_session         &_pd;
 		Genode::size_t              _session_quota = 0;
 
 		/**
@@ -71,33 +72,23 @@ class Nitpicker::Connection : public Genode::Connection<Session>,
 
 			/* request frame-buffer and input sub sessions */
 			_framebuffer(framebuffer_session()),
-			_input(env.rm(), input_session())
-		{ }
-
-		/**
-		 * Constructor
-		 *
-		 * \noapi
-		 * \deprecated  Use the constructor with 'Env &' as first
-		 *              argument instead
-		 */
-		Connection(char const *label = "") __attribute__((deprecated))
-		:
-			/* establish nitpicker session */
-			Genode::Connection<Session>(_connect(*Genode::env_deprecated()->parent(), label)),
-			Session_client(*Genode::env_deprecated()->rm_session(), cap()),
-
-			/* request frame-buffer and input sub sessions */
-			_framebuffer(framebuffer_session()),
-			_input(*Genode::env_deprecated()->rm_session(), input_session())
+			_input(env.rm(), input_session()),
+			_pd(env.pd())
 		{ }
 
 		void buffer(Framebuffer::Mode mode, bool use_alpha)
 		{
-			Genode::size_t const needed = ram_quota(mode, use_alpha);
+			Genode::size_t const needed  = ram_quota(mode, use_alpha);
 			Genode::size_t const upgrade = needed > _session_quota
 			                             ? needed - _session_quota
 			                             : 0;
+
+			if (upgrade > _pd.avail_ram().value) {
+				Genode::error("Nitpicker buffer upgrade exceedes available RAM");
+				Genode::error("need: ", needed, " upgrade: ", upgrade, " avail: ", _pd.avail_ram().value);
+				throw Genode::Out_of_ram();
+			}
+
 			if (upgrade > 0) {
 				this->upgrade_ram(upgrade);
 				_session_quota += upgrade;
