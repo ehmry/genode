@@ -547,7 +547,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 
 		void tsr(int pn) override
 		{
-			_missing(__func__);
+			_missing(__func__, pn);
 			/*
 			int x = pn;
 			for (int y = _cursor_pos.y; y < _boundary.height-1; ++y) {
@@ -581,7 +581,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			_cursor_pos = _cursor_store;
 		}
 
-		void decsm(int p1, int p2) override
+		void decsm(int p1, int) override
 		{
 			switch (p1) {
 			case    1: _missing("Application Cursor Keys"); return; //return smkx();
@@ -597,7 +597,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			_missing(__func__, p1);
 		}
 
-		void decrm(int p1, int p2) override
+		void decrm(int p1, int) override
 		{
 			switch (p1) {
 			case    1: _missing("Application Cursor Keys"); return; //return rmkx();
