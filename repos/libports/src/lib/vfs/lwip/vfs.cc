@@ -1069,6 +1069,8 @@ class Lwip::Tcp_socket_dir final :
 			Pcb_pending *elem = new (alloc) Pcb_pending(newpcb);
 			_pcb_pending.insert(elem);
 
+			tcp_backlog_delayed(newpcb);
+
 			tcp_arg(newpcb, elem);
 			tcp_recv(newpcb, tcp_delayed_recv_callback);
 
@@ -1249,6 +1251,8 @@ class Lwip::Tcp_socket_dir final :
 					handles.remove(&handle);
 					handle.socket = &new_dir;
 					new_dir.handles.insert(&handle);
+
+					tcp_backlog_accepted(pp->pcb);
 
 					_pcb_pending.remove(pp);
 					destroy(alloc, pp);
