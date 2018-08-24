@@ -236,13 +236,11 @@ class Pdf_view
 				}
 			});
 
-			/*
 			ev.handle_wheel([&] (int, int y) {
 				pdfapp_onmouse(
 					&_pdfapp, _motion_x, _motion_y,
 					y > 0 ? 4 : 5, 1, 1);
 			});
-			 */
 		}
 
 		void _handle_input_events()
