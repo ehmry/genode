@@ -496,7 +496,8 @@ class Usb::Worker : public Genode::Weak_object<Usb::Worker>
 
 				_p_in_flight++;
 
-				if (!_device || !_device->udev) {
+				if (!_device || !_device->udev ||
+				    _device->udev->state == USB_STATE_NOTATTACHED) {
 					_ack_packet(p);
 					continue;
 				}
