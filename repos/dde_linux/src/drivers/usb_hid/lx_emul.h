@@ -79,7 +79,7 @@ int    dev_set_drvdata(struct device *dev, void *data);
 #define dev_info(dev, format, arg...) lx_printf("dev_info: " format , ## arg)
 #define dev_warn(dev, format, arg...) lx_printf("dev_warn: " format , ## arg)
 #define dev_err( dev, format, arg...) lx_printf("dev_err: "  format , ## arg)
-#define dev_dbg( dev, format, arg...) lx_printf("dev_dbg: "  format , ## arg)
+#define dev_dbg( dev, format, arg...)
 
 #define pr_info(fmt, ...)       printk(KERN_INFO fmt,    ##__VA_ARGS__)
 #define pr_err(fmt, ...)        printk(KERN_ERR  fmt,    ##__VA_ARGS__)

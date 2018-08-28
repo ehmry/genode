@@ -86,12 +86,18 @@ class Urb : public Usb::Completion
 
 		void complete(Usb::Packet_descriptor & packet) override
 		{
-			if (_urb.transfer_buffer && _urb.transfer_buffer_length)
-				Genode::memcpy(_urb.transfer_buffer,
-				               _usb.source()->packet_content(packet),
-				               _urb.transfer_buffer_length);
-			_urb.actual_length = packet.transfer.actual_size;
-			
+			if (packet.succeded) {
+				bool ctrl = (usb_pipetype(_urb.pipe) == PIPE_CONTROL);
+				_urb.actual_length = ctrl ? packet.control.actual_size
+				                          : packet.transfer.actual_size;
+
+				if (_urb.actual_length && _urb.transfer_buffer &&
+				    (_urb.transfer_buffer_length >= _urb.actual_length))
+					Genode::memcpy(_urb.transfer_buffer,
+					               _usb.source()->packet_content(packet),
+					               _urb.actual_length);
+			}
+
 			if (_urb.complete) _urb.complete(&_urb);
 			kfree(_packet.completion);
 		}

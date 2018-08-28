@@ -119,7 +119,7 @@ append config {
 	<start name="report_rom">
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Report"/> <service name="ROM"/> </provides>
-		<config verbose="yes">
+		<config verbose="no">
 			<default-policy report="usb_drv -> devices"/>
 		</config>
 	</start>
@@ -226,7 +226,7 @@ run_genode_until {\[init -\> test-input\] Input event #11.*\n} 40 [output_spawn_
 grep_output {^\[init }
 
 unify_output { number [0-9]+} ""
-unify_output {(?n)on usb-dummy.*$} ""
+unify_output {(?n)on usb-usbbus.*$} ""
 unify_output {(?n)using .*$} ""
 unify_output {(?n)^.*__wait_event.*$} ""
 unify_output {(?n)^.*Failed to submit URB.*$} ""
@@ -243,10 +243,8 @@ compare_output_to {
 [init -> test-input] Input event #5	RELEASE BTN_LEFT
 [init -> usb_drv] dev_info: USB disconnect, device
 [init -> usb_drv] dev_info: new full-speed USB device
-[init -> usb_drv] dev_info: D L
-[init -> usb_drv] dev_info: input: USB HID v1.11 Keyboard [D L]
-[init -> usb_drv] dev_info: D L
-[init -> usb_drv] dev_info: input: USB HID v1.11 Mouse [D L]
+[init -> usb_hid_drv] dev_info: input: USB HID v1.11 Keyboard [HID 03eb:204d]
+[init -> usb_hid_drv] dev_info: input: USB HID v1.11 Mouse [HID 03eb:204d]
 [init -> test-input] Input event #6	PRESS KEY_X 0
 [init -> test-input] Input event #7	RELEASE KEY_X
 [init -> test-input] Input event #8	PRESS BTN_LEFT 0

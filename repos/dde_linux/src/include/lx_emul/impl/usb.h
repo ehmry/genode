@@ -38,8 +38,9 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe,
 	Sync_ctrl_urb * scu = new (Lx::Malloc::mem())
 		Sync_ctrl_urb(*(Usb::Connection*)(dev->bus->controller), *u);
 	scu->send(timeout);
+	int ret = u->actual_length;
 	usb_free_urb(u);
-	return size;
+	return ret;
 }
 
 

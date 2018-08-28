@@ -43,7 +43,7 @@ void Driver::Device::scan_altsettings(usb_interface * iface,
 		                    USB_REQ_GET_DESCRIPTOR,
 		                    USB_RECIP_INTERFACE | USB_DIR_IN,
 		                    (HID_DT_HID << 8), iface_idx, (void*)hd,
-		                    sizeof(hid_descriptor), USB_CTRL_GET_TIMEOUT) <= 0) {
+		                    sizeof(hid_descriptor), USB_CTRL_GET_TIMEOUT) < 0) {
 			Genode::warning("could not get HID descriptor");
 		} else {
 			iface->altsetting[alt_idx].extra = (unsigned char*)hd;
