@@ -83,6 +83,8 @@ class Vfs::Fs_file_system : public File_system
 			::File_system::Connection &_fs;
 			Io_response_handler       &_io_handler;
 
+			bool write_failed = false;
+
 			bool _queue_read(file_size count, file_size const seek_offset)
 			{
 				if (queued_read_state != Handle_state::Queued_state::IDLE)
@@ -173,7 +175,7 @@ class Vfs::Fs_file_system : public File_system
 
 			bool queue_sync()
 			{
-				if (queued_sync_state != Handle_state::Queued_state::IDLE)
+				if (write_failed || queued_sync_state != Handle_state::Queued_state::IDLE)
 					return true;
 
 				::File_system::Session::Tx::Source &source = *_fs.tx();
@@ -202,8 +204,11 @@ class Vfs::Fs_file_system : public File_system
 
 			Sync_result complete_sync()
 			{
-				if (queued_sync_state != Handle_state::Queued_state::ACK)
+				if (write_failed) {
+					return SYNC_ERR_INVALID;
+				} else if (queued_sync_state != Handle_state::Queued_state::ACK) {
 					return SYNC_QUEUED;
+				}
 
 				/* obtain result packet descriptor */
 				::File_system::Packet_descriptor const
@@ -568,9 +573,6 @@ class Vfs::Fs_file_system : public File_system
 
 				auto handle_read = [&] (Fs_vfs_handle &handle) {
 
-					if (!packet.succeeded())
-						Genode::error("packet operation=", (int)packet.operation(), " failed");
-
 					switch (packet.operation()) {
 					case Packet_descriptor::READ_READY:
 						handle.read_ready_state = Handle_state::Read_ready_state::READY;
@@ -584,6 +586,7 @@ class Vfs::Fs_file_system : public File_system
 						break;
 
 					case Packet_descriptor::WRITE:
+						handle.write_failed = !packet.succeeded();
 						/*
 						 * Notify anyone who might have failed on
 						 * 'alloc_packet()'
@@ -975,6 +978,10 @@ class Vfs::Fs_file_system : public File_system
 			Lock::Guard guard(_lock);
 
 			Fs_vfs_handle &handle = static_cast<Fs_vfs_handle &>(*vfs_handle);
+			if (handle.write_failed) {
+				/* cease writing after the first error */
+				return WRITE_ERR_INVALID;
+			}
 
 			out_count = _write(handle, buf, buf_size, handle.seek());
 
