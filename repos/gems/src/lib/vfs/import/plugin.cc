@@ -152,7 +152,12 @@ class Vfs_import::File_system : public Vfs::File_system
 					file_size rn = src_file.read(at, buf, sizeof(buf));
 					if (!rn) break;
 
-					auto wres = dst_handle->fs().write(dst_handle, buf, rn, wn);
+					auto wres = WRITE_ERR_AGAIN;
+					try { wres =  dst_handle->fs().write(dst_handle, buf, rn, wn); }
+					catch (Vfs::File_io_service::Insufficient_buffer) {
+						env.env().ep().wait_and_dispatch_one_io_signal();
+						continue;
+					}
 					switch (wres) {
 					case WRITE_OK:
 					case WRITE_ERR_AGAIN:
