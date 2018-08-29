@@ -1,7 +1,0 @@
-<launcher pkg="ehmry/pkg/filthy-kitchen/2018-08-28">
-	<route>
-		<!-- <service name="Audio_out"> <child name="audio_drv"/> </service> -->
-		<service name="Nitpicker"> <child name="wm"/> </service>
-	</route>
-</launcher>
-
