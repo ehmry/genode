@@ -517,36 +517,37 @@ class Vfs::Fs_file_system : public File_system
 			return read_num_bytes;
 		}
 
-		file_size _write(Fs_vfs_handle &handle,
-		                 const char *buf, file_size count, file_size seek_offset)
+		Write_result _write(Fs_vfs_handle &handle,
+		                    const char *buf, file_size count,
+		                    file_size seek_offset, file_size &out_count)
 		{
 			::File_system::Session::Tx::Source &source = *_fs.tx();
 			using ::File_system::Packet_descriptor;
 
-			file_size const max_packet_size = source.bulk_buffer_size() / 2;
-			count = min(max_packet_size, count);
-
 			if (!source.ready_to_submit())
-				throw Insufficient_buffer();
+				return WRITE_BLOCKED;
+
+			file_size const max_packet_size = source.bulk_buffer_size() / 2;
+			if (max_packet_size < count)
+				return Write_result::WRITE_OVERSIZED;
 
 			try {
 				Packet_descriptor packet_in(source.alloc_packet(count),
-				                            handle.file_handle(),
-				                            Packet_descriptor::WRITE,
-				                            count,
-				                            seek_offset);
+			                            handle.file_handle(),
+			                            Packet_descriptor::WRITE,
+			                            count,
+			                            seek_offset);
 
 				memcpy(source.packet_content(packet_in), buf, count);
 
 				/* pass packet to server side */
 				source.submit_packet(packet_in);
+				out_count = count;
 			} catch (::File_system::Session::Tx::Source::Packet_alloc_failed) {
-				throw Insufficient_buffer();
-			} catch (...) {
-				Genode::error("unhandled exception");
-				return 0;
+				return WRITE_BLOCKED;
 			}
-			return count;
+
+			return WRITE_OK;
 		}
 
 		void _ready_to_submit()
@@ -976,9 +977,7 @@ class Vfs::Fs_file_system : public File_system
 
 			Fs_vfs_handle &handle = static_cast<Fs_vfs_handle &>(*vfs_handle);
 
-			out_count = _write(handle, buf, buf_size, handle.seek());
-
-			return WRITE_OK;
+			return _write(handle, buf, buf_size, handle.seek(), out_count);
 		}
 
 		bool queue_read(Vfs_handle *vfs_handle, file_size count) override
@@ -1045,10 +1044,10 @@ class Vfs::Fs_file_system : public File_system
 			try {
 				_fs.truncate(handle->file_handle(), len);
 			}
-			catch (::File_system::Invalid_handle)    { return FTRUNCATE_ERR_NO_PERM; }
-			catch (::File_system::Permission_denied) { return FTRUNCATE_ERR_NO_PERM; }
+			catch (::File_system::Invalid_handle)    { return FTRUNCATE_ERR_INVALID; }
+			catch (::File_system::Permission_denied) { return FTRUNCATE_ERR_INVALID; }
 			catch (::File_system::No_space)          { return FTRUNCATE_ERR_NO_SPACE; }
-			catch (::File_system::Unavailable)       { return FTRUNCATE_ERR_NO_PERM; }
+			catch (::File_system::Unavailable)       { return FTRUNCATE_ERR_INVALID; }
 
 			return FTRUNCATE_OK;
 		}
