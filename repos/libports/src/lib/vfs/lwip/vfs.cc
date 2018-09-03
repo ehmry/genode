@@ -105,7 +105,7 @@ extern "C" {
 		                               struct pbuf *p, err_t err);
 		static err_t tcp_delayed_recv_callback(void *arg, struct tcp_pcb *tpcb,
 		                                       struct pbuf *p, err_t err);
-		/* static err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len); */
+		static err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len);
 		static void  tcp_err_callback(void *arg, err_t err);
 	}
 
@@ -1036,8 +1036,7 @@ class Lwip::Tcp_socket_dir final :
 
 			tcp_recv(_pcb, tcp_recv_callback);
 
-			/* Disabled, do not track acknowledgements */
-			/* tcp_sent(_pcb, tcp_sent_callback); */
+			tcp_sent(_pcb, tcp_sent_callback);
 
 			tcp_err(_pcb, tcp_err_callback);
 		}
@@ -1316,7 +1315,9 @@ class Lwip::Tcp_socket_dir final :
 		{
 			if (_pcb == NULL) {
 				/* socket is closed */
-				return Write_result::WRITE_ERR_INVALID;
+				Genode::log("socket is closed");
+				out_count = 0;
+				return Write_result::WRITE_OK;
 			}
 
 			switch(handle.kind) {
@@ -1325,16 +1326,12 @@ class Lwip::Tcp_socket_dir final :
 					file_size out = 0;
 					while (count) {
 						/* check if the send buffer is exhausted */
-						if (tcp_sndbuf(_pcb) == 0) {
-							Genode::warning("TCP send buffer congested");
-							out_count = out;
-							return out
-								? Write_result::WRITE_OK
-								: Write_result::WRITE_ERR_WOULD_BLOCK;
-						}
+						count = min(count, tcp_sndbuf(_pcb));
+						if (!count)
+							return Write_result::WRITE_BLOCKED;
 
-						u16_t n = min(count, tcp_sndbuf(_pcb));
-						/* how much can we queue right now? */
+						/* safe to segment writes to fit into pbufs */
+						u16_t n = min(count, 0xffffU);
 
 						count -= n;
 						/* write to outgoing TCP buffer */
@@ -1533,24 +1530,25 @@ err_t tcp_delayed_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *buf
 };
 
 
-/**
- * This would be the ACK callback, we could defer sync completion
- * until then, but performance is expected to be unacceptable.
- *
 static
-err_t tcp_sent_callback(void *arg, struct tcp_pcb*, u16_t len)
+err_t tcp_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
+	/*
+	 * TODO: does this cause too many application wake-ups?
+	 * Should a notification be sent only if a write was
+	 * truncated?
+	 */
+
+	(void)len;
 	if (!arg) {
 		tcp_abort(pcb);
 		return ERR_ABRT;
 	}
 
 	Lwip::Tcp_socket_dir *socket_dir = static_cast<Lwip::Tcp_socket_dir *>(arg);
-	socket_dir->pending_ack -= len;
 	socket_dir->handle_io(Lwip_file_handle::DATA);
 	return ERR_OK;
 }
-*/
 
 
 static

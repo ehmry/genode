@@ -1250,18 +1250,12 @@ namespace {
 
 			if (!noux_syscall(Noux::Session::SYSCALL_WRITE)) {
 				switch (sysio()->error.write) {
-				case Vfs::File_io_service::WRITE_ERR_AGAIN:       errno = EAGAIN;      break;
-				case Vfs::File_io_service::WRITE_ERR_WOULD_BLOCK: errno = EWOULDBLOCK; break;
-				case Vfs::File_io_service::WRITE_ERR_INVALID:     errno = EINVAL;      break;
-				case Vfs::File_io_service::WRITE_ERR_IO:          errno = EIO;         break;
-				case Vfs::File_io_service::WRITE_ERR_INTERRUPT:   errno = EINTR;       break;
-				default: 
-					if (sysio()->error.general == Vfs::Directory_service::ERR_FD_INVALID)
-						errno = EBADF;
-					else
-						errno = 0;
-					break;
+				case Vfs::File_io_service::WRITE_ERR_INVALID: errno = EBADF;    break;
+				case Vfs::File_io_service::WRITE_ERR_IO:      errno = EIO;      break;
+				case Vfs::File_io_service::WRITE_BLOCKED:     errno = EAGAIN;   break;
+				case Vfs::File_io_service::WRITE_OK: break; /* never reached */
 				}
+				return -1;
 			}
 
 			count -= sysio()->write_out.count;
@@ -1288,17 +1282,11 @@ namespace {
 			if (!noux_syscall(Noux::Session::SYSCALL_READ)) {
 
 				switch (sysio()->error.read) {
-				case Vfs::File_io_service::READ_ERR_AGAIN:       errno = EAGAIN;      break;
-				case Vfs::File_io_service::READ_ERR_WOULD_BLOCK: errno = EWOULDBLOCK; break;
-				case Vfs::File_io_service::READ_ERR_INVALID:     errno = EINVAL;      break;
-				case Vfs::File_io_service::READ_ERR_IO:          errno = EIO;         break;
-				case Vfs::File_io_service::READ_ERR_INTERRUPT:   errno = EINTR;       break;
-				default:
-					if (sysio()->error.general == Vfs::Directory_service::ERR_FD_INVALID)
-						errno = EBADF;
-					else
-						errno = 0;
-					break;
+				case Vfs::File_io_service::READ_ERR_INVALID: errno = EBADF; break;
+				case Vfs::File_io_service::READ_ERR_IO:      errno = EIO;   break;
+
+				case Vfs::File_io_service::READ_QUEUED:
+				case Vfs::File_io_service::READ_OK: break; /* never reached */
 				}
 				return -1;
 			}
@@ -1562,10 +1550,9 @@ namespace {
 		sysio()->ftruncate_in.length = length;
 		if (!noux_syscall(Noux::Session::SYSCALL_FTRUNCATE)) {
 			switch (sysio()->error.ftruncate) {
-			case Vfs::File_io_service::FTRUNCATE_OK: /* never reached */
-			case Vfs::File_io_service::FTRUNCATE_ERR_NO_PERM:   errno = EPERM;  break;
-			case Vfs::File_io_service::FTRUNCATE_ERR_INTERRUPT: errno = EINTR;  break;
+			case Vfs::File_io_service::FTRUNCATE_ERR_INVALID:   errno = EINVAL;  break;
 			case Vfs::File_io_service::FTRUNCATE_ERR_NO_SPACE:  errno = ENOSPC; break;
+			case Vfs::File_io_service::FTRUNCATE_OK: break; /* never reached */
 			}
 			return -1;
 		}
