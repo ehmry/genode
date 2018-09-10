@@ -1,0 +1,141 @@
+##
+# \brief  Create scenario image in Dagfs
+# \author Emery Hemingway
+# \date   2018-01-01
+#
+
+##
+# Dagfs TCP server parameters
+#
+proc image_dagfs_host { } {
+	return [get_cmd_arg_first --image-dagfs-host ""]
+}
+
+##
+# Spawn the REPL process
+#
+set timeout -1
+set global_repl_id ""
+
+
+proc dagfs_repl_id { } {
+	global global_repl_id
+	if {$global_repl_id == ""} {
+		spawn dagfs_repl [image_dagfs_host] -s
+		set global_repl_id $spawn_id
+	}
+
+	return $global_repl_id
+}
+
+proc make_a_goddamn_string { stringliststring } {
+	return [join $stringliststring " "]
+}
+
+proc dagfs_ingest { args } {
+	set repl_id [dagfs_repl_id]
+	set paths [make_a_goddamn_string $args]
+
+	# convert quoted paths to the path type, apply ingest to the result
+	send -i [repl_id] "(ingest $paths)\n"
+
+	expect -i $repl_id "\n"
+	expect -i $repl_id "\n"
+	set cid [lindex [regexp -inline {[a-f0-9]*} $expect_out(buffer)] 0]
+	puts "cid is $cid"
+	return $cid
+}
+
+proc dagfs_ingest_string { name string } {
+	set repl_id [dagfs_repl_id]
+
+	set path [file normalize $name]
+	set fd [open $path "WRONLY CREAT TRUNC"]
+	puts $fd $string
+	close $fd
+
+	# convert quoted paths to the path type, apply ingest to the result
+	send -i $repl_id "(ingest $path)\n"
+
+	expect -i $repl_id "\n"
+	expect -i $repl_id "\n"
+	set cid [lindex [regexp -inline {[a-f0-9]*} $expect_out(buffer)] 0]
+	file delete $path
+	return $cid
+}
+
+proc dagfs_copy { cid from to } {
+	set repl_id [dagfs_repl_id]
+
+	send -i $repl_id "(copy $cid \"$from\" \"$to\")\n"
+
+	expect -i $repl_id "\n"
+	expect -i $repl_id "\n"
+	set cid [lindex [regexp -inline {[a-f0-9]*} $expect_out(buffer)] 0]
+	return $cid
+}
+
+proc dagfs_merge { args } {
+	set repl_id [dagfs_repl_id]
+
+	set cids [make_a_goddamn_string $args]
+
+	send -i $repl_id "(merge $cids)\n"
+
+	expect -i $repl_id "\n"
+	expect -i $repl_id "\n"
+	set cid [lindex [regexp -inline {[a-f0-9]*} $expect_out(buffer)] 0]
+	return $cid
+}
+
+proc dagfs_cid_from_depot { args } {
+	set cids {}
+
+	set archives [_collect_from_depot [join $args " "]]
+
+	check_for_missing_depot_archives
+
+	set globs ""
+
+	foreach archive $archives {
+		# Do not include sources for now
+		if {[regexp [_depot_archive_versioned_path_pattern] $archive dummy user type]} {
+			if {$type == "src"} continue;
+			if {$type == "api"} continue;
+			if {$type == "pkg"} continue;
+		}
+
+		set globs "$globs \"[depot_dir]/$archive/*\""
+	}
+
+	set repl_id [dagfs_repl_id]
+
+	send -i $repl_id "(apply ingest (glob $globs))\n"
+
+	expect -i $repl_id "\n"
+	expect -i $repl_id "\n"
+
+	set cid [lindex [regexp -inline {[a-f0-9]*} $expect_out(buffer)] 0]
+
+	return $cid
+}
+
+##
+# Export scenario as Dagfs root
+#
+proc run_image { {unused ""} } {
+
+	puts "ingesting scenario to Dagfs"
+	set repl_id [dagfs_repl_id]
+
+	send -i $repl_id "(apply ingest (glob \"./[run_dir]/*\"))\n"
+
+	expect -i $repl_id "\n"
+	expect -i $repl_id "\n"
+
+	set cid [lindex [regexp -inline {[a-f0-9]*} $expect_out(buffer)] 0]
+
+	set fd [open "[run_dir].dag" "WRONLY CREAT TRUNC"]
+	puts $fd $cid
+	close $fd
+}
