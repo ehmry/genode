@@ -416,7 +416,10 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 	Result         out_result = Result::WRITE_OK;
 
 	if (fd->flags & O_NONBLOCK) {
-
+		/*
+		 * XXX: WRITE_OVERSIZED not handled
+		 * here to minimize `send` surprises
+		 */
 		out_result = VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf, count, out_count));
 
 		/* wake up threads blocking for 'queue_*()' or 'write()' */
@@ -428,16 +431,17 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 
 		struct Check : Libc::Suspend_functor
 		{
-			bool             retry { false };
+			bool                  retry { false };
 
-			Vfs::Vfs_handle *handle;
-			void const      *buf;
-			::size_t         count;
-			Vfs::file_size  &out_count;
-			Result          &out_result;
+			Vfs::Vfs_handle      *handle;
+			void const           *buf;
+			Vfs::file_size const  count;
+			Vfs::file_size        offset = 0;
+			Vfs::file_size        &out_count;
+			Result                &out_result;
 
 			Check(Vfs::Vfs_handle *handle, void const *buf,
-			      ::size_t count, Vfs::file_size &out_count,
+			      Vfs::file_size count, Vfs::file_size &out_count,
 			      Result &out_result)
 			: handle(handle), buf(buf), count(count), out_count(out_count),
 			  out_result(out_result)
@@ -445,9 +449,22 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 
 			bool suspend() override
 			{
-				out_result = VFS_THREAD_SAFE(handle->fs().write(
-					handle, (char const *)buf, count, out_count));
-				retry = (out_result == Result::WRITE_BLOCKED);
+				Vfs::file_size n = count - offset;
+				Vfs::file_size out = 0;
+
+				while (0 < n) {
+					out_result = VFS_THREAD_SAFE(handle->fs().write(
+						handle, ((char const *)buf)+offset, n, out));
+					offset = min(count, offset+out);
+					out_count += out;
+					if (out_result != Result::WRITE_OVERSIZED)
+						break;
+
+					n = n >> 1;
+				}
+
+				VFS_THREAD_SAFE(handle->advance_seek(out));
+				retry = (out_result == Result::WRITE_BLOCKED) || offset < count;
 				return retry;
 			}
 		} check(handle, buf, count, out_count, out_result);
@@ -467,8 +484,6 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 	case Result::WRITE_BLOCKED:     return Errno(EAGAIN);
 	case Result::WRITE_OVERSIZED:   return Errno(ENOBUFS);
 	}
-
-	VFS_THREAD_SAFE(handle->advance_seek(out_count));
 
 	return out_count;
 }
