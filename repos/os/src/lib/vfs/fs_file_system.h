@@ -19,6 +19,7 @@
 /* Genode includes */
 #include <base/allocator_avl.h>
 #include <base/id_space.h>
+#include <base/session_label.h>
 #include <file_system_session/connection.h>
 
 
@@ -41,11 +42,12 @@ class Vfs::Fs_file_system : public File_system
 		Vfs::Env              &_env;
 		Genode::Allocator_avl  _fs_packet_alloc { &_env.alloc() };
 
-		typedef Genode::String<64> Label_string;
-		Label_string _label;
+		enum { LABEL_MAX_LEN = Genode::Session_label::capacity() };
+		typedef Genode::String<LABEL_MAX_LEN> Label_string;
+		Label_string const _label;
 
 		typedef Genode::String<::File_system::MAX_NAME_LEN> Root_string;
-		Root_string _root;
+		Root_string const _root;
 
 		::File_system::Connection _fs;
 

@@ -29,7 +29,7 @@ class Vfs::Terminal_file_system : public Single_file_system
 {
 	private:
 
-		typedef Genode::String<64> Label;
+		typedef Genode::String<LABEL_MAX_LEN> Label;
 		Label _label;
 
 		Genode::Env         &_env;

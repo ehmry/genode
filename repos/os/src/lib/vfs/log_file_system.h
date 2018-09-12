@@ -25,7 +25,7 @@ class Vfs::Log_file_system : public Single_file_system
 {
 	private:
 
-		typedef Genode::String<64> Label;
+		typedef Genode::String<LABEL_MAX_LEN> Label;
 		Label _label;
 
 		Genode::Constructible<Genode::Log_connection>     _log_connection { };
