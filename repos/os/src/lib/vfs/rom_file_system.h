@@ -28,7 +28,6 @@ class Vfs::Rom_file_system : public Single_file_system
 
 		struct Label
 		{
-			enum { LABEL_MAX_LEN = 64 };
 			char string[LABEL_MAX_LEN];
 			bool const binary;
 

@@ -28,7 +28,7 @@ class Vfs::Block_file_system : public Single_file_system
 
 		Vfs::Env &_env;
 
-		typedef Genode::String<64> Label;
+		typedef Genode::String<LABEL_MAX_LEN> Label;
 		Label _label;
 
 		/*

@@ -18,6 +18,7 @@
 #include <vfs/file_system.h>
 #include <vfs/vfs_handle.h>
 #include <base/attached_rom_dataspace.h>
+#include <base/session_label.h>
 
 namespace Vfs { class Tar_file_system; }
 
@@ -27,7 +28,8 @@ class Vfs::Tar_file_system : public File_system
 	Genode::Env       &_env;
 	Genode::Allocator &_alloc;
 
-	typedef Genode::String<64> Rom_name;
+	enum { LABEL_MAX_LEN = Genode::Session_label::capacity() };
+	typedef Genode::String<LABEL_MAX_LEN> Rom_name;
 	Rom_name _rom_name;
 
 	Genode::Attached_rom_dataspace _tar_ds { _env, _rom_name.string() };

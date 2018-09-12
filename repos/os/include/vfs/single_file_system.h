@@ -16,6 +16,7 @@
 
 #include <vfs/file_system.h>
 #include <vfs/vfs_handle.h>
+#include <base/session_label.h>
 
 namespace Vfs { class Single_file_system; }
 
@@ -28,6 +29,8 @@ class Vfs::Single_file_system : public File_system
 			NODE_TYPE_FILE,        NODE_TYPE_SYMLINK,
 			NODE_TYPE_CHAR_DEVICE, NODE_TYPE_BLOCK_DEVICE
 		};
+
+		enum { LABEL_MAX_LEN = Genode::Session_label::capacity() };
 
 	private:
 
