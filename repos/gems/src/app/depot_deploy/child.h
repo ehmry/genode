@@ -389,6 +389,10 @@ void Depot_deploy::Child::gen_start_node(Xml_generator &xml, Xml_node common,
 		if (runtime.has_sub_node("provides")) {
 			xml.node("provides", [&] () {
 				runtime.sub_node("provides").for_each_sub_node([&] (Xml_node service) {
+					if (service.has_type("service")) {
+						xml.append(service.addr(), service.size());
+						return;
+					}
 					_gen_provides_sub_node(xml, service, "rom",         "ROM");
 					_gen_provides_sub_node(xml, service, "log",         "LOG");
 					_gen_provides_sub_node(xml, service, "timer",       "Timer");
