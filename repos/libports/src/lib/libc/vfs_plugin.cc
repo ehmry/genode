@@ -462,9 +462,10 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 
 	switch (out_result) {
 	case Result::WRITE_OK:          break;
-	case Result::WRITE_BLOCKED:     return Errno(ENOBUFS);
-	case Result::WRITE_ERR_INVALID: return Errno(EINVAL);
+	case Result::WRITE_ERR_INVALID: return Errno(EBADF);
 	case Result::WRITE_ERR_IO:      return Errno(EIO);
+	case Result::WRITE_BLOCKED:     return Errno(EAGAIN);
+	case Result::WRITE_OVERSIZED:   return Errno(ENOBUFS);
 	}
 
 	VFS_THREAD_SAFE(handle->advance_seek(out_count));
