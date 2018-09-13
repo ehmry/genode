@@ -45,9 +45,9 @@ namespace Genode {
  */
 struct Genode::Child_policy
 {
-	typedef String<64> Name;
-	typedef String<64> Binary_name;
-	typedef String<64> Linker_name;
+	typedef String<80> Name;
+	typedef String<80> Binary_name;
+	typedef String<80> Linker_name;
 
 	virtual ~Child_policy() { }
 
@@ -425,7 +425,7 @@ class Genode::Child : protected Rpc_object<Parent>,
 
 			Id_space<Parent::Client>::Id const _client_id;
 
-			typedef String<64> Label;
+			typedef String<80> Label;
 
 			Args const _args;
 
