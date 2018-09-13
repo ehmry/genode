@@ -1,0 +1,6 @@
+<launcher pkg="lwip">
+	<route>
+		<service name="Nic">
+			<child name="nic_router"/> </service>
+	</route>
+</launcher>

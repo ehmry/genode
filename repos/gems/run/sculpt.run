@@ -555,6 +555,7 @@ append manual_deploy_config {
 	<!-- <start name="backdrop"/> -->
 	<!-- <start name="nano3d"/> -->
 	<!-- <start name="noux" launcher="noux-system"/> -->
+	<!-- <start name="socket_fs"/> -->
 	<!-- <start name="download_debian"/> --> 
 	<!-- <start name="vm"/> -->
 	<!-- <start name="top_view"/> -->
