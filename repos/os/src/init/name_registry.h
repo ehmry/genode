@@ -33,7 +33,7 @@ struct Init::Name_registry
 	 *
 	 * If there is no alias, the function returns the original name.
 	 */
-	virtual Name deref_alias(Name const &) = 0;
+	virtual Child_policy::Name deref_alias(Child_policy::Name const &) = 0;
 };
 
 #endif /* _SRC__INIT__NAME_REGISTRY_H_ */

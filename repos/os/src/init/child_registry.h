@@ -136,7 +136,7 @@ class Init::Child_registry : public Name_registry, Child_list
 			}
 		}
 
-		Child::Name deref_alias(Child::Name const &name) override
+		Child_policy::Name deref_alias(Child_policy::Name const &name) override
 		{
 			for (Alias const *a = _aliases.first(); a; a = a->next())
 				if (name == a->name)
