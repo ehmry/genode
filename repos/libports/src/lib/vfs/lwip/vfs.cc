@@ -1326,9 +1326,9 @@ class Lwip::Tcp_socket_dir final :
 					while (count) {
 						/* check if the send buffer is exhausted */
 						if (tcp_sndbuf(_pcb) < count) {
-							if (TCP_SND_BUF < count)
-								return Write_result::WRITE_ERR_OVERSIZED;
-							return Write_result::WRITE_BLOCKED;
+							return (TCP_SND_BUF < count)
+								? Write_result::WRITE_OVERSIZED
+								: Write_result::WRITE_BLOCKED;
 						}
 
 						/* safe to segment writes to fit into pbufs */
