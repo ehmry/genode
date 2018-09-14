@@ -99,6 +99,10 @@ inline void assert_write(Vfs::File_io_service::Write_result r)
 		error("WRITE_ERR_INVALID"); break;
 	case Result::WRITE_ERR_IO:
 		error("WRITE_ERR_IO"); break;
+	case Result::WRITE_BLOCKED:
+		error("WRITE_BLOCKED"); break;
+	case Result::WRITE_OVERSIZED:
+		error("WRITE_OVERSIZED"); break;
 	}
 	throw Exception();
 }
