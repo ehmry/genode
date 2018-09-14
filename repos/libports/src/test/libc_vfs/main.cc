@@ -27,6 +27,8 @@
 #include <string.h>
 #include <errno.h>
 
+/* PCG includes */
+#include <pcg_variants.h>
 
 struct Test_failed : Genode::Exception { };
 
@@ -36,9 +38,33 @@ struct Test_failed : Genode::Exception { };
 	if (condition) { \
 		printf(#operation " succeeded\n"); \
 	} else { \
-		printf(#operation " failed, " #ret "=%ld, errno=%d\n", (long)ret, errno); \
+		printf(#operation " failed, " #ret "=%ld, errno=%d %s\n", (long)ret, errno, strerror(errno)); \
 		throw Test_failed(); \
 	}
+
+
+static void fill_buffer(void *p, size_t len)
+{
+	pcg32_random_t rng PCG32_INITIALIZER;
+	size_t const steps = len / 4;
+	uint32_t *buf = (uint32_t *)p;
+
+	for (size_t i = 0; i < steps; ++i)
+		buf[i] = pcg32_random_r(&rng);
+}
+
+
+static bool verify_buffer(void *p, size_t len)
+{
+	pcg32_random_t rng PCG32_INITIALIZER;
+	size_t const steps = len / 4;
+	uint32_t *buf = (uint32_t *)p;
+	bool failed = false;
+
+	for (size_t i = 0; i < steps; ++i)
+		failed |= buf[i] != pcg32_random_r(&rng);
+	return !failed;
+}
 
 
 static void test_write_read(Genode::Xml_node node)
@@ -104,6 +130,7 @@ static void test(Genode::Xml_node node)
 	char const *file_name3    = "test3.tst";
 	char const *file_name4    = "test4.tst";
 	char const *file_name5    = "test5.tst";
+	char const *file_name6    = "test6.tst";
 	char const *pattern       = "a single line of text";
 
 	size_t      pattern_size  = strlen(pattern) + 1;
@@ -218,6 +245,37 @@ static void test(Genode::Xml_node node)
 			printf("file content is correct\n");
 		}
 
+		CALL_AND_CHECK(fd, open(file_name6, O_CREAT | O_WRONLY), fd >= 0, "file_name=%s", file_name6);
+		size_t large_count = 1<<21;
+		char *large_buffer = (char *)malloc(large_count);
+		fill_buffer(large_buffer, large_count);
+		CALL_AND_CHECK(count, write(fd, large_buffer, large_count), (size_t)count == large_count, "");
+		printf("wrote %ld KiB in one pass\n", large_count>>10);
+		CALL_AND_CHECK(ret, close(fd), ret == 0, "");
+
+		memset(large_buffer, 0xff, large_count);
+
+		CALL_AND_CHECK(fd, open(file_name6, O_RDONLY), fd >= 0, "file_name=%s", file_name6);
+		int read_passes = 0;
+		size_t pos = 0;
+		while (pos < large_count) {
+			int n = read(fd, large_buffer+pos, large_count-pos);
+			if (n < 1) {
+				throw Test_failed();
+			}
+			pos += n;
+			++read_passes;
+		}
+		CALL_AND_CHECK(ret, close(fd), ret == 0, "");
+		printf("read %ld KiB in %d passes\n", large_count>>10, read_passes);
+
+		if (!verify_buffer(large_buffer, large_count)) {
+			printf("large read of large write produced inconsistent data\n"); \
+			throw Test_failed(); \
+		}
+
+		free(large_buffer);
+
 		/* read directory entries */
 		DIR *dir;
 
@@ -305,23 +363,16 @@ static void test(Genode::Xml_node node)
 }
 
 
-struct Main
-{
-	Main(Genode::Env &env)
-	{
-		Genode::Attached_rom_dataspace config_rom { env, "config" };
+void Libc::Component::construct(Libc::Env &env) {
 
-		Libc::with_libc([&] () {
-
-			test(config_rom.xml());
-			test_write_read(config_rom.xml());
+	Libc::with_libc([&env] () {
+		env.config([] (Genode::Xml_node const &config) {
+			test(config);
+			test_write_read(config);
 
 			printf("test finished\n");
 		});
+	});
 
-		env.parent().exit(0);
-	}
-};
-
-
-void Libc::Component::construct(Libc::Env &env) { static Main main(env); }
+	env.parent().exit(0);
+}
