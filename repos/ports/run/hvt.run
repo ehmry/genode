@@ -1,0 +1,95 @@
+if {![have_spec nova]} {
+	puts "\nHVT requires NOVA\n"
+	exit 0
+}
+
+create_boot_directory
+
+install_config {
+<config>
+	<parent-provides>
+		<service name="CPU"/>
+		<service name="LOG"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="ROM"/>
+		<service name="IO_PORT"/>
+		<service name="TRACE"/>
+	</parent-provides>
+
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service> </default-route>
+	<default caps="256"/>
+
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
+<!--
+	<start name="top" priority="-1">
+		<resource name="RAM" quantum="2M"/>
+		<config period_ms="10000"/>
+		<route>
+			<service name="TRACE"><parent/></service>
+			<service name="LOG"><parent/></service>
+			<service name="Timer"><child name="timer"/></service>
+			<any-service><parent/></any-service>
+		</route>
+	</start>
+-->
+
+	<!--
+	<start name="rtc_drv" caps="96">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Rtc"/> </provides>
+	</start>
+	-->
+
+	<start name="nic_loopback" caps="96">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Nic"/> </provides>
+	</start>
+
+	<start name="ram_blk" caps="96">
+		<resource name="RAM" quantum="40M"/>
+		<provides> <service name="Block"/> </provides>
+		<config size="32M" block_size="4096"/>
+	</start>
+
+	<start name="hvt" caps="128" ld="no">
+		<resource name="RAM" quantum="8M"/>
+		<config></config>
+		<route>
+			<service name="ROM" label_last="guest">
+				<parent label="test.hvt"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+</config>
+}
+
+build {
+	core init
+	drivers/timer
+	app/sequence
+	server/nic_loopback
+	server/ram_blk
+	app/hvt
+	app/top
+}
+
+build_boot_image {
+	core init ld.lib.so timer
+	nic_loopback
+	timer
+	ram_blk
+	sequence
+	hvt
+	test.hvt
+	top
+}
+
+append qemu_args " -cpu phenom "
+append qemu_args " -nographic "
+
+run_genode_until {child "test" exited with exit value 0} 40
