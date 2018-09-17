@@ -76,6 +76,7 @@ class Vmm::Vcpu_dispatcher : public T
 		:
 			T(WEIGHT, name, stack_size, location), _env(env)
 		{
+			(void)cpu_session;
 			using namespace Genode;
 
 			/* request creation of a 'local' EC */
