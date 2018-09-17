@@ -471,7 +471,10 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 
 			Lxip::ssize_t res = _sock.ops->sendmsg(&_sock, &msg, len);
 
-			if (res < 0) _write_err = res;
+			if (res < 0) {
+				_write_err = res;
+				res = 0;
+			}
 
 			return res;
 		}
