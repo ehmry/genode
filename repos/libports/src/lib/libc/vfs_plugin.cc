@@ -452,19 +452,29 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 				Vfs::file_size n = count - offset;
 				Vfs::file_size out = 0;
 
-				while (0 < n) {
-					out_result = VFS_THREAD_SAFE(handle->fs().write(
-						handle, ((char const *)buf)+offset, n, out));
+				VFS_THREAD_SAFE(while (0 < n) {
+					out_result = handle->fs().write(
+						handle, ((char const *)buf)+offset, n, out);
+					handle->advance_seek(out);
 					offset = min(count, offset+out);
 					out_count += out;
 					if (out_result != Result::WRITE_OVERSIZED)
 						break;
 
 					n = n >> 1;
+				});
+
+				switch (out_result) {
+				case Result::WRITE_BLOCKED:
+					retry = true;
+					break;
+				case Result::WRITE_OK:
+					retry = (0 < out && offset <count);
+					break;
+				default:
+					break;
 				}
 
-				VFS_THREAD_SAFE(handle->advance_seek(out));
-				retry = (out_result == Result::WRITE_BLOCKED) || offset < count;
 				return retry;
 			}
 		} check(handle, buf, count, out_count, out_result);
