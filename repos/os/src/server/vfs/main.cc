@@ -78,6 +78,8 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 
 		Genode::Session_label const _label;
 
+		size_t _pending_write_offset = 0;
+
 		bool const _writable;
 
 
@@ -170,11 +172,21 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				_apply(packet.handle(), [&] (Io_node &node) {
 					if (node.mode() & WRITE_ONLY) {
 						Write_result res = node.write(
-							(char const *)content, length, seek, res_length);
-						acknowledge = progress =
-							(res != Write_result::WRITE_BLOCKED) || (res_length > 0);
-						succeeded = (res_length > 0);
+							(char const *)content + _pending_write_offset,
+							length - _pending_write_offset,
+							seek + _pending_write_offset,
+							res_length);
+						_pending_write_offset += res_length;
+
+						if (res_length == 0 || _pending_write_offset >= length) {
+							_pending_write_offset = 0;
+							res_length = length;
+							acknowledge = true;
+						}
+						progress  = (res != Write_result::WRITE_BLOCKED);
+						succeeded = (res == Write_result::WRITE_OK);
 					}
+
 				});
 				break;
 
