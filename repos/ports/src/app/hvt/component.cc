@@ -27,60 +27,34 @@
 #include <base/sleep.h>
 
 /* VMM utility includes */
+#include <vmm/guest_memory.h>
 #include <vmm/vcpu_thread.h>
 #include <vmm/vcpu_dispatcher.h>
+#include <vmm/utcb_guard.h>
+
+/* NOVA includes that come with Genode */
+#include <nova/syscalls.h>
+
+
+extern "C" {
+
+/* Upstream HVT includes */
+#include "hvt.h"
+#include "hvt_cpu_x86_64.h"
 
 /* Libc includes */
 #include <elf.h>
 
-namespace Hvt {
-extern "C" {
-#include "hvt.h"
 }
+
+namespace Hvt {
 	using namespace Genode;
 	using Genode::uint64_t;
-	struct Tender;
 
-	int const *year_info(int year)
-	{
-		static const int standard_year[] =
-			{ 365, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
-		static const int leap_year[] =
-			{ 366, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
-		return ((year%4) == 0 && ((year%100) != 0 || (year%400) == 0))
-			? leap_year : standard_year;
-	}
-
-	static uint64_t rtc_epoch(Genode::Env &env)
-	{
-		enum {
-			SEC_PER_MIN  = 60,
-			SEC_PER_HOUR = SEC_PER_MIN * 60,
-			SEC_PER_DAY  = SEC_PER_HOUR * 24
-		};
-
-		auto ts = Rtc::Connection(env).current_time();
-
-		uint64_t epoch = ts.second;
-		epoch += ts.minute * SEC_PER_MIN;
-		epoch += ts.hour   * SEC_PER_HOUR;
-
-		/* add seconds from the start of the month */
-		epoch += (ts.day-1) * SEC_PER_DAY;
-
-		/* add seconds from the start of the year */
-		int const *month_lengths = year_info(ts.year);
-		for (unsigned m = 1; m < ts.month; ++m)
-			epoch += month_lengths[m] * SEC_PER_DAY;
-
-		/* add seconds from 1970 to the start of this year */
-		for (unsigned y = 1970; y < ts.year; ++y)
-			epoch += year_info(y)[0] * SEC_PER_DAY;
-
-		return epoch;
-	}
+	struct Devices;
+	struct Exit_dispatcher;
+	struct Guest_memory;
+	struct Main;
 
 	struct Invalid_guest_image : Genode::Exception { };
 	struct Invalid_guest_access : Genode::Exception { };
@@ -124,91 +98,14 @@ extern "C" {
 };
 
 
-template <typename T>
-class Hvt::Vcpu_dispatcher : public Vmm::Vcpu_dispatcher<Genode::Thread>
-{
-	private:
-
-		typedef Vcpu_dispatcher This;
-
-		T _vcpu_thread;
-
-		/**
-		 * Shortcut for calling 'Vmm::Vcpu_dispatcher::register_handler'
-		 * with 'Vcpu_dispatcher' as template argument
-		 */
-		template <unsigned EV, void (This::*FUNC)()>
-		void _register_handler(Genode::addr_t exc_base, Nova::Mtd mtd)
-		{
-			register_handler<EV, This, FUNC>(exc_base, mtd);
-		}
-
-		enum { STACK_SIZE = 1024*sizeof(long) };
-
-
-		/***********************************
-		 ** Virtualization event handlers **
-		 ***********************************/
-
-		void _vcpu_startup()
-		{
-			Vmm::log(name(), " ", __func__, " called");
-		}
-
-		void _svm_npt()
-		{
-			Vmm::log(name(), " ", __func__, " called");
-			sleep_forever();
-
-		}
-
-
-	public:
-
-		enum Type { SVM, VTX };
-
-		Vcpu_dispatcher(Genode::Env &env, Type type, char const * name,
-		                Genode::Capability<Genode::Pd_session> pd_cap)
-		:
-			Vmm::Vcpu_dispatcher<Genode::Thread>(env, STACK_SIZE, &env.cpu(),
-			                                     Genode::Affinity::Location(),
-			                                     name),
-			_vcpu_thread(&env.cpu(), Genode::Affinity::Location(), pd_cap,
-			             STACK_SIZE)
-		{
-			using namespace Nova;
-
-			/* shortcuts for common message-transfer descriptors */
-			Mtd const mtd_all(Mtd::ALL);
-			Mtd const mtd_cpuid(Mtd::EIP | Mtd::ACDB | Mtd::IRQ);
-			Mtd const mtd_irq(Mtd::IRQ);
-
-			Genode::addr_t exc_base = _vcpu_thread.exc_base();
-
-			/* register virtualization event handlers */
-			if (type == SVM) {
-				_register_handler<0xfe, &This::_vcpu_startup>
-					(exc_base, mtd_all);
-
-				_register_handler<0xfc, &This::_svm_npt>
-					(exc_base, mtd_all);
-
-			}
-
-			/* start virtual CPU */
-			_vcpu_thread.start(sel_sm_ec() + 1);
-		}
-};
-
-
-struct Hvt::Tender
+struct Hvt::Devices
 {
 	Genode::Env &_env;
 
 	Timer::Connection _timer { _env };
 
-	Timer::One_shot_timeout<Tender> _poll_timeout {
-		_timer, *this, &Tender::_handle_timeout };
+	Timer::One_shot_timeout<Devices> _poll_timeout {
+		_timer, *this, &Devices::_handle_timeout };
 
 	/* TODO: periodic timeout to sychronize with the RTC */
 
@@ -231,8 +128,8 @@ struct Hvt::Tender
 
 	struct hvt_blkinfo _block_info { };
 
-	Io_signal_handler<Tender> _nic_handler {
-		_env.ep(), *this, &Tender::_handle_nic };
+	Io_signal_handler<Devices> _nic_handler {
+		_env.ep(), *this, &Devices::_handle_nic };
 
 	bool _nic_ready = false;
 
@@ -428,13 +325,213 @@ struct Hvt::Tender
 		sleep_forever();
 	}
 
+	static int const *year_info(int year)
+	{
+		static const int standard_year[] =
+			{ 365, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
-	typedef Vcpu_dispatcher<Vmm::Vcpu_same_pd> Vcpu;
+		static const int leap_year[] =
+			{ 366, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
-	Vcpu _vcpu { _env, Vcpu::SVM, "hvt-guest", _env.pd_session_cap() };
+		return ((year%4) == 0 && ((year%100) != 0 || (year%400) == 0))
+			? leap_year : standard_year;
+	}
 
-	Attached_ram_dataspace  _guest_ram {
-		_env.pd(), _env.rm(), 32 << 20 };
+	static uint64_t rtc_epoch(Genode::Env &env)
+	{
+		enum {
+			SEC_PER_MIN  = 60,
+			SEC_PER_HOUR = SEC_PER_MIN * 60,
+			SEC_PER_DAY  = SEC_PER_HOUR * 24
+		};
+
+		auto ts = Rtc::Connection(env).current_time();
+
+		uint64_t epoch = ts.second;
+		epoch += ts.minute * SEC_PER_MIN;
+		epoch += ts.hour   * SEC_PER_HOUR;
+
+		/* add seconds from the start of the month */
+		epoch += (ts.day-1) * SEC_PER_DAY;
+
+		/* add seconds from the start of the year */
+		int const *month_lengths = year_info(ts.year);
+		for (unsigned m = 1; m < ts.month; ++m)
+			epoch += month_lengths[m] * SEC_PER_DAY;
+
+		/* add seconds from 1970 to the start of this year */
+		for (unsigned y = 1970; y < ts.year; ++y)
+			epoch += year_info(y)[0] * SEC_PER_DAY;
+
+		return epoch;
+	}
+
+	Devices(Genode::Env &env) : _env(env)
+	{
+		Attached_rom_dataspace config_rom(env, "config");
+		Xml_node const config = config_rom.xml();
+
+		if (config.has_sub_node("rtc"))
+			_initial_epoch = rtc_epoch(env);
+
+		/*
+		 * create sessions early to subtract session
+		 * buffers from quota before the application
+		 * heap is created
+		 */
+
+		if (config.has_sub_node("nic")) {
+			_nic.construct(
+				env, &_pkt_alloc,
+				NIC_BUFFER_SIZE, NIC_BUFFER_SIZE,
+				"solo5");
+			_nic->rx_channel()->sigh_packet_avail(_nic_handler);
+
+			Net::Mac_address nic_mac = _nic->mac_address();
+
+			Genode::memcpy(
+				_nic_info.mac_address, nic_mac.addr,
+				min(sizeof(_nic_info.mac_address), sizeof(nic_mac.addr)));
+		}
+
+		if (config.has_sub_node("blk")) {
+			_block.construct(env, &_pkt_alloc, 128*1024, "solo5");
+
+			typedef Block::Packet_descriptor::Opcode Opcode;
+
+			Block::Session::Operations ops { };
+			Block::sector_t blk_count = 0;
+			Genode::size_t  blk_size = 0;
+
+			_block->info(&blk_count, &blk_size, &ops);
+
+			_block_info.sector_size = blk_size;
+			_block_info.num_sectors = blk_size;
+			_block_info.rw = ops.supported(Opcode::WRITE);
+		}
+	}
+
+};
+
+
+struct Hvt::Exit_dispatcher {
+
+		static Nova::Utcb *_utcb_of_myself() {
+			return reinterpret_cast<Nova::Utcb *>(Genode::Thread::myself()->utcb()); }
+
+		void _vcpu_startup()
+		{
+			using namespace Nova;
+
+			Vmm::log(__func__, " called");
+
+			Utcb *utcb = _utcb_of_myself();
+			memset(utcb, 0x00, sizeof(Utcb));
+
+			utcb->mtd =
+				Mtd::EBSD | Mtd::ESP | Mtd::EIP | Mtd::EFL |
+				Mtd::ESDS | Mtd::FSGS | Mtd::CSSS |
+				Mtd::TR | Mtd::LDTR | Mtd::GDTR  | Mtd::IDTR |
+				Mtd::EFER;
+
+			// TODO: try Mtd::ALL
+
+			// TODO: utcb->ip = _guest_memory._p_entry;
+			utcb->flags = X86_RFLAGS_INIT;
+			// TODO: utcb->sp = _guest_memory._guest_ram_size - 8;
+			utcb->di = X86_BOOT_INFO_BASE;
+			utcb->cr0 = X86_CR0_INIT;
+			utcb->cr3 = X86_CR3_INIT;
+			utcb->cr4 = X86_CR4_INIT;
+
+			utcb->efer = X86_EFER_INIT;
+			utcb->star = 0;
+			utcb->lstar = 0;
+			utcb->fmask = 0;
+			utcb->kernel_gs_base = 0;
+
+#define sreg_to_utcb(in, out) \
+	out.sel = in.selector * 8; \
+	out.ar = in.type \
+		| in.s <<  4 | in.dpl <<  5 | in.p <<  7 \
+		| in.l << 13 | in.db  << 14 | in.g << 15 \
+		| in.unusable << X86_SREG_UNUSABLE_BIT; \
+	out.limit = in.limit; \
+	out.base = in.base; \
+
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->es);
+			sreg_to_utcb(hvt_x86_sreg_code, utcb->cs);
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->ss);
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->ds);
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->fs);
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->gs);
+			sreg_to_utcb(hvt_x86_sreg_unusable, utcb->ldtr);
+			sreg_to_utcb(hvt_x86_sreg_tr, utcb->tr);
+
+#undef sreg_to_utcb
+
+			utcb->gdtr.limit = X86_GDTR_LIMIT;
+			utcb->gdtr.base = X86_GDT_BASE;
+
+			utcb->idtr.limit = 0xffff;
+			utcb->idtr.base = 0;
+		}
+
+		void _svm_npt()
+		{
+			using namespace Nova;
+
+			Utcb *utcb = _utcb_of_myself();
+			addr_t const q0 = utcb->qual[0];
+			addr_t const vm_fault_addr = utcb->qual[1];
+
+			auto ip = (addr_t)utcb->ip;
+			auto sp = (addr_t)utcb->sp;
+
+			log(__func__, " called, request mapping at ", (Hex)vm_fault_addr, " (", (Hex)q0, ")");
+			log("IP is ", (Hex)ip);
+			log("SP is ", (Hex)sp);
+
+			sleep_forever();
+		}
+
+
+	Exit_dispatcher()
+	{
+			using namespace Nova;
+
+			/* shortcuts for common message-transfer descriptors */
+/*
+			Mtd const mtd_all(Mtd::ALL);
+			Mtd const mtd_cpuid(Mtd::EIP | Mtd::ACDB | Mtd::IRQ);
+			Mtd const mtd_irq(Mtd::IRQ);
+
+			Genode::addr_t exc_base = _vcpu_thread.exc_base();
+*/
+			/* register virtualization event handlers */
+/*
+			if (type == SVM) {
+				_register_handler<0xfe, &This::_vcpu_startup>
+					(exc_base, mtd_all);
+
+				_register_handler<0xfc, &This::_svm_npt>
+					(exc_base, mtd_all);
+
+			}
+*/
+			/* start virtual CPU */
+			//_vcpu_thread.start(sel_sm_ec() + 1);
+	
+	}
+};
+
+
+struct Hvt::Guest_memory
+{
+	Genode::Env &_env;
+
+	Attached_ram_dataspace _guest_ram;
+	size_t const           _guest_ram_size = _guest_ram.size();
 
 	/* elf entry point (on physical memory) */
 	hvt_gpa_t _p_entry = 0;
@@ -442,9 +539,9 @@ struct Hvt::Tender
 	/* highest byte of the program (on physical memory) */
 	hvt_gpa_t _p_end   = 0;
 
-	void _load_elf()
+	void _load_elf(Genode::Env &env)
 	{
-		Attached_rom_dataspace elf_rom(_env, "guest");
+		Attached_rom_dataspace elf_rom(env, "guest");
 
 		uint8_t *mem    = _guest_ram.local_addr<uint8_t>();
 		size_t mem_size = _guest_ram.size();
@@ -550,66 +647,60 @@ struct Hvt::Tender
 		return;
 	}
 
-	Tender(Genode::Env &env) : _env(env)
+	Guest_memory(Genode::Env &env, size_t size)
+	: _env(env), _guest_ram(env.pd(), env.rm(), size)
 	{
-		Attached_rom_dataspace config_rom(env, "config");
-		Xml_node const config = config_rom.xml();
-
-		if (config.has_sub_node("rtc"))
-			_initial_epoch = rtc_epoch(env);
-
-		/*
-		 * create sessions early to subtract session
-		 * buffers from quota before the application
-		 * heap is created
-		 */
-
-		if (config.has_sub_node("nic")) {
-			_nic.construct(
-				env, &_pkt_alloc,
-				NIC_BUFFER_SIZE, NIC_BUFFER_SIZE,
-				"solo5");
-			_nic->rx_channel()->sigh_packet_avail(_nic_handler);
-
-			Net::Mac_address nic_mac = _nic->mac_address();
-
-			Genode::memcpy(
-				_nic_info.mac_address, nic_mac.addr,
-				min(sizeof(_nic_info.mac_address), sizeof(nic_mac.addr)));
-		}
-
-		if (config.has_sub_node("blk")) {
-			_block.construct(env, &_pkt_alloc, 128*1024, "solo5");
-
-			typedef Block::Packet_descriptor::Opcode Opcode;
-
-			Block::Session::Operations ops { };
-			Block::sector_t blk_count = 0;
-			Genode::size_t  blk_size = 0;
-
-			_block->info(&blk_count, &blk_size, &ops);
-
-			_block_info.sector_size = blk_size;
-			_block_info.num_sectors = blk_size;
-			_block_info.rw = ops.supported(Opcode::WRITE);
-		}
-
-	/* TODO: give the remaining RAM to the guest
-		size_t avail_ram = _env.pd().avail_ram().value;
-		if (avail_ram >> 14)
-			avail_ram -= (1 << 14);
-	*/
-
 		log("Load guest ELF...");
-		_load_elf();
+		_load_elf(env);
 		log("Guest ELF valid! entry=", (Hex)_p_entry, ", end=", (Hex)_p_end);
 	}
 
+	size_t size() const {
+		return _guest_ram_size; }
+};
+
+
+struct Hvt::Main
+{
+	Genode::Env &_env;
+
+	Devices _devices { _env };
+
+	Cpu_connection _guest_cpu { _env, "guest" };
+
+	Pd_connection  _guest_pd  { _env, "guest" };
+
+	size_t guest_size()
+	{
+		Genode::log("reserve stack virtual space");
+		Vmm::Virtual_reservation reservation(_env, Genode::Thread::stack_area_virtual_base());
+
+		size_t size = _env.ram().avail_ram().value;
+		size -= 1 << 20;
+		size = size & ~((1UL << Vmm::PAGE_SIZE_LOG2) - 1);
+
+		Genode::log("guest size will be ", (Hex)size, " (", size>>20, " MiB)");
+		return size;
+	}
+
+	Guest_memory _guest_memory { _env, guest_size() };
+
+	Vmm::Virtual_reservation _reservation { _env, _guest_memory.size() };
+
+	typedef Vcpu_dispatcher<Vmm::Vcpu_other_pd> Vcpu;
+
+	//Vcpu _vcpu { _env, Vcpu::SVM, "hvt-guest", _env_pd.cap(), _guest_memory };
+
+	Vmm::Vcpu_other_pd _vcpu_thread {
+		&_guest_cpu, Affinity::Location(), _guest_pd.cap() };
+
+	Main(Genode::Env &env) : _env(env) { }
 };
 
 void Component::construct(Genode::Env &env)
 {
 	using namespace Genode;
 
-	static Hvt::Tender tender(env);
+
+	static Hvt::Main tender(env);
 }

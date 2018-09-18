@@ -26,3 +26,5 @@ endif # x86
 SRC_CC += component.cc
 
 vpath %.c $(HVT_DIR)
+
+CC_CXX_WARN_STRICT =
