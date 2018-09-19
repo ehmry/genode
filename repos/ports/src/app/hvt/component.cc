@@ -52,8 +52,8 @@ namespace Hvt {
 	using Genode::uint64_t;
 
 	struct Devices;
-	struct Exit_dispatcher;
 	struct Guest_memory;
+	struct Exit_dispatcher;
 	struct Main;
 
 	struct Invalid_guest_image : Genode::Exception { };
@@ -92,9 +92,6 @@ namespace Hvt {
 		return static_cast<T *>(
 			static_cast<void*>(hvt->mem + gpa));
 	}
-
-	template <typename T>
-	class Vcpu_dispatcher;
 };
 
 
@@ -384,7 +381,7 @@ struct Hvt::Devices
 			_nic.construct(
 				env, &_pkt_alloc,
 				NIC_BUFFER_SIZE, NIC_BUFFER_SIZE,
-				"solo5");
+				"guest");
 			_nic->rx_channel()->sigh_packet_avail(_nic_handler);
 
 			Net::Mac_address nic_mac = _nic->mac_address();
@@ -395,7 +392,7 @@ struct Hvt::Devices
 		}
 
 		if (config.has_sub_node("blk")) {
-			_block.construct(env, &_pkt_alloc, 128*1024, "solo5");
+			_block.construct(env, &_pkt_alloc, 128*1024, "guest");
 
 			typedef Block::Packet_descriptor::Opcode Opcode;
 
@@ -414,124 +411,28 @@ struct Hvt::Devices
 };
 
 
-struct Hvt::Exit_dispatcher {
-
-		static Nova::Utcb *_utcb_of_myself() {
-			return reinterpret_cast<Nova::Utcb *>(Genode::Thread::myself()->utcb()); }
-
-		void _vcpu_startup()
-		{
-			using namespace Nova;
-
-			Vmm::log(__func__, " called");
-
-			Utcb *utcb = _utcb_of_myself();
-			memset(utcb, 0x00, sizeof(Utcb));
-
-			utcb->mtd =
-				Mtd::EBSD | Mtd::ESP | Mtd::EIP | Mtd::EFL |
-				Mtd::ESDS | Mtd::FSGS | Mtd::CSSS |
-				Mtd::TR | Mtd::LDTR | Mtd::GDTR  | Mtd::IDTR |
-				Mtd::EFER;
-
-			// TODO: try Mtd::ALL
-
-			// TODO: utcb->ip = _guest_memory._p_entry;
-			utcb->flags = X86_RFLAGS_INIT;
-			// TODO: utcb->sp = _guest_memory._guest_ram_size - 8;
-			utcb->di = X86_BOOT_INFO_BASE;
-			utcb->cr0 = X86_CR0_INIT;
-			utcb->cr3 = X86_CR3_INIT;
-			utcb->cr4 = X86_CR4_INIT;
-
-			utcb->efer = X86_EFER_INIT;
-			utcb->star = 0;
-			utcb->lstar = 0;
-			utcb->fmask = 0;
-			utcb->kernel_gs_base = 0;
-
-#define sreg_to_utcb(in, out) \
-	out.sel = in.selector * 8; \
-	out.ar = in.type \
-		| in.s <<  4 | in.dpl <<  5 | in.p <<  7 \
-		| in.l << 13 | in.db  << 14 | in.g << 15 \
-		| in.unusable << X86_SREG_UNUSABLE_BIT; \
-	out.limit = in.limit; \
-	out.base = in.base; \
-
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->es);
-			sreg_to_utcb(hvt_x86_sreg_code, utcb->cs);
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->ss);
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->ds);
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->fs);
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->gs);
-			sreg_to_utcb(hvt_x86_sreg_unusable, utcb->ldtr);
-			sreg_to_utcb(hvt_x86_sreg_tr, utcb->tr);
-
-#undef sreg_to_utcb
-
-			utcb->gdtr.limit = X86_GDTR_LIMIT;
-			utcb->gdtr.base = X86_GDT_BASE;
-
-			utcb->idtr.limit = 0xffff;
-			utcb->idtr.base = 0;
-		}
-
-		void _svm_npt()
-		{
-			using namespace Nova;
-
-			Utcb *utcb = _utcb_of_myself();
-			addr_t const q0 = utcb->qual[0];
-			addr_t const vm_fault_addr = utcb->qual[1];
-
-			auto ip = (addr_t)utcb->ip;
-			auto sp = (addr_t)utcb->sp;
-
-			log(__func__, " called, request mapping at ", (Hex)vm_fault_addr, " (", (Hex)q0, ")");
-			log("IP is ", (Hex)ip);
-			log("SP is ", (Hex)sp);
-
-			sleep_forever();
-		}
-
-
-	Exit_dispatcher()
-	{
-			using namespace Nova;
-
-			/* shortcuts for common message-transfer descriptors */
-/*
-			Mtd const mtd_all(Mtd::ALL);
-			Mtd const mtd_cpuid(Mtd::EIP | Mtd::ACDB | Mtd::IRQ);
-			Mtd const mtd_irq(Mtd::IRQ);
-
-			Genode::addr_t exc_base = _vcpu_thread.exc_base();
-*/
-			/* register virtualization event handlers */
-/*
-			if (type == SVM) {
-				_register_handler<0xfe, &This::_vcpu_startup>
-					(exc_base, mtd_all);
-
-				_register_handler<0xfc, &This::_svm_npt>
-					(exc_base, mtd_all);
-
-			}
-*/
-			/* start virtual CPU */
-			//_vcpu_thread.start(sel_sm_ec() + 1);
-	
-	}
-};
-
-
 struct Hvt::Guest_memory
 {
 	Genode::Env &_env;
 
-	Attached_ram_dataspace _guest_ram;
-	size_t const           _guest_ram_size = _guest_ram.size();
+	size_t _guest_size_estimate()
+	{
+		size_t size = _env.ram().avail_ram().value;
+		hvt_x86_mem_size(&size);
+
+		//size -= 1 << 20;
+		//size = size & ~(X86_GUEST_PAGE_SIZE - 1);
+
+		Genode::log("guest size will be ", (Hex)size, " (", size>>20, " MiB)");
+		return size;
+	}
+
+	size_t const  _guest_ram_size = _guest_size_estimate();
+
+	Ram_dataspace_capability _guest_ram_ds = _env.pd().alloc(_guest_ram_size);
+
+	addr_t const  _guest_ram_addr = (addr_t)_env.rm().attach(
+		_guest_ram_ds, 0, 0, false, 0, true, true);
 
 	/* elf entry point (on physical memory) */
 	hvt_gpa_t _p_entry = 0;
@@ -543,8 +444,8 @@ struct Hvt::Guest_memory
 	{
 		Attached_rom_dataspace elf_rom(env, "guest");
 
-		uint8_t *mem    = _guest_ram.local_addr<uint8_t>();
-		size_t mem_size = _guest_ram.size();
+		uint8_t *mem    = (uint8_t *)_guest_ram_addr;
+		size_t mem_size = _guest_ram_size;
 
 		Elf64_Phdr *phdr = NULL;
 		Elf64_Ehdr &hdr = *elf_rom.local_addr<Elf64_Ehdr>();
@@ -616,7 +517,6 @@ struct Hvt::Guest_memory
 
 		    daddr = mem + paddr;
 			memcpy(daddr, elf_rom.local_addr<uint8_t>()+offset, filesz);
-		    memset(daddr + filesz, 0, memsz - filesz);
 
 			enum {
 				PROT_NONE  = 0x00U, /* no permissions */
@@ -647,16 +547,210 @@ struct Hvt::Guest_memory
 		return;
 	}
 
-	Guest_memory(Genode::Env &env, size_t size)
-	: _env(env), _guest_ram(env.pd(), env.rm(), size)
+	Guest_memory(Genode::Env &env) : _env(env)
 	{
+		env.pd().map(_guest_ram_addr, _guest_ram_size);
+
 		log("Load guest ELF...");
 		_load_elf(env);
 		log("Guest ELF valid! entry=", (Hex)_p_entry, ", end=", (Hex)_p_end);
+
+		hvt_x86_setup_gdt((uint8_t*)_guest_ram_addr);
+		hvt_x86_setup_pagetables((uint8_t*)_guest_ram_addr, _guest_ram_size);
+
+		enum { TODO_TSC_GUESS = 7 };
+
+		struct hvt_boot_info *bi =
+			(struct hvt_boot_info *)(_guest_ram_addr + X86_BOOT_INFO_BASE);
+		bi->mem_size = _guest_ram_size;
+		bi->kernel_end = _p_end;
+		bi->cmdline = X86_CMDLINE_BASE;
+		bi->cpu.tsc_freq = TODO_TSC_GUESS;
 	}
 
 	size_t size() const {
 		return _guest_ram_size; }
+};
+
+
+struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
+{
+		Guest_memory        &_guest_memory;
+		Pd_session          &_guest_pd;
+		Vmm::Vcpu_other_pd   _vcpu_thread;
+
+		static Nova::Utcb *_utcb_of_myself()
+		{
+			return reinterpret_cast<Nova::Utcb *>(
+				Genode::Thread::myself()->utcb());
+		}
+
+		void _vcpu_startup()
+		{
+			using namespace Nova;
+
+			Vmm::log(__func__, " called");
+
+			Utcb *utcb = _utcb_of_myself();
+			memset(utcb, 0x00, sizeof(Utcb));
+
+			utcb->mtd =
+				Mtd::EBSD | Mtd::ESP | Mtd::EIP | Mtd::EFL |
+				Mtd::ESDS | Mtd::FSGS | Mtd::CSSS |
+				Mtd::TR | Mtd::LDTR | Mtd::GDTR  | Mtd::IDTR |
+				Mtd::EFER;
+
+			// TODO: try Mtd::ALL
+
+			utcb->ip    = _guest_memory._p_entry;
+			utcb->flags = X86_RFLAGS_INIT;
+			utcb->sp    = _guest_memory._guest_ram_size - 8;
+			utcb->di    = X86_BOOT_INFO_BASE;
+			utcb->cr0   = X86_CR0_INIT;
+			utcb->cr3   = X86_CR3_INIT;
+			utcb->cr4   = X86_CR4_INIT;
+
+			utcb->efer  = X86_EFER_INIT;
+			utcb->star  = 0;
+			utcb->lstar = 0;
+			utcb->fmask = 0;
+			utcb->kernel_gs_base = 0;
+
+#define sreg_to_utcb(in, out) \
+	out.sel = in.selector * 8; \
+	out.ar = in.type \
+		| in.s <<  4 | in.dpl <<  5 | in.p <<  7 \
+		| in.l << 13 | in.db  << 14 | in.g << 15 \
+		| in.unusable << X86_SREG_UNUSABLE_BIT; \
+	out.limit = in.limit; \
+	out.base = in.base; \
+
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->es);
+			sreg_to_utcb(hvt_x86_sreg_code, utcb->cs);
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->ss);
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->ds);
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->fs);
+			sreg_to_utcb(hvt_x86_sreg_data, utcb->gs);
+			sreg_to_utcb(hvt_x86_sreg_unusable, utcb->ldtr);
+			sreg_to_utcb(hvt_x86_sreg_tr, utcb->tr);
+
+#undef sreg_to_utcb
+
+			utcb->gdtr.limit = X86_GDTR_LIMIT;
+			utcb->gdtr.base = X86_GDT_BASE;
+
+			utcb->idtr.limit = 0xffff;
+			utcb->idtr.base = 0;			
+		}
+
+		void _svm_npt()
+		{
+			using namespace Nova;
+
+			Utcb *utcb = _utcb_of_myself();
+			Vmm::log(
+				__func__,
+				" ip=", Hex((addr_t)utcb->ip),
+				" sp=", Hex((addr_t)utcb->sp));
+
+			addr_t const guest_fault = utcb->qual[1];
+
+			Vmm::log(__func__, ": ", (Hex)guest_fault);
+
+			Nova::Mem_crd crd(
+				_guest_memory._guest_ram_addr >> PAGE_SIZE_LOG2, 0,
+				Nova::Rights(true, true, true));
+
+			utcb->set_msg_word(0);
+			utcb->mtd = 0;
+
+			utcb->append_item(crd, guest_fault, false, true);
+		}
+
+		void _svm_io()
+		{
+			Vmm::log(__func__);
+		}
+
+		void _gdt_access()
+		{
+			Vmm::log(__func__);
+		}
+
+		void _recall()
+		{
+			using namespace Nova;
+			Utcb *utcb = _utcb_of_myself();
+
+			Vmm::log(
+				__func__,
+				" ip=", Hex((addr_t)utcb->ip),
+				" sp=", Hex((addr_t)utcb->sp));
+		}
+
+		/**
+		 * Shortcut for calling 'Vmm::Vcpu_dispatcher::register_handler'
+		 * with 'Vcpu_dispatcher' as template argument
+		 */
+		template <unsigned EV, void (Exit_dispatcher::*FUNC)()>
+		void _register_handler(Genode::addr_t exc_base, Nova::Mtd mtd)
+		{
+			register_handler<EV, Exit_dispatcher, FUNC>(exc_base, mtd);
+		}
+
+		addr_t ec_sel()
+		{
+			return sel_sm_ec() + 1;
+		}
+
+		enum { STACK_SIZE = 1024*sizeof(long) };
+
+		Exit_dispatcher(Genode::Env &env,
+		                Pd_connection &pd,
+		                Guest_memory &memory)
+		:
+			Vmm::Vcpu_dispatcher<Genode::Thread>(
+				env, STACK_SIZE, &env.cpu(), Affinity::Location()),
+			_guest_memory(memory), _guest_pd(pd),
+			_vcpu_thread(&env.cpu(), Affinity::Location(), pd.cap())
+		{
+			using namespace Nova;
+
+			/* shortcuts for common message-transfer descriptors */
+
+			Mtd const mtd_all(Mtd::ALL);
+			Mtd const mtd_cpuid(Mtd::EIP | Mtd::ACDB | Mtd::IRQ);
+			Mtd const mtd_irq(Mtd::IRQ);
+
+			Genode::addr_t exc_base = _vcpu_thread.exc_base();
+
+			/* TODO: wrong */
+			enum { QUMU_SVM = true };
+
+			/* register virtualization event handlers */
+			if (QUMU_SVM) {
+				_register_handler<0xfe, &Exit_dispatcher::_vcpu_startup>
+					(exc_base, mtd_all);
+
+				_register_handler<0xfc, &Exit_dispatcher::_svm_npt>
+					(exc_base, mtd_all);
+
+				_register_handler<0x7b, &Exit_dispatcher::_svm_io>
+					(exc_base, mtd_all);
+
+				_register_handler<0x67, &Exit_dispatcher::_gdt_access>
+					(exc_base, mtd_all);
+				_register_handler<0x6b, &Exit_dispatcher::_gdt_access>
+					(exc_base, mtd_all);
+
+				_register_handler<0xff, &Exit_dispatcher::_recall>
+					(exc_base, mtd_all);
+			}
+
+			/* start virtual CPU */
+			Genode::log("start start virtual CPU");
+			_vcpu_thread.start(ec_sel());
+		}
 };
 
 
@@ -670,37 +764,59 @@ struct Hvt::Main
 
 	Pd_connection  _guest_pd  { _env, "guest" };
 
-	size_t guest_size()
-	{
-		Genode::log("reserve stack virtual space");
-		Vmm::Virtual_reservation reservation(_env, Genode::Thread::stack_area_virtual_base());
-
-		size_t size = _env.ram().avail_ram().value;
-		size -= 1 << 20;
-		size = size & ~((1UL << Vmm::PAGE_SIZE_LOG2) - 1);
-
-		Genode::log("guest size will be ", (Hex)size, " (", size>>20, " MiB)");
-		return size;
-	}
-
-	Guest_memory _guest_memory { _env, guest_size() };
-
-	Vmm::Virtual_reservation _reservation { _env, _guest_memory.size() };
-
-	typedef Vcpu_dispatcher<Vmm::Vcpu_other_pd> Vcpu;
-
-	//Vcpu _vcpu { _env, Vcpu::SVM, "hvt-guest", _env_pd.cap(), _guest_memory };
-
 	Vmm::Vcpu_other_pd _vcpu_thread {
 		&_guest_cpu, Affinity::Location(), _guest_pd.cap() };
+
+	Guest_memory _guest_memory { _env };
+
+	Exit_dispatcher _exit_dispatcher { _env, _guest_pd, _guest_memory };
+
+	Timer::Connection _recall_timer { _env, "recall" };
+
+	Timer::Periodic_timeout<Main> _recall_timeout {
+		_recall_timer, *this, &Main::_handle_recall_timeout,
+		Microseconds(1000*1000) };
+
+	void _handle_recall_timeout(Duration)
+	{
+		Nova::ec_ctrl(Nova::EC_RECALL, _exit_dispatcher.ec_sel());
+	}
 
 	Main(Genode::Env &env) : _env(env) { }
 };
 
-void Component::construct(Genode::Env &env)
+
+Genode::size_t Component::stack_size() {
+	return sizeof(long)<<12; }
+
+
+void Component::construct(Genode::Env &env) {
+	static Hvt::Main tender(env); }
+
+
+extern "C" {
+
+void warnx(const char *s, ...)
 {
-	using namespace Genode;
+	Genode::warning(s);
+}
 
+void err(int, const char *s, ...)
+{
+	Genode::error(s);
+	Genode::sleep_forever();
+}
 
-	static Hvt::Main tender(env);
+void errx(int, const char *s, ...)
+{
+	Genode::error(s);
+	Genode::sleep_forever();
+}
+
+void __assert(const char *func, const char *file, int line, const char *failedexpr)
+{
+	Genode::error("Assertion failed: (", failedexpr, ") ", file, ":", line);
+	Genode::sleep_forever();
+};
+
 }

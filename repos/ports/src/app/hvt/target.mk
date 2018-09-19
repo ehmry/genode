@@ -1,5 +1,5 @@
 TARGET = hvt
-REQUIRES = nova
+REQUIRES = nova x86_64
 LIBS = base-nova
 
 SOLO5_DIR := /home/repo/mirage/solo5
@@ -24,6 +24,7 @@ ifeq ($(filter-out $(SPECS),x86),)
 endif # x86
 
 SRC_CC += component.cc
+SRC_C  += hvt_cpu_x86_64.c
 
 vpath %.c $(HVT_DIR)
 
