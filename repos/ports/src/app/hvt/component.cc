@@ -482,40 +482,41 @@ struct Hvt::Guest_memory
 		 * p_memsz aligned up to p_align bytes on memory.
 		 */
 		for (Elf64_Half ph_i = 0; ph_i < hdr.e_phnum; ph_i++) {
-		    uint8_t *daddr;
-		    uint64_t _end;
-		    size_t offset = phdr[ph_i].p_offset;
-		    size_t filesz = phdr[ph_i].p_filesz;
-		    size_t memsz = phdr[ph_i].p_memsz;
-		    uint64_t paddr = phdr[ph_i].p_paddr;
-		    uint64_t align = phdr[ph_i].p_align;
-		    uint64_t result;
-		    int prot;
+			uint8_t *daddr;
+			uint64_t _end;
+			size_t offset = phdr[ph_i].p_offset;
+			size_t filesz = phdr[ph_i].p_filesz;
+			size_t memsz = phdr[ph_i].p_memsz;
+			uint64_t paddr = phdr[ph_i].p_paddr;
+			uint64_t align = phdr[ph_i].p_align;
+			uint64_t result;
+			int prot;
 
-		    if (phdr[ph_i].p_type != PT_LOAD)
-		        continue;
+			if (phdr[ph_i].p_type != PT_LOAD)
+			    continue;
 
-		    if ((paddr >= mem_size) || add_overflow(paddr, filesz, result)
-		            || (result >= mem_size))
-		        throw Invalid_guest_image();
-		    if (add_overflow(paddr, memsz, result) || (result >= mem_size))
-		        throw Invalid_guest_image();
-		    /*
-		     * Verify that align is a non-zero power of 2 and safely compute
-		     * ((_end + (align - 1)) & -align).
-		     */
-		    if (align > 0 && (align & (align - 1)) == 0) {
-		        if (add_overflow(result, (align - 1), _end))
-		            throw Invalid_guest_image();
-		        _end = _end & -align;
-		    }
-		    else {
-		        _end = result;
-		    }
-		    if (_end > _p_end)
-		        _p_end = _end;
+			if ((paddr >= mem_size) || add_overflow(paddr, filesz, result)
+			        || (result >= mem_size))
+			    throw Invalid_guest_image();
+			if (add_overflow(paddr, memsz, result) || (result >= mem_size))
+			    throw Invalid_guest_image();
+			/*
+			 * Verify that align is a non-zero power of 2 and safely compute
+			 * ((_end + (align - 1)) & -align).
+			 */
+			if (align > 0 && (align & (align - 1)) == 0) {
+			    if (add_overflow(result, (align - 1), _end))
+			        throw Invalid_guest_image();
+			    _end = _end & -align;
+			}
+			else {
+				_end = result;
+			}
+			if (_end > _p_end)
+				_p_end = _end;
 
-		    daddr = mem + paddr;
+			log("copy ELF section to offset ", (Hex)paddr, " (", paddr >> 10, " KiB)");
+			daddr = mem + paddr;
 			memcpy(daddr, elf_rom.local_addr<uint8_t>()+offset, filesz);
 
 			enum {
@@ -525,22 +526,22 @@ struct Hvt::Guest_memory
 				PROT_EXEC  = 0x04U, /* pages can be executed */
 			};
 
-		    prot = PROT_NONE;
-		    if (phdr[ph_i].p_flags & PF_R)
-		        prot |= PROT_READ;
-		    if (phdr[ph_i].p_flags & PF_W) {
-		        prot |= PROT_WRITE;
-		        warning("phdr[", ph_i, "] requests WRITE permissions");
+			prot = PROT_NONE;
+			if (phdr[ph_i].p_flags & PF_R)
+				prot |= PROT_READ;
+			if (phdr[ph_i].p_flags & PF_W) {
+				prot |= PROT_WRITE;
+				warning("phdr[", ph_i, "] requests WRITE permissions");
 			}
-		    if (phdr[ph_i].p_flags & PF_X) {
-		        prot |= PROT_EXEC;
-		        warning("phdr[", ph_i, "] requests EXEC permissions");
+			if (phdr[ph_i].p_flags & PF_X) {
+				prot |= PROT_EXEC;
+				warning("phdr[", ph_i, "] requests EXEC permissions");
 			}
 
-		/*
-		    if (mprotect(daddr, _end - paddr, prot) == -1)
-		        throw Invalid_guest_image();
-		 */
+			/*
+			if (mprotect(daddr, _end - paddr, prot) == -1)
+				throw Invalid_guest_image();
+			*/
 		}
 
 		_p_entry = hdr.e_entry;
@@ -585,7 +586,9 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 				Genode::Thread::myself()->utcb());
 		}
 
-		void _vcpu_startup()
+		enum Skip { SKIP = true, NO_SKIP = false };
+
+		void _svm_startup()
 		{
 			using namespace Nova;
 
@@ -594,13 +597,7 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 			Utcb *utcb = _utcb_of_myself();
 			memset(utcb, 0x00, sizeof(Utcb));
 
-			utcb->mtd =
-				Mtd::EBSD | Mtd::ESP | Mtd::EIP | Mtd::EFL |
-				Mtd::ESDS | Mtd::FSGS | Mtd::CSSS |
-				Mtd::TR | Mtd::LDTR | Mtd::GDTR  | Mtd::IDTR |
-				Mtd::EFER;
-
-			// TODO: try Mtd::ALL
+			utcb->mtd = Mtd::ALL;
 
 			utcb->ip    = _guest_memory._p_entry;
 			utcb->flags = X86_RFLAGS_INIT;
@@ -643,6 +640,16 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb->idtr.base = 0;			
 		}
 
+		void _vmx_startup()
+		{
+			using namespace Nova;
+
+			Vmm::log(__func__, " called");
+
+			Utcb *utcb = _utcb_of_myself();
+			utcb->ctrl[0] = ~0;
+		}
+
 		void _svm_npt()
 		{
 			using namespace Nova;
@@ -658,13 +665,18 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 			Vmm::log(__func__, ": ", (Hex)guest_fault);
 
 			Nova::Mem_crd crd(
-				_guest_memory._guest_ram_addr >> PAGE_SIZE_LOG2, 0,
+				_guest_memory._guest_ram_addr >> PAGE_SIZE_LOG2, 3,
 				Nova::Rights(true, true, true));
 
 			utcb->set_msg_word(0);
 			utcb->mtd = 0;
 
 			utcb->append_item(crd, guest_fault, false, true);
+		}
+
+		void _svm_triple()
+		{
+			Vmm::log(__func__);
 		}
 
 		void _svm_io()
@@ -716,6 +728,14 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 		{
 			using namespace Nova;
 
+			/* detect virtualization extension */
+			Attached_rom_dataspace const info(env, "platform_info");
+			Genode::Xml_node const features = info.xml().sub_node("hardware").sub_node("features");
+
+			bool const has_svm = features.attribute_value("svm", false);
+			bool const has_vmx = features.attribute_value("vmx", false);
+
+
 			/* shortcuts for common message-transfer descriptors */
 
 			Mtd const mtd_all(Mtd::ALL);
@@ -728,11 +748,14 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 			enum { QUMU_SVM = true };
 
 			/* register virtualization event handlers */
-			if (QUMU_SVM) {
-				_register_handler<0xfe, &Exit_dispatcher::_vcpu_startup>
+			if (has_svm) {
+				_register_handler<0xfe, &Exit_dispatcher::_svm_startup>
 					(exc_base, mtd_all);
 
 				_register_handler<0xfc, &Exit_dispatcher::_svm_npt>
+					(exc_base, mtd_all);
+
+				_register_handler<0x7f, &Exit_dispatcher::_svm_triple>
 					(exc_base, mtd_all);
 
 				_register_handler<0x7b, &Exit_dispatcher::_svm_io>
@@ -745,6 +768,18 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 				_register_handler<0xff, &Exit_dispatcher::_recall>
 					(exc_base, mtd_all);
+
+			} else if (has_vmx) {
+				error("VMX support not implemented");
+
+
+				_register_handler<0xfe, &Exit_dispatcher::_vmx_startup>
+					(exc_base, mtd_all);
+
+
+			} else {
+				error("no hardware virtualization extensions available");
+				throw Exception();
 			}
 
 			/* start virtual CPU */
