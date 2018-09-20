@@ -45,9 +45,11 @@ namespace Genode {
  */
 struct Genode::Child_policy
 {
-	typedef String<80> Name;
-	typedef String<80> Binary_name;
-	typedef String<80> Linker_name;
+	enum { MAX_LABEL_LEN = 128 };
+
+	typedef String<MAX_LABEL_LEN> Name;
+	typedef String<MAX_LABEL_LEN> Binary_name;
+	typedef String<MAX_LABEL_LEN> Linker_name;
 
 	virtual ~Child_policy() { }
 
@@ -425,7 +427,7 @@ class Genode::Child : protected Rpc_object<Parent>,
 
 			Id_space<Parent::Client>::Id const _client_id;
 
-			typedef String<80> Label;
+			typedef String<MAX_LABEL_LEN> Label;
 
 			Args const _args;
 
