@@ -415,19 +415,18 @@ struct Hvt::Guest_memory
 {
 	Genode::Env &_env;
 
-	size_t _guest_size_estimate()
+	size_t _guest_quota()
 	{
-		size_t size = _env.ram().avail_ram().value;
-		hvt_x86_mem_size(&size);
-
-		//size -= 1 << 20;
-		//size = size & ~(X86_GUEST_PAGE_SIZE - 1);
-
-		Genode::log("guest size will be ", (Hex)size, " (", size>>20, " MiB)");
-		return size;
+		size_t avail_ram = _env.ram().avail_ram().value;
+		size_t avail_pages = min(512, avail_ram / X86_GUEST_PAGE_SIZE);
+		if (!avail_pages) {
+			error("insufficient RAM quota to host an HVT guest");
+			throw Out_of_ram();
+		}
+		return avail_pages * X86_GUEST_PAGE_SIZE;
 	}
 
-	size_t const  _guest_ram_size = _guest_size_estimate();
+	size_t const _guest_ram_size = _guest_quota();
 
 	Ram_dataspace_capability _guest_ram_ds = _env.pd().alloc(_guest_ram_size);
 
@@ -567,7 +566,13 @@ struct Hvt::Guest_memory
 		bi->kernel_end = _p_end;
 		bi->cmdline = X86_CMDLINE_BASE;
 		bi->cpu.tsc_freq = TODO_TSC_GUESS;
+
+		char *cmdline = (char *)(_guest_ram_addr+X86_CMDLINE_BASE);
+		Genode::snprintf(cmdline, HVT_CMDLINE_SIZE, "NOVA HVT");
 	}
+
+	addr_t local_base() const {
+		return _guest_ram_addr; }
 
 	size_t size() const {
 		return _guest_ram_size; }
@@ -613,31 +618,34 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb->fmask = 0;
 			utcb->kernel_gs_base = 0;
 
-#define sreg_to_utcb(in, out) \
+#define set_utcb_sreg(out, in) \
 	out.sel = in.selector * 8; \
 	out.ar = in.type \
-		| in.s <<  4 | in.dpl <<  5 | in.p <<  7 \
-		| in.l << 13 | in.db  << 14 | in.g << 15 \
-		| in.unusable << X86_SREG_UNUSABLE_BIT; \
+		| (in.s   <<  4) \
+		| (in.dpl <<  5) \
+		| (in.p   <<  7) \
+		| (in.l   << 13) \
+		| (in.db  << 14) \
+		| (in.g   << 15) \
+		| (in.unusable << X86_SREG_UNUSABLE_BIT); \
 	out.limit = in.limit; \
 	out.base = in.base; \
 
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->es);
-			sreg_to_utcb(hvt_x86_sreg_code, utcb->cs);
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->ss);
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->ds);
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->fs);
-			sreg_to_utcb(hvt_x86_sreg_data, utcb->gs);
-			sreg_to_utcb(hvt_x86_sreg_unusable, utcb->ldtr);
-			sreg_to_utcb(hvt_x86_sreg_tr, utcb->tr);
+			set_utcb_sreg(utcb->es,   hvt_x86_sreg_data);
+			set_utcb_sreg(utcb->cs,   hvt_x86_sreg_code);
+			set_utcb_sreg(utcb->ss,   hvt_x86_sreg_data);
+			set_utcb_sreg(utcb->ds,   hvt_x86_sreg_data);
+			set_utcb_sreg(utcb->fs,   hvt_x86_sreg_data);
+			set_utcb_sreg(utcb->gs,   hvt_x86_sreg_data);
+			set_utcb_sreg(utcb->ldtr, hvt_x86_sreg_unusable);
+			set_utcb_sreg(utcb->tr,   hvt_x86_sreg_tr);
 
-#undef sreg_to_utcb
+#undef set_utcb_sreg
 
 			utcb->gdtr.limit = X86_GDTR_LIMIT;
 			utcb->gdtr.base = X86_GDT_BASE;
 
 			utcb->idtr.limit = 0xffff;
-			utcb->idtr.base = 0;			
 		}
 
 		void _vmx_startup()
@@ -655,28 +663,37 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 			using namespace Nova;
 
 			Utcb *utcb = _utcb_of_myself();
-			Vmm::log(
-				__func__,
-				" ip=", Hex((addr_t)utcb->ip),
-				" sp=", Hex((addr_t)utcb->sp));
+			Vmm::log(__func__, ": ip=", Hex(utcb->ip));
 
-			addr_t const guest_fault = utcb->qual[1];
+			addr_t const phys_addr = utcb->qual[1];
+			addr_t const phys_page = phys_addr >> PAGE_SIZE_LOG2;
+			addr_t const local_base = _guest_memory._guest_ram_addr;
+			addr_t const local_addr = local_base + phys_addr;
+			addr_t const local_page = local_addr >> PAGE_SIZE_LOG2;
 
-			Vmm::log(__func__, ": ", (Hex)guest_fault);
+			Vmm::log(__func__, ": guest fault at ", Hex(phys_addr), "(",Hex(phys_page), "), local address is ", Hex(local_addr), "(",(Hex)local_page,")");
 
 			Nova::Mem_crd crd(
-				_guest_memory._guest_ram_addr >> PAGE_SIZE_LOG2, 3,
+				local_page, 0,
 				Nova::Rights(true, true, true));
+
+			addr_t const hotspot = phys_addr;
+
+			Vmm::log(__func__, ": NPT mapping ("
+				"base=", Hex(crd.base()), ", "
+				"order=", Hex(crd.order()), ", "
+				"hotspot=", Hex(hotspot));
 
 			utcb->set_msg_word(0);
 			utcb->mtd = 0;
 
-			utcb->append_item(crd, guest_fault, false, true);
+			utcb->append_item(crd, hotspot, false, true);
 		}
 
 		void _svm_triple()
 		{
-			Vmm::log(__func__);
+			error("SVM triple fault exit");
+			throw Exception();
 		}
 
 		void _svm_io()
@@ -767,7 +784,7 @@ struct Hvt::Exit_dispatcher : Vmm::Vcpu_dispatcher<Genode::Thread>
 					(exc_base, mtd_all);
 
 				_register_handler<0xff, &Exit_dispatcher::_recall>
-					(exc_base, mtd_all);
+					(exc_base, Mtd::EIP);
 
 			} else if (has_vmx) {
 				error("VMX support not implemented");
