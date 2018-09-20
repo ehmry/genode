@@ -673,7 +673,6 @@ void Driver_manager::Main::_generate_usb_drv_config(Reporter &usb_drv_config,
 
 			devices.for_each_sub_node("device", [&] (Xml_node device) {
 
-				typedef String<64> Label;
 				typedef String<32> Id;
 
 				Label const label      = device.attribute_value("label", Label());

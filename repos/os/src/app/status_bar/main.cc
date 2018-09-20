@@ -26,7 +26,6 @@ namespace Status_bar {
 	using namespace Genode;
 
 	typedef String<128>         Domain_name;
-	typedef String<128>         Label;
 	typedef Surface_base::Area  Area;
 	typedef Surface_base::Point Point;
 	typedef Surface_base::Rect  Rect;

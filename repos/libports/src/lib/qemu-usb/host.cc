@@ -928,7 +928,7 @@ struct Usb_devices : List<Usb_host_device>
 
 			Dev_info const dev_info(bus, dev, vendor, product);
 
-			String<128> label;
+			Label label;
 			try {
 				node.attribute("label").value(&label);
 			} catch (Xml_attribute::Nonexistent_attribute) {

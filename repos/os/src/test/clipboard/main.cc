@@ -92,8 +92,6 @@ class Test::Subsystem
 
 		Env &_env;
 
-		typedef String<100> Label;
-
 		Label _name;
 
 		Handle_step_fn &_handle_step_fn;

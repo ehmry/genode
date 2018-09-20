@@ -309,7 +309,7 @@ struct Nitpicker::Session : Genode::Session
 	 */
 	virtual void focus(Genode::Capability<Session> focused) = 0;
 
-	typedef Genode::String<160> Label;
+	typedef Genode::Label Label;
 
 	enum Session_control { SESSION_CONTROL_HIDE, SESSION_CONTROL_SHOW,
 	                       SESSION_CONTROL_TO_FRONT };

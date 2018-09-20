@@ -43,7 +43,7 @@ class Cpu_load_display::Timeline : public Genode::List<Timeline>::Element
 
 		enum { HISTORY_LEN = 32 };
 
-		typedef Genode::String<160> Label;
+		typedef Genode::Label Label;
 
 	private:
 

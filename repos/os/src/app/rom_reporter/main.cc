@@ -28,7 +28,6 @@ struct Rom_reporter::Rom_module
 {
 	Env &_env;
 
-	typedef String<160> Label;
 	Label const _label;
 
 	Attached_rom_dataspace _rom_ds { _env, _label.string() };
@@ -76,8 +75,7 @@ struct Rom_reporter::Main
 	{
 		_config.xml().for_each_sub_node("rom", [&] (Xml_node const &rom) {
 			new (_heap)
-				Rom_module(_env, rom.attribute_value("label",
-				                                     Rom_module::Label()));
+				Rom_module(_env, rom.attribute_value("label", Label()));
 		});
 	}
 };

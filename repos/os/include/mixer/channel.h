@@ -14,6 +14,7 @@
 #ifndef _INCLUDE__MIXER__CHANNEL_H_
 #define _INCLUDE__MIXER__CHANNEL_H_
 
+#include <base/session_label.h>
 #include <util/string.h>
 #include <util/xml_node.h>
 
@@ -25,7 +26,7 @@ struct Mixer::Channel
 {
 	struct Invalid_channel { };
 
-	typedef Genode::String<128> Label;
+	typedef Genode::Label Label;
 	typedef Genode::String<32>  Name;
 
 	typedef enum { INVALID = -1, LEFT, RIGHT, MAX_CHANNELS } Number;

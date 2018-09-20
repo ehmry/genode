@@ -19,9 +19,12 @@
 #include <util/arg_string.h>
 #include <util/string.h>
 
-namespace Genode { struct Session_label; }
+namespace Genode {
+	typedef String<160> Label;
+	struct Session_label;
+}
 
-struct Genode::Session_label : String<160>
+struct Genode::Session_label : Label
 {
 	private:
 

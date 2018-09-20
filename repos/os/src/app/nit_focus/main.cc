@@ -37,7 +37,6 @@ struct Nit_focus::Main
 		_clicked_rom.update();
 		_config_rom.update();
 
-		typedef String<160> Label;
 		Label const label = _clicked_rom.xml().attribute_value("label", Label());
 
 		try {

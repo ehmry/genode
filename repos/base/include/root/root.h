@@ -29,7 +29,7 @@ namespace Genode {
 
 struct Genode::Root
 {
-	typedef Rpc_in_buffer<160> Session_args;
+	typedef Rpc_in_buffer<256> Session_args;
 	typedef Rpc_in_buffer<160> Upgrade_args;
 
 	virtual ~Root() { }

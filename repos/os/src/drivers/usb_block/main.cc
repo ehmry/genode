@@ -106,7 +106,7 @@ struct Usb::Block_driver : Usb::Completion,
 	 */
 	static char const *get_label(Xml_node node)
 	{
-		static Genode::String<256> usb_label;
+		static Genode::Label usb_label;
 		try {
 			node.attribute("label").value(&usb_label);
 			return usb_label.string();
