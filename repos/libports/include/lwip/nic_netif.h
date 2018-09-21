@@ -297,21 +297,7 @@ class Lwip::Nic_netif
 		{
 			auto &tx = *_nic.tx();
 
-			/* flush acknowledgements */
-			while (tx.ack_avail())
-				tx.release_packet(tx.get_acked_packet());
-
-			if (!tx.ready_to_submit()) {
-				Genode::error("lwIP: Nic packet queue congested, cannot send packet");
-				return ERR_WOULDBLOCK;
-			}
-
-			Nic::Packet_descriptor packet;
-			try { packet = tx.alloc_packet(p->tot_len); }
-			catch (...) {
-				Genode::error("lwIP: Nic packet allocation failed, cannot send packet");
-				return ERR_WOULDBLOCK;
-			}
+			Nic::Packet_descriptor packet = tx.alloc_packet(p->tot_len);
 
 			/*
 			 * We iterate over the pbuf chain until we have read the entire
@@ -325,6 +311,8 @@ class Lwip::Nic_netif
 			}
 
 			tx.submit_packet(packet);
+			tx.release_packet(tx.get_acked_packet());
+
 			LINK_STATS_INC(link.xmit);
 			return ERR_OK;
 		}

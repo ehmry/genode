@@ -1191,7 +1191,7 @@ class Lwip::Tcp_socket_dir final :
 							: Read_result::READ_OK;
 					}
 
-					u16_t const ucount = count;
+					u16_t const ucount = min(u16_t(~0U), count);
 					u16_t const n = pbuf_copy_partial(_recv_pbuf, dst, ucount, _recv_off);
 					_recv_off += n;
 					{
@@ -1315,7 +1315,6 @@ class Lwip::Tcp_socket_dir final :
 		{
 			if (_pcb == NULL) {
 				/* socket is closed */
-				Genode::log("socket is closed");
 				out_count = 0;
 				return Write_result::WRITE_OK;
 			}
@@ -1323,34 +1322,21 @@ class Lwip::Tcp_socket_dir final :
 			switch(handle.kind) {
 			case Lwip_file_handle::DATA:
 				if (state == READY) {
-					file_size out = 0;
-					while (count) {
-						/* check if the send buffer is exhausted */
-						count = min(count, tcp_sndbuf(_pcb));
-						if (!count)
-							return Write_result::WRITE_BLOCKED;
+					u16_t n = min(u16_t(~0U), min(count, tcp_sndbuf(_pcb)));
+					if (!n) return Write_result::WRITE_BLOCKED;
 
-						/* safe to segment writes to fit into pbufs */
-						u16_t n = min(count, 0xffffU);
+					/* write to outgoing TCP buffer */
+					err_t err = tcp_write(_pcb, src, n, TCP_WRITE_FLAG_COPY);
 
-						count -= n;
-						/* write to outgoing TCP buffer */
-						err_t err = tcp_write(
-							_pcb, src, n, TCP_WRITE_FLAG_COPY);
-						if (err == ERR_OK)
-							/* flush the buffer */
-							err = tcp_output(_pcb);
-						if (err != ERR_OK) {
-							Genode::error("lwIP: tcp_write failed, error ", (int)-err);
-							return Write_result::WRITE_ERR_IO;
-						}
-
-						src += n;
-						out += n;
-						/* pending_ack += n; */
+					if (err == ERR_OK)
+						/* flush the buffer */
+						err = tcp_output(_pcb);
+					if (err != ERR_OK) {
+						Genode::error("lwIP: tcp_write failed, error ", (int)-err);
+						return Write_result::WRITE_ERR_IO;
 					}
 
-					out_count = out;
+					out_count = n;
 					return Write_result::WRITE_OK;
 				}
 				break;
@@ -1573,6 +1559,8 @@ class Lwip::File_system final : public Vfs::File_system
 {
 	private:
 
+		Genode::Entrypoint &_ep;
+
 		/**
 		 * LwIP connection to Nic service
 		 */
@@ -1626,7 +1614,7 @@ class Lwip::File_system final : public Vfs::File_system
 	public:
 
 		File_system(Vfs::Env &vfs_env, Genode::Xml_node config)
-		: _netif(vfs_env, config, vfs_env.io_handler())
+		:  _ep(vfs_env.env().ep()), _netif(vfs_env, config, vfs_env.io_handler())
 		{ }
 
 		/**
@@ -1756,12 +1744,30 @@ class Lwip::File_system final : public Vfs::File_system
 		                   char const *src, file_size count,
 		                   file_size &out_count) override
 		{
-			out_count = 0;
-
 			if ((vfs_handle->status_flags() & OPEN_MODE_ACCMODE) == OPEN_MODE_RDONLY)
 				return Write_result::WRITE_ERR_INVALID;
-			if (Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle))
-				return handle->write(src, count, out_count);
+
+			if (Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle)) {
+				Write_result res = Write_result::WRITE_ERR_INVALID;
+				file_size offset = 0;
+				file_size remain = count;
+				while (remain) {
+					file_size out = 0;
+					res = handle->write(src+offset, remain, out);
+					offset += out;
+					remain -= out;
+
+					if (res == Write_result::WRITE_BLOCKED) {
+						if (remain == count)
+							return Write_result::WRITE_BLOCKED;
+						_ep.wait_and_dispatch_one_io_signal();
+					} else if (res != Write_result::WRITE_OK) {
+						break;
+					}
+				}
+				out_count = count - remain;
+				return res;
+			}
 			return Write_result::WRITE_ERR_INVALID;
 		}
 
@@ -1773,7 +1779,7 @@ class Lwip::File_system final : public Vfs::File_system
 			 * LwIP buffer operations are limited to sizes that
 			 * can be expressed in sixteen bits
 			 */
-			count = Genode::min(count, 0xffffU);
+			count = Genode::min(uint16_t(~0U), count);
 
 			out_count = 0;
 
