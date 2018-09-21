@@ -18,7 +18,6 @@
 
 #include <util/xml_node.h>
 #include <base/attached_dataspace.h>
-#include <base/session_label.h>
 #include <ram_session/ram_session.h>
 
 namespace Init { class Child_config; }
@@ -30,7 +29,7 @@ class Init::Child_config
 
 		Genode::Ram_session &_ram;
 
-		typedef Genode::Label Rom_name;
+		typedef Genode::String<64> Rom_name;
 		Rom_name const _rom_name;
 
 		Genode::Ram_dataspace_capability const _ram_ds;

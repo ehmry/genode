@@ -95,8 +95,8 @@ namespace Audio_out
 	class Root;
 	class Mixer;
 
-	enum { MAX_CHANNEL_NAME_LEN = 16 };
-	typedef Genode::Label Label;
+	enum { MAX_CHANNEL_NAME_LEN = 16, MAX_LABEL_LEN = 128 };
+	typedef Genode::String<MAX_LABEL_LEN> Label;
 }
 
 

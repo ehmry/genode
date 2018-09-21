@@ -21,6 +21,7 @@ void Sculpt::gen_update_start_content(Xml_generator &xml)
 
 	xml.node("route", [&] () {
 
+		typedef String<32> Label;
 		auto gen_fs = [&] (Label const &label, Label const &server) {
 			gen_service_node<::File_system::Session>(xml, [&] () {
 				xml.attribute("label", label);

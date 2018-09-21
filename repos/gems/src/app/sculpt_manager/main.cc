@@ -606,6 +606,7 @@ void Sculpt::Main::_handle_window_layout()
 		log_at_right ? Point(log_p1.x() - margins.right - margins.left - 1, log_p2.y())
 		             : Point(log_p2.x(), log_p1.y() - margins.bottom - margins.top - 1);
 
+	typedef String<128> Label;
 	Label const inspect_label     ("runtime -> leitzentrale -> inspect");
 	Label const runtime_view_label("runtime -> leitzentrale -> runtime_view");
 

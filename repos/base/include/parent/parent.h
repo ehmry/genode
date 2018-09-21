@@ -53,8 +53,6 @@ class Genode::Parent
 
 	public:
 
-		enum { MAX_LABEL_LEN = 128 };
-
 		typedef Rpc_in_buffer<64>  Service_name;
 		typedef Rpc_in_buffer<160> Session_args;
 		typedef Rpc_in_buffer<160> Upgrade_args;
