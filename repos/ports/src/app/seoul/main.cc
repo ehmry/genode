@@ -58,6 +58,7 @@
 
 /* NOVA includes that come with Genode */
 #include <nova/syscalls.h>
+#include <nova/print.h>
 
 /* NOVA userland includes */
 #include <nul/vcpu.h>
@@ -504,6 +505,7 @@ class Vcpu_dispatcher : public Vcpu_handler,
 
 			Nova::Utcb * u = (Nova::Utcb *)utcb;
 			u->set_msg_word(0);
+
 			if (!u->append_item(crd, hotspot, false, true))
 				Logging::printf("Could not map everything");
 
@@ -644,6 +646,8 @@ class Vcpu_dispatcher : public Vcpu_handler,
 			utcb->mtd |= MTD_RFLAGS;
 		}
 
+		char _utcb_backup[Nova::Utcb::size()];
+
 		void _vmx_startup()
 		{
 			Utcb *utcb = _utcb_of_myself();
@@ -651,6 +655,23 @@ class Vcpu_dispatcher : public Vcpu_handler,
 			utcb->mtd |= MTD_CTRL;
 			utcb->ctrl[0] = 0;
 			utcb->ctrl[1] = 0;
+
+			Genode::memcpy(&_utcb_backup, utcb, Nova::Utcb::size());
+		}
+
+	Timer::Connection _debug_timer;
+
+	Timer::Periodic_timeout<Vcpu_dispatcher> _debug_timeout {
+		_debug_timer, *this, &Vcpu_dispatcher::_handle_debug_timeout,
+		Genode::Microseconds(1000*1000) };
+
+		void _handle_debug_timeout(Genode::Duration)
+		{
+			using namespace Genode;
+
+			Nova::Utcb &utcb = *((Nova::Utcb *)_utcb_backup);
+
+			Genode::log("--- _vmx_startup ---\n", utcb);
 		}
 
 		void _vmx_recall()
@@ -750,7 +771,8 @@ class Vcpu_dispatcher : public Vcpu_handler,
 			_vcpu(vcpu_lock, unsynchronized_vcpu),
 			_vcpu_thread(vcpu_thread),
 			_guest_memory(guest_memory),
-			_motherboard(motherboard)
+			_motherboard(motherboard),
+			_debug_timer(env, "debug")
 		{
 			using namespace Genode;
 			using namespace Nova;
