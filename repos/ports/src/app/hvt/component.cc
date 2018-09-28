@@ -654,13 +654,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				_guest_memory.base(), _guest_memory.size());
 		}
 
-		/**
-		 * Configure an x86_64 vCPU for HVT
-		 *
-		 * The segment registers must be configured
-		 * seperately because the format is different
-		 * for SVM and VMX.
-		 */
 		void _vcpu_hvt_init(Nova::Utcb &utcb)
 		{
 			Vmm::log(__func__);
@@ -669,7 +662,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			using namespace Nova;
 
-			utcb.mtd = 0
+			utcb.mtd |= 0
 				| Mtd::EBSD
 				| Mtd::ESP
 				| Mtd::EIP
@@ -699,11 +692,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			// Long-mode
 			utcb.efer  = X86_EFER_INIT;
-
-			utcb.star  = 0;
-			utcb.lstar = 0;
-			utcb.fmask = 0;
-			utcb.kernel_gs_base = 0;
 
 			/**
 			 * Convert from HVT x86_sreg to NOVA format
@@ -735,9 +723,11 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			utcb.gdtr.limit = X86_GDTR_LIMIT;
 			utcb.gdtr.base  = X86_GDT_BASE;
-			//utcb.idtr.limit = 0xFFFF;
 
-			/* initialze GDT in guest */
+			/* this is done on OpenBSD */
+			utcb.idtr.limit = 0xffff;
+
+			/* initialize GDT in guest */
 			hvt_x86_setup_gdt(_guest_memory.base());
 
 			/* initialize the page tables in guest memory */
@@ -746,7 +736,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			/* map the guest pages */
 			utcb.set_msg_word(0);
-			for (addr_t phys = X86_GUEST_PAGE_SIZE;
+			for (addr_t phys = 0;
 			     phys < _guest_memory.size();
 			     phys += X86_GUEST_PAGE_SIZE)
 			{
@@ -872,6 +862,9 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			Utcb &utcb = _utcb_of_myself();
 
 			_vcpu_init(utcb);
+			_vcpu_hvt_init(utcb);
+
+			utcb.cr4 |= X86_CR4_VMXE;
 
 			Genode::memcpy(&_utcb_backup, &utcb, sizeof(_utcb_backup));
 		}
@@ -893,26 +886,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			addr_t const local_page = local_addr >> PAGE_SIZE_LOG2;
 
 			Vmm::log(__func__, ": guest fault at ", Hex(phys_addr), "(",Hex(phys_page), "), local address is ", Hex(local_addr), "(",(Hex)local_page,")");
-
-			Nova::Mem_crd crd(
-				local_page, GUEST_PAGE_ORDER,
-				Nova::Rights(true, true, true));
-
-			addr_t const hotspot = crd.hotspot(phys_addr);
-
-			utcb.mtd = 0;
-			utcb.set_msg_word(0);
-
-			Vmm::log(__func__, ": NPT mapping ("
-				"guest=", Hex(phys_addr), ", "
-				"crd.base=", Hex(crd.base()), ", "
-				"hotspot=", Hex(hotspot));
-
-			if (!utcb.append_item(crd, hotspot, false, true))
-				Vmm::warning("could not map everything");
-
-			if (phys_addr == 0xffe00000)
-				throw Exception();
+			throw Exception();
 		}
 
 		void _vmx_ept()
@@ -924,16 +898,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			addr_t const phys_addr = utcb.qual[1];
 
 			Vmm::log(__func__, " ", (Hex)phys_addr);
-
-			if (phys_addr < X86_GUEST_PAGE_SIZE) {
-				Nova::Mem_crd crd(
-					_guest_memory.addr() >> PAGE_SIZE_LOG2,
-						GUEST_PAGE_ORDER, Nova::Rights(true, true, true));
-				if (!utcb.append_item(crd, 0, false, true))
-				Vmm::error("initial mapping failed");
-			}
-
-			//_vcpu_hvt_init(utcb);
 		}
 
 		void _svm_exception()
