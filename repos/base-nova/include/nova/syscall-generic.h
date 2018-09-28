@@ -660,12 +660,12 @@ namespace Nova {
 		/**
 		 * Return current number of message word in UTCB
 		 */
-		unsigned msg_words() { return items & 0xffffU; }
+		unsigned msg_words() const { return items & 0xffffU; }
 
 		/**
 		 * Return current number of message items on UTCB
 		 */
-		unsigned msg_items() { return items >> 16; }
+		unsigned msg_items() const { return items >> 16; }
 
 		/**
 		 * Append message-transfer item to message buffer
