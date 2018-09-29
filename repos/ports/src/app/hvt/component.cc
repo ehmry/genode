@@ -49,6 +49,9 @@ extern "C" {
 
 }
 
+/* local includes */
+//#include "devices.h"
+
 namespace Hvt {
 	using namespace Genode;
 	using Genode::uint64_t;
@@ -59,362 +62,11 @@ namespace Hvt {
 		GUEST_PAGE_ORDER = 9
 	};
 
-	struct Devices;
 	struct Guest_memory;
 	struct Vcpu_handler;
 	struct Main;
 
 	struct Invalid_guest_image : Genode::Exception { };
-	struct Invalid_guest_access : Genode::Exception { };
-
-	template<typename T>
-	T &gpa_cast(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-	    hvt_gpa_t r;
-
-	    if ((gpa >= hvt->mem_size) ||
-		    add_overflow(gpa, sizeof(T), r) ||
-		    (r >= hvt->mem_size))
-		{
-			Genode::error("Invalid guest access: gpa=", gpa, ", sz=", sizeof(T));
-			throw Invalid_guest_access();
-    	}
-
-		return *static_cast<T *>(
-			static_cast<void*>(hvt->mem + gpa));
-	}
-
-	template<typename T>
-	T *gpa_buffer_cast(struct hvt *hvt, hvt_gpa_t gpa, size_t len)
-	{
-	    hvt_gpa_t r;
-
-	    if ((gpa >= hvt->mem_size) ||
-		    add_overflow(gpa, len, r) ||
-		    (r >= hvt->mem_size))
-		{
-			Genode::error("Invalid guest access: gpa=", gpa, ", sz=", len);
-			throw Invalid_guest_access();
-    	}
-
-		return static_cast<T *>(
-			static_cast<void*>(hvt->mem + gpa));
-	}
-};
-
-
-struct Hvt::Devices
-{
-	Genode::Env &_env;
-
-	Timer::Connection _timer { _env };
-
-	Timer::One_shot_timeout<Devices> _poll_timeout {
-		_timer, *this, &Devices::_handle_timeout };
-
-	/* TODO: periodic timeout to sychronize with the RTC */
-
-	uint64_t _initial_epoch = 0;
-
-	Log_connection _log { _env, "guest" };
-
-	Heap _heap { _env.pd(), _env.rm() };
-
-	enum { NIC_BUFFER_SIZE =
-		Nic::Packet_allocator::DEFAULT_PACKET_SIZE * 128 };
-
-	Genode::Allocator_avl _pkt_alloc { &_heap };
-
-	Constructible<Nic::Connection> _nic { };
-
-	struct hvt_netinfo _nic_info { };
-
-	Constructible<Block::Connection> _block { };
-
-	struct hvt_blkinfo _block_info { };
-
-	Io_signal_handler<Devices> _nic_handler {
-		_env.ep(), *this, &Devices::_handle_nic };
-
-	bool _nic_ready = false;
-
-	void _handle_timeout(Duration) { }
-
-	void _handle_nic() {_nic_ready = true; }
-
-	void _walltime(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_walltime &time = gpa_cast<struct hvt_walltime>(hvt, gpa);
-		time.nsecs = _initial_epoch + _timer.curr_time().trunc_to_plain_ms().value / 1000;
-	}
-
-	void _puts(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_puts &puts = gpa_cast<struct hvt_puts>(hvt, gpa);
-		char const *buf = gpa_buffer_cast<char>(hvt, puts.data, puts.len);
-		_log.write(Log_session::String(buf, puts.len));
-	}
-
-	void _poll(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_poll &poll = gpa_cast<struct hvt_poll>(hvt, gpa);
-
-		if (_nic_ready) {
-			poll.ret = 1;
-			return;
-		}
-
-		_poll_timeout.schedule(Microseconds{poll.timeout_nsecs * 1000});
-
-		do {
-			_env.ep().wait_and_dispatch_one_io_signal();
-			if (_nic_ready)
-				_poll_timeout.discard();
-		} while (_poll_timeout.scheduled());
-
-		poll.ret = _nic_ready;
-	}
-
-	void _blkinfo(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_blkinfo &info = gpa_cast<struct hvt_blkinfo>(hvt, gpa);
-
-		info.sector_size = _block_info.sector_size;
-		info.num_sectors = _block_info.num_sectors;
-		info.rw = _block_info.rw;
-	}
-
-	void _blkwrite(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_blkwrite &wr = gpa_cast<struct hvt_blkwrite>(hvt, gpa);
-		off_t pos, end;
-
-		if (wr.sector >= _block_info.num_sectors) {
-			wr.ret = -1;
-			return;
-		}
-		pos = (off_t)_block_info.sector_size * (off_t)wr.sector;
-		if (add_overflow(pos, wr.len, end) ||
-			(end > off_t(_block_info.num_sectors * _block_info.sector_size)))
-		{
-			wr.ret = -1;
-			return;
-		}
-
-		auto &source = *_block->tx();
-
-		Block::Packet_descriptor pkt(
-			source.alloc_packet(wr.len),
-			Block::Packet_descriptor::WRITE,
-			wr.sector / _block_info.sector_size,
-			wr.len / _block_info.sector_size);
-
-		Genode::memcpy(
-			source.packet_content(pkt),
-			gpa_buffer_cast<char>(hvt, wr.data, wr.len),
-			wr.len);
-
-		source.submit_packet(pkt);
-		pkt = source.get_acked_packet();
-		source.release_packet(pkt);
-
-		wr.ret = 0 - pkt.succeeded();
-	}
-
-	void _blkread(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_blkread &rd = gpa_cast<struct hvt_blkread>(hvt, gpa);
-		off_t pos, end;
-
-		if (rd.sector >= _block_info.num_sectors) {
-			rd.ret = -1;
-			return;
-		}
-		pos = (off_t)_block_info.sector_size * (off_t)rd.sector;
-		if (add_overflow(pos, rd.len, end) ||
-		    (end > off_t(_block_info.num_sectors * _block_info.sector_size)))
-		{
-			rd.ret = -1;
-			return;
-		}
-
-		auto &source = *_block->tx();
-
-		Block::Packet_descriptor pkt(
-			source.alloc_packet(rd.len),
-			Block::Packet_descriptor::READ,
-			rd.sector / _block_info.sector_size,
-			rd.len / _block_info.sector_size);
-
-		source.submit_packet(pkt);
-		pkt = source.get_acked_packet();
-		if (!pkt.succeeded()) {
-			rd.ret = -1;
-			return;
-		}
-
-		Genode::memcpy(
-			gpa_buffer_cast<char>(hvt, rd.data, rd.len),
-			source.packet_content(pkt),
-			pkt.size());
-		source.release_packet(pkt);
-
-		rd.ret = 0;
-	}
-
-	void _netinfo(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_netinfo &info = gpa_cast<struct hvt_netinfo>(hvt, gpa);
-
-		Genode::memcpy(
-			info.mac_address,
-			_nic_info.mac_address,
-			sizeof(_nic_info.mac_address));
-	}
-
-	void _netwrite(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_netwrite &wr = gpa_cast<struct hvt_netwrite>(hvt, gpa);
-		if (!_nic.constructed()) {
-			wr.ret = -1;
-			return;
-		}
-
-		auto &tx = *_nic->tx();
-
-		/* free packets processed by service */
-		while (tx.ack_avail())
-			tx.release_packet(tx.get_acked_packet());
-
-		if (!tx.ready_to_submit()) {
-			wr.ret = -1;
-			return;
-		}
-
-		auto pkt = tx.alloc_packet(wr.len);
-		Genode::memcpy(
-			tx.packet_content(pkt),
-			gpa_buffer_cast<char>(hvt, wr.data, wr.len), wr.len);
-		tx.submit_packet(pkt);
-		wr.ret = 0;
-	}
-
-	void _netread(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_netread &rd = gpa_cast<struct hvt_netread>(hvt, gpa);
-		if (!_nic.constructed()) {
-			rd.ret = -1;
-			return;
-		}
-
-		auto &rx = *_nic->rx();
-		if (!rx.packet_avail() || !rx.ready_to_ack()) {
-			rd.ret = -1;
-			return;
-		}
-
-		auto pkt = rx.get_packet();
-		rd.len = min(rd.len, pkt.size());
-		Genode::memcpy(gpa_buffer_cast<char>(hvt, rd.data, rd.len), rx.packet_content(pkt), rd.len);
-		rx.acknowledge_packet(pkt);
-		_nic_ready = rx.packet_avail();
-		rd.ret = 0;
-	}
-
-	void _halt(struct hvt *hvt, hvt_gpa_t gpa)
-	{
-		struct hvt_halt &halt = gpa_cast<struct hvt_halt>(hvt, gpa);
-		if (halt.cookie)
-			log("Halt: ", (Hex)Genode::addr_t(halt.cookie));
-		_env.parent().exit(halt.exit_status);
-		sleep_forever();
-	}
-
-	static int const *year_info(int year)
-	{
-		static const int standard_year[] =
-			{ 365, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
-		static const int leap_year[] =
-			{ 366, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
-		return ((year%4) == 0 && ((year%100) != 0 || (year%400) == 0))
-			? leap_year : standard_year;
-	}
-
-	static uint64_t rtc_epoch(Genode::Env &env)
-	{
-		enum {
-			SEC_PER_MIN  = 60,
-			SEC_PER_HOUR = SEC_PER_MIN * 60,
-			SEC_PER_DAY  = SEC_PER_HOUR * 24
-		};
-
-		auto ts = Rtc::Connection(env).current_time();
-
-		uint64_t epoch = ts.second;
-		epoch += ts.minute * SEC_PER_MIN;
-		epoch += ts.hour   * SEC_PER_HOUR;
-
-		/* add seconds from the start of the month */
-		epoch += (ts.day-1) * SEC_PER_DAY;
-
-		/* add seconds from the start of the year */
-		int const *month_lengths = year_info(ts.year);
-		for (unsigned m = 1; m < ts.month; ++m)
-			epoch += month_lengths[m] * SEC_PER_DAY;
-
-		/* add seconds from 1970 to the start of this year */
-		for (unsigned y = 1970; y < ts.year; ++y)
-			epoch += year_info(y)[0] * SEC_PER_DAY;
-
-		return epoch;
-	}
-
-	Devices(Genode::Env &env) : _env(env)
-	{
-		Attached_rom_dataspace config_rom(env, "config");
-		Xml_node const config = config_rom.xml();
-
-		if (config.has_sub_node("rtc"))
-			_initial_epoch = rtc_epoch(env);
-
-		/*
-		 * create sessions early to subtract session
-		 * buffers from quota before the application
-		 * heap is created
-		 */
-
-		if (config.has_sub_node("nic")) {
-			_nic.construct(
-				env, &_pkt_alloc,
-				NIC_BUFFER_SIZE, NIC_BUFFER_SIZE,
-				"guest");
-			_nic->rx_channel()->sigh_packet_avail(_nic_handler);
-
-			Net::Mac_address nic_mac = _nic->mac_address();
-
-			Genode::memcpy(
-				_nic_info.mac_address, nic_mac.addr,
-				min(sizeof(_nic_info.mac_address), sizeof(nic_mac.addr)));
-		}
-
-		if (config.has_sub_node("blk")) {
-			_block.construct(env, &_pkt_alloc, 128*1024, "guest");
-
-			typedef Block::Packet_descriptor::Opcode Opcode;
-
-			Block::Session::Operations ops { };
-			Block::sector_t blk_count = 0;
-			Genode::size_t  blk_size = 0;
-
-			_block->info(&blk_count, &blk_size, &ops);
-
-			_block_info.sector_size = blk_size;
-			_block_info.num_sectors = blk_size;
-			_block_info.rw = ops.supported(Opcode::WRITE);
-		}
-	}
 
 };
 
@@ -425,7 +77,7 @@ struct Hvt::Guest_memory
 
 	size_t _guest_quota()
 	{
-		size_t avail_ram = _env.ram().avail_ram().value;
+		size_t avail_ram = _env.pd().avail_ram().value;
 		size_t avail_pages = min(size_t(512), avail_ram / size_t(X86_GUEST_PAGE_SIZE));
 		if (!avail_pages) {
 			error("insufficient RAM quota to host an HVT guest");
@@ -436,8 +88,13 @@ struct Hvt::Guest_memory
 
 	size_t const _guest_ram_size = _guest_quota();
 
+	Ram_dataspace_capability _ram_ds_cap =
+		_env.pd().alloc(_guest_ram_size-0x1000);
+
+/*
 	Attached_ram_dataspace _ram_ds {
 		_env.pd(), _env.rm(), _guest_ram_size };
+ */
 
 	/* elf entry point (on physical memory) */
 	hvt_gpa_t _p_entry = 0;
@@ -449,7 +106,7 @@ struct Hvt::Guest_memory
 	{
 		Attached_rom_dataspace elf_rom(env, "guest");
 
-		uint8_t *mem = _ram_ds.local_addr<uint8_t>();
+		uint8_t *mem = 0; //_ram_ds.local_addr<uint8_t>();
 		Genode::log("Guest base address: ", (Hex)(addr_t)mem);
 
 
@@ -553,11 +210,18 @@ struct Hvt::Guest_memory
 
 	Guest_memory(Genode::Env &env) : _env(env)
 	{
-		Genode::memset(base(), 0, size());
+		/* attach guest RAM at second page in local address space */
+		_env.rm().attach_at(_ram_ds_cap, 0x1000);
 
 		log("Load guest ELF...");
 		_load_elf(env);
 		log("Guest ELF valid! entry=", (Hex)_p_entry, ", end=", (Hex)_p_end);
+
+		/* initialize GDT */
+			hvt_x86_setup_gdt(base());
+
+		/* initialize the page tables */
+		hvt_x86_setup_pagetables(base(), size());
 
 		enum { TODO_TSC_GUESS = 7 };
 
@@ -568,15 +232,15 @@ struct Hvt::Guest_memory
 		bi->cmdline = X86_CMDLINE_BASE;
 		bi->cpu.tsc_freq = TODO_TSC_GUESS;
 
-		char *cmdline = _ram_ds.local_addr<char>()+X86_CMDLINE_BASE;
+		char *cmdline = (char *)X86_CMDLINE_BASE; //_ram_ds.local_addr<char>()+X86_CMDLINE_BASE;
 		Genode::snprintf(cmdline, HVT_CMDLINE_SIZE, "NOVA HVT");
 	}
 
 	uint8_t *base() const {
-		return _ram_ds.local_addr<uint8_t>(); }
+		return 0; } //_ram_ds.local_addr<uint8_t>(); }
 
 	addr_t addr() const {
-		return (addr_t)_ram_ds.local_addr<uint8_t>(); }
+		return 0; } //(addr_t)_ram_ds.local_addr<uint8_t>(); }
 
 	size_t size() const {
 		return _guest_ram_size; }
@@ -596,8 +260,7 @@ struct Hvt::Guest_memory
 struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 {
 		Guest_memory        &_guest_memory;
-		Pd_session          &_guest_pd;
-		Vmm::Vcpu_other_pd   _vcpu_thread;
+		Vmm::Vcpu_same_pd   _vcpu_thread;
 
 		static Nova::Utcb &_utcb_of_myself()
 		{
@@ -612,9 +275,8 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			memset(&utcb, 0x00, Utcb::size());
 			utcb.mtd = 0xfffff;
 
-			utcb.ip = _guest_memory._p_entry;
-			utcb.flags = X86_RFLAGS_INIT;
-			utcb.sp    = _guest_memory.size() - 8;
+			utcb.ip = 0xfff0;
+			utcb.flags = 0x2; // reserved
 
 			utcb.dx = 0x600; // Seoul
 			utcb.cr0 = 0x10;
@@ -644,23 +306,15 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.ldtr.ar = 0x1000;
 			utcb.tr.ar = 0x8b;
 
-			/* initialize GDT in guest */
 			utcb.gdtr.limit = X86_GDTR_LIMIT;
 			utcb.gdtr.base  = X86_GDT_BASE;
-			hvt_x86_setup_gdt(_guest_memory.base());
-
-			/* initialize the page tables for later */
-			hvt_x86_setup_pagetables(
-				_guest_memory.base(), _guest_memory.size());
 		}
 
 		void _vcpu_hvt_init(Nova::Utcb &utcb)
 		{
-			Vmm::log(__func__);
-			// /home/repo/openbsd/sys/arch/amd64/amd64/vmm.c
-			// Look for EFER_LM
-
 			using namespace Nova;
+
+			_vcpu_init(utcb);
 
 			utcb.mtd |= 0
 				| Mtd::EBSD
@@ -682,7 +336,8 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.di    = X86_BOOT_INFO_BASE;
 
 			// Basic CPU control in CR0
-			utcb.cr0 = X86_CR0_INIT;
+			utcb.cr0 = X86_CR0_PE | X86_CR0_NE;
+			//utcb.cr0 = X86_CR0_INIT;
 
 			// PML4
 			utcb.cr3   = X86_CR3_INIT;
@@ -691,7 +346,8 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.cr4   = X86_CR4_INIT;
 
 			// Long-mode
-			utcb.efer  = X86_EFER_INIT;
+			utcb.efer  = X86_EFER_LME | X86_EFER_LMA;
+			// set LME but not LMA?
 
 			/**
 			 * Convert from HVT x86_sreg to NOVA format
@@ -710,8 +366,8 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				nova.limit = hvt.limit; \
 				nova.base  = hvt.base; \
 
-			write_sreg(utcb.es,   hvt_x86_sreg_data);
 			write_sreg(utcb.cs,   hvt_x86_sreg_code);
+			write_sreg(utcb.es,   hvt_x86_sreg_data);
 			write_sreg(utcb.ss,   hvt_x86_sreg_data);
 			write_sreg(utcb.ds,   hvt_x86_sreg_data);
 			write_sreg(utcb.fs,   hvt_x86_sreg_data);
@@ -754,10 +410,10 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 		{
 			using namespace Nova;
 
-			Vmm::log(__func__);
-
 			Utcb &utcb = _utcb_of_myself();
 			_vcpu_hvt_init(utcb);
+
+			/* set false segment register bases to identify the first page fault */
 
 			Genode::memcpy(&_utcb_backup, &utcb, sizeof(_utcb_backup));
 		}
@@ -804,8 +460,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 		void _vmx_triple()
 		{
 			using namespace Nova;
-
-			Utcb &utcb = _utcb_of_myself();
 
 			Vmm::error(__func__);
 
@@ -861,7 +515,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			Utcb &utcb = _utcb_of_myself();
 
-			_vcpu_init(utcb);
 			_vcpu_hvt_init(utcb);
 
 			utcb.cr4 |= X86_CR4_VMXE;
@@ -869,24 +522,61 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			Genode::memcpy(&_utcb_backup, &utcb, sizeof(_utcb_backup));
 		}
 
+		__attribute__((noreturn))
 		void _svm_npt()
 		{
 			using namespace Nova;
 
-			Vmm::log(__func__);
+			enum {
+				NOVA_REQ_IRQWIN_EXIT = 0x1000U,
+				IRQ_INJ_VALID_MASK   = 0x80000000UL,
+				IRQ_INJ_NONE         = 0U,
+
+				/*
+				 * Intel® 64 and IA-32 Architectures Software Developer’s Manual 
+				 * Volume 3C, Chapter 24.4.2.
+				 * May 2012
+				*/
+				BLOCKING_BY_STI    = 1U << 0,
+				BLOCKING_BY_MOV_SS = 1U << 1,
+				ACTIVITY_STATE_ACTIVE = 0U,
+				INTERRUPT_STATE_NONE  = 0U,
+			};
+
+			/*
+			[init -> hvt] _svm_npt 0x0 0x2000
+			[init -> hvt] _svm_npt 0x0 0x3400
+			[init -> hvt] _svm_npt 0x0 0x4070
+			 */
 
 			Utcb &utcb = _utcb_of_myself();
 
-			addr_t const phys_addr = utcb.qual[1] & GUEST_PAGE_MASK;
-			Vmm::log(__func__, " ", (Hex)phys_addr);
-			addr_t const phys_page = phys_addr >> PAGE_SIZE_LOG2;
+			if (utcb.actv_state != ACTIVITY_STATE_ACTIVE) {
+				Vmm::log(__func__, " qual[1]=", (Hex)utcb.qual[1], " actv_state=", (Hex)utcb.actv_state);
+			}
 
-			addr_t const local_base = _guest_memory.addr();
-			addr_t const local_addr = local_base + phys_addr;
-			addr_t const local_page = local_addr >> PAGE_SIZE_LOG2;
+			if (utcb.inj_info & IRQ_INJ_VALID_MASK) {
+				Vmm::error("EPT violation during IDT vectoring, ", (Hex)utcb.qual[1]);
+				enum {
+					INJ_IRQWIN = 0x1000,
+					INJ_NMIWIN = 0x0000, // XXX missing
+					INJ_WIN    = INJ_IRQWIN | INJ_NMIWIN
+				};
+			}
 
-			Vmm::log(__func__, ": guest fault at ", Hex(phys_addr), "(",Hex(phys_page), "), local address is ", Hex(local_addr), "(",(Hex)local_page,")");
-			throw Exception();
+			addr_t const gpa = utcb.qual[1];
+			Vmm::log(__func__, " ", (Hex)gpa);
+
+			utcb.mtd = 0;
+			utcb.set_msg_word(0);
+
+			/* map a single page */
+			Nova::Mem_crd crd(
+				gpa>>PAGE_SIZE_LOG2, 0, Nova::Rights(true, true, true));
+			if (!utcb.append_item(crd, gpa, false, true)) {
+				Vmm::warning(__func__, " failed");
+			}
+			Vmm::log(__func__, " reply");
 		}
 
 		void _vmx_ept()
@@ -920,7 +610,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			_guest_memory.dump_page_tables();
 
-			throw Exception();
+			sleep_forever();
 		}
 
 		void _svm_io()
@@ -963,14 +653,15 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 		enum { STACK_SIZE = 1024*sizeof(long) };
 
-		Vcpu_handler(Genode::Env &env,
-		                Pd_connection &pd,
-		                Guest_memory &memory)
+		Vcpu_handler(Genode::Env &env, Guest_memory &memory)
 		:
 			Vmm::Vcpu_dispatcher<Genode::Thread>(
 				env, STACK_SIZE, &env.cpu(), Affinity::Location()),
-			_guest_memory(memory), _guest_pd(pd),
-			_vcpu_thread(&env.cpu(), Affinity::Location(), pd.cap()),
+			_guest_memory(memory),
+			_vcpu_thread(&env.cpu(),
+			             Affinity::Location(),
+			             env.pd_session_cap(),
+			             1024*sizeof(Genode::addr_t)),
 			_debug_timer(env, "debug")
 		{
 			using namespace Nova;
@@ -1008,7 +699,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 					(exc_base, mtd_all);
 
 				_register_handler<0x7f, &Vcpu_handler::_svm_triple>
-					(exc_base, mtd_all);
+					(exc_base, Mtd::ALL);
 
 				_register_handler<0x7b, &Vcpu_handler::_svm_io>
 					(exc_base, mtd_all);
@@ -1043,7 +734,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			}
 
 			/* start virtual CPU */
-			log("start start virtual CPU");
+			log("start virtual CPU");
 			_vcpu_thread.start(ec_sel());
 		}
 };
@@ -1053,18 +744,11 @@ struct Hvt::Main
 {
 	Genode::Env &_env;
 
-	Devices _devices { _env };
-
-	Cpu_connection _guest_cpu { _env, "guest" };
-
-	Pd_connection  _guest_pd  { _env, "guest" };
-
-	Vmm::Vcpu_other_pd _vcpu_thread {
-		&_guest_cpu, Affinity::Location(), _guest_pd.cap() };
+	//Devices _devices { _env };
 
 	Guest_memory _guest_memory { _env };
 
-	Vcpu_handler _vpu_handler { _env, _guest_pd, _guest_memory };
+	Vcpu_handler _vpu_handler { _env, _guest_memory };
 
 	Main(Genode::Env &env) : _env(env) { }
 };
@@ -1074,8 +758,10 @@ Genode::size_t Component::stack_size() {
 	return sizeof(long)<<12; }
 
 
-void Component::construct(Genode::Env &env) {
-	static Hvt::Main tender(env); }
+void Component::construct(Genode::Env &env)
+{
+	static Hvt::Main tender(env);
+}
 
 
 extern "C" {
