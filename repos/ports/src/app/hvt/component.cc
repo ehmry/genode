@@ -27,6 +27,7 @@
 #include <base/heap.h>
 #include <base/component.h>
 #include <base/sleep.h>
+#include <util/touch.h>
 
 /* VMM utility includes */
 #include <vmm/guest_memory.h>
@@ -67,7 +68,6 @@ namespace Hvt {
 	struct Main;
 
 	struct Invalid_guest_image : Genode::Exception { };
-
 };
 
 
@@ -86,31 +86,32 @@ struct Hvt::Guest_memory
 		return avail_pages * X86_GUEST_PAGE_SIZE;
 	}
 
-	size_t const _guest_ram_size = _guest_quota();
+	size_t const _size = _guest_quota();
 
-	Ram_dataspace_capability _ram_ds_cap =
-		_env.pd().alloc(_guest_ram_size-0x1000);
+	Ram_dataspace_capability _ram_cap = _env.pd().alloc(_size);
 
-/*
-	Attached_ram_dataspace _ram_ds {
-		_env.pd(), _env.rm(), _guest_ram_size };
- */
+	addr_t const _colo_start = (addr_t)_env.rm().attach_executable(
+		_ram_cap, 0x1000, 0, 0x1000);
+
+	addr_t const _shadow_base = (addr_t)_env.rm().attach(
+		_ram_cap, 0, 0, false, 0UL, true, true);
+
+	Attached_dataspace _ram_ds { _env.rm(), _ram_cap };
+
+	struct hvt_boot_info &boot_info =
+		*(struct hvt_boot_info *)(_shadow_base + X86_BOOT_INFO_BASE);
 
 	/* elf entry point (on physical memory) */
 	hvt_gpa_t _p_entry = 0;
-
-	/* highest byte of the program (on physical memory) */
-	hvt_gpa_t _p_end   = 0;
 
 	void _load_elf(Genode::Env &env)
 	{
 		Attached_rom_dataspace elf_rom(env, "guest");
 
-		uint8_t *mem = 0; //_ram_ds.local_addr<uint8_t>();
+		uint8_t *mem = base();
 		Genode::log("Guest base address: ", (Hex)(addr_t)mem);
 
-
-		size_t mem_size = _guest_ram_size;
+		size_t mem_size = size();
 
 		Elf64_Phdr *phdr = NULL;
 		Elf64_Ehdr &hdr = *elf_rom.local_addr<Elf64_Ehdr>();
@@ -177,8 +178,8 @@ struct Hvt::Guest_memory
 			else {
 				_end = result;
 			}
-			if (_end > _p_end)
-				_p_end = _end;
+			if (_end > boot_info.kernel_end)
+				boot_info.kernel_end = _end;
 
 			daddr = mem + paddr;
 			memcpy(daddr, elf_rom.local_addr<uint8_t>()+offset, filesz);
@@ -210,49 +211,69 @@ struct Hvt::Guest_memory
 
 	Guest_memory(Genode::Env &env) : _env(env)
 	{
-		/* attach guest RAM at second page in local address space */
-		_env.rm().attach_at(_ram_ds_cap, 0x1000);
-
 		log("Load guest ELF...");
 		_load_elf(env);
-		log("Guest ELF valid! entry=", (Hex)_p_entry, ", end=", (Hex)_p_end);
+		log("Guest ELF valid! entry=", (Hex)entry(), ", end=", (Hex)boot_info.kernel_end);
 
 		/* initialize GDT */
-			hvt_x86_setup_gdt(base());
+		hvt_x86_setup_gdt(base());
 
-		/* initialize the page tables */
-		hvt_x86_setup_pagetables(base(), size());
+		{
+			uint64_t *pml4  = (uint64_t *)(base() + X86_PML4_BASE);
+			uint64_t *pdpte = (uint64_t *)(base() + X86_PDPTE_BASE);
+			uint64_t *pde   = (uint64_t *)(base() + X86_PDE_BASE);
 
-		enum { TODO_TSC_GUESS = 7 };
+			/*
+			 * For simplicity we currently use 2MB pages and only a single
+			 * PML4/PDPTE/PDE.
+			 */
 
-		struct hvt_boot_info *bi =
-			(struct hvt_boot_info *)(base() + X86_BOOT_INFO_BASE);
-		bi->mem_size = _guest_ram_size;
-		bi->kernel_end = _p_end;
-		bi->cmdline = X86_CMDLINE_BASE;
-		bi->cpu.tsc_freq = TODO_TSC_GUESS;
+    		*pml4  = X86_PDPTE_BASE | (X86_PDPT_P | X86_PDPT_RW);
+    		*pdpte = X86_PDE_BASE   | (X86_PDPT_P | X86_PDPT_RW);
+			for (uint64_t offset = 0; offset < size();
+			     offset += X86_GUEST_PAGE_SIZE, pde++)
+			{
+				*pde = (offset) | (X86_PDPT_P | X86_PDPT_RW | X86_PDPT_PS);
+			}
+		}
 
-		char *cmdline = (char *)X86_CMDLINE_BASE; //_ram_ds.local_addr<char>()+X86_CMDLINE_BASE;
+		boot_info.mem_size = _size;
+		boot_info.cmdline = X86_CMDLINE_BASE;
+
+		char *cmdline = (char *)(shadow()+X86_CMDLINE_BASE);
 		Genode::snprintf(cmdline, HVT_CMDLINE_SIZE, "NOVA HVT");
 	}
 
-	uint8_t *base() const {
-		return 0; } //_ram_ds.local_addr<uint8_t>(); }
+	uint8_t *base()
+	{
+		return (uint8_t *)0;
+	}
 
-	addr_t addr() const {
-		return 0; } //(addr_t)_ram_ds.local_addr<uint8_t>(); }
+	addr_t addr() const
+	{
+		return _shadow_base;
+	}
 
-	size_t size() const {
-		return _guest_ram_size; }
+	addr_t shadow() const
+	{
+		return _shadow_base;
+	}
+
+	size_t size() const
+	{
+		return _size;
+	}
+
+	hvt_gpa_t entry() const {
+		return _p_entry; }
 
 	void dump_page_tables() const
 	{
-		Vmm::log("PDE:");
 		uint64_t *pde = (uint64_t *)(addr() + X86_PDE_BASE);
 		size_t pages = size() / X86_GUEST_PAGE_SIZE;
 
 		for (unsigned i = 0; i < pages; ++i)
-			Vmm::log(i, ": ", Hex(pde[i], Hex::PREFIX, Hex::PAD));
+			log("PDE[",i,"]=", Hex(pde[i], Hex::PREFIX, Hex::PAD));
 	}
 };
 
@@ -270,44 +291,47 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 		void _vcpu_init(Nova::Utcb &utcb)
 		{
+			/* From the AMD manual */
 			using namespace Nova;
 
 			memset(&utcb, 0x00, Utcb::size());
 			utcb.mtd = 0xfffff;
 
-			utcb.ip = 0xfff0;
-			utcb.flags = 0x2; // reserved
-
-			utcb.dx = 0x600; // Seoul
 			utcb.cr0 = 0x10;
+			utcb.flags = 0x2;
 
-			utcb.dr7 = 0x400;
+			utcb.ip = 0xfff0;
 
-			utcb.cs.sel  = 0xf000;
-			utcb.cs.base = 0xffff0000;
+			utcb.cs.sel   = 0xf000;
+			utcb.cs.base  = 0xffff0000;
+			utcb.cs.limit = 0xffff;
+			utcb.cs.ar    = 0x9a;
 
-			utcb.es.ar =
-			utcb.cs.ar =
-			utcb.ss.ar =
-			utcb.ds.ar =
-			utcb.fs.ar =
-			utcb.gs.ar = 0x93;
-
-			utcb.es.limit =
-			utcb.cs.limit =
-			utcb.ss.limit =
 			utcb.ds.limit =
+			utcb.es.limit =
 			utcb.fs.limit =
 			utcb.gs.limit =
-			utcb.ldtr.limit =
-			utcb.tr.limit =
+			utcb.ss.limit = 0xffff;
+
+			utcb.ds.ar =
+			utcb.es.ar =
+			utcb.fs.ar =
+			utcb.gs.ar =
+			utcb.ss.ar = 0x92;
+
+			utcb.gdtr.limit =
 			utcb.idtr.limit = 0xffff;
 
-			utcb.ldtr.ar = 0x1000;
-			utcb.tr.ar = 0x8b;
+			utcb.ldtr.ar = 0x82;
+			utcb.ldtr.limit = 0xffff;
 
-			utcb.gdtr.limit = X86_GDTR_LIMIT;
-			utcb.gdtr.base  = X86_GDT_BASE;
+			utcb.tr.ar      = 0x83;
+			utcb.tr.limit   = 0xffff;
+
+			// processor info
+			// utcb.dx = 0x600;
+
+			utcb.dr7 = 0x00000400;
 		}
 
 		void _vcpu_hvt_init(Nova::Utcb &utcb)
@@ -330,14 +354,13 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				| Mtd::IDTR
 				| Mtd::CR;
 
-			utcb.ip    = _guest_memory._p_entry;
+			utcb.ip    = _guest_memory.entry();
 			utcb.flags = X86_RFLAGS_INIT;
 			utcb.sp    = _guest_memory.size() - 8;
 			utcb.di    = X86_BOOT_INFO_BASE;
 
 			// Basic CPU control in CR0
-			utcb.cr0 = X86_CR0_PE | X86_CR0_NE;
-			//utcb.cr0 = X86_CR0_INIT;
+			utcb.cr0 = X86_CR0_INIT; // ^ X86_CR0_PG;
 
 			// PML4
 			utcb.cr3   = X86_CR3_INIT;
@@ -346,25 +369,25 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.cr4   = X86_CR4_INIT;
 
 			// Long-mode
-			utcb.efer  = X86_EFER_LME | X86_EFER_LMA;
-			// set LME but not LMA?
+			utcb.efer  = X86_EFER_INIT;
 
 			/**
 			 * Convert from HVT x86_sreg to NOVA format
 			 */
 			#define write_sreg(nova, hvt) \
-				nova.sel = hvt.selector; \
-				nova.ar  = hvt.type \
-					| hvt.s   <<  4 \
-					| hvt.dpl <<  5 \
-					| hvt.p   <<  7 \
-					| hvt.avl <<  8 \
-					| hvt.l   <<  9 \
-					| hvt.db  << 10 \
-					| hvt.g   << 11 \
+				nova.sel = hvt.selector;  \
+				nova.ar  = 0              \
+					| hvt.type     << 0   \
+					| hvt.s        << 4   \
+					| hvt.dpl      << 5   \
+					| hvt.p        << 7   \
+					| hvt.avl      << 8   \
+					| hvt.l        << 9   \
+					| hvt.db       << 10  \
+					| hvt.g        << 11  \
 					| hvt.unusable << 12; \
-				nova.limit = hvt.limit; \
-				nova.base  = hvt.base; \
+				nova.limit = hvt.limit;   \
+				nova.base  = hvt.base;    \
 
 			write_sreg(utcb.cs,   hvt_x86_sreg_code);
 			write_sreg(utcb.es,   hvt_x86_sreg_data);
@@ -380,27 +403,16 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.gdtr.limit = X86_GDTR_LIMIT;
 			utcb.gdtr.base  = X86_GDT_BASE;
 
-			/* this is done on OpenBSD */
-			utcb.idtr.limit = 0xffff;
-
-			/* initialize GDT in guest */
-			hvt_x86_setup_gdt(_guest_memory.base());
-
-			/* initialize the page tables in guest memory */
-			hvt_x86_setup_pagetables(
-				_guest_memory.base(), _guest_memory.size());
-
-			/* map the guest pages */
 			utcb.set_msg_word(0);
-			for (addr_t phys = 0;
-			     phys < _guest_memory.size();
-			     phys += X86_GUEST_PAGE_SIZE)
+			for (addr_t gpa = 0;
+			     gpa < _guest_memory.size();
+			     gpa += X86_GUEST_PAGE_SIZE)
 			{
 				Nova::Mem_crd crd(
-					(_guest_memory.addr() + phys) >> PAGE_SIZE_LOG2,
+					(_guest_memory.shadow()+gpa) >> PAGE_SIZE_LOG2,
 					GUEST_PAGE_ORDER, Nova::Rights(true, true, true));
-				if (!utcb.append_item(crd, phys, false, true)) {
-					Vmm::warning("initial mapping failed");
+				touch_read((unsigned char volatile *)crd.addr());
+				if (!utcb.append_item(crd, gpa, false, true)) {
 					break;
 				}
 			}
@@ -412,10 +424,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			Utcb &utcb = _utcb_of_myself();
 			_vcpu_hvt_init(utcb);
-
-			/* set false segment register bases to identify the first page fault */
-
-			Genode::memcpy(&_utcb_backup, &utcb, sizeof(_utcb_backup));
 		}
 
 		/*
@@ -476,8 +484,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 					" base=", (Hex)((gdt[i].base_hi<<24) | (gdt[i].base_lo)));
 			}
 
-			_guest_memory.dump_page_tables();
-
 			throw Exception();
 		}
 
@@ -510,80 +516,27 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 		void _vmx_startup()
 		{
-			using namespace Nova;
-			Vmm::log(__func__);
-
-			Utcb &utcb = _utcb_of_myself();
-
+			Nova::Utcb &utcb = _utcb_of_myself();
 			_vcpu_hvt_init(utcb);
-
-			utcb.cr4 |= X86_CR4_VMXE;
-
-			Genode::memcpy(&_utcb_backup, &utcb, sizeof(_utcb_backup));
 		}
 
-		__attribute__((noreturn))
 		void _svm_npt()
 		{
-			using namespace Nova;
+			Nova::Utcb &utcb = _utcb_of_myself();
 
-			enum {
-				NOVA_REQ_IRQWIN_EXIT = 0x1000U,
-				IRQ_INJ_VALID_MASK   = 0x80000000UL,
-				IRQ_INJ_NONE         = 0U,
-
-				/*
-				 * Intel® 64 and IA-32 Architectures Software Developer’s Manual 
-				 * Volume 3C, Chapter 24.4.2.
-				 * May 2012
-				*/
-				BLOCKING_BY_STI    = 1U << 0,
-				BLOCKING_BY_MOV_SS = 1U << 1,
-				ACTIVITY_STATE_ACTIVE = 0U,
-				INTERRUPT_STATE_NONE  = 0U,
-			};
-
-			/*
-			[init -> hvt] _svm_npt 0x0 0x2000
-			[init -> hvt] _svm_npt 0x0 0x3400
-			[init -> hvt] _svm_npt 0x0 0x4070
-			 */
-
-			Utcb &utcb = _utcb_of_myself();
-
-			if (utcb.actv_state != ACTIVITY_STATE_ACTIVE) {
-				Vmm::log(__func__, " qual[1]=", (Hex)utcb.qual[1], " actv_state=", (Hex)utcb.actv_state);
+			addr_t const pf = utcb.qual[1];
+			if (pf > _guest_memory.size()) {
+				error("guest attemped to access ", Hex(pf), " which is beyond ", Hex(_guest_memory.size()));
+				throw Exception();
 			}
 
-			if (utcb.inj_info & IRQ_INJ_VALID_MASK) {
-				Vmm::error("EPT violation during IDT vectoring, ", (Hex)utcb.qual[1]);
-				enum {
-					INJ_IRQWIN = 0x1000,
-					INJ_NMIWIN = 0x0000, // XXX missing
-					INJ_WIN    = INJ_IRQWIN | INJ_NMIWIN
-				};
-			}
-
-			addr_t const gpa = utcb.qual[1];
-			Vmm::log(__func__, " ", (Hex)gpa);
-
-			utcb.mtd = 0;
-			utcb.set_msg_word(0);
-
-			/* map a single page */
-			Nova::Mem_crd crd(
-				gpa>>PAGE_SIZE_LOG2, 0, Nova::Rights(true, true, true));
-			if (!utcb.append_item(crd, gpa, false, true)) {
-				Vmm::warning(__func__, " failed");
-			}
-			Vmm::log(__func__, " reply");
+			Vmm::error(__func__, " ", (Hex)pf);
+			touch_read((unsigned char volatile *)(_guest_memory.shadow()+pf));
 		}
 
 		void _vmx_ept()
 		{
-			using namespace Nova;
-
-			Utcb &utcb = _utcb_of_myself();
+			Nova::Utcb &utcb = _utcb_of_myself();
 
 			addr_t const phys_addr = utcb.qual[1];
 
@@ -595,27 +548,100 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			Vmm::error(__func__, " not handled");
 		}
 
-		void _svm_triple()
+		void _analyze_page_table(addr_t cr3)
 		{
-			using namespace Nova;
+			enum { ACCESS = 1 << 5 };
+			addr_t gpa = _guest_memory.entry();
+			log(__func__, ": gpa is ", (Hex)gpa);
 
-			Utcb &utcb = _utcb_of_myself();
-			addr_t ip = utcb.ip;
-			unsigned long long qual[2] = { utcb.qual[0], utcb.qual[1] };
+			log("PML4 is at ", Hex(cr3));
 
-			error("SVM triple fault exit");
-			error("ip=",(Hex)ip);
-			error("qual[0]=",(Hex)qual[0]);
-			error("qual[1]=",(Hex)qual[1]);
+			addr_t plm4i = (gpa >> 39);
+			log("PML4 index is ", plm4i, " ");
+
+			uint64_t *pml4 = (uint64_t *)cr3;
+			log("PML4E: ", Hex(pml4[plm4i]));
+			if (pml4[plm4i] & ACCESS)
+				log("PML4E has been accessed");
+
+			log("PDPT is at ", Hex(pml4[plm4i] & (~0U<<12)));
+			uint64_t *pdpt = (uint64_t *)(pml4[plm4i] & (~0U<<12));
+
+			addr_t pdpti = (gpa >> 30);
+			log("Page directory pointer index is ", pdpti);
+
+			log("PDPTE: ", Hex(pdpt[pdpti]));
+			if (pdpt[pdpti] & ACCESS)
+				log("PDPTE has been accessed");
+
+
+			log("PDT is at ", Hex(pdpt[pdpti] & (~0U<<12)));
+			uint64_t *pdt = (uint64_t *)(pdpt[pdpti] & (~0U<<12));
+
+			addr_t pdi  = (gpa >> 21);
+			log("Page directory index is ", pdi);
+
+			log("PDE: ", Hex(pdt[pdi]));
+			if (pdt[pdi] & ACCESS)
+				log("PDE has been accessed");
+
+			log("Physical page is at ", Hex(pdt[pdi] & (~0U<<20)));
+
+			addr_t offset = gpa & ((1<< 21)-1);
+			log("Page byte offset is ", (Hex)offset);
 
 			_guest_memory.dump_page_tables();
+		}
 
-			sleep_forever();
+		void _svm_triple()
+		{
+			{
+				Vmm::Utcb_guard::Utcb_backup backup_utcb;
+				Vmm::Utcb_guard guard(backup_utcb);
+
+				Nova::Utcb &utcb = *reinterpret_cast<Nova::Utcb *>(&backup_utcb);
+
+				error("SVM triple fault exit");
+				error("        ip=", (Hex)utcb.ip);
+				error("   qual[0]=", (Hex)utcb.qual[0]);
+				error("   qual[1]=", (Hex)utcb.qual[1]);
+				error("intr_state=", (Hex)utcb.intr_state);
+				error("actv_state=", (Hex)utcb.actv_state);
+				error(  "inj_info=", (Hex)utcb.inj_info);
+				error( "inj_error=", (Hex)utcb.inj_error);
+				error( "inj_info.vector=", utcb.inj_info & 0x7f);
+
+				if (utcb.inj_info & (1<<11)) {
+					error("guest exception would have pushed an error code");
+				}
+
+				if (utcb.inj_info & (1<<31)) {
+					error("intercept occured while guest attempted to deliver an exception through the IDT");
+				}
+
+				if ((utcb.inj_info & 0x7f) == 14)
+					_analyze_page_table(utcb.cr3);
+
+				sleep_forever();
+			}
+
+			Nova::Utcb &utcb = _utcb_of_myself();
+			utcb.mtd = Nova::Mtd::INJ;
+			utcb.inj_info = 0;
 		}
 
 		void _svm_io()
 		{
-			Vmm::log(__func__);
+			using namespace Nova;
+
+			Utcb &utcb = _utcb_of_myself();
+			unsigned io_order = utcb.qual[0] & 1;
+			unsigned port     = utcb.qual[0] >> 16;
+
+			Vmm::log(__func__, ": ip=", (Hex)utcb.ip, " order=", (Hex)io_order, " port=", (Hex)port, " hypecall=", port-HVT_HYPERCALL_PIO_BASE, " (", Hex(utcb.qual[0]), ")");
+
+			//void _handle_io(bool is_in, unsigned io_order, unsigned port)
+			throw Exception();
 		}
 
 		void _gdt_access()
@@ -646,19 +672,17 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			register_handler<EV, Vcpu_handler, FUNC>(exc_base, mtd);
 		}
 
-		addr_t ec_sel()
-		{
-			return sel_sm_ec() + 1;
-		}
+		addr_t ec_sel() {
+			return sel_sm_ec() + 1; }
 
 		enum { STACK_SIZE = 1024*sizeof(long) };
 
 		Vcpu_handler(Genode::Env &env, Guest_memory &memory)
 		:
 			Vmm::Vcpu_dispatcher<Genode::Thread>(
-				env, STACK_SIZE, &env.cpu(), Affinity::Location()),
+				env, STACK_SIZE, env.cpu(), Affinity::Location()),
 			_guest_memory(memory),
-			_vcpu_thread(&env.cpu(),
+			_vcpu_thread(env, env.cpu(),
 			             Affinity::Location(),
 			             env.pd_session_cap(),
 			             1024*sizeof(Genode::addr_t)),
@@ -668,50 +692,47 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			/* detect virtualization extension */
 			Attached_rom_dataspace const info(env, "platform_info");
-			Genode::Xml_node const features = info.xml().sub_node("hardware").sub_node("features");
-			//PDBG(info.xml());
+			Genode::Xml_node const hardware = info.xml().sub_node("hardware");
 
+			hardware.sub_node("tsc").attribute("freq_khz").value(
+				&_guest_memory.boot_info.cpu.tsc_freq);
+			_guest_memory.boot_info.cpu.tsc_freq *= 1000;
+
+			Genode::Xml_node const features = hardware.sub_node("features");
 			bool const has_svm = features.attribute_value("svm", false);
 			bool const has_vmx = features.attribute_value("vmx", false);
 
-			/* shortcuts for common message-transfer descriptors */
-
-			Mtd const mtd_all(Mtd::ALL);
-			Mtd const mtd_cpuid(Mtd::EIP | Mtd::ACDB | Mtd::IRQ);
-			Mtd const mtd_irq(Mtd::IRQ);
-
-			Genode::addr_t exc_base = _vcpu_thread.exc_base();
-
-			/* TODO: wrong */
-			enum { QUMU_SVM = true };
+			addr_t const exc_base = _vcpu_thread.exc_base();
 
 			/* register virtualization event handlers */
 			if (has_svm) {
 				log("SVM detected");
 
-				_register_handler<0xfe, &Vcpu_handler::_svm_startup>
-					(exc_base, mtd_all);
-
-				_register_handler<0xfc, &Vcpu_handler::_svm_npt>
-					(exc_base, mtd_all);
-
-				_register_handler<0x4e, &Vcpu_handler::_svm_exception>
-					(exc_base, mtd_all);
+				_register_handler<0x7b, &Vcpu_handler::_svm_io>
+					(exc_base, Mtd::ALL);
 
 				_register_handler<0x7f, &Vcpu_handler::_svm_triple>
 					(exc_base, Mtd::ALL);
 
-				_register_handler<0x7b, &Vcpu_handler::_svm_io>
-					(exc_base, mtd_all);
+				_register_handler<0xfe, &Vcpu_handler::_svm_startup>
+					(exc_base, Mtd::ALL);
+
+				_register_handler<0xfc, &Vcpu_handler::_svm_npt>
+					(exc_base, Mtd::ALL);
+
+	/*
+				_register_handler<0x4e, &Vcpu_handler::_svm_exception>
+					(exc_base, Mtd::ALL);
 
 				_register_handler<0x67, &Vcpu_handler::_gdt_access>
-					(exc_base, mtd_all);
+					(exc_base, Mtd::ALL);
 
 				_register_handler<0x6b, &Vcpu_handler::_gdt_access>
-					(exc_base, mtd_all);
+					(exc_base, Mtd::ALL);
 
 				_register_handler<0xff, &Vcpu_handler::_recall>
 					(exc_base, Mtd::ALL);
+	*/
 
 			} else if (has_vmx) {
 				log("VMX detected");
@@ -754,39 +775,7 @@ struct Hvt::Main
 };
 
 
-Genode::size_t Component::stack_size() {
-	return sizeof(long)<<12; }
-
-
 void Component::construct(Genode::Env &env)
 {
-	static Hvt::Main tender(env);
-}
-
-
-extern "C" {
-
-void warnx(const char *s, ...)
-{
-	Genode::warning(s);
-}
-
-void err(int, const char *s, ...)
-{
-	Genode::error(s);
-	Genode::sleep_forever();
-}
-
-void errx(int, const char *s, ...)
-{
-	Genode::error(s);
-	Genode::sleep_forever();
-}
-
-void __assert(const char *, const char *file, int line, const char *failedexpr)
-{
-	Genode::error("Assertion failed: (", failedexpr, ") ", file, ":", line);
-	Genode::sleep_forever();
-};
-
+	static Hvt::Main inst(env);
 }
