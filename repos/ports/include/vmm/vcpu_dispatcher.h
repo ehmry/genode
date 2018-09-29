@@ -70,11 +70,13 @@ class Vmm::Vcpu_dispatcher : public T
 		unsigned int exit_reason = 0;
 
 		Vcpu_dispatcher(Genode::Env &env, Genode::size_t stack_size,
-		                Cpu_session * cpu_session,
+		                Cpu_session &cpu_session,
 		                Genode::Affinity::Location location,
 		                const char * name = "vCPU dispatcher")
 		:
-			T(WEIGHT, name, stack_size, location), _env(env)
+			T(env, Cpu_session::Name(name), stack_size,
+			  location, Cpu_session::Weight(), cpu_session),
+			_env(env)
 		{
 			(void)cpu_session;
 			using namespace Genode;

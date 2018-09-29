@@ -51,7 +51,7 @@ class Vmm::Vcpu_other_pd : public Vmm::Vcpu_thread
 
 		Genode::Capability<Genode::Pd_session> _pd_cap;
 		Genode::Affinity::Location  _location;
-		Genode::Cpu_session        *_cpu_session;
+		Genode::Cpu_session        &_cpu_session;
 
 		Genode::addr_t _exc_pt_sel;
 
@@ -63,7 +63,7 @@ class Vmm::Vcpu_other_pd : public Vmm::Vcpu_thread
 
 	public:
 
-		Vcpu_other_pd(Cpu_session * cpu_session,
+		Vcpu_other_pd(Cpu_session &cpu_session,
 		              Genode::Affinity::Location location,
 		              Genode::Capability<Genode::Pd_session> pd_cap,
 		              Genode::size_t = 0 /* stack_size */)
@@ -77,13 +77,13 @@ class Vmm::Vcpu_other_pd : public Vmm::Vcpu_thread
 			using namespace Genode;
 
 			Thread_capability vcpu_vm =
-				_cpu_session->create_thread(_pd_cap, "vCPU",
+				_cpu_session.create_thread(_pd_cap, "vCPU",
 				                            _location, Cpu_session::Weight());
 
 			/* tell parent that this will be a vCPU */
 			Nova_native_cpu::Thread_type thread_type { Nova_native_cpu::Thread_type::VCPU };
 			Nova_native_cpu::Exception_base exception_base { _exc_pt_sel };
-			Nova_native_cpu_client native_cpu(_cpu_session->native_cpu());
+			Nova_native_cpu_client native_cpu(_cpu_session.native_cpu());
 			native_cpu.thread_type(vcpu_vm, thread_type, exception_base);
 
 			Cpu_thread_client cpu_thread(vcpu_vm);
@@ -119,16 +119,23 @@ class Vmm::Vcpu_other_pd : public Vmm::Vcpu_thread
 
 class Vmm::Vcpu_same_pd : public Vmm::Vcpu_thread, Genode::Thread
 {
-	enum { WEIGHT = Genode::Cpu_session::Weight::DEFAULT_WEIGHT };
+	private:
+
+		static Cpu_session::Name const &_name()
+		{
+			static Cpu_session::Name name("vCPU");
+			return name;
+		}
 
 	public:
 
-		Vcpu_same_pd(Cpu_session * cpu_session,
+		Vcpu_same_pd(Genode::Env &env,
+		             Cpu_session &cpu_session,
 		             Genode::Affinity::Location location,
 		             Genode::Capability<Genode::Pd_session>,
 		             Genode::size_t stack_size)
 		:
-			Thread(WEIGHT, "vCPU", stack_size, Type::NORMAL, cpu_session, location)
+			Thread(env, _name(), stack_size, location, Weight(), cpu_session)
 		{
 			/* release pre-allocated selectors of Thread */
 			Genode::cap_map()->remove(native_thread().exc_pt_sel, Nova::NUM_INITIAL_PT_LOG2);
