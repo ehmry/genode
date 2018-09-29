@@ -89,17 +89,17 @@ struct Hvt::Guest_memory
 	size_t const _size = _guest_quota();
 
 	Ram_dataspace_capability _ram_cap = _env.pd().alloc(_size);
-
+	
 	addr_t const _colo_start = (addr_t)_env.rm().attach_executable(
 		_ram_cap, 0x1000, 0, 0x1000);
 
-	addr_t const _shadow_base = (addr_t)_env.rm().attach(
-		_ram_cap, 0, 0, false, 0UL, true, true);
+	//addr_t const _shadow_base = (addr_t)_env.rm().attach(
+	//	_ram_cap, 0, 0, false, 0UL, true, true);
 
 	Attached_dataspace _ram_ds { _env.rm(), _ram_cap };
 
 	struct hvt_boot_info &boot_info =
-		*(struct hvt_boot_info *)(_shadow_base + X86_BOOT_INFO_BASE);
+		*(struct hvt_boot_info *)(0 + X86_BOOT_INFO_BASE);
 
 	/* elf entry point (on physical memory) */
 	hvt_gpa_t _p_entry = 0;
@@ -211,6 +211,8 @@ struct Hvt::Guest_memory
 
 	Guest_memory(Genode::Env &env) : _env(env)
 	{
+		_env.pd().map(_colo_start, size()-0x1000);
+
 		log("Load guest ELF...");
 		_load_elf(env);
 		log("Guest ELF valid! entry=", (Hex)entry(), ", end=", (Hex)boot_info.kernel_end);
@@ -219,21 +221,22 @@ struct Hvt::Guest_memory
 		hvt_x86_setup_gdt(base());
 
 		{
-			uint64_t *pml4  = (uint64_t *)(base() + X86_PML4_BASE);
-			uint64_t *pdpte = (uint64_t *)(base() + X86_PDPTE_BASE);
-			uint64_t *pde   = (uint64_t *)(base() + X86_PDE_BASE);
+			uint64_t *pml4  = (uint64_t *)(X86_PML4_BASE);
+			uint64_t *pdpte = (uint64_t *)(X86_PDPTE_BASE);
+			uint64_t *pde   = (uint64_t *)(X86_PDE_BASE);
 
 			/*
 			 * For simplicity we currently use 2MB pages and only a single
 			 * PML4/PDPTE/PDE.
 			 */
 
-    		*pml4  = X86_PDPTE_BASE | (X86_PDPT_P | X86_PDPT_RW);
-    		*pdpte = X86_PDE_BASE   | (X86_PDPT_P | X86_PDPT_RW);
-			for (uint64_t offset = 0; offset < size();
-			     offset += X86_GUEST_PAGE_SIZE, pde++)
+			*pml4  = X86_PDPTE_BASE | (X86_PDPT_P | X86_PDPT_RW);
+			*pdpte = X86_PDE_BASE   | (X86_PDPT_P | X86_PDPT_RW);
+			for (addr_t paddr = 0; paddr < size();
+			     paddr += X86_GUEST_PAGE_SIZE, pde++)
 			{
-				*pde = (offset) | (X86_PDPT_P | X86_PDPT_RW | X86_PDPT_PS);
+				*pde = paddr | (X86_PDPT_P | X86_PDPT_RW | X86_PDPT_PS);
+				log("PDE: ", Hex(*pde));
 			}
 		}
 
@@ -251,25 +254,25 @@ struct Hvt::Guest_memory
 
 	addr_t addr() const
 	{
-		return _shadow_base;
+		return 0;
 	}
 
 	addr_t shadow() const
 	{
-		return _shadow_base;
+		return 0;
 	}
 
 	size_t size() const
 	{
 		return _size;
 	}
-
+	
 	hvt_gpa_t entry() const {
 		return _p_entry; }
 
 	void dump_page_tables() const
 	{
-		uint64_t *pde = (uint64_t *)(addr() + X86_PDE_BASE);
+		uint64_t *pde = (uint64_t *)(X86_PDE_BASE);
 		size_t pages = size() / X86_GUEST_PAGE_SIZE;
 
 		for (unsigned i = 0; i < pages; ++i)
@@ -280,8 +283,8 @@ struct Hvt::Guest_memory
 
 struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 {
-		Guest_memory        &_guest_memory;
-		Vmm::Vcpu_same_pd   _vcpu_thread;
+		Guest_memory      &_guest_memory;
+		Vmm::Vcpu_same_pd  _vcpu_thread;
 
 		static Nova::Utcb &_utcb_of_myself()
 		{
@@ -403,19 +406,21 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.gdtr.limit = X86_GDTR_LIMIT;
 			utcb.gdtr.base  = X86_GDT_BASE;
 
+/*
 			utcb.set_msg_word(0);
 			for (addr_t gpa = 0;
 			     gpa < _guest_memory.size();
 			     gpa += X86_GUEST_PAGE_SIZE)
 			{
 				Nova::Mem_crd crd(
-					(_guest_memory.shadow()+gpa) >> PAGE_SIZE_LOG2,
+					(gpa) >> PAGE_SIZE_LOG2,
 					GUEST_PAGE_ORDER, Nova::Rights(true, true, true));
-				touch_read((unsigned char volatile *)crd.addr());
+				touch_read((unsigned char volatile *)crd.addr()+0x1000);
 				if (!utcb.append_item(crd, gpa, false, true)) {
 					break;
 				}
 			}
+ */
 		}
 
 		void _svm_startup()
@@ -524,14 +529,17 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 		{
 			Nova::Utcb &utcb = _utcb_of_myself();
 
-			addr_t const pf = utcb.qual[1];
-			if (pf > _guest_memory.size()) {
-				error("guest attemped to access ", Hex(pf), " which is beyond ", Hex(_guest_memory.size()));
+			addr_t const gpa = utcb.qual[1];
+			if (gpa > _guest_memory.size()) {
+				error("guest attemped to access ", Hex(gpa), " which is beyond ", Hex(_guest_memory.size()));
 				throw Exception();
 			}
 
-			Vmm::error(__func__, " ", (Hex)pf);
-			touch_read((unsigned char volatile *)(_guest_memory.shadow()+pf));
+			uint64_t *data  = (uint64_t *)(gpa);
+			Vmm::error(__func__, " ", (Hex)gpa, " - ", Hex(*data), " - is this even in the guest address space?");
+			touch_read((unsigned char volatile *)(_guest_memory.shadow()+gpa));
+			if (gpa)
+				touch_read((unsigned char volatile *)(gpa));
 		}
 
 		void _vmx_ept()
@@ -586,7 +594,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				log("PDE has been accessed");
 
 			log("Physical page is at ", Hex(pdt[pdi] & (~0U<<20)));
-
+			
 			addr_t offset = gpa & ((1<< 21)-1);
 			log("Page byte offset is ", (Hex)offset);
 

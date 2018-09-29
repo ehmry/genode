@@ -43,7 +43,6 @@ install_config {
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Rtc"/> </provides>
 	</start>
-	-->
 
 	<start name="nic_loopback" caps="96">
 		<resource name="RAM" quantum="1M"/>
@@ -55,9 +54,10 @@ install_config {
 		<provides> <service name="Block"/> </provides>
 		<config size="32M" block_size="4096"/>
 	</start>
+	-->
 
 	<start name="hvt" caps="128" ld="no">
-		<resource name="RAM" quantum="8M"/>
+		<resource name="RAM" quantum="9M"/>
 		<config></config>
 		<route>
 			<service name="ROM" label_last="guest">
