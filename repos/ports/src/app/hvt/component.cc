@@ -40,20 +40,16 @@
 #include <nova/print.h>
 
 extern "C" {
-
 /* Upstream HVT includes */
 #include "hvt.h"
 #include "hvt_cpu_x86_64.h"
-
-/* Libc includes */
-#include <elf.h>
-
 }
 
-/* local includes */
 //#include "devices.h"
 
 namespace Hvt {
+	typedef Genode::Hex_range<unsigned long> Hex_range;
+
 	using namespace Genode;
 	using Genode::uint64_t;
 
@@ -63,234 +59,22 @@ namespace Hvt {
 		GUEST_PAGE_ORDER = 9
 	};
 
-	struct Guest_memory;
+	struct _Guest_memory;
 	struct Vcpu_handler;
 	struct Main;
 
-	struct Invalid_guest_image : Genode::Exception { };
 };
 
 
-struct Hvt::Guest_memory
-{
-	Genode::Env &_env;
-
-	size_t _guest_quota()
-	{
-		size_t avail_ram = _env.pd().avail_ram().value;
-		size_t avail_pages = min(size_t(512), avail_ram / size_t(X86_GUEST_PAGE_SIZE));
-		if (!avail_pages) {
-			error("insufficient RAM quota to host an HVT guest");
-			throw Out_of_ram();
-		}
-		return avail_pages * X86_GUEST_PAGE_SIZE;
-	}
-
-	size_t const _size = _guest_quota();
-
-	Ram_dataspace_capability _ram_cap = _env.pd().alloc(_size);
-	
-	addr_t const _colo_start = (addr_t)_env.rm().attach_executable(
-		_ram_cap, 0x1000, 0, 0x1000);
-
-	//addr_t const _shadow_base = (addr_t)_env.rm().attach(
-	//	_ram_cap, 0, 0, false, 0UL, true, true);
-
-	Attached_dataspace _ram_ds { _env.rm(), _ram_cap };
-
-	struct hvt_boot_info &boot_info =
-		*(struct hvt_boot_info *)(0 + X86_BOOT_INFO_BASE);
-
-	/* elf entry point (on physical memory) */
-	hvt_gpa_t _p_entry = 0;
-
-	void _load_elf(Genode::Env &env)
-	{
-		Attached_rom_dataspace elf_rom(env, "guest");
-
-		uint8_t *mem = base();
-		Genode::log("Guest base address: ", (Hex)(addr_t)mem);
-
-		size_t mem_size = size();
-
-		Elf64_Phdr *phdr = NULL;
-		Elf64_Ehdr &hdr = *elf_rom.local_addr<Elf64_Ehdr>();
-
-		/*
-		 * Validate program is in ELF64 format:
-		 * 1. EI_MAG fields 0, 1, 2, 3 spell ELFMAG('0x7f', 'E', 'L', 'F'),
-		 * 2. File contains 64-bit objects,
-		 * 3. Objects are Executable,
-		 * 4. Target instruction must be set to the correct architecture.
-		 */
-		if (hdr.e_ident[EI_MAG0] != ELFMAG0
-		        || hdr.e_ident[EI_MAG1] != ELFMAG1
-		        || hdr.e_ident[EI_MAG2] != ELFMAG2
-		        || hdr.e_ident[EI_MAG3] != ELFMAG3
-		        || hdr.e_ident[EI_CLASS] != ELFCLASS64
-		        || hdr.e_type != ET_EXEC
-#if defined(__x86_64__)
-		        || hdr.e_machine != EM_X86_64
-#elif defined(__aarch64__)
-		        || hdr.e_machine != EM_AARCH64
-#else
-#error Unsupported target
-#endif
-		    )
-		    throw Invalid_guest_image();
-
-		phdr = (Elf64_Phdr *)(elf_rom.local_addr<char>()+hdr.e_phoff);
-
-		/*
-		 * Load all segments with the LOAD directive from the elf file at offset
-		 * p_offset, and copy that into p_addr in memory. The amount of bytes
-		 * copied is p_filesz.  However, each segment should be given
-		 * p_memsz aligned up to p_align bytes on memory.
-		 */
-		for (Elf64_Half ph_i = 0; ph_i < hdr.e_phnum; ph_i++) {
-			uint8_t *daddr;
-			uint64_t _end;
-			size_t  offset = phdr[ph_i].p_offset;
-			size_t  filesz = phdr[ph_i].p_filesz;
-			size_t   memsz = phdr[ph_i].p_memsz;
-			uint64_t paddr = phdr[ph_i].p_paddr;
-			uint64_t align = phdr[ph_i].p_align;
-			uint64_t result;
-			int prot;
-
-			if (phdr[ph_i].p_type != PT_LOAD)
-			    continue;
-
-			if ((paddr >= mem_size) || add_overflow(paddr, filesz, result)
-			        || (result >= mem_size))
-			    throw Invalid_guest_image();
-			if (add_overflow(paddr, memsz, result) || (result >= mem_size))
-			    throw Invalid_guest_image();
-			/*
-			 * Verify that align is a non-zero power of 2 and safely compute
-			 * ((_end + (align - 1)) & -align).
-			 */
-			if (align > 0 && (align & (align - 1)) == 0) {
-			    if (add_overflow(result, (align - 1), _end))
-			        throw Invalid_guest_image();
-			    _end = _end & -align;
-			}
-			else {
-				_end = result;
-			}
-			if (_end > boot_info.kernel_end)
-				boot_info.kernel_end = _end;
-
-			daddr = mem + paddr;
-			memcpy(daddr, elf_rom.local_addr<uint8_t>()+offset, filesz);
-			log("ELF: ", (Hex)paddr, "...", Hex(paddr+filesz));
-
-			enum {
-				PROT_NONE  = 0x00U, /* no permissions */
-				PROT_READ  = 0x01U, /* pages can be read */
-				PROT_WRITE = 0x02U, /* pages can be written */
-				PROT_EXEC  = 0x04U, /* pages can be executed */
-			};
-
-			prot = PROT_NONE;
-			if (phdr[ph_i].p_flags & PF_R)
-				prot |= PROT_READ;
-			if (phdr[ph_i].p_flags & PF_W) {
-				prot |= PROT_WRITE;
-				warning("phdr[", ph_i, "] requests WRITE permissions");
-			}
-			if (phdr[ph_i].p_flags & PF_X) {
-				prot |= PROT_EXEC;
-				warning("phdr[", ph_i, "] requests EXEC permissions");
-			}
-		}
-
-		_p_entry = hdr.e_entry;
-		return;
-	}
-
-	Guest_memory(Genode::Env &env) : _env(env)
-	{
-		_env.pd().map(_colo_start, size()-0x1000);
-
-		log("Load guest ELF...");
-		_load_elf(env);
-		log("Guest ELF valid! entry=", (Hex)entry(), ", end=", (Hex)boot_info.kernel_end);
-
-		/* initialize GDT */
-		hvt_x86_setup_gdt(base());
-
-		{
-			uint64_t *pml4  = (uint64_t *)(X86_PML4_BASE);
-			uint64_t *pdpte = (uint64_t *)(X86_PDPTE_BASE);
-			uint64_t *pde   = (uint64_t *)(X86_PDE_BASE);
-
-			/*
-			 * For simplicity we currently use 2MB pages and only a single
-			 * PML4/PDPTE/PDE.
-			 */
-
-			*pml4  = X86_PDPTE_BASE | (X86_PDPT_P | X86_PDPT_RW);
-			*pdpte = X86_PDE_BASE   | (X86_PDPT_P | X86_PDPT_RW);
-			for (addr_t paddr = 0; paddr < size();
-			     paddr += X86_GUEST_PAGE_SIZE, pde++)
-			{
-				*pde = paddr | (X86_PDPT_P | X86_PDPT_RW | X86_PDPT_PS);
-				log("PDE: ", Hex(*pde));
-			}
-			for (addr_t paddr = size(); (paddr < X86_GUEST_PAGE_SIZE*512);
-			     paddr += X86_GUEST_PAGE_SIZE, pde++)
-			{
-				*pde = (X86_PDPT_P | X86_PDPT_RW | X86_PDPT_PS);
-				log("PDE: ", Hex(*pde));
-			}
-		}
-
-		boot_info.mem_size = _size;
-		boot_info.cmdline = X86_CMDLINE_BASE;
-
-		char *cmdline = (char *)(shadow()+X86_CMDLINE_BASE);
-		Genode::snprintf(cmdline, HVT_CMDLINE_SIZE, "NOVA HVT");
-	}
-
-	uint8_t *base()
-	{
-		return (uint8_t *)0;
-	}
-
-	addr_t addr() const
-	{
-		return 0;
-	}
-
-	addr_t shadow() const
-	{
-		return 0;
-	}
-
-	size_t size() const
-	{
-		return _size;
-	}
-	
-	hvt_gpa_t entry() const {
-		return _p_entry; }
-
-	void dump_page_tables() const
-	{
-		uint64_t *pde = (uint64_t *)(X86_PDE_BASE);
-		size_t pages = size() / X86_GUEST_PAGE_SIZE;
-
-		for (unsigned i = 0; i < pages; ++i)
-			log("PDE[",i,"]=", Hex(pde[i], Hex::PREFIX, Hex::PAD));
-	}
-};
+/* local includes */
+#include "guest_memory.h"
 
 
 struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 {
 		Guest_memory      &_guest_memory;
 		Vmm::Vcpu_same_pd  _vcpu_thread;
+		addr_t             _guest_entry = 0xfff0;
 
 		static Nova::Utcb &_utcb_of_myself()
 		{
@@ -363,7 +147,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				| Mtd::IDTR
 				| Mtd::CR;
 
-			utcb.ip    = _guest_memory.entry();
+			utcb.ip    = _guest_memory.gp_entry();
 			utcb.flags = X86_RFLAGS_INIT;
 			utcb.sp    = _guest_memory.size() - 8;
 			utcb.di    = X86_BOOT_INFO_BASE;
@@ -411,22 +195,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			utcb.gdtr.limit = X86_GDTR_LIMIT;
 			utcb.gdtr.base  = X86_GDT_BASE;
-
-/*
-			utcb.set_msg_word(0);
-			for (addr_t gpa = 0;
-			     gpa < _guest_memory.size();
-			     gpa += X86_GUEST_PAGE_SIZE)
-			{
-				Nova::Mem_crd crd(
-					(gpa) >> PAGE_SIZE_LOG2,
-					GUEST_PAGE_ORDER, Nova::Rights(true, true, true));
-				touch_read((unsigned char volatile *)crd.addr()+0x1000);
-				if (!utcb.append_item(crd, gpa, false, true)) {
-					break;
-				}
-			}
- */
 		}
 
 		void _svm_startup()
@@ -455,14 +223,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 		char _utcb_backup[Nova::Utcb::size()];
 
-		Timer::Connection _debug_timer;
-
-/*
-		Timer::Periodic_timeout<Vcpu_handler> _debug_timeout {
-			_debug_timer, *this, &Vcpu_handler::_handle_debug_timeout,
-			Microseconds(1000*1000*4) };
- */
-
 		void _dump_utcb_backup()
 		{
 			Nova::Utcb &utcb = *((Nova::Utcb *)_utcb_backup);
@@ -485,9 +245,9 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			//_dump_utcb_backup();
 
     		struct x86_gdt_desc *gdt = (struct x86_gdt_desc *)
-				(_guest_memory.base() + X86_GDT_BASE);
+				(_guest_memory.local_base() + X86_GDT_BASE);
     		uint64_t *raw = (uint64_t *)
-				(_guest_memory.base() + X86_GDT_BASE);
+				(_guest_memory.local_base() + X86_GDT_BASE);
 
 			for (unsigned i = 0; i < X86_GDT_MAX; ++i) {
 				log("GDT ", i, ": ", (Hex)raw[i]);
@@ -533,26 +293,31 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 		void _svm_npt()
 		{
+			using namespace Nova;
 			Nova::Utcb &utcb = _utcb_of_myself();
 
 			addr_t const gpa = utcb.qual[1];
 			addr_t const ip  = utcb.ip;
 			if (gpa > _guest_memory.size()) {
-				error("guest attemped to access ", Hex(gpa), " which is beyond ", Hex(_guest_memory.size()));
-				throw Exception();
+				Vmm::error("guest attemped to access ", Hex(gpa), " which is beyond ", Hex(_guest_memory.size()));
+				utcb.mtd |= Mtd::CTRL;
+				utcb.ctrl[0] = 1 << 18; /* cpuid */
+				utcb.ctrl[1] = 1 << 0;  /* vmrun */
+				return;
 			}
 
-			uint64_t *data  = (uint64_t *)(gpa);
-			Vmm::error(__func__, " ip=", Hex(ip), " ", (Hex)gpa, " - PDE=", Hex(*data));
-			touch_read((unsigned char volatile *)(_guest_memory.shadow()+gpa));
-			if (gpa)
-				touch_read((unsigned char volatile *)(gpa));
-
-
-			int pdi = (gpa - X86_PDE_BASE) >> 3;
-			Vmm::log("page directory index is ", pdi);
-			addr_t phys = pdi & (~0U<<21);
-			Vmm::log("physical page is at ", (Hex)phys);
+			utcb.set_msg_word(0);
+			for (addr_t boundry = 0;
+			     boundry < _guest_memory.local_size();
+			     boundry += X86_GUEST_PAGE_SIZE)
+			{
+				Nova::Mem_crd crd(
+					(_guest_memory.local_addr()+boundry) >> PAGE_SIZE_LOG2,
+					GUEST_PAGE_ORDER, Nova::Rights(true, true, true));
+				if (!utcb.append_item(crd, boundry, false, true)) {
+					break;
+				}
+			}
 		}
 
 		void _vmx_ept()
@@ -569,11 +334,10 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			Vmm::error(__func__, " not handled");
 		}
 
-		void _analyze_page_table(addr_t cr3)
+		void _analyze_page_table(addr_t cr3, addr_t gpa)
 		{
 			enum { ACCESS = 1 << 5 };
-			addr_t gpa = _guest_memory.entry();
-			log(__func__, ": gpa is ", (Hex)gpa);
+			log(__func__, ": page fault adress is ", (Hex)gpa);
 
 			log("PML4 is at ", Hex(cr3));
 
@@ -610,8 +374,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			
 			addr_t offset = gpa & ((1<< 21)-1);
 			log("Page byte offset is ", (Hex)offset);
-
-			_guest_memory.dump_page_tables();
 		}
 
 		void _svm_triple()
@@ -640,8 +402,10 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 					error("intercept occured while guest attempted to deliver an exception through the IDT");
 				}
 
-				if ((utcb.inj_info & 0x7f) == 14)
-					_analyze_page_table(utcb.cr3);
+				if ((utcb.inj_info & 0x7f) == 14) {
+					addr_t pfa = utcb.cr2;
+					_analyze_page_table(utcb.cr3, pfa);
+				}
 
 				sleep_forever();
 			}
@@ -663,24 +427,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			//void _handle_io(bool is_in, unsigned io_order, unsigned port)
 			throw Exception();
-		}
-
-		void _gdt_access()
-		{
-			Vmm::log(__func__);
-		}
-
-		void _recall()
-		{
-			using namespace Nova;
-			Utcb &utcb = _utcb_of_myself();
-
-			addr_t ip = utcb.ip;
-			addr_t addr = _guest_memory.addr()+ip;
-
-			Vmm::log(__func__, " instruction location=", (Hex)addr, " value=", Hex(*((uint32_t*)addr)));
-
-			utcb.mtd = 0;
 		}
 
 		/**
@@ -706,8 +452,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			_vcpu_thread(env, env.cpu(),
 			             Affinity::Location(),
 			             env.pd_session_cap(),
-			             1024*sizeof(Genode::addr_t)),
-			_debug_timer(env, "debug")
+			             1024*sizeof(Genode::addr_t))
 		{
 			using namespace Nova;
 
@@ -716,8 +461,8 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			Genode::Xml_node const hardware = info.xml().sub_node("hardware");
 
 			hardware.sub_node("tsc").attribute("freq_khz").value(
-				&_guest_memory.boot_info.cpu.tsc_freq);
-			_guest_memory.boot_info.cpu.tsc_freq *= 1000;
+				&_guest_memory.boot_info().cpu.tsc_freq);
+			_guest_memory.boot_info().cpu.tsc_freq *= 1000;
 
 			Genode::Xml_node const features = hardware.sub_node("features");
 			bool const has_svm = features.attribute_value("svm", false);
@@ -729,19 +474,20 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			if (has_svm) {
 				log("SVM detected");
 
-				_register_handler<0x7b, &Vcpu_handler::_svm_io>
-					(exc_base, Mtd::ALL);
-
 				_register_handler<0x7f, &Vcpu_handler::_svm_triple>
 					(exc_base, Mtd::ALL);
+
+				_register_handler<0xfc, &Vcpu_handler::_svm_npt>
+					(exc_base, Mtd::CTRL);
 
 				_register_handler<0xfe, &Vcpu_handler::_svm_startup>
 					(exc_base, Mtd::ALL);
 
-				_register_handler<0xfc, &Vcpu_handler::_svm_npt>
+		/*
+			_register_handler<0x7b, &Vcpu_handler::_svm_io>
 					(exc_base, Mtd::ALL);
 
-	/*
+
 				_register_handler<0x4e, &Vcpu_handler::_svm_exception>
 					(exc_base, Mtd::ALL);
 
@@ -775,10 +521,16 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				throw Exception();
 			}
 
-			/* start virtual CPU */
+			log("eager map memory");
+			env.pd().map(_guest_memory.local_addr(), _guest_memory.local_size());
+		}
+
+		void start()
+		{
 			log("start virtual CPU");
 			_vcpu_thread.start(ec_sel());
 		}
+		
 };
 
 
@@ -788,15 +540,56 @@ struct Hvt::Main
 
 	//Devices _devices { _env };
 
-	Guest_memory _guest_memory { _env };
+	Guest_memory _guest_memory { _env, X86_GUEST_PAGE_SIZE*3 };
 
 	Vcpu_handler _vpu_handler { _env, _guest_memory };
 
-	Main(Genode::Env &env) : _env(env) { }
+	Main(Genode::Env &env)
+	: _env(env)
+	{
+		char *cmdline = (char *)(_guest_memory.local_base()+X86_CMDLINE_BASE);
+		Genode::snprintf(cmdline, HVT_CMDLINE_SIZE, "NOVA");
+	}
+
+	void start() { _vpu_handler.start(); }
 };
 
+extern unsigned long _prog_img_beg;  /* begin of program image (link address) */
+extern unsigned long _prog_img_end;  /* end of program image */
 
 void Component::construct(Genode::Env &env)
 {
-	static Hvt::Main inst(env);
+	using namespace Genode;
+
+	/* reserve the guest physical address space */
+	static Vmm::Virtual_reservation reservation(
+		env, 512*X86_GUEST_PAGE_SIZE);
+
+	static Hvt::Main main(env);
+
+	/* diagnostic messages */
+	log(Hvt::Hex_range(0, 512*X86_GUEST_PAGE_SIZE),
+	            " - Solo5 physical memory");
+
+	log(Hvt::Hex_range(main._guest_memory.local_addr(), main._guest_memory.local_size()),
+	            " - HVT shadow mapping");
+
+	log(Hvt::Hex_range((Genode::addr_t)&_prog_img_beg,
+	                      (Genode::addr_t)&_prog_img_end -
+	                      (Genode::addr_t)&_prog_img_beg),
+	            " - HVT program image");
+
+	log(Hvt::Hex_range(Genode::Thread::stack_area_virtual_base(),
+	                      Genode::Thread::stack_area_virtual_size()),
+	            " - Genode stack area");
+
+	main.start();
 }
+
+
+extern "C"
+void __assert(const char *, const char *file, int line, const char *failedexpr)
+{
+	Genode::error("Assertion failed: (", failedexpr, ") ", file, ":", line);
+	Genode::sleep_forever();
+};

@@ -60,8 +60,10 @@ install_config {
 		<resource name="RAM" quantum="9M"/>
 		<config></config>
 		<route>
-			<service name="ROM" label_last="guest">
-				<parent label="test.hvt"/> </service>
+			<!--
+			<service name="ROM" label_last="guest.hvt">
+				<parent label="goodstuff.hvt"/> </service>
+			  -->
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 	</start>
@@ -85,7 +87,7 @@ build_boot_image {
 	ram_blk
 	sequence
 	hvt
-	test.hvt
+	guest.hvt
 	top
 }
 
