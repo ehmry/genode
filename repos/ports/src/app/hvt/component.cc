@@ -238,6 +238,12 @@ struct Hvt::Guest_memory
 				*pde = paddr | (X86_PDPT_P | X86_PDPT_RW | X86_PDPT_PS);
 				log("PDE: ", Hex(*pde));
 			}
+			for (addr_t paddr = size(); (paddr < X86_GUEST_PAGE_SIZE*512);
+			     paddr += X86_GUEST_PAGE_SIZE, pde++)
+			{
+				*pde = (X86_PDPT_P | X86_PDPT_RW | X86_PDPT_PS);
+				log("PDE: ", Hex(*pde));
+			}
 		}
 
 		boot_info.mem_size = _size;
@@ -530,16 +536,23 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			Nova::Utcb &utcb = _utcb_of_myself();
 
 			addr_t const gpa = utcb.qual[1];
+			addr_t const ip  = utcb.ip;
 			if (gpa > _guest_memory.size()) {
 				error("guest attemped to access ", Hex(gpa), " which is beyond ", Hex(_guest_memory.size()));
 				throw Exception();
 			}
 
 			uint64_t *data  = (uint64_t *)(gpa);
-			Vmm::error(__func__, " ", (Hex)gpa, " - ", Hex(*data), " - is this even in the guest address space?");
+			Vmm::error(__func__, " ip=", Hex(ip), " ", (Hex)gpa, " - PDE=", Hex(*data));
 			touch_read((unsigned char volatile *)(_guest_memory.shadow()+gpa));
 			if (gpa)
 				touch_read((unsigned char volatile *)(gpa));
+
+
+			int pdi = (gpa - X86_PDE_BASE) >> 3;
+			Vmm::log("page directory index is ", pdi);
+			addr_t phys = pdi & (~0U<<21);
+			Vmm::log("physical page is at ", (Hex)phys);
 		}
 
 		void _vmx_ept()
