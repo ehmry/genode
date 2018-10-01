@@ -37,8 +37,8 @@
 #include <nova/syscalls.h>
 #include <nova/print.h>
 
-/* Upstream HVT includes */
 extern "C" {
+/* Upstream HVT includes */
 #include "hvt.h"
 #include "hvt_cpu_x86_64.h"
 }
@@ -56,7 +56,7 @@ namespace Hvt {
 		GUEST_PAGE_ORDER = 9
 	};
 
-	struct Guest_memory;
+	struct _Guest_memory;
 	struct Vcpu_handler;
 	struct Main;
 
@@ -67,7 +67,6 @@ namespace Hvt {
 #include "guest_memory.h"
 //#include "devices.h"
 
-extern void *bootstrap_guest;
 
 struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 {
@@ -80,17 +79,17 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				Genode::Thread::myself()->utcb());
 		}
 
-		void _map_all(Nova::Utcb &utcb)
+		void _delegate_memory(Nova::Utcb &utcb)
 		{
 			using namespace Nova;
 
 			utcb.set_msg_word(0);
 
 			addr_t gpa = 0;
-			while (gpa < _guest_memory.local_size()) {
+			while (gpa < _guest_memory.size()) {
 				Mem_crd crd(
 					(_guest_memory.local_addr()+gpa) >> PAGE_SIZE_LOG2,
-					GUEST_PAGE_ORDER, Nova::Rights(true, true, true));
+					0, Nova::Rights(true, true, true));
 
 				/* lookup whether page is mapped and its size */
 				Nova::uint8_t ret = Nova::lookup(crd);
@@ -99,28 +98,32 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 					throw Exception();
 				}
 
-				if (crd.is_null()) {
+				if (crd.is_null() || crd.addr() == 0) {
 					/* page is not mapped, touch it */
-					Genode::touch_read((unsigned char volatile *)crd.addr());
+					Genode::touch_read((unsigned char volatile *)_guest_memory.local_addr()+gpa);
 					continue;
 				}
+
+				if (!crd.rights().executable())
+					Vmm::error("CRD ", crd.base(), " is not executable!");
 
 				if (!utcb.append_item(crd, gpa, false, true)) {
 					error("failed to append all CRDs");
 					throw Exception();
 				}
 
+				/* move to the next memory capability */
 				gpa = (crd.addr() - _guest_memory.local_addr()) + (0x1000 << crd.order());
 			}
 		}
 
-		void _vcpu_init(Nova::Utcb &utcb)
+		void _vcpu_reset(Nova::Utcb &utcb)
 		{
 			/* From the AMD manual */
 			using namespace Nova;
 
 			memset(&utcb, 0x00, Utcb::size());
-			utcb.mtd = 0xfffff;
+			utcb.mtd |= 0xfffff;
 
 			utcb.cr0 = 0x10;
 			utcb.flags = 0x2;
@@ -145,12 +148,13 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.ss.ar = 0x92;
 
 			utcb.gdtr.limit =
-			utcb.idtr.limit =
-			utcb.ldtr.limit =
-			utcb.tr.limit   = 0xffff;
+			utcb.idtr.limit = 0xffff;
 
-			utcb.ldtr.ar =
-			utcb.tr.ar   = 0x82;
+			utcb.ldtr.ar = 0x82;
+			utcb.ldtr.limit = 0xffff;
+
+			utcb.tr.ar      = 0x83;
+			utcb.tr.limit   = 0xffff;
 
 			// processor info
 			// utcb.dx = 0x600;
@@ -226,26 +230,36 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.gdtr.base  = X86_GDT_BASE;
 		}
 
-		void _startup()
+		void _svm_startup()
 		{
-			Vmm::Utcb_guard::Utcb_backup reply;
-			Vmm::Utcb_guard guard(reply);
+			using namespace Nova;
 
-			_vcpu_init(reply.utcb());
-			_vcpu_hvt_init(reply.utcb());
-			_map_all(reply.utcb());
+			Utcb &utcb = _utcb_of_myself();
+			_vcpu_reset(utcb);
+			_vcpu_hvt_init(utcb);
+			_delegate_memory(utcb);
+		}
+
+		void _vmx_startup()
+		{
+			Nova::Utcb &utcb = _utcb_of_myself();
+			memcpy(&utcb, _utcb_backup, Nova::Utcb::size());
+
+			_vcpu_reset(utcb);
+			_vcpu_hvt_init(utcb);
+			_delegate_memory(utcb);
 		}
 
 		void _svm_npt()
 		{
-			Vmm::error(__func__);
-			sleep_forever();
+			using namespace Nova;
+			Vmm::log(__func__);
 		}
 
 		void _vmx_ept()
 		{
-			Vmm::error(__func__);
-			sleep_forever();
+			using namespace Nova;
+			Vmm::log(__func__);
 		}
 
 		void _analyze_page_table(addr_t cr3, addr_t gpa)
@@ -321,16 +335,8 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 					error("intercept occured while guest attempted to deliver an exception through the IDT");
 				}
 
-				if ((utcb.inj_info & 0x7f) == 14) {
-					_analyze_page_table(utcb.cr3, utcb.cr2);
-				}
+				_analyze_page_table(utcb.cr3, utcb.cr2);
 
-			/*
-				warning("CS selector: ", (Hex)utcb.cs.sel);
-				warning("CS base: ", (Hex)utcb.cs.base);
-				warning("CS limit: ", (Hex)utcb.cs.limit);
-				warning("CS AR: ", (Hex)utcb.cs.ar);
-			 */
 				sleep_forever();
 			}
 
@@ -404,7 +410,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				_register_handler<0xfc, &Vcpu_handler::_svm_npt>
 					(exc_base, Mtd::ALL);
 
-				_register_handler<0xfe, &Vcpu_handler::_startup>
+				_register_handler<0xfe, &Vcpu_handler::_svm_startup>
 					(exc_base, Mtd::ALL);
 
 		/*
@@ -426,24 +432,20 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			} else if (has_vmx) {
 				log("VMX detected");
-/*
+
 				_register_handler<0x02, &Vcpu_handler::_triple>
 					(exc_base, Mtd::ALL);
+
 				_register_handler<0x30, &Vcpu_handler::_vmx_ept>
 					(exc_base, Mtd::ALL);
- */
-				_register_handler<0xfe, &Vcpu_handler::_startup>
-					(exc_base, Mtd::ALL);
+
+				_register_handler<0xfe, &Vcpu_handler::_vmx_startup>
+					(exc_base, 0);
+
 			} else {
 				error("no hardware virtualization extensions available");
 				throw Exception();
 			}
-
-			log("eager map memory");
-			env.pd().map(_guest_memory.local_addr(), _guest_memory.local_size());
-
-			/* copy boot code into guest memory */
-			//memcpy(_guest_memory.local_base()+0xfff0, bootstrap_guest, 0x8);
 		}
 
 		void start()
@@ -451,6 +453,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			log("start virtual CPU");
 			_vcpu_thread.start(ec_sel());
 		}
+		
 };
 
 
@@ -491,17 +494,17 @@ void Component::construct(Genode::Env &env)
 	log(Hvt::Hex_range(0, 512*X86_GUEST_PAGE_SIZE),
 	            " - Solo5 physical memory");
 
-	log(Hvt::Hex_range(main._guest_memory.local_addr(), main._guest_memory.local_size()),
+	log(Hvt::Hex_range(main._guest_memory.local_addr(), main._guest_memory.size()),
 	            " - HVT shadow mapping");
+
+	log(Hvt::Hex_range(Genode::Thread::stack_area_virtual_base(),
+	                      Genode::Thread::stack_area_virtual_size()),
+	            " - Genode stack area");
 
 	log(Hvt::Hex_range((Genode::addr_t)&_prog_img_beg,
 	                      (Genode::addr_t)&_prog_img_end -
 	                      (Genode::addr_t)&_prog_img_beg),
 	            " - HVT program image");
-
-	log(Hvt::Hex_range(Genode::Thread::stack_area_virtual_base(),
-	                      Genode::Thread::stack_area_virtual_size()),
-	            " - Genode stack area");
 
 	main.start();
 }

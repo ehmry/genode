@@ -1,7 +1,7 @@
 TARGET = hvt
 REQUIRES = nova x86_64
 
-LD_TEXT_ADDR = 0x80000000
+LD_TEXT_ADDR = 0x7fffbf800000
 
 LIBS = base-nova
 
