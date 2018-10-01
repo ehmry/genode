@@ -37,8 +37,8 @@
 #include <nova/syscalls.h>
 #include <nova/print.h>
 
-extern "C" {
 /* Upstream HVT includes */
+extern "C" {
 #include "hvt.h"
 #include "hvt_cpu_x86_64.h"
 }
@@ -56,7 +56,7 @@ namespace Hvt {
 		GUEST_PAGE_ORDER = 9
 	};
 
-	struct _Guest_memory;
+	struct Guest_memory;
 	struct Vcpu_handler;
 	struct Main;
 
@@ -67,6 +67,7 @@ namespace Hvt {
 #include "guest_memory.h"
 //#include "devices.h"
 
+extern void *bootstrap_guest;
 
 struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 {
@@ -84,16 +85,32 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			using namespace Nova;
 
 			utcb.set_msg_word(0);
-			for (addr_t boundry = 0;
-			     boundry < _guest_memory.local_size();
-			     boundry += X86_GUEST_PAGE_SIZE)
-			{
-				Nova::Mem_crd crd(
-					(_guest_memory.local_addr()+boundry) >> PAGE_SIZE_LOG2,
+
+			addr_t gpa = 0;
+			while (gpa < _guest_memory.local_size()) {
+				Mem_crd crd(
+					(_guest_memory.local_addr()+gpa) >> PAGE_SIZE_LOG2,
 					GUEST_PAGE_ORDER, Nova::Rights(true, true, true));
-				if (!utcb.append_item(crd, boundry, false, true)) {
-					break;
+
+				/* lookup whether page is mapped and its size */
+				Nova::uint8_t ret = Nova::lookup(crd);
+				if (ret != Nova::NOVA_OK) {
+					error("lookup of crd ", (Hex)crd.base(), " failed");
+					throw Exception();
 				}
+
+				if (crd.is_null()) {
+					/* page is not mapped, touch it */
+					Genode::touch_read((unsigned char volatile *)crd.addr());
+					continue;
+				}
+
+				if (!utcb.append_item(crd, gpa, false, true)) {
+					error("failed to append all CRDs");
+					throw Exception();
+				}
+
+				gpa = (crd.addr() - _guest_memory.local_addr()) + (0x1000 << crd.order());
 			}
 		}
 
@@ -128,13 +145,12 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.ss.ar = 0x92;
 
 			utcb.gdtr.limit =
-			utcb.idtr.limit = 0xffff;
-
-			utcb.ldtr.ar = 0x82;
-			utcb.ldtr.limit = 0xffff;
-
-			utcb.tr.ar      = 0x83;
+			utcb.idtr.limit =
+			utcb.ldtr.limit =
 			utcb.tr.limit   = 0xffff;
+
+			utcb.ldtr.ar =
+			utcb.tr.ar   = 0x82;
 
 			// processor info
 			// utcb.dx = 0x600;
@@ -210,34 +226,26 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.gdtr.base  = X86_GDT_BASE;
 		}
 
-		void _svm_startup()
+		void _startup()
 		{
-			using namespace Nova;
+			Vmm::Utcb_guard::Utcb_backup reply;
+			Vmm::Utcb_guard guard(reply);
 
-			Utcb &utcb = _utcb_of_myself();
-			_vcpu_init(utcb);
-			_vcpu_hvt_init(utcb);
-		}
-
-		void _vmx_startup()
-		{
-			Nova::Utcb &utcb = _utcb_of_myself();
-			_vcpu_init(utcb);
-			_vcpu_hvt_init(utcb);
+			_vcpu_init(reply.utcb());
+			_vcpu_hvt_init(reply.utcb());
+			_map_all(reply.utcb());
 		}
 
 		void _svm_npt()
 		{
-			using namespace Nova;
-			Nova::Utcb &utcb = _utcb_of_myself();
-			_map_all(utcb);
+			Vmm::error(__func__);
+			sleep_forever();
 		}
 
 		void _vmx_ept()
 		{
-			using namespace Nova;
-			Nova::Utcb &utcb = _utcb_of_myself();
-			_map_all(utcb);
+			Vmm::error(__func__);
+			sleep_forever();
 		}
 
 		void _analyze_page_table(addr_t cr3, addr_t gpa)
@@ -396,7 +404,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				_register_handler<0xfc, &Vcpu_handler::_svm_npt>
 					(exc_base, Mtd::ALL);
 
-				_register_handler<0xfe, &Vcpu_handler::_svm_startup>
+				_register_handler<0xfe, &Vcpu_handler::_startup>
 					(exc_base, Mtd::ALL);
 
 		/*
@@ -418,16 +426,14 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			} else if (has_vmx) {
 				log("VMX detected");
-
+/*
 				_register_handler<0x02, &Vcpu_handler::_triple>
 					(exc_base, Mtd::ALL);
-
 				_register_handler<0x30, &Vcpu_handler::_vmx_ept>
 					(exc_base, Mtd::ALL);
-
-				_register_handler<0xfe, &Vcpu_handler::_vmx_startup>
-					(exc_base, 0);
-
+ */
+				_register_handler<0xfe, &Vcpu_handler::_startup>
+					(exc_base, Mtd::ALL);
 			} else {
 				error("no hardware virtualization extensions available");
 				throw Exception();
@@ -435,6 +441,9 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 			log("eager map memory");
 			env.pd().map(_guest_memory.local_addr(), _guest_memory.local_size());
+
+			/* copy boot code into guest memory */
+			//memcpy(_guest_memory.local_base()+0xfff0, bootstrap_guest, 0x8);
 		}
 
 		void start()
@@ -442,7 +451,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			log("start virtual CPU");
 			_vcpu_thread.start(ec_sel());
 		}
-		
 };
 
 

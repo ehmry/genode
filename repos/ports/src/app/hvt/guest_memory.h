@@ -106,7 +106,7 @@ class Hvt::Guest_memory
 
 		~Guest_memory()
 		{
-			/* detache and free backing dataspace */
+			/* detach and free backing dataspace */
 			_env.rm().detach((void *)_local_addr);
 			_env.pd().free(_ds);
 		}
