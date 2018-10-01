@@ -3,7 +3,7 @@ include $(call select_from_repositories,mk/spec/nova.mk)
 TARGET           = hypervisor
 REQUIRES         = x86 nova
 NOVA_BUILD_DIR   = $(BUILD_BASE_DIR)/kernel
-NOVA_SRC_DIR     = $(call select_from_ports,nova)/src/kernel/nova
+NOVA_SRC_DIR     = /home/repo/nova
 SRC_CC           = $(sort $(notdir $(wildcard $(NOVA_SRC_DIR)/src/*.cpp)))
 SRC_S            = $(sort $(notdir $(wildcard $(NOVA_SRC_DIR)/src/*.S)))
 INC_DIR          = $(NOVA_SRC_DIR)/include
@@ -24,6 +24,7 @@ CC_OPT          += -pipe \
 # kernel memory: 28M minimum dynamic or 10 pro mill of the system memory
 CC_OPT          += -DCONFIG_MEMORY_DYN_MIN=0x1c00000 \
                    -DCONFIG_MEMORY_DYN_PER_MILL=10
+CC_OPT += -DDEBUG
 CC_OPT_PIC      :=
 ifeq ($(filter-out $(SPECS),32bit),)
 override CC_MARCH = -m32
