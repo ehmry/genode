@@ -11,8 +11,6 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#include <base/debug.h>
-
 /* Genode includes */
 #include <vmm/vcpu_thread.h>
 #include <block_session/connection.h>
@@ -45,7 +43,6 @@ extern "C" {
 #include "hvt_cpu_x86_64.h"
 }
 
-//#include "devices.h"
 
 namespace Hvt {
 	typedef Genode::Hex_range<unsigned long> Hex_range;
@@ -68,18 +65,36 @@ namespace Hvt {
 
 /* local includes */
 #include "guest_memory.h"
+//#include "devices.h"
 
 
 struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 {
 		Guest_memory      &_guest_memory;
 		Vmm::Vcpu_same_pd  _vcpu_thread;
-		addr_t             _guest_entry = 0xfff0;
 
 		static Nova::Utcb &_utcb_of_myself()
 		{
 			return *reinterpret_cast<Nova::Utcb *>(
 				Genode::Thread::myself()->utcb());
+		}
+
+		void _map_all(Nova::Utcb &utcb)
+		{
+			using namespace Nova;
+
+			utcb.set_msg_word(0);
+			for (addr_t boundry = 0;
+			     boundry < _guest_memory.local_size();
+			     boundry += X86_GUEST_PAGE_SIZE)
+			{
+				Nova::Mem_crd crd(
+					(_guest_memory.local_addr()+boundry) >> PAGE_SIZE_LOG2,
+					GUEST_PAGE_ORDER, Nova::Rights(true, true, true));
+				if (!utcb.append_item(crd, boundry, false, true)) {
+					break;
+				}
+			}
 		}
 
 		void _vcpu_init(Nova::Utcb &utcb)
@@ -131,8 +146,6 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 		{
 			using namespace Nova;
 
-			_vcpu_init(utcb);
-
 			utcb.mtd |= 0
 				| Mtd::EBSD
 				| Mtd::ESP
@@ -153,7 +166,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.di    = X86_BOOT_INFO_BASE;
 
 			// Basic CPU control in CR0
-			utcb.cr0 = X86_CR0_INIT; // ^ X86_CR0_PG;
+			utcb.cr0 = X86_CR0_INIT;
 
 			// PML4
 			utcb.cr3   = X86_CR3_INIT;
@@ -202,92 +215,14 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			using namespace Nova;
 
 			Utcb &utcb = _utcb_of_myself();
+			_vcpu_init(utcb);
 			_vcpu_hvt_init(utcb);
-		}
-
-		/*
-		 * VirtualBox stores segment attributes in Intel format using a 32-bit
- 		* value. NOVA represents the attributes in packed format using a 16-bit
-		 * value.
-		 */
-		static inline Genode::uint16_t sel_ar_conv_to_nova(Genode::uint32_t v)
-		{
-			return (v & 0xff) | ((v & 0x1f000) >> 4);
-		}
-
-
-		static inline Genode::uint32_t sel_ar_conv_from_nova(Genode::uint16_t v)
-		{
-			return (v & 0xff) | (((uint32_t )v << 4) & 0x1f000);
-		}
-
-		char _utcb_backup[Nova::Utcb::size()];
-
-		void _dump_utcb_backup()
-		{
-			Nova::Utcb &utcb = *((Nova::Utcb *)_utcb_backup);
-			Vmm::log("--- _vmx_startup UTCB ---\n", utcb);
-		}
-
-		void _handle_debug_timeout(Duration)
-		{
-			//_dump_utcb_backup;
-
-			Nova::ec_ctrl(Nova::EC_RECALL, ec_sel());
-		}
-
-		void _vmx_triple()
-		{
-			using namespace Nova;
-
-			Vmm::error(__func__);
-
-			//_dump_utcb_backup();
-
-    		struct x86_gdt_desc *gdt = (struct x86_gdt_desc *)
-				(_guest_memory.local_base() + X86_GDT_BASE);
-    		uint64_t *raw = (uint64_t *)
-				(_guest_memory.local_base() + X86_GDT_BASE);
-
-			for (unsigned i = 0; i < X86_GDT_MAX; ++i) {
-				log("GDT ", i, ": ", (Hex)raw[i]);
-				log("       type=", (Hex)gdt[i].type,
-					" base=", (Hex)((gdt[i].base_hi<<24) | (gdt[i].base_lo)));
-			}
-
-			throw Exception();
-		}
-
-		void _vmx_invalid()
-		{
-			using namespace Nova;
-
-			Vmm::error(__func__);
-			_handle_debug_timeout(Duration(Microseconds(0)));
-
-			Utcb &utcb = _utcb_of_myself();
-
-			unsigned const dubious = utcb.inj_info |
-			                         utcb.intr_state | utcb.actv_state;
-			if (dubious)
-				Vmm::warning(__func__, " - dubious -"
-				             " inj_info=", Genode::Hex(utcb.inj_info),
-				             " inj_error=", Genode::Hex(utcb.inj_error),
-				             " intr_state=", Genode::Hex(utcb.intr_state),
-				             " actv_state=", Genode::Hex(utcb.actv_state));
-
-			{
-				Nova::Utcb &u = *((Nova::Utcb *)_utcb_backup);
-				log(u);
-			}
-
-			//_dump_utcb_backup();
-			throw Exception();
 		}
 
 		void _vmx_startup()
 		{
 			Nova::Utcb &utcb = _utcb_of_myself();
+			_vcpu_init(utcb);
 			_vcpu_hvt_init(utcb);
 		}
 
@@ -295,43 +230,14 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 		{
 			using namespace Nova;
 			Nova::Utcb &utcb = _utcb_of_myself();
-
-			addr_t const gpa = utcb.qual[1];
-			addr_t const ip  = utcb.ip;
-			if (gpa > _guest_memory.size()) {
-				Vmm::error("guest attemped to access ", Hex(gpa), " which is beyond ", Hex(_guest_memory.size()));
-				utcb.mtd |= Mtd::CTRL;
-				utcb.ctrl[0] = 1 << 18; /* cpuid */
-				utcb.ctrl[1] = 1 << 0;  /* vmrun */
-				return;
-			}
-
-			utcb.set_msg_word(0);
-			for (addr_t boundry = 0;
-			     boundry < _guest_memory.local_size();
-			     boundry += X86_GUEST_PAGE_SIZE)
-			{
-				Nova::Mem_crd crd(
-					(_guest_memory.local_addr()+boundry) >> PAGE_SIZE_LOG2,
-					GUEST_PAGE_ORDER, Nova::Rights(true, true, true));
-				if (!utcb.append_item(crd, boundry, false, true)) {
-					break;
-				}
-			}
+			_map_all(utcb);
 		}
 
 		void _vmx_ept()
 		{
+			using namespace Nova;
 			Nova::Utcb &utcb = _utcb_of_myself();
-
-			addr_t const phys_addr = utcb.qual[1];
-
-			Vmm::log(__func__, " ", (Hex)phys_addr);
-		}
-
-		void _svm_exception()
-		{
-			Vmm::error(__func__, " not handled");
+			_map_all(utcb);
 		}
 
 		void _analyze_page_table(addr_t cr3, addr_t gpa)
@@ -376,15 +282,18 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			log("Page byte offset is ", (Hex)offset);
 		}
 
-		void _svm_triple()
+		void _triple()
 		{
+			// [ 0] VTLB Miss CR3:0x00002000 A:0x00100000 E:0x0
+			// [ 0] VTLB Miss CR3:0x00002000 A:0x00000070 E:0x0
+
 			{
 				Vmm::Utcb_guard::Utcb_backup backup_utcb;
 				Vmm::Utcb_guard guard(backup_utcb);
 
 				Nova::Utcb &utcb = *reinterpret_cast<Nova::Utcb *>(&backup_utcb);
 
-				error("SVM triple fault exit");
+				error("triple fault exit");
 				error("        ip=", (Hex)utcb.ip);
 				error("   qual[0]=", (Hex)utcb.qual[0]);
 				error("   qual[1]=", (Hex)utcb.qual[1]);
@@ -393,6 +302,8 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				error(  "inj_info=", (Hex)utcb.inj_info);
 				error( "inj_error=", (Hex)utcb.inj_error);
 				error( "inj_info.vector=", utcb.inj_info & 0x7f);
+ 
+				error("error type is ", (utcb.inj_info >> 8) & 7);
 
 				if (utcb.inj_info & (1<<11)) {
 					error("guest exception would have pushed an error code");
@@ -403,10 +314,15 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				}
 
 				if ((utcb.inj_info & 0x7f) == 14) {
-					addr_t pfa = utcb.cr2;
-					_analyze_page_table(utcb.cr3, pfa);
+					_analyze_page_table(utcb.cr3, utcb.cr2);
 				}
 
+			/*
+				warning("CS selector: ", (Hex)utcb.cs.sel);
+				warning("CS base: ", (Hex)utcb.cs.base);
+				warning("CS limit: ", (Hex)utcb.cs.limit);
+				warning("CS AR: ", (Hex)utcb.cs.ar);
+			 */
 				sleep_forever();
 			}
 
@@ -474,19 +390,18 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			if (has_svm) {
 				log("SVM detected");
 
-				_register_handler<0x7f, &Vcpu_handler::_svm_triple>
+				_register_handler<0x7f, &Vcpu_handler::_triple>
 					(exc_base, Mtd::ALL);
 
 				_register_handler<0xfc, &Vcpu_handler::_svm_npt>
-					(exc_base, Mtd::CTRL);
+					(exc_base, Mtd::ALL);
 
 				_register_handler<0xfe, &Vcpu_handler::_svm_startup>
 					(exc_base, Mtd::ALL);
 
 		/*
-			_register_handler<0x7b, &Vcpu_handler::_svm_io>
+				_register_handler<0x7b, &Vcpu_handler::_svm_io>
 					(exc_base, Mtd::ALL);
-
 
 				_register_handler<0x4e, &Vcpu_handler::_svm_exception>
 					(exc_base, Mtd::ALL);
@@ -499,15 +414,12 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 				_register_handler<0xff, &Vcpu_handler::_recall>
 					(exc_base, Mtd::ALL);
-	*/
+		*/
 
 			} else if (has_vmx) {
 				log("VMX detected");
 
-				_register_handler<0x02, &Vcpu_handler::_vmx_triple>
-					(exc_base, Mtd::ALL);
-
-				_register_handler<0x21, &Vcpu_handler::_vmx_invalid>
+				_register_handler<0x02, &Vcpu_handler::_triple>
 					(exc_base, Mtd::ALL);
 
 				_register_handler<0x30, &Vcpu_handler::_vmx_ept>
