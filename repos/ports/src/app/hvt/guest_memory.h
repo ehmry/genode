@@ -62,9 +62,8 @@ class Hvt::Guest_memory
 
 		Genode::Env                      &_env;
 		Genode::Ram_dataspace_capability  _ds;
-		Genode::size_t const              _local_size;
 		Genode::addr_t                    _local_addr = 0;
-
+		Genode::size_t const              _size;
 		Genode::addr_t                    _gp_entry = 0;
 
 		/*
@@ -79,7 +78,7 @@ class Hvt::Guest_memory
 		:
 			_env(env),
 			_ds(env.pd().alloc(guest_size)),
-			_local_size(guest_size)
+			_size(guest_size)
 		{
 			try {
 				addr_t const local_addr =
@@ -97,10 +96,10 @@ class Hvt::Guest_memory
 			/* upstream utilities */
 			hvt_x86_setup_gdt(local_base());
 			hvt_x86_setup_pagetables(
-				local_base(), local_size());
+				local_base(), size());
 
 			struct hvt_boot_info &bi = boot_info();
-			bi.mem_size = local_size();
+			bi.mem_size = size();
 			bi.cmdline = X86_CMDLINE_BASE;
 		}
 
@@ -117,11 +116,8 @@ class Hvt::Guest_memory
 		uint8_t *local_base() {
 			return reinterpret_cast<uint8_t *>(_local_addr); }
 
-		size_t local_size() const {
-			return _local_size; }
-
 		size_t size() const {
-			return _local_size; }
+			return _size; }
 
 		/* guest physical entry location */
 		addr_t gp_entry() const {
@@ -141,7 +137,7 @@ class Hvt::Guest_memory
 
 			uint8_t *mem = local_base();
 
-			size_t mem_size = local_size();
+			size_t mem_size = size();
 
 			Elf64_Phdr *phdr = nullptr;
 			Elf64_Ehdr &hdr = *elf_rom.local_addr<Elf64_Ehdr>();

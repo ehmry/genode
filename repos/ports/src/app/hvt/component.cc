@@ -157,7 +157,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.tr.limit   = 0xffff;
 
 			// processor info
-			// utcb.dx = 0x600;
+			utcb.dx = 0x600;
 
 			utcb.dr7 = 0x00000400;
 		}
@@ -189,7 +189,8 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			utcb.cr0 = X86_CR0_INIT;
 
 			// PML4
-			utcb.cr3   = X86_CR3_INIT;
+			//utcb.cr3   = X86_CR3_INIT;
+#warning long mode disabled
 
 			// Intel CPU features in CR4
 			utcb.cr4   = X86_CR4_INIT;
@@ -232,9 +233,7 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 
 		void _svm_startup()
 		{
-			using namespace Nova;
-
-			Utcb &utcb = _utcb_of_myself();
+			Nova::Utcb &utcb = _utcb_of_myself();
 			_vcpu_reset(utcb);
 			_vcpu_hvt_init(utcb);
 			_delegate_memory(utcb);
@@ -243,11 +242,15 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 		void _vmx_startup()
 		{
 			Nova::Utcb &utcb = _utcb_of_myself();
-			memcpy(&utcb, _utcb_backup, Nova::Utcb::size());
-
 			_vcpu_reset(utcb);
 			_vcpu_hvt_init(utcb);
-			_delegate_memory(utcb);
+			//_delegate_memory(utcb);
+		}
+
+		void _vmx_invalid()
+		{
+			error("VMX guest state invalid");
+			throw Exception();
 		}
 
 		void _svm_npt()
@@ -260,6 +263,30 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 		{
 			using namespace Nova;
 			Vmm::log(__func__);
+			Nova::Utcb &utcb = _utcb_of_myself();
+			_delegate_memory(utcb);
+		}
+
+		void _dump_page_tables()
+		{
+			uint64_t *pml4 = (uint64_t *)(X86_PML4_BASE);
+			uint64_t *pdpte = (uint64_t *)(X86_PDPTE_BASE);
+			uint64_t *pde = (uint64_t *)(X86_PDE_BASE);
+
+			log("PML4E: ", (Hex)*pml4);
+			log("PDPTE: ", (Hex)*pdpte);
+			log("PDE: ", (Hex)*pde);
+		}
+
+		void _dump_shadow_tables()
+		{
+			uint64_t *pml4 = (uint64_t *)(_guest_memory.local_addr() + X86_PML4_BASE);
+			uint64_t *pdpte = (uint64_t *)(_guest_memory.local_addr() + X86_PDPTE_BASE);
+			uint64_t *pde = (uint64_t *)(_guest_memory.local_addr() + X86_PDE_BASE);
+
+			log("PML4E: ", (Hex)*pml4);
+			log("PDPTE: ", (Hex)*pdpte);
+			log("PDE: ", (Hex)*pde);
 		}
 
 		void _analyze_page_table(addr_t cr3, addr_t gpa)
@@ -272,13 +299,15 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			addr_t plm4i = (gpa >> 39);
 			log("PML4 index is ", plm4i, " ");
 
-			uint64_t *pml4 = (uint64_t *)cr3;
+			uint64_t *pml4 = (uint64_t *)_guest_memory.local_addr()+cr3;
 			log("PML4E: ", Hex(pml4[plm4i]));
 			if (pml4[plm4i] & ACCESS)
 				log("PML4E has been accessed");
+			else
+				log("PML4E has not been accessed");
 
 			log("PDPT is at ", Hex(pml4[plm4i] & (~0U<<12)));
-			uint64_t *pdpt = (uint64_t *)(pml4[plm4i] & (~0U<<12));
+			uint64_t *pdpt = (uint64_t *)_guest_memory.local_addr()+(pml4[plm4i] & (~0U<<12));
 
 			addr_t pdpti = (gpa >> 30);
 			log("Page directory pointer index is ", pdpti);
@@ -286,10 +315,11 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			log("PDPTE: ", Hex(pdpt[pdpti]));
 			if (pdpt[pdpti] & ACCESS)
 				log("PDPTE has been accessed");
-
+			else
+				log("PDPTE has not been accessed");
 
 			log("PDT is at ", Hex(pdpt[pdpti] & (~0U<<12)));
-			uint64_t *pdt = (uint64_t *)(pdpt[pdpti] & (~0U<<12));
+			uint64_t *pdt = (uint64_t *)_guest_memory.local_addr()+(pdpt[pdpti] & (~0U<<12));
 
 			addr_t pdi  = (gpa >> 21);
 			log("Page directory index is ", pdi);
@@ -297,11 +327,58 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			log("PDE: ", Hex(pdt[pdi]));
 			if (pdt[pdi] & ACCESS)
 				log("PDE has been accessed");
+			else
+				log("PDE has not been accessed");
 
 			log("Physical page is at ", Hex(pdt[pdi] & (~0U<<20)));
 			
 			addr_t offset = gpa & ((1<< 21)-1);
 			log("Page byte offset is ", (Hex)offset);
+		}
+
+		void _vmx_exception()
+		{
+			// [ 0] VTLB Miss CR3:0x00002000 A:0x00100000 E:0x0
+			// [ 0] VTLB Miss CR3:0x00002000 A:0x00000070 E:0x0
+
+			{
+				Vmm::Utcb_guard::Utcb_backup backup_utcb;
+				Vmm::Utcb_guard guard(backup_utcb);
+
+				Nova::Utcb &utcb = *reinterpret_cast<Nova::Utcb *>(&backup_utcb);
+
+				error("exception exit");
+				error("        ip=", (Hex)utcb.ip);
+				error("   qual[0]=", (Hex)utcb.qual[0]);
+				error("   qual[1]=", (Hex)utcb.qual[1]);
+				error("intr_state=", (Hex)utcb.intr_state);
+				error("actv_state=", (Hex)utcb.actv_state);
+				error(  "inj_info=", (Hex)utcb.inj_info);
+				error( "inj_error=", (Hex)utcb.inj_error);
+				error( "inj_info.vector=", utcb.inj_info & 0x7f);
+ 
+				error("error type is ", (utcb.inj_info >> 8) & 7);
+
+				if (utcb.inj_info & (1<<11)) {
+					error("guest exception would have pushed an error code");
+				}
+
+				if (utcb.inj_info & (1<<31)) {
+					error("intercept occured while guest attempted to deliver an exception through the IDT");
+				}
+
+				_analyze_page_table(utcb.cr3, utcb.cr2);
+				log("Shadow page tables:");
+				_dump_page_tables();
+				log("Guest physical page tables:");
+				_dump_page_tables();
+
+				sleep_forever();
+			}
+
+			Nova::Utcb &utcb = _utcb_of_myself();
+			utcb.mtd = Nova::Mtd::INJ;
+			utcb.inj_info = 0;
 		}
 
 		void _triple()
@@ -336,6 +413,10 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 				}
 
 				_analyze_page_table(utcb.cr3, utcb.cr2);
+				log("Shadow page tables:");
+				_dump_page_tables();
+				log("Guest physical page tables:");
+				_dump_page_tables();
 
 				sleep_forever();
 			}
@@ -433,6 +514,10 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 			} else if (has_vmx) {
 				log("VMX detected");
 
+				_register_handler<0x00, &Vcpu_handler::_vmx_exception>
+					(exc_base, Mtd::ALL);
+
+
 				_register_handler<0x02, &Vcpu_handler::_triple>
 					(exc_base, Mtd::ALL);
 
@@ -440,7 +525,10 @@ struct Hvt::Vcpu_handler : Vmm::Vcpu_dispatcher<Genode::Thread>
 					(exc_base, Mtd::ALL);
 
 				_register_handler<0xfe, &Vcpu_handler::_vmx_startup>
-					(exc_base, 0);
+					(exc_base, Mtd::ALL);
+
+				_register_handler<0x21, &Vcpu_handler::_vmx_invalid>
+					(exc_base, Mtd::ALL);
 
 			} else {
 				error("no hardware virtualization extensions available");

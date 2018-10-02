@@ -32,7 +32,15 @@ class Vmm::Utcb_guard
 {
 	public:
 
-		struct Utcb_backup { char buf[Nova::Utcb::size()]; };
+		struct Utcb_backup
+		{
+			char buf[Nova::Utcb::size()];
+
+			Nova::Utcb &utcb()
+			{
+				return *reinterpret_cast<Nova::Utcb *>(buf);
+			}
+		};
 
 	private:
 
