@@ -319,6 +319,9 @@ bool solo5_yield(solo5_time_t deadline)
 
 void solo5_console_write(const char *buf, size_t size)
 {
+	while (buf[size-1] == '\0' || buf[size-1] == '\n')
+		--size;
+
 	Genode::log(Genode::Cstring(buf, size));
 }
 
