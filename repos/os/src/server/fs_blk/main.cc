@@ -60,7 +60,7 @@ class Fs_blk::Session_component final : private Block_buffer,
 		File_system::Connection    _fs;
 		Signal_handler<Session_component> _fs_handler;
 		Signal_handler<Session_component> _blk_handler;
-		File_system::Node_handle   _handle { };
+		File_system::File_handle   _handle { ~0U };
 		Genode::size_t       const _blk_size;
 		Block::sector_t            _blk_count = 0;
 		Block::Session::Operations _ops { };
@@ -106,13 +106,14 @@ class Fs_blk::Session_component final : private Block_buffer,
 			    && _pending_count < PENDING_QUEUE_COUNT)
 			{
 				Block::Packet_descriptor pkt = sink.get_packet();
+				pkt.succeeded(false);
 
-				if (pkt.size() == 0 || pkt.operation() > Block::Packet_descriptor::Opcode::WRITE)
+				if (pkt.operation() > Block::Packet_descriptor::Opcode::WRITE
+				 || pkt.block_number() + pkt.block_count() > _blk_count
+				 || pkt.block_count() * _blk_size > pkt.size())
 				{
-					warning("refusing invalid Block packet");
 					sink.acknowledge_packet(pkt);
 				} else {
-					pkt.succeeded(false);
 					for (int i = 0; i < PENDING_QUEUE_COUNT; ++i) {
 						if (_pending[i].size() == 0) {
 							_pending[i] = pkt;
@@ -213,6 +214,7 @@ class Fs_blk::Session_component final : private Block_buffer,
 		                  Genode::Heap &heap,
 		                  size_t        tx_buf_size,
 		                  size_t        block_size,
+		                  size_t        block_count,
 		                  char const   *file_path,
 		                  bool          writeable)
 		:
@@ -242,11 +244,21 @@ class Fs_blk::Session_component final : private Block_buffer,
 						_handle = _fs.file(dir, name, READ_WRITE, false);
 						_ops.set_operation(Block::Packet_descriptor::READ);
 						_ops.set_operation(Block::Packet_descriptor::WRITE);
-					} catch (Permission_denied) {
+					}
+
+					catch (Lookup_failed) {
+						_handle = _fs.file(dir, name, READ_WRITE, true);
+						_ops.set_operation(Block::Packet_descriptor::READ);
+						_ops.set_operation(Block::Packet_descriptor::WRITE);
+					}
+
+					catch (Permission_denied) {
 						try {
 							_handle = _fs.file(dir, name, READ_ONLY, false);
 							_ops.set_operation(Block::Packet_descriptor::READ);
-						} catch (Permission_denied) {
+						}
+
+						catch (Permission_denied) {
 							/* not likely, but still supported */
 							_handle = _fs.file(dir, name, WRITE_ONLY, false);
 							_ops.set_operation(Block::Packet_descriptor::WRITE);
@@ -257,14 +269,25 @@ class Fs_blk::Session_component final : private Block_buffer,
 					_ops.set_operation(Block::Packet_descriptor::READ);
 				}
 			} catch (...) {
-				error("failed to open ", file_path);
+				error("failed to open ", file_path,
+				      writeable ? " writeable " : " read-only");
 				throw Service_denied();
 			}
 
 			File_system::Status st = _fs.status(_handle);
-			_blk_count = st.size / block_size;
+			_blk_count = st.size / _blk_size;
 			if (st.size % block_size) /* round up */
 				++_blk_count;
+
+			if (writeable && block_count > 0 && block_count != _blk_count) {
+				file_size_t file_size = _blk_size*block_count;
+				try { _fs.truncate(_handle, file_size); }
+				catch (...) {
+					error("failed to resize ", file_path, " to ", file_size, " bytes");
+					throw Service_denied();
+				}
+				_blk_count = file_size / _blk_size;
+			}
 
 			/* register signal handlers */
 			_fs.sigh_ack_avail(_fs_handler);
@@ -317,22 +340,23 @@ class Fs_blk::Root_component final :
 		{
 			Session_label const label = label_from_args(args);
 
-			long block_size = 512;
-			bool writeable = false;
+			long block_size  = 512;
+			long block_count = 0;
+			bool writeable   = false;
 
 			_config_rom.update();
-			Xml_node config_node = _config_rom.xml();
 
 			String<File_system::MAX_PATH_LEN> path;
 			try {
-				Session_policy const policy(label, config_node);
+				Session_policy const policy(label, _config_rom.xml());
 				policy.attribute("file").value(&path);
+				block_size  = policy.attribute_value("block_size",  block_size);
+				block_count = policy.attribute_value("block_count", block_count);
+				writeable   = policy.attribute_value("writeable", false);
 			} catch (...) {
 				error("no valid policy for '", label, "'");
 				throw Service_denied();
 			}
-			block_size = config_node.attribute_value("block_size", block_size);
-			writeable  = config_node.attribute_value("writeable", false);
 
 			/*
 			 * Check that there is sufficient quota, but the client is not
@@ -372,7 +396,8 @@ class Fs_blk::Root_component final :
 			}
 
 			return new (_heap)
-				Session_component(_env, _heap, tx_buf_size, block_size,
+				Session_component(_env, _heap, tx_buf_size,
+				                  block_size, block_count,
 				                  path.string(), writeable);
 		}
 

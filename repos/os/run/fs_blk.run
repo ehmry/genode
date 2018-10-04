@@ -4,9 +4,18 @@
 # \date   2015-09-25
 #
 
-build "core init server/vfs server/fs_blk test/rom_blk"
-
 create_boot_directory
+
+import_from_depot \
+	genodelabs/src/[base_src] \
+	genodelabs/src/init \
+	genodelabs/src/vfs \
+
+build {
+	server/fs_blk
+	test/rom_blk
+}
+
 
 install_config {
 <config>
@@ -47,7 +56,10 @@ install_config {
 </config>
 }
 
-build_boot_image "core init ld.lib.so vfs fs_blk test-rom_blk"
+build_boot_image {
+	fs_blk
+	test-rom_blk
+}
 
 append qemu_args "-m 64 -nographic "
 
