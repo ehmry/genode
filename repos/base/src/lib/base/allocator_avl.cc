@@ -384,8 +384,11 @@ Allocator_avl_base::Block *Allocator_avl_base::_find_any_used_block(Block *sub_t
 bool Allocator_avl_base::any_block_addr(addr_t *out_addr)
 {
 	Block * const b = _find_any_used_block(_addr_tree.first());
-	*out_addr = b ? b->addr() : 0;
-	return b != nullptr;
+	if (b) {
+		*out_addr = b->addr();
+		return true;
+	}
+	return false;
 }
 
 
