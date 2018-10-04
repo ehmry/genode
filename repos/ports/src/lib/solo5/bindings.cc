@@ -26,14 +26,18 @@ extern "C" {
 #include "bindings.h"
 }
 
+
 namespace Solo5 {
 	using namespace Genode;
 	struct Platform;
 };
 
+
 struct Solo5::Platform
 {
 	Genode::Env &env;
+
+	Heap heap { env.pd(), env.rm() };
 
 	Timer::Connection timer { env, "solo5" };
 
@@ -42,8 +46,6 @@ struct Solo5::Platform
 
 	/* TODO: periodic RTC synchronization */
 	Genode::uint64_t _initial_epoch = 0;
-
-	Heap heap { env.pd(), env.rm() };
 
 	enum { NIC_BUFFER_SIZE =
 		Nic::Packet_allocator::DEFAULT_PACKET_SIZE * 128 };
@@ -254,33 +256,32 @@ struct Solo5::Platform
 
 		return pkt.succeeded() ? SOLO5_R_OK : SOLO5_R_EUNSPEC;
 	}
+
+	void exit(int status, void *cookie) __attribute__((noreturn))
+	{
+		if (cookie)
+			log((Hex)addr_t(cookie));
+		env.parent().exit(status);
+		Genode::sleep_forever();
+	}
 };
+
 
 static Solo5::Platform *_platform;
 
+
 extern "C" {
 
-void platform_exit(int status, void *cookie)
-{
-	using namespace Genode;
 
-	if (cookie)
-		error((Hex)addr_t(cookie));
-	_platform->env.parent().exit(status);
-	Genode::sleep_forever();
+void solo5_exit(int status)
+{
+    _platform->exit(status, NULL);
 }
 
 
-uint64_t platform_mem_size(void)
+void solo5_abort(void)
 {
-    return _platform->env.pd().ram_quota().value;
-}
-
-
-int platform_puts(const char *buf, int n)
-{
-	Genode::log(Genode::Cstring(buf, n ? n-1 : 0));
-    return n;
+    _platform->exit(SOLO5_EXIT_ABORT, NULL);
 }
 
 
@@ -384,6 +385,11 @@ void Component::construct(Genode::Env &env)
 		env.pd().alloc(si.heap_size);
 
 	si.heap_start = env.rm().attach(heap_ds);
+
+	typedef Genode::Hex_range<unsigned long> Hex_range;
+	Genode::log(
+		Hex_range(si.heap_start, si.heap_start+si.heap_size),
+		" - Solo5 heap");
 
 	solo5_exit(solo5_app_main(&si));
 }
