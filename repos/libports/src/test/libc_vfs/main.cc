@@ -317,9 +317,8 @@ struct Main
 			test_write_read(config_rom.xml());
 
 			printf("test finished\n");
+			::exit(0);
 		});
-
-		env.parent().exit(0);
 	}
 };
 

@@ -5,20 +5,49 @@
  */
 
 /*
- * Copyright (C) 2008-2017 Genode Labs GmbH
+ * Copyright (C) 2008-2018 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
  */
 
+/* Genode includes */
 #include <base/env.h>
 #include <base/sleep.h>
-#include <base/printf.h>
+
+/* Libc includes */
+#include <libc-plugin/fd_alloc.h>
+#include <unistd.h>
 
 extern void genode_exit(int status) __attribute__((noreturn));
 
 extern "C" void _exit(int status)
 {
+	using namespace Libc;
+
+	auto const close_fn = [] (Libc::File_descriptor &fd) {
+		if (fd.plugin) {
+			::close(fd.libc_fd);
+		} else {
+			/*
+			 * stdio descriptors have no plugin,
+			 * just sync, free, and continue
+			 */
+			::fsync(fd.libc_fd);
+			file_descriptor_allocator()->free(&fd);
+		}
+	};
+
+	/*
+	 * apply close to all registered descriptors
+	 *
+	 * TODO: safe to call before atexit handlers?
+	 */
+	File_descriptor_allocator &fd_alloc =
+		*file_descriptor_allocator();
+	while (fd_alloc.apply_any(close_fn)) { }
+
+	/* calls `atexit` procedures */
 	genode_exit(status);
 }
 
