@@ -212,11 +212,14 @@ struct Linker::Elf_file : File
 		}
 	}
 
-	bool is_rx(Elf::Phdr const &ph) {
+	static bool is_rx(Elf::Phdr const &ph) {
 		return ((ph.p_flags & PF_MASK) == (PF_R | PF_X)); }
 
-	bool is_rw(Elf::Phdr const &ph) {
+	static bool is_rw(Elf::Phdr const &ph) {
 		return ((ph.p_flags & PF_MASK) == (PF_R | PF_W)); }
+
+	static bool is_ro(Elf::Phdr const &ph) {
+		return ((ph.p_flags & PF_MASK) == PF_R); }
 
 	/**
 	 * Load PT_LOAD segments
@@ -246,8 +249,11 @@ struct Linker::Elf_file : File
 			else if (is_rw(*ph))
 				load_segment_rw(*ph, i);
 
+			else if (is_ro(*ph))
+				load_segment_ro(*ph);
+
 			else {
-				error("LD: Non-RW/RX segment");
+				error("LD: Non-RW/RX/RO segment, p_flags=", (Hex)ph->p_flags);
 				throw Invalid_file();
 			}
 		}
@@ -255,6 +261,17 @@ struct Linker::Elf_file : File
 
 	/**
 	 * Map read-only segment
+	 */
+	void load_segment_ro(Elf::Phdr const &p)
+	{
+		Region_map::r()->attach_at(rom_cap,
+		                                   trunc_page(p.p_vaddr) + reloc_base,
+		                                   round_page(p.p_memsz),
+		                                   trunc_page(p.p_offset));
+	}
+
+	/**
+	 * Map read-execute segment
 	 */
 	void load_segment_rx(Elf::Phdr const &p)
 	{
