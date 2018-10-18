@@ -1,0 +1,199 @@
+#
+# \brief  Test for the SSH terminal
+#
+
+# Build
+#
+
+set build_components {
+	core init
+	app/ssh_molest
+	drivers/timer
+	lib/vfs/jitterentropy
+	lib/vfs/lwip
+	lib/vfs/lxip
+	server/nic_router
+	server/ssh_terminal
+	test/terminal_echo
+}
+
+build $build_components
+
+create_boot_directory
+
+#
+# Generate config
+#
+
+set config {
+<config verbose="no">
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="RAM"/>
+		<service name="IRQ"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<default caps="100"/>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
+	<start name="nic_router" caps="200">
+		<resource name="RAM" quantum="6M"/>
+		<provides><service name="Nic"/></provides>
+		<config>
+			<default-policy domain="local"/>
+
+			<domain name="local" interface="10.0.1.1/24">
+				<dhcp-server ip_first="10.0.1.100"
+				             ip_last="10.0.1.200"/>
+			</domain>
+
+		</config>
+		<route>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="ssh_terminal" caps="250">
+		<resource name="RAM" quantum="32M"/>
+		<provides> <service name="Terminal"/> </provides>
+		<config ld_verbose="yes"
+		        port="22" allow_password="yes"
+		        show_password="yes" ed25519_key="/etc/ssh/ed25519_key">
+			<policy label_prefix="test-terminal_echo" user="root" password="admin"/>
+
+			<vfs>
+				<dir name="dev">
+					<log/>
+					<jitterentropy name="random"/>
+					<jitterentropy name="urandom"/>
+					<inline name="rtc">2000-01-01 00:00</inline>
+				</dir>
+				<dir name="etc">
+					<dir name="ssh">
+						<rom name="ed25519_key"/>
+					</dir>
+				</dir>
+				<dir name="socket"> <lwip ip_addr="10.0.1.2" netmask="255.255.255.0" gateway="10.0.1.1"/> </dir>
+			</vfs>
+			<libc stdout="/dev/log" stderr="/dev/log" socket="/socket" rtc="/dev/rtc">
+			</libc>
+		</config>
+	</start>
+	<start name="test-terminal_echo">
+		<resource name="RAM" quantum="1M"/>
+	</start>
+
+	<start name="larry" caps="500">
+		<binary name="ssh_molest"/>
+		<resource name="RAM" quantum="32M"/>
+		<route>
+			<service name="ROM" label="config">
+				<parent label="molest.config"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+	<start name="curly" caps="500">
+		<binary name="ssh_molest"/>
+		<resource name="RAM" quantum="32M"/>
+		<route>
+			<service name="ROM" label="config">
+				<parent label="molest.config"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+	<start name="moe" caps="500">
+		<binary name="ssh_molest"/>
+		<resource name="RAM" quantum="32M"/>
+		<route>
+			<service name="ROM" label="config">
+				<parent label="molest.config"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+	<start name="shemp" caps="500">
+		<binary name="ssh_molest"/>
+		<resource name="RAM" quantum="32M"/>
+		<route>
+			<service name="ROM" label="config">
+				<parent label="molest.config"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+</config>
+}
+
+set fd [open [run_dir]/genode/molest.config "w"]
+puts $fd {
+<config>
+	<vfs>
+		<ram/>
+		<dir name="dev">
+				<log/> <null/> <inline name="rtc">2000-01-01 00:00</inline>
+					<inline name="random">01234567890123456789</inline>
+		</dir>
+		<dir name="socket"> <lxip dhcp="yes"/> </dir>
+		<inline name="host"><host name="10.0.1.2" user="root" password="admin"/></inline>
+	</vfs>
+	<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc" socket="/socket"/>
+</config>
+}
+close $fd
+
+
+install_config $config
+
+#
+# Generate a new host key
+#
+if {![file exists bin/ed25519_key]} {
+	exec ssh-keygen -t ed25519 -f bin/ed25519_key -q -N ""
+}
+
+#
+# Boot modules
+#
+
+# generic modules
+set boot_modules {
+	core ld.lib.so init timer
+	libc.lib.so pthread.lib.so libm.lib.so posix.lib.so
+	libc_pipe.lib.so
+	libcrypto.lib.so libssh.lib.so zlib.lib.so
+	nic_router
+	ssh_molest
+	ssh_terminal
+	test-terminal_echo
+	vfs_jitterentropy.lib.so
+	vfs.lib.so
+	vfs_lwip.lib.so
+	vfs_lxip.lib.so lxip.lib.so
+
+	ed25519_key
+}
+
+build_boot_image $boot_modules
+
+#
+# Execute test
+#
+
+append qemu_args " -m 512 -nographic "
+
+run_genode_until forever
+
+exec rm bin/ed25519_key bin/ed25519_key.pub
+
+# vi: set ft=tcl :
