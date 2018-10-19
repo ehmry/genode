@@ -23,6 +23,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
 
 /* PCG includes */
 #include <pcg_variants.h>
@@ -33,7 +34,10 @@ static uint32_t data[NUM_TEST_INTS];
 
 int test_send(char const *host)
 {
+	struct timespec start, end;
+
 	usleep(1000000);
+	clock_gettime(CLOCK_MONOTONIC, &start);
 
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock < 0) {
@@ -73,8 +77,16 @@ int test_send(char const *host)
 		}
 	}
 
+	clock_gettime(CLOCK_MONOTONIC, &end);
+	float delta
+		= (end.tv_sec - start.tv_sec)
+		+ ((end.tv_nsec - start.tv_nsec) / 1000000000.0);
+	float rate = sizeof(data) * BULK_ITERATIONS / delta;
+	fprintf(stderr, "send rate: %0.2fMiB/s\n", rate / (1<<20));
+
 	fprintf(stderr, "close server\n");
 	shutdown(sock, SHUT_RDWR);
+
 	usleep(10000000);
 
 	return 0;
@@ -82,6 +94,8 @@ int test_send(char const *host)
 
 int test_recv()
 {
+	struct timespec start, end;
+
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock < 0) {
 		perror("`socket` failed");
@@ -118,6 +132,8 @@ int test_recv()
 		inet_ntop(AF_INET, &(addr.sin_addr), string, super_socket_safety);
 		fprintf(stderr, "recv from %s\n", string);
 
+		clock_gettime(CLOCK_MONOTONIC, &start);
+
 		pcg32_random_t rng = PCG32_INITIALIZER;
 		for (int j = 0; j < BULK_ITERATIONS; ++j) {
 
@@ -140,6 +156,13 @@ int test_recv()
 				}
 			}
 		}
+
+		clock_gettime(CLOCK_MONOTONIC, &end);
+		float delta
+			= (end.tv_sec - start.tv_sec)
+			+ ((end.tv_nsec - start.tv_nsec) / 1000000000.0);
+		float rate = sizeof(data) * BULK_ITERATIONS / delta;
+		fprintf(stderr, "recv rate: %0.2fMiB/s\n", rate / (1<<20));
 
 		fprintf(stderr, "close client\n");
 		shutdown(client, SHUT_RDWR);
