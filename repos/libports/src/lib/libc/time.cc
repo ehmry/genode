@@ -28,7 +28,7 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts)
 	static time_t initial_rtc = 0;
 	static unsigned long t0_ms = 0;
 
-	if (!ts) return Libc::Errno(EINVAL);
+	if (!ts) return Libc::Errno(EFAULT);
 
 	Genode::Duration curr_dur = Libc::current_time();
 
@@ -64,7 +64,7 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts)
 		break;
 
 	default:
-		return Libc::Errno(ENOSYS);
+		return Libc::Errno(EINVAL);
 	}
 
 	return 0;
