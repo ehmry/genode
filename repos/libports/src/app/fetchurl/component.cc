@@ -36,6 +36,37 @@ namespace Fetchurl {
 	typedef Genode::Path<256>   Path;
 }
 
+namespace Genode {
+
+	template <typename FN>
+	static inline void gen_named_node(Genode::Xml_generator &xml,
+	                                  char const *type, char const *name, FN const &fn)
+	{
+		xml.node(type, [&] () {
+			xml.attribute("name", name);
+			fn();
+		});
+	}
+
+	static inline void gen_named_node(Genode::Xml_generator &xml, char const *type, char const *name)
+	{
+		xml.node(type, [&] () { xml.attribute("name", name); });
+	}
+
+	template <size_t N, typename FN>
+	static inline void gen_named_node(Xml_generator &xml,
+	                                  char const *type, String<N> const &name, FN const &fn)
+	{
+		gen_named_node(xml, type, name.string(), fn);
+	}
+
+	template <size_t N>
+	static inline void gen_named_node(Xml_generator &xml, char const *type, String<N> const &name)
+	{
+		gen_named_node(xml, type, name.string());
+	}
+}
+
 static size_t write_callback(char   *ptr,
                              size_t  size,
                              size_t  nmemb,
@@ -86,7 +117,8 @@ struct Fetchurl::Main
 
 	Timer::Connection _timer { _env, "reporter" };
 
-	Genode::Constructible<Genode::Expanding_reporter> _reporter { };
+	Genode::Constructible<Genode::Expanding_reporter> _progress_reporter { };
+	Genode::Constructible<Genode::Expanding_reporter>   _dialog_reporter { };
 
 	Genode::List<Fetch> _fetches { };
 
@@ -108,18 +140,49 @@ struct Fetchurl::Main
 
 	void _report()
 	{
-		if (!_reporter.constructed())
-			return;
+		using namespace Genode;
 
-		_reporter->generate([&] (Genode::Xml_generator &xml) {
-			for (Fetch *f = _fetches.first(); f; f = f->next()) {
-				xml.node("fetch", [&] {
-					xml.attribute("url",   f->url);
-					xml.attribute("total", f->dltotal);
-					xml.attribute("now",   f->dlnow);
+		if (_progress_reporter.constructed())
+			_progress_reporter->generate([&] (Genode::Xml_generator &xml) {
+				for (Fetch *f = _fetches.first(); f; f = f->next()) {
+					xml.node("fetch", [&] {
+						xml.attribute("url",   f->url);
+						xml.attribute("total", f->dltotal);
+						xml.attribute("now",   f->dlnow);
+					});
+				}
+			});
+
+		if (_dialog_reporter.constructed())
+			_dialog_reporter->generate([&] (Genode::Xml_generator &xml) {
+				xml.node("vbox", [&] () {
+
+					xml.node("label", [&] () {
+						xml.attribute("text", "Download"); });
+
+					unsigned count = 0;
+					for (Fetch *f = _fetches.first(); f; f = f->next()) {
+						gen_named_node(xml, "hbox", String<10>(count++), [&] () {
+							gen_named_node(xml, "float", "left", [&] () {
+								xml.attribute("west", "yes");
+								xml.node("label", [&] () {
+									xml.attribute("text", f->url);
+									xml.attribute("font", "annotation/regular");
+								});
+							});
+
+							gen_named_node(xml, "float", "right", [&] () {
+								xml.attribute("east", "yes");
+								xml.node("label", [&] () {
+									String<8> text((unsigned)((100*f->dlnow)/f->dltotal), "%");
+									xml.attribute("text", text);
+									xml.attribute("font", "annotation/regular");
+								});
+							});
+						});
+					}
 				});
-			}
-		});
+			});
 	}
 
 	void _report(Genode::Duration) { _report(); }
@@ -132,7 +195,10 @@ struct Fetchurl::Main
 			enum { DEFAULT_DELAY_MS = 100UL };
 
 			Xml_node const report_node = config_node.sub_node("report");
-			if (report_node.attribute_value("progress", false)) {
+			bool report_progress = report_node.attribute_value("progress", false);
+			bool report_dialog   = report_node.attribute_value("dialog", false);
+
+			if (report_progress | report_dialog) {
 				Milliseconds delay_ms { 0 };
 				delay_ms.value = report_node.attribute_value(
 					"delay_ms", (unsigned)DEFAULT_DELAY_MS);
@@ -141,8 +207,13 @@ struct Fetchurl::Main
 
 				_report_delay = Duration(delay_ms);
 				_schedule_report();
-				_reporter.construct(_env, "progress", "progress");
 			}
+
+			if (report_progress)
+				_progress_reporter.construct(_env, "progress", "progress");
+
+			if (report_dialog)
+				_dialog_reporter.construct(_env, "dialog", "dialog");
 		}
 		catch (...) { }
 
