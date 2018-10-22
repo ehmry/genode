@@ -1,0 +1,17 @@
+_/raw/vm_template
+_/src/curl
+_/src/fetchurl
+_/src/init
+_/src/libc
+_/src/libcrypto
+_/src/libssh
+_/src/libssl
+_/src/nit_fb
+_/src/noux
+_/src/report_rom
+_/src/terminal
+_/src/terminal_log
+_/src/vfs
+_/src/vfs_import
+_/src/vfs_lwip
+_/src/zlib
