@@ -12,5 +12,6 @@
 		<service name="Rtc">    <parent/> </service>
 		<service name="Usb">    <parent/> </service>
 		<service name="File_system" label="shared"> <child name="shared_fs"/> </service>
+		<!-- <service name="Audio_out"> <child name="mixer"/> </service> -->
 	</route>
 </launcher>
