@@ -4,13 +4,11 @@ _/src/fetchurl
 _/src/init
 _/src/libc
 _/src/libcrypto
+_/src/libpng
 _/src/libssh
 _/src/libssl
-_/src/nit_fb
-_/src/noux
+_/src/menu_view
 _/src/report_rom
-_/src/terminal
-_/src/terminal_log
 _/src/vfs
 _/src/vfs_import
 _/src/vfs_lwip
