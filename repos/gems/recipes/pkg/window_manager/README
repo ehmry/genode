@@ -1,0 +1,6 @@
+
+       Window manager core subystem
+
+The package provides the wm and report_rom component.
+Layouter and decorator packages are required for a complete
+window manager.
