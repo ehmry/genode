@@ -1,18 +1,67 @@
-<runtime ram="40M" caps="1000" binary="init" config="wm.config">
+<runtime ram="24M" caps="384" binary="init">
 
 	<requires> <nitpicker/> <timer/> </requires>
 
-	<provides> <nitpicker/> </provides>
+	<provides> <nitpicker/> <report/> <rom/> </provides>
 
 	<content>
 		<rom label="ld.lib.so"/>
 		<rom label="report_rom"/>
-		<rom label="decorator"/>
-		<rom label="floating_window_layouter"/>
 		<rom label="wm"/>
-		<rom label="wm.config"/>
-		<rom label="decorator_init.config"/>
-		<rom label="layouter.config"/>
 	</content>
+
+	<config>
+		<parent-provides>
+			<service name="CPU"/>
+			<service name="LOG"/>
+			<service name="PD"/>
+			<service name="ROM"/>
+			<service name="Nitpicker"/>
+			<service name="Timer"/>
+		</parent-provides>
+		<service name="Nitpicker">
+			<default-policy> <child name="wm"/> </default-policy>
+		</service>
+		<service name="ROM">
+			<default-policy> <child name="report_rom"/> </default-policy>
+		</service>
+		<service name="Report">
+			<default-policy> <child name="report_rom"/> </default-policy>
+		</service>
+		<start name="report_rom" caps="128">
+			<resource name="RAM" quantum="4M"/>
+			<provides>
+				<service name="Report"/>
+				<service name="ROM"/>
+			</provides>
+			<config>
+				<policy label="layouter -> window_list"       report="wm -> window_list"/>
+				<policy label="layouter -> focus_request"     report="wm -> focus_request"/>
+				<policy label="decorator -> window_layout"    report="layouter -> window_layout"/>
+				<policy label="wm -> resize_request"          report="layouter -> resize_request"/>
+				<policy label="decorator -> pointer"          report="wm -> pointer"/>
+				<policy label="layouter -> hover"             report="decorator -> hover"/>
+				<policy label="layouter -> decorator_margins" report="decorator -> decorator_margins"/>
+				<policy label="wm -> focus"                   report="layouter -> focus"/>
+			</config>
+			<any-service> <parent/> </any-service>
+		</start>
+		<start name="wm" caps="256">
+			<resource name="RAM" quantum="6M"/>
+			<provides>
+				<service name="Nitpicker"/>
+			</provides>
+			<config>
+				<policy label_prefix="decorator" role="decorator"/>
+				<policy label_prefix="layouter"  role="layouter"/>
+			</config>
+			<route>
+				<service name="ROM" label="resize_request"> <child name="report_rom"/> </service>
+				<service name="ROM" label="focus">          <child name="report_rom"/> </service>
+				<service name="Report">                     <child name="report_rom"/> </service>
+				<any-service> <parent/> </any-service>
+			</route>
+		</start>
+	</config>
 
 </runtime>
