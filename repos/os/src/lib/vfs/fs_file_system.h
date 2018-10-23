@@ -517,8 +517,9 @@ class Vfs::Fs_file_system : public File_system
 			return read_num_bytes;
 		}
 
-		file_size _write(Fs_vfs_handle &handle,
-		                 const char *buf, file_size count, file_size seek_offset)
+		Write_result _write(Fs_vfs_handle &handle,
+		                    const char *buf,  file_size seek_offset,
+		                    file_size count, file_size &out_count)
 		{
 			::File_system::Session::Tx::Source &source = *_fs.tx();
 			using ::File_system::Packet_descriptor;
@@ -527,7 +528,7 @@ class Vfs::Fs_file_system : public File_system
 			count = min(max_packet_size, count);
 
 			if (!source.ready_to_submit())
-				throw Insufficient_buffer();
+				return WRITE_ERR_WOULD_BLOCK;
 
 			try {
 				Packet_descriptor packet_in(source.alloc_packet(count),
@@ -541,12 +542,14 @@ class Vfs::Fs_file_system : public File_system
 				/* pass packet to server side */
 				source.submit_packet(packet_in);
 			} catch (::File_system::Session::Tx::Source::Packet_alloc_failed) {
-				throw Insufficient_buffer();
+				return WRITE_ERR_WOULD_BLOCK;
 			} catch (...) {
 				Genode::error("unhandled exception");
-				return 0;
+				return WRITE_ERR_IO;
 			}
-			return count;
+
+			out_count = count;
+			return WRITE_OK;
 		}
 
 		void _ready_to_submit()
@@ -972,13 +975,20 @@ class Vfs::Fs_file_system : public File_system
 		Write_result write(Vfs_handle *vfs_handle, char const *buf,
 		                   file_size buf_size, file_size &out_count) override
 		{
-			Lock::Guard guard(_lock);
 
 			Fs_vfs_handle &handle = static_cast<Fs_vfs_handle &>(*vfs_handle);
 
-			out_count = _write(handle, buf, buf_size, handle.seek());
+			Write_result wres = WRITE_ERR_INVALID;
+			while (true) {
+				{
+					Lock::Guard guard(_lock);
+					wres = _write(handle, buf, handle.seek(), buf_size, out_count);
+				}
+				if (wres != WRITE_ERR_WOULD_BLOCK) break;
+				_env.env().ep().wait_and_dispatch_one_io_signal();
+			}
 
-			return WRITE_OK;
+			return wres;
 		}
 
 		bool queue_read(Vfs_handle *vfs_handle, file_size count) override
