@@ -215,13 +215,7 @@ class Vfs_server::Io_node : public  Vfs_server::Node,
 			Vfs::file_size res = 0;
 
 			_handle->seek(seek_offset);
-
-			try {
-				_handle->fs().write(_handle, src, len, res);
-			} catch (Vfs::File_io_service::Insufficient_buffer) {
-				throw Operation_incomplete();
-			}
-
+			_handle->fs().write(_handle, src, len, res);
 			if (res)
 				mark_as_updated();
 

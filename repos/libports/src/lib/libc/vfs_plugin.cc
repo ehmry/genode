@@ -417,13 +417,10 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 
 	if (fd->flags & O_NONBLOCK) {
 
-		try {
-			out_result = VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf, count, out_count));
+		out_result = VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf, count, out_count));
 
-			/* wake up threads blocking for 'queue_*()' or 'write()' */
-			Libc::resume_all();
-
-		} catch (Vfs::File_io_service::Insufficient_buffer) { }
+		/* wake up threads blocking for 'queue_*()' or 'write()' */
+		Libc::resume_all();
 
 	} else {
 
@@ -446,15 +443,10 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 
 			bool suspend() override
 			{
-				try {
-					out_result = VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf,
-						                                              count, out_count));
-					retry = false;
-				} catch (Vfs::File_io_service::Insufficient_buffer) {
-					retry = true;
-				}
+				out_result = VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf,
+				                                                count, out_count));
 
-				return retry;
+				return false;
 			}
 		} check(handle, buf, count, out_count, out_result);
 
@@ -973,15 +965,9 @@ int Libc::Vfs_plugin::symlink(const char *oldpath, const char *newpath)
 
 		bool suspend() override
 		{
-			try {
-				VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf,
-					              count, out_count));
-				retry = false;
-			} catch (Vfs::File_io_service::Insufficient_buffer) {
-				retry = true;
-			}
-
-			return retry;
+			VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf,
+			                count, out_count));
+			return false;
 		}
 	} check ( handle, oldpath, count, out_count);
 
