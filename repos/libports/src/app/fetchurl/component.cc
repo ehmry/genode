@@ -156,13 +156,9 @@ struct Fetchurl::Main
 		if (_dialog_reporter.constructed())
 			_dialog_reporter->generate([&] (Genode::Xml_generator &xml) {
 				xml.node("vbox", [&] () {
-
-					xml.node("label", [&] () {
-						xml.attribute("text", "Download"); });
-
 					unsigned count = 0;
 					for (Fetch *f = _fetches.first(); f; f = f->next()) {
-						gen_named_node(xml, "hbox", String<10>(count++), [&] () {
+						gen_named_node(xml, "frame", String<10>(count++), [&] () { xml.node("vbox", [&] () {
 							gen_named_node(xml, "float", "left", [&] () {
 								xml.attribute("west", "yes");
 								xml.node("label", [&] () {
@@ -174,7 +170,7 @@ struct Fetchurl::Main
 							gen_named_node(xml, "float", "right", [&] () {
 								xml.attribute("east", "yes");
 								xml.node("label", [&] () {
-									String<8> text((unsigned)((100*f->dlnow)/f->dltotal), "%");
+									String<8> (unsigned)((100*f->dlnow)/f->dltotal), "%");
 									xml.attribute("text", text);
 									xml.attribute("font", "annotation/regular");
 								});
