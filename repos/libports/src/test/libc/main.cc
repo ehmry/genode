@@ -147,9 +147,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	perror("perror");
 
 	struct timespec ts;
-	for (int i = 0; i < 10; ++i) {
+	for (int i = 0; i < 3; ++i) {
 		sleep(1);
 		ts.tv_sec = ts.tv_nsec = 0;
 		clock_gettime(CLOCK_MONOTONIC, &ts);
