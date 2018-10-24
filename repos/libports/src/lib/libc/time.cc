@@ -24,10 +24,6 @@ namespace Libc { time_t read_rtc(); }
 extern "C" __attribute__((weak))
 int clock_gettime(clockid_t clk_id, struct timespec *ts)
 {
-	static bool   initial_rtc_requested = false;
-	static time_t initial_rtc = 0;
-	static unsigned long t0_ms = 0;
-
 	if (!ts) return Libc::Errno(EFAULT);
 
 	Genode::Duration curr_dur = Libc::current_time();
@@ -36,6 +32,10 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts)
 
 	/* IRL wall-time */
 	case CLOCK_REALTIME: {
+		static bool   initial_rtc_requested = false;
+		static time_t initial_rtc = 0;
+		static unsigned long t0_ms = 0;
+
 		/* try to read rtc once */
 		if (!initial_rtc_requested) {
 			initial_rtc_requested = true;
@@ -56,12 +56,13 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts)
 
 	/* component uptime */
 	case CLOCK_MONOTONIC:
-	case CLOCK_UPTIME:
-		ts->tv_sec = curr_dur.trunc_to_plain_ms().value/1000;
-		ts->tv_nsec
-			= (curr_dur.trunc_to_plain_us().value * 1000)
-			% (1000*1000*1000);
+	case CLOCK_UPTIME: {
+		unsigned long us = curr_dur.trunc_to_plain_us().value;
+
+		ts->tv_sec  = us / (1000*1000);
+		ts->tv_nsec = (us % (1000*1000)) * 1000;
 		break;
+	}
 
 	default:
 		return Libc::Errno(EINVAL);

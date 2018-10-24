@@ -281,8 +281,6 @@ struct Libc::Timeout
 
 	void start(unsigned long timeout_ms)
 	{
-		using namespace Genode;
-
 		Milliseconds const now = _timer_accessor.timer().curr_time().trunc_to_plain_ms();
 
 		_expired             = false;
