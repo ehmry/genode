@@ -26,6 +26,10 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts)
 {
 	if (!ts) return Libc::Errno(EFAULT);
 
+	/* initialize timespec just in case users do not check for errors */
+	ts->tv_sec  = 0;
+	ts->tv_nsec = 0;
+
 	switch (clk_id) {
 
 	/* IRL wall-time */
@@ -45,10 +49,10 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts)
 			}
 		}
 
-		if (!initial_rtc)
-			return Libc::Errno(EINVAL);
+		if (!initial_rtc) return Libc::Errno(EINVAL);
 
 		unsigned long time = Libc::current_time().trunc_to_plain_ms().value - t0_ms;
+
 		ts->tv_sec  = initial_rtc + time/1000;
 		ts->tv_nsec = (time % 1000) * (1000*1000);
 		break;
@@ -56,8 +60,9 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts)
 
 	/* component uptime */
 	case CLOCK_MONOTONIC:
-	case CLOCK_UPTIME: {
-		unsigned long us = curr_dur.trunc_to_plain_us().value;
+	case CLOCK_UPTIME:
+	{
+		unsigned long us = Libc::current_time().trunc_to_plain_us().value;
 
 		ts->tv_sec  = us / (1000*1000);
 		ts->tv_nsec = (us % (1000*1000)) * 1000;
@@ -79,7 +84,7 @@ int gettimeofday(struct timeval *tv, struct timezone *)
 
 	struct timespec ts;
 
-	if (int ret = clock_gettime(0, &ts))
+	if (int ret = clock_gettime(CLOCK_REALTIME, &ts))
 		return ret;
 
 	tv->tv_sec  = ts.tv_sec;
