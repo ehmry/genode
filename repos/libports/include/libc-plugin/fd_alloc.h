@@ -90,11 +90,6 @@ namespace Libc {
 			void free(File_descriptor *fdo);
 
 			File_descriptor *find_by_libc_fd(int libc_fd);
-
-			/**
-			 * Exposed for emptying the allocator
-			 */
-			using Allocator_avl_tpl<File_descriptor>::apply_any;
 	};
 
 
