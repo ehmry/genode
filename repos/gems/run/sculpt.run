@@ -552,6 +552,8 @@ append manual_deploy_config {
 	<!-- <start name="vm_fs"/> -->
 	<!-- <start name="fonts_fs"/> -->
 	<!-- <start name="wm"/> -->
+	<!-- <start name="floating_window_layouter"/> -->
+	<!-- <start name="themed_decorator"/> -->
 	<!-- <start name="backdrop"/> -->
 	<!-- <start name="nano3d"/> -->
 	<!-- <start name="noux" launcher="noux-system"/> -->

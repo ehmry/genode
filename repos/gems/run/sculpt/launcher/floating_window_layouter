@@ -1,0 +1,27 @@
+<launcher pkg="floating_window_layouter">
+	<route>
+		<service name="Nitpicker"> <child name="wm" label="layouter"/> </service>
+
+		<service name="Report" label="focus">
+			<child name="wm"     label="layouter -> focus"/> </service>
+
+		<service name="Report" label="resize_request">
+			<child name="wm"     label="layouter -> resize_request"/> </service>
+
+		<service name="Report" label="window_layout">
+			<child name="wm"     label="layouter -> window_layout"/> </service>
+
+		<service name="ROM" label="decorator_margins">
+			<child name="wm"  label="layouter -> decorator_margins"/> </service>
+
+		<service name="ROM" label="focus_request">
+			<child name="wm"  label="layouter -> focus_request"/> </service>
+
+		<service name="ROM" label="hover">
+			<child name="wm"  label="layouter -> hover"/> </service>
+
+		<service name="ROM" label="window_list">
+			<child name="wm"  label="layouter -> window_list"/> </service>
+
+	</route>
+</launcher>

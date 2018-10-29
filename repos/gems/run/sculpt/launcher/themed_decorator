@@ -1,0 +1,18 @@
+<launcher pkg="themed_decorator">
+	<route>
+		<service name="Nitpicker"> <child name="wm" label="decorator"/> </service>
+
+		<service name="Report" label="decorator_margins">
+			<child name="wm"     label="decorator -> decorator_margins"/> </service>
+
+		<service name="Report" label="hover">
+			<child name="wm"     label="decorator -> hover"/> </service>
+
+		<service name="ROM" label="window_layout">
+			<child name="wm"  label="decorator -> window_layout"/> </service>
+
+		<service name="ROM" label="pointer">
+			<child name="wm"  label="decorator -> pointer"/> </service>
+
+	</route>
+</launcher>
