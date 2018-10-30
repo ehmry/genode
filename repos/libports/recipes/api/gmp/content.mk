@@ -11,8 +11,8 @@ include:
 	mkdir -p $@
 	cp -r $(PORT_DIR)/include/* $@/
 	cp -r $(REP_DIR)/include/gmp/* $@/
-	cp -r $(REP_DIR)/include/32bit/gmp/* $@/
-	cp -r $(REP_DIR)/include/64bit/gmp/* $@/
+	cp -r $(REP_DIR)/include/spec/32bit/gmp/* $@/
+	cp -r $(REP_DIR)/include/spec/64bit/gmp/* $@/
 
 LICENSE:
 	cp $(PORT_DIR)/src/lib/gmp/COPYING $@
