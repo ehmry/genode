@@ -70,15 +70,18 @@ class Vfs::Fs_file_system : public File_system
 		struct Fs_vfs_handle : Vfs_handle,
 		                       private ::File_system::Node,
 		                       private Handle_space::Element,
+		                       private List<Fs_vfs_handle>::Element,
 		                       private Handle_state
 		{
+			friend Genode::Id_space<::File_system::Node>;
+			friend Genode::List<Fs_vfs_handle>;
+			using  Genode::List<Fs_vfs_handle>::Element::next;
+
 			using Handle_state::queued_read_state;
 			using Handle_state::queued_read_packet;
 			using Handle_state::queued_sync_packet;
 			using Handle_state::queued_sync_state;
 			using Handle_state::read_ready_state;
-
-			friend class Genode::Id_space<::File_system::Node>;
 
 			::File_system::Connection &_fs;
 			Io_response_handler       &_io_handler;
@@ -345,11 +348,14 @@ class Vfs::Fs_file_system : public File_system
 			}
 		};
 
-		struct Fs_vfs_watch_handle : Vfs_watch_handle,
-		                             private ::File_system::Node,
-		                             private Handle_space::Element
+		struct Fs_vfs_watch_handle final : Vfs_watch_handle,
+		                                   private ::File_system::Node,
+		                                   private Handle_space::Element,
+		                                   private List<Fs_vfs_watch_handle>::Element
 		{
-			friend class Genode::Id_space<::File_system::Node>;
+			friend Genode::Id_space<::File_system::Node>;
+			friend Genode::List<Fs_vfs_watch_handle>;
+			using  Genode::List<Fs_vfs_watch_handle>::Element::next;
 
 			::File_system::Watch_handle const  fs_handle;
 
@@ -369,9 +375,8 @@ class Vfs::Fs_file_system : public File_system
 			Genode::Entrypoint        &_ep;
 			Io_response_handler       &_io_handler;
 			Watch_response_handler    &_watch_handler;
-			List<Vfs_handle::Context>  _context_list { };
-			List<Vfs_watch_handle::Context>
-			                           _watch_context_list { };
+			List<Fs_vfs_handle>        _io_handle_list { };
+			List<Fs_vfs_watch_handle>  _watch_handle_list { };
 			Lock                       _list_lock    { };
 			bool                       _notify_all   { false };
 
@@ -382,7 +387,7 @@ class Vfs::Fs_file_system : public File_system
 				_watch_handler(env.watch_handler())
 			{ }
 
-			void arm_io_event(Vfs_handle::Context *context)
+			void arm_io_event(Fs_vfs_handle *context)
 			{
 				if (!context) {
 					Lock::Guard list_guard(_list_lock);
@@ -390,7 +395,7 @@ class Vfs::Fs_file_system : public File_system
 				} else {
 					Lock::Guard list_guard(_list_lock);
 
-					for (Vfs_handle::Context *list_context = _context_list.first();
+					for (Fs_vfs_handle *list_context = _io_handle_list.first();
 					     list_context;
 					     list_context = list_context->next())
 					{
@@ -400,18 +405,18 @@ class Vfs::Fs_file_system : public File_system
 						}
 					}
 
-					_context_list.insert(context);
+					_io_handle_list.insert(context);
 				}
 
 				_ep.schedule_post_signal_hook(this);
 			}
 
-			void arm_watch_event(Vfs_watch_handle::Context &context)
+			void arm_watch_event(Fs_vfs_watch_handle &context)
 			{
 				{
 					Lock::Guard list_guard(_list_lock);
 
-					for (Vfs_watch_handle::Context *list_context = _watch_context_list.first();
+					for (Fs_vfs_watch_handle *list_context = _watch_handle_list.first();
 					     list_context;
 					     list_context = list_context->next())
 					{
@@ -421,7 +426,7 @@ class Vfs::Fs_file_system : public File_system
 						}
 					}
 
-					_watch_context_list.insert(&context);
+					_watch_handle_list.insert(&context);
 				}
 
 				_ep.schedule_post_signal_hook(this);
@@ -429,7 +434,7 @@ class Vfs::Fs_file_system : public File_system
 
 			void function() override
 			{
-				Vfs_handle::Context *context = nullptr;
+				Fs_vfs_handle *context = nullptr;
 
 				do {
 					bool notify_all = false;
@@ -437,8 +442,8 @@ class Vfs::Fs_file_system : public File_system
 					{
 						Lock::Guard list_guard(_list_lock);
 
-						context = _context_list.first();
-						_context_list.remove(context);
+						context = _io_handle_list.first();
+						_io_handle_list.remove(context);
 
 						if (!context && _notify_all) {
 							notify_all  = true;
@@ -446,23 +451,38 @@ class Vfs::Fs_file_system : public File_system
 						}
 					}
 
-					if (context || notify_all)
-						_io_handler.handle_io_response(context);
+					if (context) {
+						_io_handler.handle_io_response(context->context());
+					} else if (notify_all) {
+						_io_handler.handle_io_response(nullptr);
+					}
 
 					/* done if no contexts and all notified */
 				} while (context);
 
 				for (;;) {
-					Vfs_watch_handle::Context *context = nullptr;
+					Fs_vfs_watch_handle *context = nullptr;
 					{
 						Lock::Guard list_guard(_list_lock);
 
-						context = _watch_context_list.first();
+						context = _watch_handle_list.first();
 						if (!context) break;
-						_watch_context_list.remove(context);
-						_watch_handler.handle_watch_response(context);
+						_watch_handle_list.remove(context);
+						_watch_handler.handle_watch_response(context->context());
 					}
 				}
+			}
+
+			void disarm(Fs_vfs_handle &handle)
+			{
+				Lock::Guard list_guard(_list_lock);
+				_io_handle_list.remove(&handle);
+			}
+
+			void disarm(Fs_vfs_watch_handle &handle)
+			{
+				Lock::Guard list_guard(_list_lock);
+				_watch_handle_list.remove(&handle);
 			}
 		};
 
@@ -574,13 +594,13 @@ class Vfs::Fs_file_system : public File_system
 					switch (packet.operation()) {
 					case Packet_descriptor::READ_READY:
 						handle.read_ready_state = Handle_state::Read_ready_state::READY;
-						_post_signal_hook.arm_io_event(handle.context);
+						_post_signal_hook.arm_io_event(&handle);
 						break;
 
 					case Packet_descriptor::READ:
 						handle.queued_read_packet = packet;
 						handle.queued_read_state  = Handle_state::Queued_state::ACK;
-						_post_signal_hook.arm_io_event(handle.context);
+						_post_signal_hook.arm_io_event(&handle);
 						break;
 
 					case Packet_descriptor::WRITE:
@@ -594,7 +614,7 @@ class Vfs::Fs_file_system : public File_system
 					case Packet_descriptor::SYNC:
 						handle.queued_sync_packet = packet;
 						handle.queued_sync_state  = Handle_state::Queued_state::ACK;
-						_post_signal_hook.arm_io_event(handle.context);
+						_post_signal_hook.arm_io_event(&handle);
 						break;
 
 					case Packet_descriptor::CONTENT_CHANGED:
@@ -606,8 +626,8 @@ class Vfs::Fs_file_system : public File_system
 				try {
 					if (packet.operation() == Packet_descriptor::CONTENT_CHANGED) {
 						_watch_handle_space.apply<Fs_vfs_watch_handle>(id, [&] (Fs_vfs_watch_handle &handle) {
-							if (auto *ctx = handle.context())
-								_post_signal_hook.arm_watch_event(*ctx); });
+							if (handle.context())
+								_post_signal_hook.arm_watch_event(handle); });
 					} else {
 						_handle_space.apply<Fs_vfs_handle>(id, handle_read);
 					}
@@ -911,12 +931,11 @@ class Vfs::Fs_file_system : public File_system
 
 		void close(Vfs_handle *vfs_handle) override
 		{
-			if (!vfs_handle) return;
-
 			Lock::Guard guard(_lock);
 
 			Fs_vfs_handle *fs_handle = static_cast<Fs_vfs_handle *>(vfs_handle);
 
+			_post_signal_hook.disarm(*fs_handle);
 			_fs.close(fs_handle->file_handle());
 			destroy(fs_handle->alloc(), fs_handle);
 		}
@@ -952,6 +971,7 @@ class Vfs::Fs_file_system : public File_system
 		{
 			Fs_vfs_watch_handle *handle =
 				static_cast<Fs_vfs_watch_handle *>(vfs_handle);
+			_post_signal_hook.disarm(*handle);
 			_fs.close(handle->fs_handle);
 			destroy(handle->alloc(), handle);
 		};
