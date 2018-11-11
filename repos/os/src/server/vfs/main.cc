@@ -702,7 +702,7 @@ struct Vfs_server::Io_response_handler : Vfs::Io_response_handler
 	Io_response_handler(Session_registry &session_registry)
 	: _session_registry(session_registry) { }
 
-	void handle_io_response(Vfs::Vfs_handle::Context *context) override
+	void handle_io_response(void *context) override
 	{
 		if (_in_progress) {
 			/* called recursively, context is nullptr in this case */
@@ -713,7 +713,7 @@ struct Vfs_server::Io_response_handler : Vfs::Io_response_handler
 		_in_progress = true;
 
 		if (context)
-			Io_node::node_by_context(*context).handle_io_response();
+			Io_node::node_by_context(context)->handle_io_response();
 		else
 			_handle_general_io = true;
 
@@ -733,10 +733,10 @@ struct Vfs_server::Io_response_handler : Vfs::Io_response_handler
  */
 struct Vfs_server::Watch_response_handler : Vfs::Watch_response_handler
 {
-	void handle_watch_response(Vfs::Vfs_watch_handle::Context *context) override
+	void handle_watch_response(void *context) override
 	{
 		if (context)
-			Watch_node::node_by_context(*context).handle_watch_response();
+			Watch_node::node_by_context(context)->handle_watch_response();
 	}
 };
 

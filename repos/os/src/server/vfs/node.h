@@ -133,8 +133,7 @@ class Vfs_server::Node : public  File_system::Node_base,
 			out.out_string(_path.base()); }
 };
 
-class Vfs_server::Io_node : public  Vfs_server::Node,
-                            private Vfs::Vfs_handle::Context
+class Vfs_server::Io_node : public  Vfs_server::Node
 {
 	public:
 
@@ -153,8 +152,6 @@ class Vfs_server::Io_node : public  Vfs_server::Node,
 		bool _notify_read_ready = false;
 
 	protected:
-
-		Vfs::Vfs_handle::Context &context() { return *this; }
 
 		Vfs::Vfs_handle *_handle { nullptr };
 		Op_state         op_state { Op_state::IDLE };
@@ -238,9 +235,9 @@ class Vfs_server::Io_node : public  Vfs_server::Node,
 
 		using Node_space::Element::id;
 
-		static Io_node &node_by_context(Vfs::Vfs_handle::Context &context)
+		static Io_node *node_by_context(void *context)
 		{
-			return static_cast<Io_node &>(context);
+			return static_cast<Io_node *>(context);
 		}
 
 		Mode mode() const { return _mode; }
@@ -307,8 +304,7 @@ class Vfs_server::Io_node : public  Vfs_server::Node,
 };
 
 
-class Vfs_server::Watch_node final : public  Vfs_server::Node,
-                                     private Vfs::Vfs_watch_handle::Context
+class Vfs_server::Watch_node final : public  Vfs_server::Node
 {
 	private:
 
@@ -338,13 +334,12 @@ class Vfs_server::Watch_node final : public  Vfs_server::Node,
 
 		~Watch_node()
 		{
-			_watch_handle.context((Vfs::Vfs_watch_handle::Context*)~0ULL);
 			_watch_handle.close();
 		}
 
-		static Watch_node &node_by_context(Vfs::Vfs_watch_handle::Context &context)
+		static Watch_node *node_by_context(void *context)
 		{
-			return static_cast<Watch_node &>(context);
+			return static_cast<Watch_node *>(context);
 		}
 
 		/**
@@ -369,7 +364,7 @@ struct Vfs_server::Symlink : Io_node
 	: Io_node(space, link_path, mode, node_io_handler)
 	{
 		assert_openlink(vfs.openlink(link_path, create, &_handle, alloc));
-		_handle->context(&context());
+		_handle->context(this);
 	}
 
 	~Symlink() { _handle->close(); }
@@ -446,7 +441,7 @@ class Vfs_server::File : public Io_node
 
 			assert_open(vfs.open(file_path, vfs_mode, &_handle, alloc));
 			_leaf_path       = vfs.leaf_path(path());
-			_handle->context(&context());
+			_handle->context(this);
 		}
 
 		~File() { _handle->close(); }
@@ -499,7 +494,7 @@ struct Vfs_server::Directory : Io_node
 	: Io_node(space, dir_path, READ_ONLY, node_io_handler)
 	{
 		assert_opendir(vfs.opendir(dir_path, create, &_handle, alloc));
-		_handle->context(&context());
+		_handle->context(this);
 	}
 
 	~Directory() { _handle->close(); }

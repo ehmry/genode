@@ -26,13 +26,6 @@ namespace Vfs{
 
 class Vfs::Vfs_handle
 {
-	public:
-
-		/**
-		 * Opaque handle context
-		 */
-		struct Context { };
-
 	private:
 
 		Directory_service &_ds;
@@ -40,7 +33,7 @@ class Vfs::Vfs_handle
 		Genode::Allocator &_alloc;
 		int                _status_flags;
 		file_size          _seek = 0;
-		Context           *_context = nullptr;
+		void              *_context = nullptr;
 
 		/*
 		 * Noncopyable
@@ -90,8 +83,16 @@ class Vfs::Vfs_handle
 		Directory_service &ds() { return _ds; }
 		File_io_service   &fs() { return _fs; }
 		Allocator      &alloc() { return _alloc; }
-		void context(Context *context) { _context = context; }
-		Context *context() const { return _context; }
+
+		/**
+		 * Set opaque application context
+		 */
+		void context(void *context) { _context = context; }
+
+		/**
+		 * Get opaque application context
+		 */
+		void *context() const { return _context; }
 
 		int status_flags() const { return _status_flags; }
 
@@ -123,18 +124,11 @@ class Vfs::Vfs_handle
 
 class Vfs::Vfs_watch_handle
 {
-	public:
-
-		/**
-		 * Opaque handle context
-		 */
-		struct Context { };
-
 	private:
 
 		Directory_service &_fs;
 		Genode::Allocator &_alloc;
-		Context           *_context = nullptr;
+		void              *_context = nullptr;
 
 		/*
 		 * Noncopyable
@@ -154,8 +148,16 @@ class Vfs::Vfs_watch_handle
 
 		Directory_service &fs() { return _fs; }
 		Allocator &alloc() { return _alloc; }
-		virtual void context(Context *context) { _context = context; }
-		Context *context() const { return _context; }
+
+		/**
+		 * Set opaque application context
+		 */
+		virtual void context(void *context) { _context = context; }
+
+		/**
+		 * Get opaque application context
+		 */
+		void *context() const { return _context; }
 
 		/**
 		 * Close handle at backing file-system.

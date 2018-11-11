@@ -127,7 +127,7 @@ class Vfs::Dir_file_system : public File_system
 			/**
 			 * Propagate the handle context to each sub-handle
 			 */
-			void context(Context *ctx) override
+			void context(void *ctx) override
 			{
 				handle_registry.for_each( [&] (Watch_handle_element &elem) {
 					elem.watch_handle.context(ctx); } );

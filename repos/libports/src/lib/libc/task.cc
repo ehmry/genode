@@ -63,7 +63,7 @@ class Libc::Vfs_env : public Vfs::Env
 		Vfs::Io_response_handler &_io_handler;
 
 		struct Watch_response_stub : Vfs::Watch_response_handler {
-			void handle_watch_response(Vfs::Vfs_watch_handle::Context*) override { };
+			void handle_watch_response(void *) override { };
 		} _watch_stub { };
 
 		Vfs::Global_file_system_factory _global_file_system_factory { _alloc };
@@ -388,7 +388,7 @@ extern void (*libc_select_notify)();
 
 struct Libc::Io_response_handler : Vfs::Io_response_handler
 {
-	void handle_io_response(Vfs::Vfs_handle::Context *) override
+	void handle_io_response(void *) override
 	{
 		/* some contexts may have been deblocked from select() */
 		if (libc_select_notify)

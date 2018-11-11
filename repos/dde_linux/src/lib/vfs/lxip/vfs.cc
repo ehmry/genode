@@ -178,7 +178,7 @@ struct Vfs::File : Vfs::Node
 	/**
 	 * Check for data to read or write
 	 */
-	virtual bool poll(bool trigger_io_response, Vfs::Vfs_handle::Context *context) = 0;
+	virtual bool poll(bool trigger_io_response, void *context) = 0;
 
 	virtual Lxip::ssize_t write(Lxip_vfs_file_handle &,
 	                             char const *src, Genode::size_t len,
@@ -249,7 +249,7 @@ struct Lxip::Socket_dir : Vfs::Directory
 	virtual sockaddr_storage &remote_addr() = 0;
 	virtual void     close() = 0;
 	virtual bool     closed() const = 0;
-	virtual void trigger_io_response(Vfs::Vfs_handle::Context *) = 0;
+	virtual void trigger_io_response(void *) = 0;
 
 	Socket_dir(char const *name) : Vfs::Directory(name) { }
 };
@@ -442,7 +442,7 @@ class Vfs::Lxip_data_file : public Vfs::Lxip_file
 		 ********************/
 
 		bool poll(bool trigger_io_response,
-		          Vfs::Vfs_handle::Context *context) override
+		          void *context) override
 		{
 			using namespace Linux;
 
@@ -513,7 +513,7 @@ class Vfs::Lxip_bind_file : public Vfs::Lxip_file
 		 ** File interface **
 		 ********************/
 
-		bool poll(bool, Vfs::Vfs_handle::Context *) { return true; }
+		bool poll(bool, void *) { return true; }
 
 		Lxip::ssize_t write(Lxip_vfs_file_handle &handle,
 		                    char const *src, Genode::size_t len,
@@ -581,7 +581,7 @@ class Vfs::Lxip_listen_file : public Vfs::Lxip_file
 		 ** File interface **
 		 ********************/
 
-		bool poll(bool, Vfs::Vfs_handle::Context *) { return true; }
+		bool poll(bool, void *) { return true; }
 
 		Lxip::ssize_t write(Lxip_vfs_file_handle &handle,
 		                    char const *src, Genode::size_t len,
@@ -635,7 +635,7 @@ class Vfs::Lxip_connect_file : public Vfs::Lxip_file
 		 ** File interface **
 		 ********************/
 
-		bool poll(bool, Vfs::Vfs_handle::Context *) { return true; }
+		bool poll(bool, void *) { return true; }
 
 		Lxip::ssize_t write(Lxip_vfs_file_handle &handle,
 		                    char const *src, Genode::size_t len,
@@ -705,7 +705,7 @@ class Vfs::Lxip_local_file : public Vfs::Lxip_file
 		 ** File interface **
 		 ********************/
 
-		bool poll(bool, Vfs::Vfs_handle::Context *) { return true; }
+		bool poll(bool, void *) { return true; }
 
 		Lxip::ssize_t read(Lxip_vfs_file_handle &handle,
 		                   char *dst, Genode::size_t len,
@@ -746,8 +746,7 @@ class Vfs::Lxip_remote_file : public Vfs::Lxip_file
 		 ** File interface **
 		 ********************/
 
-		bool poll(bool trigger_io_response,
-		          Vfs::Vfs_handle::Context *context) override
+		bool poll(bool trigger_io_response, void *context) override
 		{
 			using namespace Linux;
 
@@ -848,8 +847,7 @@ class Vfs::Lxip_accept_file : public Vfs::Lxip_file
 		 ** File interface **
 		 ********************/
 
-		bool poll(bool trigger_io_response,
-		          Vfs::Vfs_handle::Context *context) override
+		bool poll(bool trigger_io_response, void *context) override
 		{
 			using namespace Linux;
 
@@ -925,7 +923,7 @@ class Vfs::Lxip_socket_dir final : public Lxip::Socket_dir
 		{
 			Accept_socket_file() : Vfs::File("accept_socket") { }
 
-			bool poll(bool, Vfs::Vfs_handle::Context *) override { return true; }
+			bool poll(bool, void *) override { return true; }
 		} _accept_socket_file { };
 
 		char _name[Lxip::MAX_SOCKET_NAME_LEN];
@@ -1039,7 +1037,7 @@ class Vfs::Lxip_socket_dir final : public Lxip::Socket_dir
 		void close()        override { _closed = true; }
 		bool closed() const override { return _closed; }
 
-		void trigger_io_response(Vfs::Vfs_handle::Context *context) override
+		void trigger_io_response(void *context) override
 		{
 			_io_response_handler.handle_io_response(context);
 		}
@@ -1175,7 +1173,7 @@ class Lxip::Protocol_dir_impl : public Protocol_dir
 		{
 			New_socket_file() : Vfs::File("new_socket") { }
 
-			bool poll(bool, Vfs::Vfs_handle::Context *) override { return true; }
+			bool poll(bool, void *) override { return true; }
 		} _new_socket_file { };
 
 		Type const _type;
@@ -1451,7 +1449,7 @@ class Vfs::Lxip_address_file : public Vfs::File
 		Lxip_address_file(char const *name, unsigned int &numeric_address)
 		: Vfs::File(name), _numeric_address(numeric_address) { }
 
-		bool poll(bool, Vfs::Vfs_handle::Context *) { return true; }
+		bool poll(bool, void *) { return true; }
 
 		Lxip::ssize_t read(Lxip_vfs_file_handle &handle,
 		                   char *dst, Genode::size_t len,
@@ -1486,7 +1484,7 @@ class Vfs::Lxip_link_state_file : public Vfs::File
 		Lxip_link_state_file(char const *name, bool &numeric_link_state)
 		: Vfs::File(name), _numeric_link_state(numeric_link_state) { }
 
-		bool poll(bool, Vfs::Vfs_handle::Context *) { return true; }
+		bool poll(bool, void *) { return true; }
 
 		Lxip::ssize_t read(Lxip_vfs_file_handle &handle,
 		                   char *dst, Genode::size_t len,
