@@ -25,8 +25,30 @@
 		<service name="ROM">
 			<default-policy> <child name="report_rom"/> </default-policy>
 		</service>
-		<service name="Report">
-			<default-policy> <child name="report_rom"/> </default-policy>
+		<service name="Report" label_suffix=" -> window_layout">
+			<default-policy>
+				<child name="report_rom" label="window_layout"/>
+			</default-policy>
+		</service>
+		<service name="Report" label_suffix=" -> decorator_margins">
+			<default-policy>
+				<child name="report_rom" label="decorator_margins"/>
+			</default-policy>
+		</service>
+		<service name="Report" label_suffix=" -> hover">
+			<default-policy>
+				<child name="report_rom" label="hover"/>
+			</default-policy>
+		</service>
+		<service name="Report" label_suffix=" -> focus">
+			<default-policy>
+				<child name="report_rom" label="focus"/>
+			</default-policy>
+		</service>
+		<service name="Report" label_suffix=" -> resize_request">
+			<default-policy>
+				<child name="report_rom" label="resize_request"/>
+			</default-policy>
 		</service>
 		<start name="report_rom" caps="128">
 			<resource name="RAM" quantum="4M"/>
@@ -35,14 +57,14 @@
 				<service name="ROM"/>
 			</provides>
 			<config>
-				<policy label="decorator -> pointer"          report="wm -> pointer"/>
-				<policy label="decorator -> window_layout"    report="layouter -> window_layout"/>
-				<policy label="layouter -> decorator_margins" report="decorator -> decorator_margins"/>
-				<policy label="layouter -> focus_request"     report="wm -> focus_request"/>
-				<policy label="layouter -> hover"             report="decorator -> hover"/>
-				<policy label="layouter -> window_list"       report="wm -> window_list"/>
-				<policy label="wm -> focus"                   report="layouter -> focus"/>
-				<policy label="wm -> resize_request"          report="layouter -> resize_request"/>
+				<policy label_suffix="pointer"           report="wm -> pointer"/>
+				<policy label_suffix="window_layout"     report="window_layout"/>
+				<policy label_suffix="decorator_margins" report="decorator_margins"/>
+				<policy label_suffix="focus_request"     report="wm -> focus_request"/>
+				<policy label_suffix="hover"             report="hover"/>
+				<policy label_suffix="window_list"       report="wm -> window_list"/>
+				<policy label="wm -> focus"              report="focus"/>
+				<policy label="wm -> resize_request"     report="resize_request"/>
 			</config>
 			<route> <any-service> <parent/> </any-service> </route>
 		</start>
