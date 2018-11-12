@@ -106,7 +106,7 @@ class Vfs_server::Node : public  File_system::Node_base,
 	protected:
 
 		/**
-		 * I/O handler for session context
+		 * Session I/O response handler
 		 */
 		Session_io_handler &_session_io_handler;
 
@@ -133,8 +133,8 @@ class Vfs_server::Node : public  File_system::Node_base,
 			out.out_string(_path.base()); }
 };
 
-class Vfs_server::Io_node : public  Vfs_server::Node,
-                            private Vfs::Vfs_handle::Context
+class Vfs_server::Io_node : public Vfs_server::Node,
+                            public Vfs::Response_handler
 {
 	public:
 
@@ -153,8 +153,6 @@ class Vfs_server::Io_node : public  Vfs_server::Node,
 		bool _notify_read_ready = false;
 
 	protected:
-
-		Vfs::Vfs_handle::Context &context() { return *this; }
 
 		Vfs::Vfs_handle *_handle { nullptr };
 		Op_state         op_state { Op_state::IDLE };
@@ -238,11 +236,6 @@ class Vfs_server::Io_node : public  Vfs_server::Node,
 
 		using Node_space::Element::id;
 
-		static Io_node &node_by_context(Vfs::Vfs_handle::Context &context)
-		{
-			return static_cast<Io_node &>(context);
-		}
-
 		Mode mode() const { return _mode; }
 
 		virtual size_t read(char * /* dst */, size_t /* len */, seek_off_t)
@@ -252,14 +245,6 @@ class Vfs_server::Io_node : public  Vfs_server::Node,
 		                     seek_off_t) { return 0; }
 
 		bool read_ready() { return _handle->fs().read_ready(_handle); }
-
-		/**
-		 * The global handler has drawn an association from an I/O
-		 * context and this open node, now process the event at the
-		 * session for this node.
-		 */
-		void handle_io_response() {
-			_session_io_handler.handle_node_io(*this); }
 
 		void notify_read_ready(bool requested)
 		{
@@ -304,11 +289,18 @@ class Vfs_server::Io_node : public  Vfs_server::Node,
 			}
 			return false;
 		}
+
+		/*************************************
+		 ** Vfs::Response_handler interface **
+		 *************************************/
+
+		void notify() override {
+			_session_io_handler.handle_node_io(*this); }
 };
 
 
-class Vfs_server::Watch_node final : public  Vfs_server::Node,
-                                     private Vfs::Vfs_watch_handle::Context
+class Vfs_server::Watch_node final : public Vfs_server::Node,
+                                     public Vfs::Response_handler
 {
 	private:
 
@@ -330,29 +322,23 @@ class Vfs_server::Watch_node final : public  Vfs_server::Node,
 			_watch_handle(handle)
 		{
 			/*
-			 * set the context so this Watch object
+			 * set the handler so this Watch object
 			 * is passed back thru the Io_handler
 			 */
-			_watch_handle.context(this);
+			_watch_handle.handler(this);
 		}
 
 		~Watch_node()
 		{
-			_watch_handle.context((Vfs::Vfs_watch_handle::Context*)~0ULL);
 			_watch_handle.close();
 		}
 
-		static Watch_node &node_by_context(Vfs::Vfs_watch_handle::Context &context)
-		{
-			return static_cast<Watch_node &>(context);
-		}
 
-		/**
-		 * The global handler has drawn an association from a watch
-		 * context and this open node, now process the event at the
-		 * session for this node.
-		 */
-		void handle_watch_response() {
+		/*************************************
+		 ** Vfs::Response_handler interface **
+		 *************************************/
+
+		void notify() override {
 			_session_io_handler.handle_node_watch(*this); }
 };
 
@@ -369,7 +355,7 @@ struct Vfs_server::Symlink : Io_node
 	: Io_node(space, link_path, mode, node_io_handler)
 	{
 		assert_openlink(vfs.openlink(link_path, create, &_handle, alloc));
-		_handle->context(&context());
+		_handle->handler(this);
 	}
 
 	~Symlink() { _handle->close(); }
@@ -445,8 +431,8 @@ class Vfs_server::File : public Io_node
 				(fs_mode-1) | (create ? Vfs::Directory_service::OPEN_MODE_CREATE : 0);
 
 			assert_open(vfs.open(file_path, vfs_mode, &_handle, alloc));
-			_leaf_path       = vfs.leaf_path(path());
-			_handle->context(&context());
+			_leaf_path = vfs.leaf_path(path());
+			_handle->handler(this);
 		}
 
 		~File() { _handle->close(); }
@@ -499,7 +485,7 @@ struct Vfs_server::Directory : Io_node
 	: Io_node(space, dir_path, READ_ONLY, node_io_handler)
 	{
 		assert_opendir(vfs.opendir(dir_path, create, &_handle, alloc));
-		_handle->context(&context());
+		_handle->handler(this);
 	}
 
 	~Directory() { _handle->close(); }

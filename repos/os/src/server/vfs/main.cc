@@ -21,8 +21,7 @@
 #include <root/component.h>
 #include <os/session_policy.h>
 #include <base/allocator_guard.h>
-#include <vfs/dir_file_system.h>
-#include <vfs/file_system_factory.h>
+#include <vfs/simple_env.h>
 
 /* Local includes */
 #include "assert.h"
@@ -34,13 +33,8 @@ namespace Vfs_server {
 	using namespace Vfs;
 
 	class Session_component;
-	class Io_response_handler;
-	class Watch_response_handler;
 	class Vfs_env;
 	class Root;
-
-	typedef Genode::Registered<Session_component> Registered_session;
-	typedef Genode::Registry<Registered_session>  Session_registry;
 
 	/**
 	 * Convenience utities for parsing quotas
@@ -66,7 +60,7 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 		Genode::Constrained_ram_allocator _ram_alloc;
 		Genode::Heap                      _alloc;
 
-		Genode::Signal_handler<Session_component> _process_packet_handler;
+		Genode::Io_signal_handler<Session_component> _process_packet_handler;
 
 		Vfs::File_system &_vfs;
 
@@ -435,14 +429,6 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 		void upgrade(Genode::Cap_quota caps) {
 			_cap_guard.upgrade(caps); }
 
-		/*
-		 * Called by the IO response handler for events which are not
-		 * node-specific, for example after 'release_packet()' to signal
-		 * that a previously failed 'alloc_packet()' may succeed now.
-		 */
-		void handle_general_io() {
-			_process_packets(); }
-
 
 		/********************************
 		 **  Node_io_handler interface **
@@ -467,6 +453,8 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				tx_sink()->acknowledge_packet(packet);
 				node.notify_read_ready(false);
 			}
+
+			_process_packets();
 		}
 
 		void handle_node_watch(Watch_node &node) override
@@ -689,93 +677,6 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 		void control(Node_handle, Control) override { }
 };
 
-/**
- * Global I/O event handler
- */
-struct Vfs_server::Io_response_handler : Vfs::Io_response_handler
-{
-	Session_registry &_session_registry;
-
-	bool _in_progress  { false };
-	bool _handle_general_io { false };
-
-	Io_response_handler(Session_registry &session_registry)
-	: _session_registry(session_registry) { }
-
-	void handle_io_response(Vfs::Vfs_handle::Context *context) override
-	{
-		if (_in_progress) {
-			/* called recursively, context is nullptr in this case */
-			_handle_general_io = true;
-			return;
-		}
-
-		_in_progress = true;
-
-		if (context)
-			Io_node::node_by_context(*context).handle_io_response();
-		else
-			_handle_general_io = true;
-
-		while (_handle_general_io) {
-			_handle_general_io = false;
-			_session_registry.for_each([ ] (Registered_session &r) {
-				r.handle_general_io();
-			});
-		}
-
-		_in_progress = false;
-	}
-};
-
-/**
- * Global VFS watch handler
- */
-struct Vfs_server::Watch_response_handler : Vfs::Watch_response_handler
-{
-	void handle_watch_response(Vfs::Vfs_watch_handle::Context *context) override
-	{
-		if (context)
-			Watch_node::node_by_context(*context).handle_watch_response();
-	}
-};
-
-
-class Vfs_server::Vfs_env final : Vfs::Env
-{
-	private:
-
-		Genode::Env  &_env;
-		Genode::Heap  _heap { &_env.ram(), &_env.rm() };
-
-		Io_response_handler    _io_handler;
-		Watch_response_handler _watch_handler { };
-
-		Vfs::Global_file_system_factory _global_file_system_factory { _heap };
-
-		Vfs::Dir_file_system _root_dir;
-
-	public:
-
-		Vfs_env(Genode::Env &env, Genode::Xml_node config,
-		        Session_registry &sessions)
-		: _env(env), _io_handler(sessions),
-		  _root_dir(*this, config, _global_file_system_factory)
-		{ }
-
-		Genode::Env &env() override { return _env; }
-
-		Genode::Allocator &alloc() override { return _heap; }
-
-		Vfs::File_system &root_dir() override { return _root_dir; }
-
-		Io_response_handler &io_handler() override {
-			return _io_handler; }
-
-		Watch_response_handler &watch_handler() override {
-			return _watch_handler; }
-};
-
 
 class Vfs_server::Root : public Genode::Root_component<Session_component>
 {
@@ -795,9 +696,8 @@ class Vfs_server::Root : public Genode::Root_component<Session_component>
 			}
 		}
 
-		Session_registry _session_registry { };
-
-		Vfs_env _vfs_env { _env, vfs_config(), _session_registry };
+		Genode::Heap    _vfs_heap { &_env.ram(), &_env.rm() };
+		Vfs::Simple_env _vfs_env  { _env, _vfs_heap, vfs_config() };
 
 		Genode::Signal_handler<Root> _config_handler {
 			_env.ep(), *this, &Root::_config_update };
@@ -890,11 +790,11 @@ class Vfs_server::Root : public Genode::Root_component<Session_component>
 			}
 
 			Session_component *session = new (md_alloc())
-				Registered_session(_session_registry, _env, label.string(),
-				                   Genode::Ram_quota{ram_quota},
-				                   Genode::Cap_quota{cap_quota},
-				                   tx_buf_size, _vfs_env.root_dir(),
-				                   session_root.base(), writeable);
+				Session_component(_env, label.string(),
+				                  Genode::Ram_quota{ram_quota},
+				                  Genode::Cap_quota{cap_quota},
+				                  tx_buf_size, _vfs_env.root_dir(),
+				                  session_root.base(), writeable);
 
 			auto ram_used = _env.pd().used_ram().value - initial_ram_usage;
 			auto cap_used = _env.pd().used_caps().value - initial_cap_usage;

@@ -33,7 +33,6 @@ class Vfs::Terminal_file_system : public Single_file_system
 		Label _label;
 
 		Genode::Env         &_env;
-		Io_response_handler &_io_handler;
 
 		Terminal::Connection _terminal { _env, _label.string() };
 
@@ -43,12 +42,9 @@ class Vfs::Terminal_file_system : public Single_file_system
 		struct Post_signal_hook : Genode::Entrypoint::Post_signal_hook
 		{
 			Genode::Entrypoint  &_ep;
-			Io_response_handler &_io_handler;
 			Vfs_handle          *_handle = nullptr;
 
-			Post_signal_hook(Genode::Entrypoint &ep,
-			                 Io_response_handler &io_handler)
-			: _ep(ep), _io_handler(io_handler) { }
+			Post_signal_hook(Genode::Entrypoint &ep) : _ep(ep) { }
 
 			void arm(Vfs_handle &handle)
 			{
@@ -61,11 +57,12 @@ class Vfs::Terminal_file_system : public Single_file_system
 				/*
 				 * XXX The current implementation executes the post signal hook
 				 *     for the last armed context only. When changing this,
-				 *     beware that the called handle_io_response() may change
+				 *     beware that the called notify() may change
 				 *     this object in a signal handler.
 				 */
 
-				_io_handler.handle_io_response(_handle ? _handle->context() : nullptr);
+				if (_handle)
+					_handle->notify();
 				_handle = nullptr;
 			}
 
@@ -78,7 +75,7 @@ class Vfs::Terminal_file_system : public Single_file_system
 				Post_signal_hook &operator = (Post_signal_hook const &);
 		};
 
-		Post_signal_hook _post_signal_hook { _env.ep(), _io_handler };
+		Post_signal_hook _post_signal_hook { _env.ep() };
 
 		Handle_registry _handle_registry { };
 
@@ -109,7 +106,7 @@ class Vfs::Terminal_file_system : public Single_file_system
 		:
 			Single_file_system(NODE_TYPE_CHAR_DEVICE, name(), config),
 			_label(config.attribute_value("label", Label())),
-			_env(env.env()), _io_handler(env.io_handler())
+			_env(env.env())
 		{
 			/* register for read-avail notification */
 			_terminal.read_avail_sigh(_read_avail_handler);

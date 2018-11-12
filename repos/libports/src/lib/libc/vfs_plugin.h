@@ -39,9 +39,9 @@ class Libc::Vfs_plugin : public Libc::Plugin
 {
 	private:
 
-		Genode::Allocator &_alloc;
-
-		Vfs::File_system &_root_dir;
+		Genode::Allocator     &_alloc;
+		Vfs::File_system      &_root_dir;
+		Vfs::Response_handler &_response_handler;
 
 		void _open_stdio(Genode::Xml_node const &node, char const *attr,
 		                 int libc_fd, unsigned flags)
@@ -152,9 +152,11 @@ class Libc::Vfs_plugin : public Libc::Plugin
 
 	public:
 
-		Vfs_plugin(Libc::Env &env, Genode::Allocator &alloc)
+		Vfs_plugin(Libc::Env             &env,
+		           Genode::Allocator     &alloc,
+		           Vfs::Response_handler &handler)
 		:
-			_alloc(alloc), _root_dir(env.vfs())
+			_alloc(alloc), _root_dir(env.vfs()), _response_handler(handler)
 		{
 			using Genode::Xml_node;
 

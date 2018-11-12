@@ -527,7 +527,7 @@ class Genode::File_content
 };
 
 
-class Genode::Watcher : Interface, Vfs::Vfs_watch_handle::Context
+class Genode::Watcher : public Vfs::Response_handler
 {
 	private:
 
@@ -559,10 +559,12 @@ class Genode::Watcher : Interface, Vfs::Vfs_watch_handle::Context
 		{
 			_watch(_mutable(dir)._fs, _mutable(dir)._alloc,
 			       Directory::join(dir._path, rel_path));
-			_handle->context(this);
+			_handle->handler(this);
 		}
 
 		~Watcher() { _handle->fs().close(_handle); }
+
+		void notify() override { handle_watch_notification(); }
 
 		virtual void handle_watch_notification() { }
 };
