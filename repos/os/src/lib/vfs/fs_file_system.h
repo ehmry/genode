@@ -375,8 +375,8 @@ class Vfs::Fs_file_system : public File_system
 			Genode::Entrypoint        &_ep;
 			Io_response_handler       &_io_handler;
 			Watch_response_handler    &_watch_handler;
-			List<Fs_vfs_handle>        _context_list { };
-			List<Fs_vfs_watch_handle>  _watch_context_list { };
+			List<Fs_vfs_handle>        _io_handle_list { };
+			List<Fs_vfs_watch_handle>  _watch_handle_list { };
 			Lock                       _list_lock    { };
 			bool                       _notify_all   { false };
 
@@ -395,7 +395,7 @@ class Vfs::Fs_file_system : public File_system
 				} else {
 					Lock::Guard list_guard(_list_lock);
 
-					for (Fs_vfs_handle *list_context = _context_list.first();
+					for (Fs_vfs_handle *list_context = _io_handle_list.first();
 					     list_context;
 					     list_context = list_context->next())
 					{
@@ -405,7 +405,7 @@ class Vfs::Fs_file_system : public File_system
 						}
 					}
 
-					_context_list.insert(context);
+					_io_handle_list.insert(context);
 				}
 
 				_ep.schedule_post_signal_hook(this);
@@ -416,7 +416,7 @@ class Vfs::Fs_file_system : public File_system
 				{
 					Lock::Guard list_guard(_list_lock);
 
-					for (Fs_vfs_watch_handle *list_context = _watch_context_list.first();
+					for (Fs_vfs_watch_handle *list_context = _watch_handle_list.first();
 					     list_context;
 					     list_context = list_context->next())
 					{
@@ -426,7 +426,7 @@ class Vfs::Fs_file_system : public File_system
 						}
 					}
 
-					_watch_context_list.insert(&context);
+					_watch_handle_list.insert(&context);
 				}
 
 				_ep.schedule_post_signal_hook(this);
@@ -442,8 +442,8 @@ class Vfs::Fs_file_system : public File_system
 					{
 						Lock::Guard list_guard(_list_lock);
 
-						context = _context_list.first();
-						_context_list.remove(context);
+						context = _io_handle_list.first();
+						_io_handle_list.remove(context);
 
 						if (!context && _notify_all) {
 							notify_all  = true;
@@ -465,9 +465,9 @@ class Vfs::Fs_file_system : public File_system
 					{
 						Lock::Guard list_guard(_list_lock);
 
-						context = _watch_context_list.first();
+						context = _watch_handle_list.first();
 						if (!context) break;
-						_watch_context_list.remove(context);
+						_watch_handle_list.remove(context);
 						_watch_handler.handle_watch_response(context->context());
 					}
 				}
@@ -476,13 +476,13 @@ class Vfs::Fs_file_system : public File_system
 			void disarm(Fs_vfs_handle &handle)
 			{
 				Lock::Guard list_guard(_list_lock);
-				_context_list.remove(&handle);
+				_io_handle_list.remove(&handle);
 			}
 
 			void disarm(Fs_vfs_watch_handle &handle)
 			{
 				Lock::Guard list_guard(_list_lock);
-				_watch_context_list.remove(&handle);
+				_watch_handle_list.remove(&handle);
 			}
 		};
 
