@@ -125,12 +125,12 @@ class Vfs::Dir_file_system : public File_system
 			}
 
 			/**
-			 * Propagate the handle context to each sub-handle
+			 * Propagate the response handler to each sub-handle
 			 */
-			void context(Context *ctx) override
+			void handler(Response_handler *h) override
 			{
 				handle_registry.for_each( [&] (Watch_handle_element &elem) {
-					elem.watch_handle.context(ctx); } );
+					elem.watch_handle.handler(h); } );
 			}
 		};
 
@@ -312,8 +312,8 @@ class Vfs::Dir_file_system : public File_system
 					index = index - base;
 					vfs_handle.seek(index * sizeof(Dirent));
 
-					/* forward the handle context */
-					vfs_handle.context(dir_vfs_handle->context());
+					/* forward the response handler */
+					vfs_handle.handler(dir_vfs_handle->handler());
 
 					result = vfs_handle.fs().queue_read(&vfs_handle, sizeof(Dirent));
 				}
@@ -956,8 +956,8 @@ class Vfs::Dir_file_system : public File_system
 				static_cast<Dir_vfs_handle*>(vfs_handle);
 
 			auto f = [&result, dir_vfs_handle] (Dir_vfs_handle::Subdir_handle_element &e) {
-				/* forward the handle context */
-				e.vfs_handle.context(dir_vfs_handle->context());
+				/* forward the response handler */
+				e.vfs_handle.handler(dir_vfs_handle->handler());
 				e.synced = false;
 
 				if (!e.vfs_handle.fs().queue_sync(&e.vfs_handle)) {

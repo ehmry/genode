@@ -223,12 +223,13 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 		/* FIXME error cleanup code leaks resources! */
 
 		if (!fd) {
+			handle->close();
 			errno = EMFILE;
 			return nullptr;
 		}
 
+		handle->handler(&_response_handler);
 		fd->flags = flags & O_ACCMODE;
-
 		return fd;
 	}
 
@@ -302,10 +303,12 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 	/* FIXME error cleanup code leaks resources! */
 
 	if (!fd) {
+		handle->close();
 		errno = EMFILE;
 		return nullptr;
 	}
 
+	handle->handler(&_response_handler);
 	fd->flags = flags & (O_ACCMODE|O_NONBLOCK|O_APPEND);
 
 	if ((flags & O_TRUNC) && (ftruncate(fd, 0) == -1)) {
@@ -954,6 +957,8 @@ int Libc::Vfs_plugin::symlink(const char *oldpath, const char *newpath)
 		return Errno(EPERM);
 	}
 
+	handle->handler(&_response_handler);
+
 	Vfs::file_size count = ::strlen(oldpath) + 1;
 	Vfs::file_size out_count  = 0;
 
@@ -1024,6 +1029,8 @@ ssize_t Libc::Vfs_plugin::readlink(const char *path, char *buf, ::size_t buf_siz
 	case Vfs::Directory_service::OPENLINK_ERR_PERMISSION_DENIED:
 		return Errno(EACCES);
 	}
+
+	symlink_handle->handler(&_response_handler);
 
 	{
 		struct Check : Libc::Suspend_functor

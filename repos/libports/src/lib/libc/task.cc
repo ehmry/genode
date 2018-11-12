@@ -47,7 +47,7 @@ namespace Libc {
 	class Timer_accessor;
 	class Timeout;
 	class Timeout_handler;
-	class Io_response_handler;
+	class Vfs_response_handler;
 
 	using Genode::Microseconds;
 }
@@ -60,12 +60,6 @@ class Libc::Vfs_env : public Vfs::Env
 		Genode::Env       &_env;
 		Genode::Allocator &_alloc;
 
-		Vfs::Io_response_handler &_io_handler;
-
-		struct Watch_response_stub : Vfs::Watch_response_handler {
-			void handle_watch_response(Vfs::Vfs_watch_handle::Context*) override { };
-		} _watch_stub { };
-
 		Vfs::Global_file_system_factory _global_file_system_factory { _alloc };
 
 		Vfs::Dir_file_system _root_dir;
@@ -74,9 +68,8 @@ class Libc::Vfs_env : public Vfs::Env
 
 		Vfs_env(Genode::Env &env,
 		        Genode::Allocator &alloc,
-		        Genode::Xml_node config,
-		        Vfs::Io_response_handler &io_handler)
-		: _env(env), _alloc(alloc), _io_handler(io_handler),
+		        Genode::Xml_node config)
+		: _env(env), _alloc(alloc),
 		  _root_dir(*this, config, _global_file_system_factory)
 		{ }
 
@@ -85,12 +78,6 @@ class Libc::Vfs_env : public Vfs::Env
 		Genode::Allocator &alloc() override { return _alloc; }
 
 		Vfs::File_system &root_dir() override { return _root_dir; }
-
-		Vfs::Io_response_handler &io_handler() override {
-			return _io_handler; }
-
-		Vfs::Watch_response_handler &watch_handler() override {
-			return _watch_stub; }
 };
 
 
@@ -134,11 +121,10 @@ class Libc::Env_implementation : public Libc::Env
 
 	public:
 
-		Env_implementation(Genode::Env &env, Genode::Allocator &alloc,
-		                   Vfs::Io_response_handler &io_response_handler)
+		Env_implementation(Genode::Env &env, Genode::Allocator &alloc)
 		:
 			_env(env), _file_system_factory(alloc),
-			_vfs_env(_env, alloc, _vfs_config(), io_response_handler)
+			_vfs_env(_env, alloc, _vfs_config())
 		{ }
 
 
@@ -386,9 +372,13 @@ struct Libc::Pthreads
 
 extern void (*libc_select_notify)();
 
-struct Libc::Io_response_handler : Vfs::Io_response_handler
+
+/**
+ * Global VFS I/O response handler
+ */
+struct Libc::Vfs_response_handler : Vfs::Response_handler
 {
-	void handle_io_response(Vfs::Vfs_handle::Context *) override
+	void notify() override
 	{
 		/* some contexts may have been deblocked from select() */
 		if (libc_select_notify)
@@ -421,9 +411,10 @@ struct Libc::Kernel
 
 		Genode::Env         &_env;
 		Genode::Allocator   &_heap;
-		Io_response_handler  _io_response_handler;
-		Env_implementation   _libc_env { _env, _heap, _io_response_handler };
-		Vfs_plugin           _vfs { _libc_env, _heap };
+		Libc::Vfs_response_handler  _io_response_handler;
+		Env_implementation          _libc_env { _env, _heap };
+		Vfs_plugin                  _vfs { _libc_env, _heap,
+		                                   _io_response_handler };
 
 		Genode::Reconstructible<Genode::Io_signal_handler<Kernel>> _resume_main_handler {
 			_env.ep(), *this, &Kernel::_resume_main };
