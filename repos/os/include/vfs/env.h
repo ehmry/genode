@@ -34,10 +34,6 @@ struct Vfs::Env : Interface
 	 * VFS root file-system
 	 */
 	virtual File_system &root_dir() = 0;
-
-	virtual Io_response_handler &io_handler() = 0;
-
-	virtual Watch_response_handler &watch_handler() = 0;
 };
 
 #endif /* _INCLUDE__VFS__ENV_H_ */

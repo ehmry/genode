@@ -21,18 +21,22 @@ namespace Vfs{
 	class File_io_service;
 	class File_system;
 	class Vfs_watch_handle;
+	struct Response_handler;
 }
+
+
+/**
+ * Object for encapsulating application-level
+ * handlers of VFS responses.
+ */
+struct Vfs::Response_handler : Genode::Interface
+{
+	virtual void notify() = 0;
+};
 
 
 class Vfs::Vfs_handle
 {
-	public:
-
-		/**
-		 * Opaque handle context
-		 */
-		struct Context { };
-
 	private:
 
 		Directory_service &_ds;
@@ -40,7 +44,7 @@ class Vfs::Vfs_handle
 		Genode::Allocator &_alloc;
 		int                _status_flags;
 		file_size          _seek = 0;
-		Context           *_context = nullptr;
+		Response_handler  *_handler = nullptr;
 
 		/*
 		 * Noncopyable
@@ -90,11 +94,8 @@ class Vfs::Vfs_handle
 		Directory_service &ds() { return _ds; }
 		File_io_service   &fs() { return _fs; }
 		Allocator      &alloc() { return _alloc; }
-		void context(Context *context) { _context = context; }
-		Context *context() const { return _context; }
 
 		int status_flags() const { return _status_flags; }
-
 		void status_flags(int flags) { _status_flags = flags; }
 
 		/**
@@ -113,6 +114,29 @@ class Vfs::Vfs_handle
 		void advance_seek(file_size incr) { _seek += incr; }
 
 		/**
+		 * Set response handler, unset with nullptr
+		 */
+		virtual void handler(Response_handler *handler)
+		{
+			_handler = handler;
+		}
+
+		/**
+		 * Get response handler, may be nullptr
+		 */
+		Response_handler *handler() const {
+			return _handler; }
+
+		/**
+		 * Notify application through response handler
+		 */
+		void notify()
+		{
+			if (_handler)
+				_handler->notify();
+		}
+
+		/**
 		 * Close handle at backing file-system.
 		 *
 		 * This leaves the handle pointer in an invalid and unsafe state.
@@ -123,18 +147,11 @@ class Vfs::Vfs_handle
 
 class Vfs::Vfs_watch_handle
 {
-	public:
-
-		/**
-		 * Opaque handle context
-		 */
-		struct Context { };
-
 	private:
 
 		Directory_service &_fs;
 		Genode::Allocator &_alloc;
-		Context           *_context = nullptr;
+		Response_handler  *_handler = nullptr;
 
 		/*
 		 * Noncopyable
@@ -154,8 +171,27 @@ class Vfs::Vfs_watch_handle
 
 		Directory_service &fs() { return _fs; }
 		Allocator &alloc() { return _alloc; }
-		virtual void context(Context *context) { _context = context; }
-		Context *context() const { return _context; }
+
+		/**
+		 * Set response handler, unset with nullptr
+		 */
+		virtual void handler(Response_handler *handler) {
+			_handler = handler; }
+
+		/**
+		 * Get response handler, may be nullptr
+		 */
+		Response_handler *handler() const {
+			return _handler; }
+
+		/**
+		 * Notify application through response handler
+		 */
+		void notify()
+		{
+			if (_handler)
+				_handler->notify();
+		}
 
 		/**
 		 * Close handle at backing file-system.

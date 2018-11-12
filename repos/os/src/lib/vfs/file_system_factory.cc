@@ -32,9 +32,6 @@
 
 
 namespace Vfs {
-
-	using Vfs::Io_response_handler;
-
 	template <typename> struct Builtin_entry;
 	struct External_entry;
 }

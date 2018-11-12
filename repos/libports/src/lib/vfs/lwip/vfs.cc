@@ -243,8 +243,6 @@ struct Lwip::Lwip_file_handle final : Lwip_handle, private Lwip_handle_list::Ele
 
 	Kind kind;
 
-	bool notify = false;
-
 	void print(Genode::Output &output) const;
 
 	Lwip_file_handle(Vfs::File_system &fs, Allocator &alloc, int status_flags,
@@ -275,8 +273,6 @@ struct Lwip::Socket_dir : Lwip::Directory
 
 		Genode::Allocator &alloc;
 
-		Vfs::Io_response_handler &io_handler;
-
 		unsigned    const _num;
 		Socket_name const _name { name_from_num(_num) };
 
@@ -293,8 +289,8 @@ struct Lwip::Socket_dir : Lwip::Directory
 			CLOSED
 		};
 
-		Socket_dir(unsigned num, Genode::Allocator &alloc, Vfs::Io_response_handler &io_handler)
-		: alloc(alloc), io_handler(io_handler), _num(num) { };
+		Socket_dir(unsigned num, Genode::Allocator &alloc)
+		: alloc(alloc), _num(num) { };
 
 
 		~Socket_dir()
@@ -368,9 +364,8 @@ struct Lwip::Socket_dir : Lwip::Directory
 			for (Lwip::Lwip_file_handle *h = handles.first();
 			     h; h = h->next())
 			{
-				if (h->kind & mask) {
-					io_handler.handle_io_response(h->context());
-				}
+				if (h->kind & mask)
+					h->notify();
 			}
 		}
 
@@ -457,9 +452,8 @@ class Lwip::Protocol_dir_impl final : public Protocol_dir
 {
 	private:
 
-		Genode::Allocator        &_alloc;
-		Vfs::Io_response_handler &_io_handler;
-		Genode::Entrypoint       &_ep;
+		Genode::Allocator  &_alloc;
+		Genode::Entrypoint &_ep;
 
 		Genode::List<SOCKET_DIR> _socket_dirs { };
 
@@ -472,7 +466,7 @@ class Lwip::Protocol_dir_impl final : public Protocol_dir
 		friend class Udp_socket_dir;
 
 		Protocol_dir_impl(Vfs::Env &vfs_env)
-		: _alloc(vfs_env.alloc()), _io_handler(vfs_env.io_handler()), _ep(vfs_env.env().ep()) { }
+		: _alloc(vfs_env.alloc()), _ep(vfs_env.env().ep()) { }
 
 		SOCKET_DIR *lookup(char const *name)
 		{
@@ -581,7 +575,7 @@ class Lwip::Protocol_dir_impl final : public Protocol_dir
 			}
 
 			SOCKET_DIR *new_socket = new (alloc)
-				SOCKET_DIR(id, *this, alloc, _io_handler, _ep, pcb);
+				SOCKET_DIR(id, *this, alloc, _ep, pcb);
 			_socket_dirs.insert(new_socket);
 			return *new_socket;
 		}
@@ -736,10 +730,9 @@ class Lwip::Udp_socket_dir final :
 
 		Udp_socket_dir(unsigned num, Udp_proto_dir &proto_dir,
 		               Genode::Allocator &alloc,
-		               Vfs::Io_response_handler &io_handler,
 		               Genode::Entrypoint &,
 		               udp_pcb *pcb)
-		: Socket_dir(num, alloc, io_handler),
+		: Socket_dir(num, alloc),
 		  _proto_dir(proto_dir), _pcb(pcb ? pcb : udp_new())
 		{
 			ip_addr_set_zero(&_to_addr);
@@ -1025,10 +1018,9 @@ class Lwip::Tcp_socket_dir final :
 
 		Tcp_socket_dir(unsigned num, Tcp_proto_dir &proto_dir,
 		               Genode::Allocator &alloc,
-		               Vfs::Io_response_handler &io_handler,
 		               Genode::Entrypoint &ep,
 		               tcp_pcb *pcb)
-		: Socket_dir(num, alloc, io_handler), _proto_dir(proto_dir),
+		: Socket_dir(num, alloc), _proto_dir(proto_dir),
 		  _ep(ep), _pcb(pcb ? pcb : tcp_new()), state(pcb ? READY : NEW)
 		{
 			/* 'this' will be the argument to LwIP callbacks */
@@ -1575,8 +1567,6 @@ class Lwip::File_system final : public Vfs::File_system
 		 */
 		struct Vfs_netif : Lwip::Nic_netif
 		{
-			Vfs::Io_response_handler &io_handler;
-
 			Tcp_proto_dir tcp_dir;
 			Udp_proto_dir udp_dir;
 
@@ -1591,14 +1581,13 @@ class Lwip::File_system final : public Vfs::File_system
 				udp_dir.notify();
 
 				nameserver_handles.for_each([&] (Lwip_nameserver_handle &h) {
-					io_handler.handle_io_response(h.context()); });
+					h.notify(); });
 			}
 
 			Vfs_netif(Vfs::Env &vfs_env,
-			          Genode::Xml_node config,
-			          Vfs::Io_response_handler &io)
+			          Genode::Xml_node config)
 			: Lwip::Nic_netif(vfs_env.env(), vfs_env.alloc(), config),
-			  io_handler(io), tcp_dir(vfs_env), udp_dir(vfs_env)
+			  tcp_dir(vfs_env), udp_dir(vfs_env)
 			{ }
 		} _netif;
 
@@ -1623,7 +1612,7 @@ class Lwip::File_system final : public Vfs::File_system
 	public:
 
 		File_system(Vfs::Env &vfs_env, Genode::Xml_node config)
-		: _ep(vfs_env.env().ep()), _netif(vfs_env, config, vfs_env.io_handler())
+		: _ep(vfs_env.env().ep()), _netif(vfs_env, config)
 		{ }
 
 		/**

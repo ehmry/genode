@@ -81,20 +81,24 @@ class Vfs_audit::File_system : public Vfs::File_system
 			Handle(Handle const &);
 			Handle &operator = (Handle const &);
 
-			Absolute_path const path;
 			Vfs_handle *audit = nullptr;
 
-			void sync_state()
-			{
-				audit->seek(Vfs_handle::seek());
-				audit->context = context;
-			}
+			Absolute_path const path;
 
 			Handle(Vfs_audit::File_system &fs,
 			       Genode::Allocator &alloc,
 			       int flags,
 			       char const *path)
 			: Vfs_handle(fs, fs, alloc, flags), path(path) { };
+
+			void handler(Response_handler *rh) override
+			{
+				Vfs_handle::handler(rh);
+				if (audit) audit->handler(rh);
+			}
+
+			void sync_state() {
+				audit->seek(Vfs_handle::seek()); }
 		};
 
 	public:
