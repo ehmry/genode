@@ -23,13 +23,18 @@ import_from_depot \
 	genodelabs/src/[base_src] \
 	genodelabs/src/init \
 	genodelabs/src/rtc_drv \
+	genodelabs/pkg/terminal \
 
 source ${genode_dir}/repos/base/run/platform_drv.inc
 
 set build_components {
+	app/log_core
+	drivers/framebuffer
+	drivers/input/dummy
 	drivers/nic
 	drivers/rtc
 	lib/solo5
+	server/terminal_log
 }
 
 append_platform_drv_build_components
@@ -44,6 +49,12 @@ proc gpio_drv { } { if {[have_spec rpi] && [have_spec hw]}  { return hw_gpio_drv
 lappend_if [have_spec gpio] build_components drivers/gpio
 
 build $build_components
+
+set fb_drv "fb_drv"
+
+if {[have_include "image/uefi"]} {
+	set fb_drv "fb_boot_drv"
+}
 
 append config {
 <config>
@@ -89,16 +100,53 @@ append config {
 		<resource name="RAM" quantum="32M"/>
 		<config> <nic/> <rtc/> </config>
 	</start>
+
+	<start name="} $fb_drv {" caps="200">
+		<resource name="RAM" quantum="32M"/>
+		<provides><service name="Framebuffer"/></provides>
+	</start>
+	<start name="dummy_input_drv">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="Input"/></provides>
+	</start>
+	<start name="terminal">
+		<resource name="RAM" quantum="2M"/>
+		<provides><service name="Terminal"/></provides>
+		<route>
+			<service name="ROM" label="config"> <parent label="terminal.config"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+	<start name="terminal_log">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="LOG"/></provides>
+	</start>
+	<start name="log_core">
+		<resource name="RAM" quantum="10M"/>
+		<config period_ms="2000"/>
+		<route>
+			<service name="ROM" unscoped_label="log_core"> <parent/> </service>
+			<service name="ROM" unscoped_label="ld.lib.so"> <parent/> </service>
+			<service name="ROM" label="log"> <parent label="core_log"/> </service>
+			<service name="LOG"> <child name="terminal_log" label="core_log"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
 </config>
 }
 
 install_config $config
 
-set boot_modules {
+append boot_modules {
+	dummy_input_drv
+	log_core
+	terminal_log
 	mirage
 	rtc_drv
 	solo5.lib.so
 }
+
+append boot_modules " $fb_drv"
 
 # platform-specific modules
 append_platform_drv_boot_modules
@@ -109,7 +157,7 @@ lappend_if [have_spec gpio] boot_modules [gpio_drv]
 
 build_boot_image $boot_modules
 
-append qemu_args " -nographic -net user"
+append qemu_args " -net user"
 
 append_if [have_spec x86]     qemu_args " -net nic,model=e1000 "
 append_if [have_spec lan9118] qemu_args " -net nic,model=lan9118 "
