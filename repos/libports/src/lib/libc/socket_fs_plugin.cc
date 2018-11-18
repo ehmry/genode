@@ -765,6 +765,9 @@ extern "C" int socket_fs_setsockopt(int libc_fd, int level, int optname,
 		case SO_REUSEADDR:
 			/* not yet implemented - always return true */
 			return 0;
+		case SO_KEEPALIVE:
+			Genode::warning("ignoring SO_KEEPALIVE on socket");
+			return 0;
 		default: return Errno(ENOPROTOOPT);
 		}
 
@@ -843,6 +846,16 @@ int Socket_fs::Plugin::fcntl(Libc::File_descriptor *fd, int cmd, long arg)
 	if (!context) return Errno(EBADF);
 
 	switch (cmd) {
+	case F_SETFD:
+		switch (arg) {
+		case FD_CLOEXEC:
+			Genode::warning("ignoring FD_CLOEXEC on socket");
+			return 0;
+		default:
+		Genode::error(__func__, " F_SETFD ", arg, " not supported on sockets");
+			break;
+		}
+		break;
 	case F_GETFL:
 		return context->fd_flags();
 	case F_SETFL:
@@ -850,8 +863,10 @@ int Socket_fs::Plugin::fcntl(Libc::File_descriptor *fd, int cmd, long arg)
 		return 0;
 	default:
 		Genode::error(__func__, " command ", cmd, " not supported on sockets");
-		return Errno(EINVAL);
+		break;
 	}
+	return Errno(EINVAL);
+	
 }
 
 ssize_t Socket_fs::Plugin::read(Libc::File_descriptor *fd, void *buf, ::size_t count)
