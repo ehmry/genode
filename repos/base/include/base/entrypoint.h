@@ -100,10 +100,11 @@ class Genode::Entrypoint : Noncopyable
 
 		void _execute_post_signal_hook()
 		{
-			if (_post_signal_hook != nullptr)
-				_post_signal_hook->function();
-
-			_post_signal_hook = nullptr;
+			while (_post_signal_hook != nullptr) {
+				Post_signal_hook *psh = _post_signal_hook;
+				_post_signal_hook = nullptr;
+				psh->function();
+			}
 		}
 
 		/*
