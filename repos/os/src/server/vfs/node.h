@@ -134,9 +134,13 @@ class Vfs_server::Node : public  File_system::Node_base,
 };
 
 class Vfs_server::Io_node : public Vfs_server::Node,
-                            public Vfs::Response_handler
+                            public Vfs::Response_handler,
+                            private Genode::List<Io_node>::Element
 {
 	public:
+
+		friend Genode::List<Io_node>;
+		using  Genode::List<Io_node>::Element::next;
 
 		enum Op_state { IDLE, READ_QUEUED, SYNC_QUEUED };
 
@@ -300,7 +304,8 @@ class Vfs_server::Io_node : public Vfs_server::Node,
 
 
 class Vfs_server::Watch_node final : public Vfs_server::Node,
-                                     public Vfs::Response_handler
+                                     public Vfs::Response_handler,
+                                     private Genode::List<Watch_node>::Element
 {
 	private:
 
@@ -313,6 +318,9 @@ class Vfs_server::Watch_node final : public Vfs_server::Node,
 		Vfs::Vfs_watch_handle &_watch_handle;
 
 	public:
+
+		friend Genode::List<Watch_node>;
+		using  Genode::List<Watch_node>::Element::next;
 
 		Watch_node(Node_space &space,  char const *path,
 		           Vfs::Vfs_watch_handle &handle,

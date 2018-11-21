@@ -12,6 +12,8 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
+#include <base/debug.h>
+
 /* Genode includes */
 #include <base/component.h>
 #include <base/registry.h>
@@ -26,6 +28,34 @@
 /* Local includes */
 #include "assert.h"
 #include "node.h"
+
+struct Recursion_marker
+{
+	int count = 0;
+
+	char const *name;
+
+	Recursion_marker(char const *s) : name(s) { }
+
+	struct Guard
+	{
+		Recursion_marker &_marker;
+
+		Guard(Recursion_marker &marker) : _marker(marker)
+		{
+			if (_marker.count > 0)
+				Genode::error(_marker.name, " entering recursion level ", _marker.count);
+			_marker.count++;
+		}
+
+		~Guard()
+		{
+			_marker.count--;
+			if (_marker.count > 0)
+				Genode::error(_marker.name, " leavinging recursion level ", _marker.count);
+		}
+	};
+};
 
 
 namespace Vfs_server {
@@ -49,7 +79,8 @@ namespace Vfs_server {
 
 
 class Vfs_server::Session_component : public File_system::Session_rpc_object,
-                                      public Session_io_handler
+                                      public Session_io_handler,
+                                      public Genode::Entrypoint::Post_signal_hook
 {
 	private:
 
@@ -63,6 +94,104 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 		Genode::Io_signal_handler<Session_component> _process_packet_handler;
 
 		Vfs::File_system &_vfs;
+
+		/**
+		 * Class for deferring packet responses to I/O signals received in the VFS
+		 */
+		//struct Post_io_hook final : Session_io_handler,
+		//                            Genode::Entrypoint::Post_signal_hook
+		//{
+			Genode::Entrypoint &ep;
+
+			::File_system::Session::Tx::Sink &stream;
+
+			/* lists of nodes to process after an I/O signal */
+			Genode::List<Io_node>    io_nodes    { };
+			Genode::List<Watch_node> watch_nodes { };
+
+			//Post_io_hook(Genode::Entrypoint &ep,
+			//             File_system::Session::Tx::Sink &tx_sink)
+			//: ep(ep), stream(tx_sink) { }
+
+
+			/********************************
+			 **  Node_io_handler interface **
+			 ********************************/
+
+			void handle_node_io(Io_node &other) override
+			{
+				ep.schedule_post_signal_hook(this);
+
+				Io_node *node = io_nodes.first();
+				if (node != nullptr) for (;;) {
+					if (node == &other) return;
+					if (node->next() == nullptr) break;
+					node = node->next();
+				}
+
+				io_nodes.insert(&other, node);
+			}
+
+			void handle_node_watch(Watch_node &other) override
+			{
+				ep.schedule_post_signal_hook(this);
+
+				Watch_node *node = watch_nodes.first();
+				if (node != nullptr) for (;;) {
+					if (node == &other) return;
+					if (node->next() == nullptr) break;
+					node = node->next();
+				}
+
+				watch_nodes.insert(&other, node);
+			}
+
+
+			/**********************
+			 ** Post_signal_hook **
+			 **********************/
+
+			Recursion_marker rfunction{"function"};
+			void function() override
+			{
+				Recursion_marker::Guard rg(rfunction);
+				_process_backlog();
+
+				for (Io_node *node = io_nodes.first();
+				     node; node = io_nodes.first())
+				{
+					if (!stream.ready_to_ack()) return;
+
+					if (node->notify_read_ready() && node->read_ready()) {
+						node->notify_read_ready(false);
+
+						Packet_descriptor packet(Packet_descriptor(),
+						                         Node_handle { node->id().value },
+						                         Packet_descriptor::READ_READY,
+						                         0, 0);
+						packet.succeeded(true);
+						stream.acknowledge_packet(packet);
+					}
+
+					io_nodes.remove(node);
+				}
+
+				for (Watch_node *node = watch_nodes.first();
+				     node; node = watch_nodes.first())
+				{
+					if (!stream.ready_to_ack()) return;
+
+					Packet_descriptor packet(Packet_descriptor(),
+					                         Node_handle { node->id().value },
+					                         Packet_descriptor::CONTENT_CHANGED,
+					                         0, 0);
+					stream.acknowledge_packet(packet);
+
+					watch_nodes.remove(node);
+				}
+			}
+
+		//} _post_io_hook;
 
 		/*
 		 * The root node needs be allocated with the session struct
@@ -215,7 +344,6 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				throw Dont_ack();
 
 			case Packet_descriptor::SYNC:
-
 				/**
 				 * Sync the VFS and send any pending signals on the node.
 				 */
@@ -245,8 +373,10 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			return false;
 		}
 
+		Recursion_marker rpb{"_process_backlog"};
 		bool _process_backlog()
 		{
+			Recursion_marker::Guard rg(rpb);
 			/* indicate success if there's no backlog */
 			if (!_backlog_packet.size() &&
 			    (_backlog_packet.operation() != Packet_descriptor::SYNC)) {
@@ -292,8 +422,10 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 		 * Called by signal dispatcher, executed in the context of the main
 		 * thread (not serialized with the RPC functions)
 		 */
+		Recursion_marker rpp { "_process_packets" };
 		void _process_packets()
 		{
+			Recursion_marker::Guard rg(rpp);
 			using namespace Genode;
 
 			/*
@@ -302,9 +434,10 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			 *     was also the case before adding the backlog in case of
 			 *     blocking operations).
 			 */
-			if (!_process_backlog())
+			if (!_process_backlog()) {
 				/* backlog not cleared - block for next condition change */
 				return;
+			}
 
 			/**
 			 * Process packets in batches, otherwise a client that
@@ -332,8 +465,9 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				 * of the main thread. The main thread is however needed
 				 * for receiving any subsequent 'ready-to-ack' signals.
 				 */
-				if (!tx_sink()->ready_to_ack())
+				if (!tx_sink()->ready_to_ack()) {
 					return;
+				}
 
 				try {
 					if (!_process_packet())
@@ -400,6 +534,7 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			_alloc(_ram_alloc, env.rm()),
 			_process_packet_handler(env.ep(), *this, &Session_component::_process_packets),
 			_vfs(vfs),
+			ep(env.ep()), stream(*tx_sink()), //_post_io_hook(env.ep(), *tx_sink()),
 			_root_path(root_path),
 			_label(label),
 			_writable(writable)
@@ -430,47 +565,6 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 			_cap_guard.upgrade(caps); }
 
 
-		/********************************
-		 **  Node_io_handler interface **
-		 ********************************/
-
-		void handle_node_io(Io_node &node) override
-		{
-			_process_backlog();
-
-			if (!tx_sink()->ready_to_ack()) {
-				Genode::error(
-					"dropping I/O notfication, congested packet buffer to '", _label, "'");
-			}
-
-			if (node.notify_read_ready() && node.read_ready()
-			 && tx_sink()->ready_to_ack()) {
-				Packet_descriptor packet(Packet_descriptor(),
-				                         Node_handle { node.id().value },
-				                         Packet_descriptor::READ_READY,
-				                         0, 0);
-				packet.succeeded(true);
-				tx_sink()->acknowledge_packet(packet);
-				node.notify_read_ready(false);
-			}
-
-			_process_packets();
-		}
-
-		void handle_node_watch(Watch_node &node) override
-		{
-			if (!tx_sink()->ready_to_ack()) {
-				Genode::error(
-					"dropping watch notfication, congested packet buffer to '", _label, "'");
-			} else {
-				Packet_descriptor packet(Packet_descriptor(),
-				                         Node_handle { node.id().value },
-				                         Packet_descriptor::CONTENT_CHANGED,
-				                         0, 0);
-				tx_sink()->acknowledge_packet(packet);
-			}
-		}
-
 		/***************************
 		 ** File_system interface **
 		 ***************************/
@@ -496,7 +590,7 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 
 			Directory *dir;
 			try { dir = new (_alloc) Directory(_node_space, _vfs, _alloc,
-			                                  *this, path_str, create); }
+			                                   *this, path_str, create); }
 			catch (Out_of_memory) { throw Out_of_ram(); }
 
 			return Dir_handle(dir->id().value);
