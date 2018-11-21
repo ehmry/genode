@@ -127,10 +127,10 @@ class Vfs::Dir_file_system : public File_system
 			/**
 			 * Propagate the response handler to each sub-handle
 			 */
-			void handler(Response_handler *h) override
+			void context(Handle_context *ctx) override
 			{
 				handle_registry.for_each( [&] (Watch_handle_element &elem) {
-					elem.watch_handle.handler(h); } );
+					elem.watch_handle.context(ctx); } );
 			}
 		};
 
@@ -313,7 +313,7 @@ class Vfs::Dir_file_system : public File_system
 					vfs_handle.seek(index * sizeof(Dirent));
 
 					/* forward the response handler */
-					vfs_handle.handler(dir_vfs_handle->handler());
+					vfs_handle.context(dir_vfs_handle->context());
 
 					result = vfs_handle.fs().queue_read(&vfs_handle, sizeof(Dirent));
 				}
@@ -932,18 +932,10 @@ class Vfs::Dir_file_system : public File_system
 			return FTRUNCATE_ERR_NO_PERM;
 		}
 
-		bool read_ready(Vfs_handle *handle) override
-		{
-			if (&handle->fs() == this)
-				return true;
-
-			return handle->fs().read_ready(handle);
-		}
-
 		bool notify_read_ready(Vfs_handle *handle) override
 		{
 			if (&handle->fs() == this)
-				return true;
+				return false;
 
 			return handle->fs().notify_read_ready(handle);
 		}
@@ -957,7 +949,7 @@ class Vfs::Dir_file_system : public File_system
 
 			auto f = [&result, dir_vfs_handle] (Dir_vfs_handle::Subdir_handle_element &e) {
 				/* forward the response handler */
-				e.vfs_handle.handler(dir_vfs_handle->handler());
+				e.vfs_handle.context(dir_vfs_handle->context());
 				e.synced = false;
 
 				if (!e.vfs_handle.fs().queue_sync(&e.vfs_handle)) {

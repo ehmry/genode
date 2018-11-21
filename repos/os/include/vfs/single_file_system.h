@@ -260,17 +260,6 @@ class Vfs::Single_file_system : public File_system
 			return WRITE_ERR_INVALID;
 		}
 
-		bool read_ready(Vfs_handle *vfs_handle) override
-		{
-			Single_vfs_handle *handle =
-				static_cast<Single_vfs_handle*>(vfs_handle);
-
-			if (handle)
-				return handle->read_ready();
-
-			return false;
-		}
-
 		Ftruncate_result ftruncate(Vfs_handle *, file_size) override
 		{
 			return FTRUNCATE_ERR_NO_PERM;

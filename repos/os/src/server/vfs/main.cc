@@ -154,11 +154,6 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 
 				try {
 					_apply(packet.handle(), [&] (Io_node &node) {
-						if (!node.read_ready()) {
-							node.notify_read_ready(true);
-							throw Not_ready();
-						}
-
 						if (node.mode() & READ_ONLY) {
 							res_length = node.read((char *)content, length, seek);
 							/* no way to distinguish EOF from unsuccessful
@@ -199,10 +194,8 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 
 				try {
 					_apply(static_cast<File_handle>(packet.handle().value), [] (File &node) {
-						if (!node.read_ready()) {
-							node.notify_read_ready(true);
-							throw Dont_ack();
-						}
+						node.notify_read_ready(true);
+						throw Dont_ack();
 					});
 					succeeded = true;
 				}
@@ -434,7 +427,7 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 		 **  Node_io_handler interface **
 		 ********************************/
 
-		void handle_node_io(Io_node &node) override
+		void read_ready(Io_node &node) override
 		{
 			_process_backlog();
 
@@ -443,8 +436,7 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 					"dropping I/O notfication, congested packet buffer to '", _label, "'");
 			}
 
-			if (node.notify_read_ready() && node.read_ready()
-			 && tx_sink()->ready_to_ack()) {
+			if (tx_sink()->ready_to_ack()) {
 				Packet_descriptor packet(Packet_descriptor(),
 				                         Node_handle { node.id().value },
 				                         Packet_descriptor::READ_READY,
@@ -454,10 +446,11 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				node.notify_read_ready(false);
 			}
 
+			/* TODO: remove recursion */
 			_process_packets();
 		}
 
-		void handle_node_watch(Watch_node &node) override
+		void notify(Watch_node &node) override
 		{
 			if (!tx_sink()->ready_to_ack()) {
 				Genode::error(

@@ -32,7 +32,10 @@
 #include "libc_errno.h"
 
 
-namespace Libc { class Vfs_plugin; }
+namespace Libc {
+	class  Vfs_plugin;
+	struct Vfs_plugin_context;
+}
 
 
 class Libc::Vfs_plugin : public Libc::Plugin
@@ -41,7 +44,8 @@ class Libc::Vfs_plugin : public Libc::Plugin
 
 		Genode::Allocator     &_alloc;
 		Vfs::File_system      &_root_dir;
-		Vfs::Response_handler &_response_handler;
+
+		Genode::List<Vfs_plugin_context> _notified_contexts { };
 
 		void _open_stdio(Genode::Xml_node const &node, char const *attr,
 		                 int libc_fd, unsigned flags)
@@ -152,11 +156,10 @@ class Libc::Vfs_plugin : public Libc::Plugin
 
 	public:
 
-		Vfs_plugin(Libc::Env             &env,
-		           Genode::Allocator     &alloc,
-		           Vfs::Response_handler &handler)
+		Vfs_plugin(Libc::Env &env,
+		           Genode::Allocator &alloc)
 		:
-			_alloc(alloc), _root_dir(env.vfs()), _response_handler(handler)
+			_alloc(alloc), _root_dir(env.vfs())
 		{
 			using Genode::Xml_node;
 
@@ -179,6 +182,8 @@ class Libc::Vfs_plugin : public Libc::Plugin
 		}
 
 		~Vfs_plugin() final { }
+
+		void read_ready(Vfs_plugin_context&);
 
 		bool supports_access(const char *, int)                override { return true; }
 		bool supports_mkdir(const char *, mode_t)              override { return true; }

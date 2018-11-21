@@ -373,23 +373,6 @@ struct Libc::Pthreads
 extern void (*libc_select_notify)();
 
 
-/**
- * Global VFS I/O response handler
- */
-struct Libc::Vfs_response_handler : Vfs::Response_handler
-{
-	void notify() override
-	{
-		/* some contexts may have been deblocked from select() */
-		if (libc_select_notify)
-			libc_select_notify();
-
-		/* resume all as any context may have been deblocked from blocking I/O */
-		Libc::resume_all();
-	}
-};
-
-
 /* internal utility */
 static void resumed_callback();
 static void suspended_callback();
@@ -411,10 +394,8 @@ struct Libc::Kernel
 
 		Genode::Env         &_env;
 		Genode::Allocator   &_heap;
-		Libc::Vfs_response_handler  _io_response_handler;
 		Env_implementation          _libc_env { _env, _heap };
-		Vfs_plugin                  _vfs { _libc_env, _heap,
-		                                   _io_response_handler };
+		Vfs_plugin                  _vfs { _libc_env, _heap };
 
 		Genode::Reconstructible<Genode::Io_signal_handler<Kernel>> _resume_main_handler {
 			_env.ep(), *this, &Kernel::_resume_main };
@@ -827,6 +808,26 @@ struct Libc::Kernel
 				_switch_to_user();
 			}
 		}
+
+		void arm_post_signal_hook()
+		{
+			struct Io_hook : Genode::Entrypoint::Post_signal_hook
+			{
+				void function() override
+				{
+					/* some contexts may have been deblocked from select() */
+					if (libc_select_notify)
+						libc_select_notify();
+
+					/* resume all as any context may have been deblocked from blocking I/O */
+					Libc::resume_all();
+				};
+			};
+
+			static Io_hook hook { };
+
+			_env.ep().schedule_post_signal_hook(&hook);
+		}
 };
 
 
@@ -946,6 +947,12 @@ Genode::Xml_node Libc::libc_config()
 {
 	return kernel->libc_env().libc_config();
 }
+
+
+void Libc::arm_post_signal_hook()
+{
+	kernel->arm_post_signal_hook();
+};
 
 
 /***************************

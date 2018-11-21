@@ -21,17 +21,28 @@ namespace Vfs{
 	class File_io_service;
 	class File_system;
 	class Vfs_watch_handle;
-	struct Response_handler;
+	struct Handle_context;
 }
 
 
 /**
- * Object for encapsulating application-level
- * handlers of VFS responses.
+ * Object for informing the application of handle state.
  */
-struct Vfs::Response_handler : Genode::Interface
+struct Vfs::Handle_context : Genode::Interface
 {
-	virtual void notify() = 0;
+	/*
+	 * TODO: need we distinguish if this occurs in I/O signal dispatch?
+	 */
+
+	virtual void  read_ready() { };
+	virtual void write_ready() { };
+
+	/**
+	 * Complete the current read or sync operation
+	 */
+	virtual void complete() { Genode::log("no application completion callback"); };
+
+	virtual void   notify() { };
 };
 
 
@@ -44,7 +55,7 @@ class Vfs::Vfs_handle
 		Genode::Allocator &_alloc;
 		int                _status_flags;
 		file_size          _seek = 0;
-		Response_handler  *_handler = nullptr;
+		Handle_context    *_context = nullptr;
 
 		/*
 		 * Noncopyable
@@ -114,26 +125,35 @@ class Vfs::Vfs_handle
 		void advance_seek(file_size incr) { _seek += incr; }
 
 		/**
-		 * Set response handler, unset with nullptr
+		 * Set application context, unset with nullptr
 		 */
-		virtual void handler(Response_handler *handler)
-		{
-			_handler = handler;
-		}
+		virtual void context(Handle_context *context) {
+			_context = context; }
 
 		/**
 		 * Get response handler, may be nullptr
 		 */
-		Response_handler *handler() const {
-			return _handler; }
+		Handle_context *context() const {
+			return _context; }
 
-		/**
-		 * Notify application through response handler
-		 */
-		void notify()
+		inline void read_ready()
 		{
-			if (_handler)
-				_handler->notify();
+			if (_context)
+				_context->read_ready();
+		}
+
+		inline void write_ready()
+		{
+			if (_context)
+				_context->write_ready();
+		}
+
+		inline void context_complete()
+		{
+			if (_context)
+				_context->complete();
+			else
+				Genode::log("application context to complete"); 
 		}
 
 		/**
@@ -151,7 +171,7 @@ class Vfs::Vfs_watch_handle
 
 		Directory_service &_fs;
 		Genode::Allocator &_alloc;
-		Response_handler  *_handler = nullptr;
+		Handle_context   *_context = nullptr;
 
 		/*
 		 * Noncopyable
@@ -173,24 +193,24 @@ class Vfs::Vfs_watch_handle
 		Allocator &alloc() { return _alloc; }
 
 		/**
-		 * Set response handler, unset with nullptr
+		 * Set application context, unset with nullptr
 		 */
-		virtual void handler(Response_handler *handler) {
-			_handler = handler; }
+		virtual void context(Handle_context *context) {
+			_context = context; }
 
 		/**
-		 * Get response handler, may be nullptr
+		 * Get application context, may be nullptr
 		 */
-		Response_handler *handler() const {
-			return _handler; }
+		Handle_context *context() const {
+			return _context; }
 
 		/**
 		 * Notify application through response handler
 		 */
 		void notify()
 		{
-			if (_handler)
-				_handler->notify();
+			if (_context)
+				_context->notify();
 		}
 
 		/**

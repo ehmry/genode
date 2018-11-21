@@ -40,8 +40,8 @@ namespace Vfs_server {
 
 	struct Session_io_handler : Interface
 	{
-		virtual void handle_node_io(Io_node &node) = 0;
-		virtual void handle_node_watch(Watch_node &node) = 0;
+		virtual void read_ready(Io_node &node) = 0;
+		virtual void notify(Watch_node &node) = 0;
 	};
 
 	/**
@@ -134,7 +134,7 @@ class Vfs_server::Node : public  File_system::Node_base,
 };
 
 class Vfs_server::Io_node : public Vfs_server::Node,
-                            public Vfs::Response_handler
+                            public Vfs::Handle_context
 {
 	public:
 
@@ -244,8 +244,6 @@ class Vfs_server::Io_node : public Vfs_server::Node,
 		virtual size_t write(char const * /* src */, size_t /* len */,
 		                     seek_off_t) { return 0; }
 
-		bool read_ready() { return _handle->fs().read_ready(_handle); }
-
 		void notify_read_ready(bool requested)
 		{
 			if (requested)
@@ -290,17 +288,20 @@ class Vfs_server::Io_node : public Vfs_server::Node,
 			return false;
 		}
 
-		/*************************************
-		 ** Vfs::Response_handler interface **
-		 *************************************/
+		/***********************************
+		 ** Vfs::Handle_context interface **
+		 ***********************************/
 
-		void notify() override {
-			_session_io_handler.handle_node_io(*this); }
+		void read_ready() override
+		{
+			if (_notify_read_ready)
+				_session_io_handler.read_ready(*this);
+		}
 };
 
 
 class Vfs_server::Watch_node final : public Vfs_server::Node,
-                                     public Vfs::Response_handler
+                                     public Vfs::Handle_context
 {
 	private:
 
@@ -325,7 +326,7 @@ class Vfs_server::Watch_node final : public Vfs_server::Node,
 			 * set the handler so this Watch object
 			 * is passed back thru the Io_handler
 			 */
-			_watch_handle.handler(this);
+			_watch_handle.context(this);
 		}
 
 		~Watch_node()
@@ -334,12 +335,13 @@ class Vfs_server::Watch_node final : public Vfs_server::Node,
 		}
 
 
-		/*************************************
-		 ** Vfs::Response_handler interface **
-		 *************************************/
+		/***********************************
+		 ** Vfs::Handle_context interface **
+		 ***********************************/
 
-		void notify() override {
-			_session_io_handler.handle_node_watch(*this); }
+/* TODO: reenable with notify is added back to the context interface */
+		void read_ready() override {
+			_session_io_handler.notify(*this); }
 };
 
 
@@ -355,7 +357,7 @@ struct Vfs_server::Symlink : Io_node
 	: Io_node(space, link_path, mode, node_io_handler)
 	{
 		assert_openlink(vfs.openlink(link_path, create, &_handle, alloc));
-		_handle->handler(this);
+		_handle->context(this);
 	}
 
 	~Symlink() { _handle->close(); }
@@ -432,7 +434,7 @@ class Vfs_server::File : public Io_node
 
 			assert_open(vfs.open(file_path, vfs_mode, &_handle, alloc));
 			_leaf_path = vfs.leaf_path(path());
-			_handle->handler(this);
+			_handle->context(this);
 		}
 
 		~File() { _handle->close(); }
@@ -485,7 +487,7 @@ struct Vfs_server::Directory : Io_node
 	: Io_node(space, dir_path, READ_ONLY, node_io_handler)
 	{
 		assert_opendir(vfs.opendir(dir_path, create, &_handle, alloc));
-		_handle->handler(this);
+		_handle->context(this);
 	}
 
 	~Directory() { _handle->close(); }

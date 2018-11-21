@@ -377,7 +377,7 @@ class Vfs::Fs_file_system : public File_system
 			Post_signal_hook(Vfs::Env &env) : _ep(env.env().ep()) { }
 
 			void arm_io_event() {
-				_ep.schedule_post_signal_hook(this); }
+				/* _ep.schedule_post_signal_hook(this); */ }
 
 			void arm_io_event(Fs_vfs_handle &handle)
 			{
@@ -397,7 +397,7 @@ class Vfs::Fs_file_system : public File_system
 					_io_handle_list.insert(&handle);
 				}
 
-				_ep.schedule_post_signal_hook(this);
+				/* _ep.schedule_post_signal_hook(this); */
 			}
 
 			void arm_watch_event(Fs_vfs_watch_handle &handle)
@@ -418,7 +418,7 @@ class Vfs::Fs_file_system : public File_system
 					_watch_handle_list.insert(&handle);
 				}
 
-				_ep.schedule_post_signal_hook(this);
+				/* _ep.schedule_post_signal_hook(this); */
 			}
 
 			void function() override
@@ -433,7 +433,7 @@ class Vfs::Fs_file_system : public File_system
 
 						_io_handle_list.remove(handle);
 					}
-					handle->notify();
+					handle->read_ready();
 				}
 
 				for (;;) {
@@ -577,6 +577,7 @@ class Vfs::Fs_file_system : public File_system
 					case Packet_descriptor::READ:
 						handle.queued_read_packet = packet;
 						handle.queued_read_state  = Handle_state::Queued_state::ACK;
+						handle.context_complete();
 						_post_signal_hook.arm_io_event(handle);
 						break;
 
@@ -591,6 +592,7 @@ class Vfs::Fs_file_system : public File_system
 					case Packet_descriptor::SYNC:
 						handle.queued_sync_packet = packet;
 						handle.queued_sync_state  = Handle_state::Queued_state::ACK;
+						handle.context_complete();
 						_post_signal_hook.arm_io_event(handle);
 						break;
 
@@ -990,13 +992,6 @@ class Vfs::Fs_file_system : public File_system
 			Fs_vfs_handle *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
 
 			return handle->complete_read(dst, count, out_count);
-		}
-
-		bool read_ready(Vfs_handle *vfs_handle) override
-		{
-			Fs_vfs_handle *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
-
-			return handle->read_ready_state == Handle_state::Read_ready_state::READY;
 		}
 
 		bool notify_read_ready(Vfs_handle *vfs_handle) override

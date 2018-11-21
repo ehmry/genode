@@ -74,6 +74,12 @@ namespace Libc {
 	 * Access libc configuration Xml_node.
 	 */
 	Genode::Xml_node libc_config();
+
+	/**
+	 * Schedule the libc kernel to be invoked after the
+	 * current or next I/O signal dispatch.
+	 */
+	void arm_post_signal_hook();
 }
 
 #endif /* _LIBC__TASK_H_ */

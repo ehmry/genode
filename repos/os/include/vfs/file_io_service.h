@@ -73,11 +73,6 @@ struct Vfs::File_io_service : Interface
 	                                  file_size & /* out count */) = 0;
 
 	/**
-	 * Return true if the handle has readable data
-	 */
-	virtual bool read_ready(Vfs_handle *) = 0;
-
-	/**
 	 * Explicitly indicate interest in read-ready for a handle
 	 *
 	 * For example, the file-system-session plugin can then send READ_READY
@@ -85,7 +80,7 @@ struct Vfs::File_io_service : Interface
 	 *
 	 * \return false if notification setup failed
 	 */
-	virtual bool notify_read_ready(Vfs_handle *) { return true; }
+	virtual bool notify_read_ready(Vfs_handle *) { return false; }
 
 
 	/***************

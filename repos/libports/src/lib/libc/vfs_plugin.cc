@@ -54,18 +54,6 @@ static Genode::Lock &vfs_lock()
 })
 
 
-static Vfs::Vfs_handle *vfs_handle(Libc::File_descriptor *fd)
-{
-	return reinterpret_cast<Vfs::Vfs_handle *>(fd->context);
-}
-
-
-static Libc::Plugin_context *vfs_context(Vfs::Vfs_handle *vfs_handle)
-{
-	return reinterpret_cast<Libc::Plugin_context *>(vfs_handle);
-}
-
-
 /**
  * Utility to convert VFS stat struct to the libc stat struct
  *
@@ -92,6 +80,50 @@ static void vfs_stat_to_libc_stat_struct(Vfs::Directory_service::Stat const &src
 static Genode::Xml_node *_config_node;
 
 char const *libc_resolv_path;
+
+
+struct Libc::Vfs_plugin_context : Vfs::Handle_context,
+                                  Libc::Plugin_context,
+                                  Genode::List<Vfs_plugin_context>::Element
+{
+	Libc::Vfs_plugin &plugin;
+	Vfs::Vfs_handle  &handle;
+
+	bool read_ready_received = false;
+
+	Vfs_plugin_context(Vfs_plugin &p, Vfs::Vfs_handle &h)
+	: plugin(p), handle(h) { handle.context(this); }
+
+	~Vfs_plugin_context() { handle.context(nullptr); }
+
+	/* called by the VFS during I/O signals  */
+	void read_ready() override
+	{
+		read_ready_received = true;
+		plugin.read_ready(*this);
+	}
+};
+
+
+static Libc::Vfs_plugin_context *vfs_context(Libc::File_descriptor *fd)
+{
+	return dynamic_cast<Libc::Vfs_plugin_context *>(fd->context);
+}
+
+
+static Vfs::Vfs_handle *vfs_handle(Libc::File_descriptor *fd)
+{
+	if (Libc::Vfs_plugin_context *ctx = vfs_context(fd))
+		return &ctx->handle;
+	return nullptr;
+}
+
+
+void Libc::Vfs_plugin::read_ready(Vfs_plugin_context &ctx)
+{
+	//_notified_contexts.insert(&ctx);
+	Libc::arm_post_signal_hook();
+}
 
 
 namespace Libc {
@@ -155,7 +187,7 @@ namespace Libc {
 		libc_resolv_path = config_nameserver_file();
 	}
 
-	void notify_read_ready(Vfs::Vfs_handle *handle)
+	void notify_read_ready(Vfs::Vfs_handle &handle)
 	{
 		/*
 		 * If this call fails, the VFS plugin is expected to call the IO
@@ -163,20 +195,16 @@ namespace Libc {
 		 * libc IO handler will then call 'notify_read_ready()' again
 		 * via 'select_notify()'.
 		 */
-		VFS_THREAD_SAFE(handle->fs().notify_read_ready(handle));
+		VFS_THREAD_SAFE(handle.fs().notify_read_ready(&handle));
 	}
 
 	bool read_ready(Libc::File_descriptor *fd)
 	{
-		Vfs::Vfs_handle *handle = vfs_handle(fd);
-		if (!handle) return false;
-
-		notify_read_ready(handle);
-
-		return VFS_THREAD_SAFE(handle->fs().read_ready(handle));
+		Vfs_plugin_context *ctx = vfs_context(fd);
+		return ctx ? ctx->read_ready_received : false;
 	}
-
 }
+
 
 int Libc::Vfs_plugin::access(const char *path, int amode)
 {
@@ -217,8 +245,10 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 
 		/* the directory was successfully opened */
 
+		Vfs_plugin_context *ctx = new (_alloc) Vfs_plugin_context(*this, *handle);
+
 		Libc::File_descriptor *fd =
-			Libc::file_descriptor_allocator()->alloc(this, vfs_context(handle), libc_fd);
+			Libc::file_descriptor_allocator()->alloc(this, ctx, libc_fd);
 
 		/* FIXME error cleanup code leaks resources! */
 
@@ -228,7 +258,6 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 			return nullptr;
 		}
 
-		handle->handler(&_response_handler);
 		fd->flags = flags & O_ACCMODE;
 		return fd;
 	}
@@ -297,8 +326,10 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 
 	/* the file was successfully opened */
 
+	Vfs_plugin_context *ctx = new (_alloc) Vfs_plugin_context(*this, *handle);
+
 	Libc::File_descriptor *fd =
-		Libc::file_descriptor_allocator()->alloc(this, vfs_context(handle), libc_fd);
+		Libc::file_descriptor_allocator()->alloc(this, ctx, libc_fd);
 
 	/* FIXME error cleanup code leaks resources! */
 
@@ -308,7 +339,6 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 		return nullptr;
 	}
 
-	handle->handler(&_response_handler);
 	fd->flags = flags & (O_ACCMODE|O_NONBLOCK|O_APPEND);
 
 	if ((flags & O_TRUNC) && (ftruncate(fd, 0) == -1)) {
@@ -454,6 +484,7 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 						                                              count, out_count));
 					retry = false;
 				} catch (Vfs::File_io_service::Insufficient_buffer) {
+					Genode::log("Insufficient_buffer");
 					retry = true;
 				}
 
@@ -491,12 +522,12 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 
 	typedef Vfs::File_io_service::Read_result Result;
 
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
+	Vfs_plugin_context &ctx = *vfs_context(fd);
 
 	if (fd->flags & O_DIRECTORY)
 		return Errno(EISDIR);
 
-	if (fd->flags & O_NONBLOCK && !Libc::read_ready(fd))
+	if (fd->flags & O_NONBLOCK && !ctx.read_ready_received)
 		return Errno(EAGAIN);
 
 	{
@@ -513,9 +544,10 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 			bool suspend() override
 			{
 				retry = !VFS_THREAD_SAFE(handle->fs().queue_read(handle, count));
+				Genode::log("read suspend retry: ", retry);
 				return retry;
 			}
-		} check ( handle, count);
+		} check ( &ctx.handle, count);
 
 		do {
 			Libc::suspend(check);
@@ -552,7 +584,7 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 
 				return retry;
 			}
-		} check ( handle, buf, count, out_count, out_result);
+		} check ( &ctx.handle, buf, count, out_count, out_result);
 
 		do {
 			Libc::suspend(check);
@@ -573,7 +605,7 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 	case Result::READ_QUEUED: /* handled above, so never reached */ break;
 	}
 
-	VFS_THREAD_SAFE(handle->advance_seek(out_count));
+	VFS_THREAD_SAFE(ctx.handle.advance_seek(out_count));
 
 	return out_count;
 }
@@ -957,30 +989,29 @@ int Libc::Vfs_plugin::symlink(const char *oldpath, const char *newpath)
 		return Errno(EPERM);
 	}
 
-	handle->handler(&_response_handler);
-
 	Vfs::file_size count = ::strlen(oldpath) + 1;
 	Vfs::file_size out_count  = 0;
 
 	struct Check : Libc::Suspend_functor
 	{
-		bool             retry { false };
+		Vfs_plugin_context ctx;
 
-		Vfs::Vfs_handle *handle;
 		void const      *buf;
 		::size_t         count;
 		Vfs::file_size  &out_count;
 
-		Check(Vfs::Vfs_handle *handle, void const *buf,
-		      ::size_t count, Vfs::file_size &out_count)
-		: handle(handle), buf(buf), count(count), out_count(out_count)
+		bool             retry { false };
+
+		Check(Vfs_plugin &plugin, Vfs::Vfs_handle &handle,
+		      void const *buf, ::size_t count, Vfs::file_size &out_count)
+		: ctx(plugin, handle), buf(buf), count(count), out_count(out_count)
 		{ }
 
 		bool suspend() override
 		{
 			try {
-				VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf,
-					              count, out_count));
+				VFS_THREAD_SAFE(ctx.handle.fs().write(
+					&ctx.handle, (char const *)buf, count, out_count));
 				retry = false;
 			} catch (Vfs::File_io_service::Insufficient_buffer) {
 				retry = true;
@@ -988,7 +1019,7 @@ int Libc::Vfs_plugin::symlink(const char *oldpath, const char *newpath)
 
 			return retry;
 		}
-	} check ( handle, oldpath, count, out_count);
+	} check ( *this, *handle, oldpath, count, out_count);
 
 	do {
 		Libc::suspend(check);
@@ -1030,27 +1061,28 @@ ssize_t Libc::Vfs_plugin::readlink(const char *path, char *buf, ::size_t buf_siz
 		return Errno(EACCES);
 	}
 
-	symlink_handle->handler(&_response_handler);
-
 	{
 		struct Check : Libc::Suspend_functor
 		{
-			bool             retry { false };
+			Vfs_plugin_context ctx;
 
 			Vfs::Vfs_handle *symlink_handle;
 			::size_t const   buf_size;
 
-			Check(Vfs::Vfs_handle *symlink_handle,
+			bool             retry { false };
+
+			Check(Vfs_plugin &plugin,
+			      Vfs::Vfs_handle &handle,
 			      ::size_t const buf_size)
-			: symlink_handle(symlink_handle), buf_size(buf_size) { }
+			: ctx(plugin, handle), buf_size(buf_size) { }
 
 			bool suspend() override
 			{
 				retry =
-					!VFS_THREAD_SAFE(symlink_handle->fs().queue_read(symlink_handle, buf_size));
+					!VFS_THREAD_SAFE(ctx.handle.fs().queue_read(&ctx.handle, buf_size));
 				return retry;
 			}
-		} check(symlink_handle, buf_size);
+		} check(*this, *symlink_handle, buf_size);
 
 		do {
 			Libc::suspend(check);
@@ -1258,15 +1290,16 @@ int Libc::Vfs_plugin::select(int nfds,
 		if (!fdo || (fdo->plugin != this))
 			continue;
 
-		Vfs::Vfs_handle *handle = vfs_handle(fdo);
-		if (!handle) continue;
+		Vfs_plugin_context *ctx = vfs_context(fdo);
+		if (!ctx) continue;
 
 		if (FD_ISSET(fd, &in_readfds)) {
-			if (VFS_THREAD_SAFE(handle->fs().read_ready(handle))) {
+			if (ctx->read_ready_received) {
+				ctx->read_ready_received = false;
 				FD_SET(fd, readfds);
 				++nready;
 			} else {
-				Libc::notify_read_ready(handle);
+				Libc::notify_read_ready(ctx->handle);
 			}
 		}
 

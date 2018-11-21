@@ -14,6 +14,8 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
+#include <base/debug.h>
+
 /* Genode includes */
 #include <base/env.h>
 #include <base/log.h>
@@ -417,12 +419,44 @@ static int read_sockaddr_in(Socket_fs::Sockaddr_functor &func,
 }
 
 
+static int read_sockaddr_in(int fd, struct sockaddr_in *addr, socklen_t *addrlen)
+{
+	if (!addr)                     return Errno(EFAULT);
+	if (!addrlen || *addrlen <= 0) return Errno(EINVAL);
+
+	Sockaddr_string addr_string;
+	int const n = read(fd, addr_string.base(), addr_string.capacity() - 1);
+	Genode::log("read of socket control file returned ", n);
+
+	if (n < 0) return Errno(errno);
+	if (!n) return -1;
+	if (n >= (int)addr_string.capacity() - 1) return Errno(EINVAL);
+
+	addr_string.terminate(n);
+	addr_string.remove_trailing_newline();
+
+	try {
+		/* convert the address but do not exceed the caller's buffer */
+		sockaddr_in saddr = sockaddr_in_struct(addr_string.host(), addr_string.port());
+		memcpy(addr, &saddr, *addrlen);
+		*addrlen = sizeof(saddr);
+
+		return 0;
+	} catch (Address_conversion_failed) {
+		Genode::warning("IP address conversion failed");
+		return Errno(ENOBUFS);
+	}
+}
+
+
+
 /***********************
  ** Address functions **
  ***********************/
 
 extern "C" int socket_fs_getpeername(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 {
+	PDBG();
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
 
@@ -444,6 +478,7 @@ extern "C" int socket_fs_getpeername(int libc_fd, sockaddr *addr, socklen_t *add
 
 extern "C" int socket_fs_getsockname(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 {
+	PDBG();
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
 
@@ -461,6 +496,7 @@ extern "C" int socket_fs_getsockname(int libc_fd, sockaddr *addr, socklen_t *add
 
 extern "C" int socket_fs_accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 {
+	PDBG();
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
 
@@ -506,16 +542,19 @@ extern "C" int socket_fs_accept(int libc_fd, sockaddr *addr, socklen_t *addrlen)
 
 	if (addr && addrlen) {
 		Socket_fs::Remote_functor func(*accept_context, false);
-		int ret = read_sockaddr_in(func, (sockaddr_in *)addr, addrlen);
+		int ret = read_sockaddr_in(
+			accept_context->remote_fd(), (sockaddr_in *)addr, addrlen);
 		if (ret == -1) return ret;
 	}
 
+	Genode::log("accept returns new socket descriptor ", accept_fd->libc_fd);
 	return accept_fd->libc_fd;
 }
 
 
 extern "C" int socket_fs_bind(int libc_fd, sockaddr const *addr, socklen_t addrlen)
 {
+	PDBG();
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
 
@@ -552,6 +591,7 @@ extern "C" int socket_fs_bind(int libc_fd, sockaddr const *addr, socklen_t addrl
 
 extern "C" int socket_fs_connect(int libc_fd, sockaddr const *addr, socklen_t addrlen)
 {
+	PDBG();
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
 
@@ -587,6 +627,7 @@ extern "C" int socket_fs_connect(int libc_fd, sockaddr const *addr, socklen_t ad
 
 extern "C" int socket_fs_listen(int libc_fd, int backlog)
 {
+	PDBG();
 	Libc::File_descriptor *fd = Libc::file_descriptor_allocator()->find_by_libc_fd(libc_fd);
 	if (!fd) return Errno(EBADF);
 

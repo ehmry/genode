@@ -23,16 +23,23 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 /* PCG includes */
 #include <pcg_variants.h>
 
-enum { NUM_TEST_INTS = 1<<20, BULK_ITERATIONS = 2 };
+enum {
+	NUM_TEST_INTS = 1<<20,
+	BULK_ITERATIONS = 2,
+	PAUSE_US = 200
+};
 
 static uint32_t data[NUM_TEST_INTS];
 
 int test_send(char const *host)
 {
+	struct timespec start, stop;
+
 	usleep(1000000);
 
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -54,6 +61,8 @@ int test_send(char const *host)
 		}
 	}
 
+	clock_gettime(CLOCK_MONOTONIC, &start);
+
 	pcg32_random_t rng = PCG32_INITIALIZER;
 	for (int j = 0; j < BULK_ITERATIONS; ++j) {
 		for (size_t i = 0; i < NUM_TEST_INTS; ++i)
@@ -71,9 +80,18 @@ int test_send(char const *host)
 			}
 			offset += res;
 		}
+
+		usleep(PAUSE_US);
 	}
 
+	clock_gettime(CLOCK_MONOTONIC, &stop);
+
 	fprintf(stderr, "close server\n");
+
+	double delta = (stop.tv_sec - start.tv_sec)
+		+ ((stop.tv_nsec - start.tv_nsec) / (1000*1000*1000.0));
+	fprintf(stderr, "elapsed send time: %.9f\n", delta);
+
 	shutdown(sock, SHUT_RDWR);
 	usleep(10000000);
 
@@ -82,6 +100,8 @@ int test_send(char const *host)
 
 int test_recv()
 {
+	struct timespec start, stop;
+
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock < 0) {
 		perror("`socket` failed");
@@ -118,6 +138,8 @@ int test_recv()
 		inet_ntop(AF_INET, &(addr.sin_addr), string, super_socket_safety);
 		fprintf(stderr, "recv from %s\n", string);
 
+		clock_gettime(CLOCK_MONOTONIC, &start);
+
 		pcg32_random_t rng = PCG32_INITIALIZER;
 		for (int j = 0; j < BULK_ITERATIONS; ++j) {
 
@@ -141,8 +163,15 @@ int test_recv()
 			}
 		}
 
+		clock_gettime(CLOCK_MONOTONIC, &stop);
+
 		fprintf(stderr, "close client\n");
 		shutdown(client, SHUT_RDWR);
+
+		double delta = (stop.tv_sec - start.tv_sec)
+			+ ((stop.tv_nsec - start.tv_nsec) / (1000*1000*1000.0));
+		fprintf(stderr, "elapsed recv time: %.9f\n", delta);
+
 		return 0;
 	}
 }

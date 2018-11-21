@@ -21,9 +21,16 @@
 #   set single_test_build { server/ram_fs test/libc_vfs }
 #   set single_test_modules { ram_fs test-libc_vfs vfs.lib.so }
 #
-set single_test_pkg ""
-set single_test_build { }
-set single_test_modules { }
+set single_test_pkg "test-libc_vfs_fs"
+set single_test_build { test/libc_vfs test/tcp server/vfs lib/vfs/lwip}
+set single_test_modules {
+	libc.lib.so
+	test-libc_vfs
+	test-tcp
+	vfs
+	vfs.lib.so
+	vfs_lwip.lib.so 
+}
 
 #
 # The list of available test packages - was obtained by issuing:

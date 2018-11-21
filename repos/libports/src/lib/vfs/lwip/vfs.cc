@@ -364,8 +364,8 @@ struct Lwip::Socket_dir : Lwip::Directory
 			for (Lwip::Lwip_file_handle *h = handles.first();
 			     h; h = h->next())
 			{
-				if (h->kind & mask)
-					h->notify();
+				if (h->kind & mask) 
+					h->read_ready();
 			}
 		}
 
@@ -1581,7 +1581,7 @@ class Lwip::File_system final : public Vfs::File_system
 				udp_dir.notify();
 
 				nameserver_handles.for_each([&] (Lwip_nameserver_handle &h) {
-					h.notify(); });
+					h.read_ready(); });
 			}
 
 			Vfs_netif(Vfs::Env &vfs_env,
@@ -1782,6 +1782,7 @@ class Lwip::File_system final : public Vfs::File_system
 		bool queue_read(Vfs_handle *, file_size) {
 			return _netif.ready(); }
 
+/*
 		bool read_ready(Vfs_handle *vfs_handle) override
 		{
 			if (Lwip_file_handle *handle = dynamic_cast<Lwip_file_handle*>(vfs_handle)) {
@@ -1789,12 +1790,9 @@ class Lwip::File_system final : public Vfs::File_system
 					return handle->socket->read_ready(*handle);
 			}
 
-			/*
-			 * in this case the polled file is a 'new_socket'
-			 * or a file with no associated socket
-			 */
 			return true;
 		}
+ */
 
 		bool notify_read_ready(Vfs_handle *vfs_handle) override
 		{

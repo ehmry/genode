@@ -62,7 +62,7 @@ class Vfs::Terminal_file_system : public Single_file_system
 				 */
 
 				if (_handle)
-					_handle->notify();
+					_handle->read_ready();
 				_handle = nullptr;
 			}
 
@@ -146,11 +146,6 @@ class Vfs::Terminal_file_system : public Single_file_system
 		                          file_size &out_count) override
 		{
 			return _read(vfs_handle, dst, count, out_count);
-		}
-
-		bool read_ready(Vfs_handle *) override
-		{
-			return _terminal.avail();
 		}
 
 		Ftruncate_result ftruncate(Vfs_handle *, file_size) override
