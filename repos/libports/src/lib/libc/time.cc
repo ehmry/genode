@@ -61,9 +61,14 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts)
 		break;
 	}
 
-	/* component uptime */
-	case CLOCK_MONOTONIC:
-	case CLOCK_UPTIME:
+	/*
+	 * Provide component uptime in all other cases.
+	 * This assumes the application only wants to
+	 * measure a duration and is unconcerned with
+	 * the exact semantics of MONOTONIC, VIRTUAL,
+	 * THREAD_CPUTIME_ID, etc.
+	 */
+	default:
 	{
 		unsigned long us = Libc::current_time().trunc_to_plain_us().value;
 
@@ -72,8 +77,6 @@ int clock_gettime(clockid_t clk_id, struct timespec *ts)
 		break;
 	}
 
-	default:
-		return Libc::Errno(EINVAL);
 	}
 
 	return 0;
