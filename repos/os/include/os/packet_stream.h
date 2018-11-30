@@ -544,7 +544,7 @@ class Genode::Packet_stream_base
 		}
 
 		template<typename CONTENT_TYPE>
-		CONTENT_TYPE *packet_content(Packet_descriptor packet)
+		CONTENT_TYPE *_packet_content(Packet_descriptor packet)
 		{
 			if (!packet.size()) return nullptr;
 
@@ -712,7 +712,7 @@ class Genode::Packet_stream_source : private Packet_stream_base
 		                                             the packet is invalid
 		 */
 		Content_type *packet_content(Packet_descriptor packet) {
-			return Packet_stream_base::packet_content<Content_type>(packet); }
+			return _packet_content<Content_type>(packet); }
 
 		/**
 		 * Apply a functor to packet content, functor is passed
@@ -886,7 +886,7 @@ class Genode::Packet_stream_sink : private Packet_stream_base
 		                                             the packet is invalid
 		 */
 		Content_type *packet_content(Packet_descriptor packet) {
-			return Packet_stream_base::packet_content<Content_type>(packet); }
+			return _packet_content<Content_type>(packet); }
 
 		/**
 		 * Apply a functor to packet content, functor is passed
