@@ -92,7 +92,8 @@ bool Session_component::_send()
 	struct sk_buff *skb = lxc_alloc_skb(packet.size() + HEAD_ROOM, HEAD_ROOM);
 
 	unsigned char *data = lxc_skb_put(skb, packet.size());
-	Genode::memcpy(data, _tx.sink()->packet_content(packet), packet.size());
+	_tx.sink()->apply_payload(packet, [&] (char const *payload, size_t len) {
+		Genode::memcpy(data, payload, len); });
 
 	_tx_data.ndev = _ndev;
 	_tx_data.skb  = skb;
@@ -147,11 +148,11 @@ void Session_component::receive(struct sk_buff *skb)
 
 	try {
 		Nic::Packet_descriptor p = _rx.source()->alloc_packet(s.packet_size + s.frag_size);
-		void *buffer = _rx.source()->packet_content(p);
-		memcpy(buffer, s.packet, s.packet_size);
-
-		if (s.frag_size)
-			memcpy((char *)buffer + s.packet_size, s.frag, s.frag_size);
+		_rx.source()->apply_payload(p, [&] (char *buffer, size_t len) {
+			memcpy(buffer, s.packet, s.packet_size);
+			if (s.frag_size)
+				memcpy((char *)buffer + s.packet_size, s.frag, s.frag_size);
+		});
 
 		_rx.source()->submit_packet(p);
 	} catch (...) {

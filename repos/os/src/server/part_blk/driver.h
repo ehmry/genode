@@ -148,8 +148,9 @@ class Block::Driver
 			_r_list.insert(r);
 
 			if (write)
-				Genode::memcpy(_session.tx()->packet_content(p),
-				               addr, size);
+				_session.tx()->apply_payload(
+					p, [&addr] (char *payload, Genode::size_t len) {
+						Genode::memcpy(payload, addr, len); });
 
 			_session.tx()->submit_packet(p);
 		}

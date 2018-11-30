@@ -165,11 +165,12 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 						}
 
 						if (node.mode() & READ_ONLY) {
-							res_length = node.read(
-								(char *)tx_sink()->packet_content(packet), length, seek);
-							/* no way to distinguish EOF from unsuccessful
-							   reads, both have res_length == 0 */
-							succeeded = true;
+							tx_sink()->apply_payload(packet, [&] (char *payload, size_t) {
+								res_length = node.read(payload, length, seek);
+								/* no way to distinguish EOF from unsuccessful
+								   reads, both have res_length == 0 */
+								succeeded = true;
+							});
 						}
 					});
 				}
@@ -184,17 +185,18 @@ class Vfs_server::Session_component : public File_system::Session_rpc_object,
 				try {
 					_apply(packet.handle(), [&] (Io_node &node) {
 						if (node.mode() & WRITE_ONLY) {
-							res_length = node.write(
-								(char const *)tx_sink()->packet_content(packet), length, seek);
+							tx_sink()->apply_payload(packet, [&] (char const *payload, size_t) {
+								res_length = node.write(payload, length, seek);
 
-							/* File system session can't handle partial writes */
-							if (res_length != length) {
-								Genode::error("partial write detected ",
-								              res_length, " vs ", length);
-								/* don't acknowledge */
-								throw Dont_ack();
-							}
-							succeeded = true;
+								/* File system session can't handle partial writes */
+								if (res_length != length) {
+									Genode::error("partial write detected ",
+									              res_length, " vs ", length);
+									/* don't acknowledge */
+									throw Dont_ack();
+								}
+								succeeded = true;
+							});
 						}
 					});
 				} catch (Operation_incomplete) {

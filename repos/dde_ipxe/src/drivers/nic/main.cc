@@ -66,7 +66,10 @@ class Ipxe_session_component  : public Nic::Session_component
 			}
 
 			if (link_state()) {
-				if (dde_ipxe_nic_tx(1, _tx.sink()->packet_content(packet), packet.size()))
+				int err = 1;
+				_tx.sink()->apply_payload(packet, [&] (char *payload, size_t len) {
+					err = dde_ipxe_nic_tx(1, payload, len); });
+				if (err)
 					Genode::warning("Sending packet failed!");
 			}
 
@@ -83,7 +86,8 @@ class Ipxe_session_component  : public Nic::Session_component
 
 			try {
 				Nic::Packet_descriptor p = _rx.source()->alloc_packet(packet_len);
-				Genode::memcpy(_rx.source()->packet_content(p), packet, packet_len);
+				_rx.source()->apply_payload(p, [&] (char *payload, size_t len) {
+					Genode::memcpy(payload, packet, len); });
 				_rx.source()->submit_packet(p);
 			} catch (...) {
 				Genode::warning(__func__, ": failed to process received packet");

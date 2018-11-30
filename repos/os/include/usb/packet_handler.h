@@ -126,10 +126,9 @@ class Usb::Packet_handler
 				_packet_handler();
 		}
 
-		void *content(Packet_descriptor &p)
-		{
-			return _connection.source()->packet_content(p);
-		}
+		template<typename FUNC>
+		void apply_payload(Packet_descriptor &packet, FUNC const &func) {
+			_connection.source()->apply_payload(packet, func); }
 
 		void release(Packet_descriptor &p)
 		{

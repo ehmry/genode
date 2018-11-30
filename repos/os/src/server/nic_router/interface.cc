@@ -1372,14 +1372,14 @@ void Interface::_handle_arp(Ethernet_frame &eth,
 
 void Interface::_handle_pkt()
 {
-	Packet_descriptor const pkt = _sink.get_packet();
-	Size_guard size_guard(pkt.size());
 	try {
-		_handle_eth(_sink.packet_content(pkt), size_guard, pkt);
+		Packet_descriptor const pkt = _sink.get_packet();
+		_source.apply_payload(pkt, [&] (char *payload, size_t len) {
+		Size_guard size_guard(len);
+			_handle_eth(payload, size_guard, pkt); });
 		_ack_packet(pkt);
 	}
 	catch (Packet_postponed) { }
-	catch (Genode::Packet_descriptor::Invalid_packet) { }
 }
 
 
@@ -1405,16 +1405,15 @@ void Interface::_ready_to_submit()
 void Interface::_continue_handle_eth(Domain            const &domain,
                                      Packet_descriptor const &pkt)
 {
-	Size_guard size_guard(pkt.size());
-	try { _handle_eth(_sink.packet_content(pkt), size_guard, pkt); }
+	try {
+		_sink.apply_payload(pkt, [&] (char *payload, size_t len) {
+			Size_guard size_guard(len);
+			_handle_eth(payload, size_guard, pkt);
+		});
+	}
 	catch (Packet_postponed) {
 		if (domain.verbose_packet_drop()) {
 			log("[", domain, "] drop packet (handling postponed twice)"); }
-	}
-	catch (Genode::Packet_descriptor::Invalid_packet) {
-		if (domain.verbose_packet_drop()) {
-			log("[", domain, "] invalid Nic packet received");
-		}
 	}
 	_ack_packet(pkt);
 }
@@ -1591,8 +1590,9 @@ void Interface::_send_alloc_pkt(Packet_descriptor &pkt,
                                 void            * &pkt_base,
                                 size_t             pkt_size)
 {
-	pkt      = _source.alloc_packet(pkt_size);
-	pkt_base = _source.packet_content(pkt);
+	pkt = _source.alloc_packet(pkt_size);
+	_source.apply_payload(pkt, [&pkt_base] (char *payload, size_t) {
+		pkt_base = payload; });
 }
 
 

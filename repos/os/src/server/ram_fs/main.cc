@@ -72,45 +72,45 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 			/* resulting length */
 			size_t res_length = 0;
 			bool succeeded = false;
+			bool ack = true;
 
 			switch (packet.operation()) {
 
 			case Packet_descriptor::READ:
-				if (packet.length() <= packet.size()) {
+				tx_sink()->apply_payload(packet, [&] (char *payload, size_t) {
 					Locked_ptr<Node> node { open_node.node() };
-					if (!node.valid())
-						break; 
-					res_length = node->read((char *)tx_sink()->packet_content(packet),
-					                        length, packet.position());
+					if (!node.valid()) return; /* from lambda */
+
+					res_length = node->read(payload, length, packet.position());
 
 					/* read data or EOF is a success */
 					succeeded = res_length || (packet.position() >= node->status().size);
-				}
+				});
 				break;
 
 			case Packet_descriptor::WRITE:
-				if (packet.length() <= packet.size()) {
+				tx_sink()->apply_payload(packet, [&] (char const *payload, size_t) {
 					Locked_ptr<Node> node { open_node.node() };
-					if (!node.valid())
-						break; 
-					res_length = node->write((char const *)tx_sink()->packet_content(packet),
-					                         length, packet.position());
+					if (!node.valid()) return; /* from lambda */
+
+					res_length = node->write(payload, length, packet.position());
 
 					/* File system session can't handle partial writes */
 					if (res_length != length) {
 						Genode::error("partial write detected ",
 						              res_length, " vs ", length);
 						/* don't acknowledge */
-						return;
+						ack = false;
 					}
+
 					succeeded = true;
-				}
+				});
 				open_node.mark_as_written();
 				break;
 
 			case Packet_descriptor::CONTENT_CHANGED:
 				Genode::error("CONTENT_CHANGED packets from clients have no effect");
-				return;
+				ack = false;
 
 			case Packet_descriptor::READ_READY:
 				/* not supported */
@@ -128,9 +128,11 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 			}
 			}
 
-			packet.length(res_length);
-			packet.succeeded(succeeded);
-			tx_sink()->acknowledge_packet(packet);
+			if (ack) {
+				packet.length(res_length);
+				packet.succeeded(succeeded);
+				tx_sink()->acknowledge_packet(packet);
+			}
 		}
 
 		void _process_packet()
@@ -139,6 +141,10 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 
 			/* assume failure by default */
 			packet.succeeded(false);
+			if (packet.length() > packet.size()) {
+				tx_sink()->acknowledge_packet(packet);
+				return;
+			}
 
 			auto process_packet_fn = [&] (Open_node &open_node) {
 				_process_packet_op(packet, open_node);
@@ -149,8 +155,6 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 			} catch (Id_space<File_system::Node>::Unknown_id const &) {
 				Genode::error("Invalid_handle");
 				tx_sink()->acknowledge_packet(packet);
-			} catch (Genode::Packet_descriptor::Invalid_packet) {
-				Genode::error("dropping invalid File_system packet");
 			}
 		}
 

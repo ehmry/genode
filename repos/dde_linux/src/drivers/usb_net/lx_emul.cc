@@ -3,6 +3,8 @@
 #include <base/snprintf.h>
 #include <nic_session/nic_session.h>
 #include <util/xml_node.h>
+/* include now and avoid problems with 'min' later */
+#include <os/duration.h>
 
 #include <driver.h>
 #include <lx_emul.h>

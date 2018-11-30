@@ -152,17 +152,18 @@ class Usb::Worker : public Genode::Weak_object<Usb::Worker>
 		 */
 		void _retrieve_string(Packet_descriptor &p)
 		{
-			char *buffer = _sink->packet_content(p);
-			int   length;
+			_sink->apply_payload(p, [&] (char *buffer, size_t len) {
+				int   length;
 
-			if ((length = usb_string(_device->udev, p.string.index, buffer, p.size())) < 0) {
-				warning("Could not read string descriptor index: ", (unsigned)p.string.index);
-				p.string.length = 0;
-			} else {
-				/* returned length is in bytes (char) */
-				p.string.length   = length / 2;
-				p.succeded        = true;
-			}
+				if ((length = usb_string(_device->udev, p.string.index, buffer, len)) < 0) {
+					warning("Could not read string descriptor index: ", (unsigned)p.string.index);
+					p.string.length = 0;
+				} else {
+					/* returned length is in bytes (char) */
+					p.string.length   = length / 2;
+					p.succeded        = true;
+				}
+			});
 		}
 
 		/**
@@ -177,8 +178,9 @@ class Usb::Worker : public Genode::Weak_object<Usb::Worker>
 			                          p.control.value, p.control.index, buf,
 			                          p.size(), p.control.timeout);
 
-			if (err > 0 && p.size())
-				Genode::memcpy(_sink->packet_content(p), buf, err);
+			if (err > 0)
+				_sink->apply_payload(p, [&] (char *payload, size_t len) {
+					Genode::memcpy(payload, buf, err); });
 
 			kfree(buf);
 
@@ -194,8 +196,8 @@ class Usb::Worker : public Genode::Weak_object<Usb::Worker>
 		{
 			void *buf = kmalloc(4096, GFP_NOIO);
 
-			if (p.size())
-				Genode::memcpy(buf, _sink->packet_content(p), p.size());
+			_sink->apply_payload(p, [&] (char *payload, size_t len) {
+				Genode::memcpy(buf, payload, len); });
 
 			int err = usb_control_msg(_device->udev, usb_sndctrlpipe(_device->udev, 0),
 			                          p.control.request, p.control.request_type,
@@ -247,8 +249,9 @@ class Usb::Worker : public Genode::Weak_object<Usb::Worker>
 				p.succeded             = true;
 
 				if (read)
-					Genode::memcpy(_sink->packet_content(p), urb->transfer_buffer, 
-					               urb->actual_length);
+					_sink->apply_payload(p, [&] (char *payload, size_t len) {
+						Genode::memcpy(payload, urb->transfer_buffer, 
+						               urb->actual_length); });
 			}
 
 			if (urb->status == -EPIPE) {
@@ -287,7 +290,8 @@ class Usb::Worker : public Genode::Weak_object<Usb::Worker>
 				pipe = usb_rcvbulkpipe(_device->udev, p.transfer.ep);
 			else {
 				pipe = usb_sndbulkpipe(_device->udev, p.transfer.ep);
-				Genode::memcpy(buf, _sink->packet_content(p), p.size());
+				_sink->apply_payload(p, [&] (char const *payload, size_t len) {
+					Genode::memcpy(buf, payload, len); });
 			}
 
 			urb *bulk_urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -329,7 +333,8 @@ class Usb::Worker : public Genode::Weak_object<Usb::Worker>
 				pipe = usb_rcvintpipe(_device->udev, p.transfer.ep);
 			else {
 				pipe = usb_sndintpipe(_device->udev, p.transfer.ep);
-				Genode::memcpy(buf, _sink->packet_content(p), p.size());
+				_sink->apply_payload(p, [&] (char const *payload, size_t len) {
+					Genode::memcpy(buf, payload, len); });
 			}
 
 			urb *irq_urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -386,7 +391,8 @@ class Usb::Worker : public Genode::Weak_object<Usb::Worker>
 			else {
 				pipe = usb_sndisocpipe(_device->udev, p.transfer.ep);
 				ep   = _device->udev->ep_out[p.transfer.ep & 0x0f];
-				Genode::memcpy(buf, _sink->packet_content(p), p.size());
+				_sink->apply_payload(p, [&] (char const *payload, size_t len) {
+					Genode::memcpy(buf, payload, len); });
 			}
 
 			urb *urb = usb_alloc_urb(p.transfer.number_of_packets, GFP_KERNEL);

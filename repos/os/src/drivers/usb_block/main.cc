@@ -203,95 +203,95 @@ struct Usb::Block_driver : Usb::Completion,
 			}
 
 			int const actual_size = p.transfer.actual_size;
-			char * const data     = reinterpret_cast<char*>(iface.content(p));
+			iface.apply_payload(p, [&] (char const *data, size_t) {
+				using namespace Scsi;
 
-			using namespace Scsi;
+				switch (actual_size) {
+				case Inquiry_response::LENGTH:
+				{
+					Inquiry_response r((addr_t)data);
+					if (verbose_scsi) r.dump();
 
-			switch (actual_size) {
-			case Inquiry_response::LENGTH:
-			{
-				Inquiry_response r((addr_t)data);
-				if (verbose_scsi) r.dump();
+					if (!r.sbc()) {
+						Genode::warning("Device does not use SCSI Block Commands and may not work");
+					}
 
-				if (!r.sbc()) {
-					Genode::warning("Device does not use SCSI Block Commands and may not work");
-				}
-
-				r.get_id<Inquiry_response::Vid>(vendor, sizeof(vendor));
-				r.get_id<Inquiry_response::Pid>(product, sizeof(product));
-				break;
-			}
-			case Capacity_response_10::LENGTH:
-			{
-				Capacity_response_10 r((addr_t)data);
-				if (verbose_scsi) r.dump();
-
-				block_count = r.last_block() + 1;
-				block_size  = r.block_size();
-				break;
-			}
-			case Capacity_response_16::LENGTH:
-			{
-				Capacity_response_16 r((addr_t)data);
-				if (verbose_scsi) r.dump();
-
-				block_count = r.last_block() + 1;
-				block_size  = r.block_size();
-				break;
-			}
-			case Request_sense_response::LENGTH:
-			{
-				Request_sense_response r((addr_t)data);
-				if (verbose_scsi) r.dump();
-
-				uint8_t const asc = r.read<Request_sense_response::Asc>();
-				uint8_t const asq = r.read<Request_sense_response::Asq>();
-
-				enum { MEDIUM_NOT_PRESENT = 0x3a, NOT_READY_TO_READY_CHANGE = 0x28 };
-				switch (asc) {
-				case MEDIUM_NOT_PRESENT:
-					Genode::error("Not ready - medium not present");
-					no_medium = true;
-					break;
-				case NOT_READY_TO_READY_CHANGE: /* asq == 0x00 */
-					Genode::warning("Not ready - try again");
-					try_again = true;
-					break;
-				default:
-					Genode::error("Request_sense_response asc: ",
-					              Hex(asc, Hex::PREFIX, Hex::PAD),
-					              " asq: ", Hex(asq, Hex::PREFIX, Hex::PAD));
+					r.get_id<Inquiry_response::Vid>(vendor, sizeof(vendor));
+					r.get_id<Inquiry_response::Pid>(product, sizeof(product));
 					break;
 				}
-				break;
-			}
-			case Csw::LENGTH:
-			{
-				Csw csw((addr_t)data);
+				case Capacity_response_10::LENGTH:
+				{
+					Capacity_response_10 r((addr_t)data);
+					if (verbose_scsi) r.dump();
 
-				uint32_t const sig = csw.sig();
-				if (sig != Csw::SIG) {
-					Genode::error("CSW signature does not match: ",
-					              Hex(sig, Hex::PREFIX, Hex::PAD));
+					block_count = r.last_block() + 1;
+					block_size  = r.block_size();
 					break;
 				}
+				case Capacity_response_16::LENGTH:
+				{
+					Capacity_response_16 r((addr_t)data);
+					if (verbose_scsi) r.dump();
 
-				uint32_t const   tag = csw.tag();
-				uint8_t const status = csw.sts();
-				if (status != Csw::PASSED) {
-					Genode::error("CSW failed: ", Hex(status, Hex::PREFIX, Hex::PAD),
-					              " tag: ", tag);
+					block_count = r.last_block() + 1;
+					block_size  = r.block_size();
 					break;
 				}
+				case Request_sense_response::LENGTH:
+				{
+					Request_sense_response r((addr_t)data);
+					if (verbose_scsi) r.dump();
 
-				inquiry       |= tag & INQ_TAG;
-				unit_ready    |= tag & RDY_TAG;
-				read_capacity |= tag & CAP_TAG;
-				request_sense |= tag & REQ_TAG;
-				break;
-			}
-			default: break;
-			}
+					uint8_t const asc = r.read<Request_sense_response::Asc>();
+					uint8_t const asq = r.read<Request_sense_response::Asq>();
+
+					enum { MEDIUM_NOT_PRESENT = 0x3a, NOT_READY_TO_READY_CHANGE = 0x28 };
+					switch (asc) {
+					case MEDIUM_NOT_PRESENT:
+						Genode::error("Not ready - medium not present");
+						no_medium = true;
+						break;
+					case NOT_READY_TO_READY_CHANGE: /* asq == 0x00 */
+						Genode::warning("Not ready - try again");
+						try_again = true;
+						break;
+					default:
+						Genode::error("Request_sense_response asc: ",
+						              Hex(asc, Hex::PREFIX, Hex::PAD),
+						              " asq: ", Hex(asq, Hex::PREFIX, Hex::PAD));
+						break;
+					}
+					break;
+				}
+				case Csw::LENGTH:
+				{
+					Csw csw((addr_t)data);
+
+					uint32_t const sig = csw.sig();
+					if (sig != Csw::SIG) {
+						Genode::error("CSW signature does not match: ",
+						              Hex(sig, Hex::PREFIX, Hex::PAD));
+						break;
+					}
+
+					uint32_t const   tag = csw.tag();
+					uint8_t const status = csw.sts();
+					if (status != Csw::PASSED) {
+						Genode::error("CSW failed: ", Hex(status, Hex::PREFIX, Hex::PAD),
+						              " tag: ", tag);
+						break;
+					}
+
+					inquiry       |= tag & INQ_TAG;
+					unit_ready    |= tag & RDY_TAG;
+					read_capacity |= tag & CAP_TAG;
+					request_sense |= tag & REQ_TAG;
+					break;
+				}
+				default: break;
+				}
+			});
 
 			iface.release(p);
 		}
@@ -306,7 +306,8 @@ struct Usb::Block_driver : Usb::Completion,
 		Usb::Interface     &iface = device.interface(active_interface);
 		Usb::Endpoint         &ep = iface.endpoint(ep_out);
 		Usb::Packet_descriptor  p = iface.alloc(CBW_VALID_SIZE);
-		memcpy(iface.content(p), cb, CBW_VALID_SIZE);
+		iface.apply_payload(p, [&] (char *data, size_t) {
+			memcpy(data, cb, CBW_VALID_SIZE); });
 		iface.bulk_transfer(p, ep, block, &c);
 	}
 
@@ -427,8 +428,12 @@ struct Usb::Block_driver : Usb::Completion,
 			 */
 			Usb::Packet_descriptor p = iface.alloc(1);
 			iface.control_transfer(p, 0xa1, 0xfe, 0, active_interface, 100);
-			uint8_t max_lun = *(uint8_t*)iface.content(p);
-			if (p.succeded && max_lun == 0) { max_lun = 1; }
+
+			uint8_t max_lun = 0;
+			iface.apply_payload(p, [&] (char const *data, size_t) {
+				max_lun = *(uint8_t const *)data;
+				if (p.succeded && max_lun == 0) { max_lun = 1; }
+			});
 			iface.release(p);
 
 			/*
@@ -583,7 +588,9 @@ struct Usb::Block_driver : Usb::Completion,
 		Usb::Endpoint          ep = iface.endpoint(req.read ? ep_in : ep_out);
 		Usb::Packet_descriptor  p = iface.alloc(req.size);
 
-		if (!req.read) memcpy(iface.content(p), req.buffer, req.size);
+		if (!req.read)
+			iface.apply_payload(p, [&] (char *payload, size_t) {
+				memcpy(payload, req.buffer, req.size); });
 
 		iface.bulk_transfer(p, ep, false, this);
 
@@ -668,7 +675,8 @@ struct Usb::Block_driver : Usb::Completion,
 			if (req.pending) {
 
 				/* the content was successfully read, get the CSW */
-				memcpy(req.buffer, iface.content(p), actual_size);
+				iface.apply_payload(p, [&] (char const *data, size_t) {
+					memcpy(req.buffer, data, actual_size); });
 				csw(*this);
 			}
 
@@ -680,21 +688,21 @@ struct Usb::Block_driver : Usb::Completion,
 		if (actual_size != Csw::LENGTH)
 			Genode::warning("This is not the actual size you are looking for");
 
-		do {
-			Csw csw((addr_t)iface.content(p));
+		iface.apply_payload(p, [&] (char *payload, size_t) {
+			Csw csw((addr_t)payload);
 
 			uint32_t const sig = csw.sig();
 			if (sig != Csw::SIG) {
 				Genode::error("CSW signature does not match: ",
 				              Hex(sig, Hex::PREFIX, Hex::PAD));
-				break;
+				return; /* from lambda */
 			}
 
 			uint32_t const tag = csw.tag();
 			if (tag != active_tag) {
 				Genode::error("CSW tag mismatch. Got ", tag, " expected: ",
 				              active_tag);
-				break;
+				return; /* from lambda */
 			}
 
 			uint8_t const status = csw.sts();
@@ -702,7 +710,7 @@ struct Usb::Block_driver : Usb::Completion,
 				Genode::error("CSW failed: ", Hex(status, Hex::PREFIX, Hex::PAD),
 				              " read: ", (int)req.read, " buffer: ", (void *)req.buffer,
 				              " lba: ", req.lba, " size: ", req.size);
-				break;
+				return; /* from lambda */
 			}
 
 			uint32_t const dr = csw.dr();
@@ -713,7 +721,7 @@ struct Usb::Block_driver : Usb::Completion,
 			/* ack Block::Packet_descriptor */
 			request_executed = false;
 			ack_pending_request();
-		} while (0);
+		});
 
 		iface.release(p);
 	}

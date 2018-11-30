@@ -148,7 +148,8 @@ class Wifi_session_component : public Nic::Session_component
 			skb->dev = _ndev;
 
 			unsigned char *data = lxc_skb_put(skb, packet.size());
-			Genode::memcpy(data, _tx.sink()->packet_content(packet), packet.size());
+			_tx.sink()->apply_payload(packet, [&] (char const *content, size_t len) {
+				Genode::memcpy(data, content, len); });
 
 			_tx_data.ndev = _ndev;
 			_tx_data.skb  = skb;
@@ -218,11 +219,11 @@ class Wifi_session_component : public Nic::Session_component
 
 			try {
 				Nic::Packet_descriptor p = _rx.source()->alloc_packet(s.packet_size + s.frag_size);
-				void *buffer = _rx.source()->packet_content(p);
-				memcpy(buffer, s.packet, s.packet_size);
-
-				if (s.frag_size)
-					memcpy((char *)buffer + s.packet_size, s.frag, s.frag_size);
+				_rx.source()->apply_payload(p, [&] (char *buffer, size_t len) {
+					memcpy(buffer, s.packet, s.packet_size);
+					if (s.frag_size)
+						memcpy((char *)buffer + s.packet_size, s.frag, s.frag_size);
+				});
 
 				_rx.source()->submit_packet(p);
 			} catch (...) {

@@ -148,17 +148,18 @@ class Linux_session_component : public Nic::Session_component
 				return true;
 			}
 
-			int ret;
-
 			/* non-blocking-write packet to TAP */
-			do {
-				ret = write(_tap_fd, _tx.sink()->packet_content(packet), packet.size());
-				/* drop packet if write would block */
-				if (ret < 0 && errno == EAGAIN)
-					continue;
+			_tx.sink()->apply_payload(packet, [&] (char const *payload, size_t len) {
+				int ret;
+				do {
+					ret = write(_tap_fd, payload, len);
+					/* drop packet if write would block */
+					if (ret < 0 && errno == EAGAIN)
+						continue;
 
-				if (ret < 0) Genode::error("write: errno=", errno);
-			} while (ret < 0);
+					if (ret < 0) Genode::error("write: errno=", errno);
+				} while (ret < 0);
+			});
 
 			_tx.sink()->acknowledge_packet(packet);
 
@@ -177,7 +178,10 @@ class Linux_session_component : public Nic::Session_component
 				p = _rx.source()->alloc_packet(max_size);
 			} catch (Session::Rx::Source::Packet_alloc_failed) { return false; }
 
-			int size = read(_tap_fd, _rx.source()->packet_content(p), max_size);
+			int size = 0;
+			_rx.source()->apply_payload(p, [&] (char *payload, size_t) {
+				size = read(_tap_fd, payload, max_size); });
+
 			if (size <= 0) {
 				_rx.source()->release_packet(p);
 				return false;

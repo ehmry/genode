@@ -67,8 +67,14 @@ struct Block::Partition_table : Genode::Interface
 
 				~Sector() { _session.tx()->release_packet(_p); }
 
-				template <typename T> T addr() {
-					return reinterpret_cast<T>(_session.tx()->packet_content(_p)); }
+				template <typename T> T addr()
+				{
+					T result = 0;
+					_session.tx()->apply_payload(
+						_p, [&result] (char *payload, Genode::size_t) {
+							result = reinterpret_cast<T>(payload); });
+					return result;
+				}
 		};
 
 		Genode::Heap & heap;

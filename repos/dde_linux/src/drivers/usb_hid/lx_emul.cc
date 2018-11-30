@@ -1,6 +1,8 @@
 
 #include <base/env.h>
 #include <usb_session/client.h>
+/* include now and avoid problems with 'min' later */
+#include <os/duration.h>
 
 #include <driver.h>
 #include <lx_emul.h>

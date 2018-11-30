@@ -715,6 +715,20 @@ class Genode::Packet_stream_source : private Packet_stream_base
 			return Packet_stream_base::packet_content<Content_type>(packet); }
 
 		/**
+		 * Apply a functor to packet content, functor is passed
+		 * a pointer to a buffer and the size of buffer.
+		 *
+		 * If the packet does not represent a valid buffer region
+		 * the functor will not be called.
+		 */
+		template<typename FUNC>
+		void apply_payload(Packet_descriptor packet, FUNC const func)
+		{
+			if (Content_type *ptr = _packet_content<Content_type>(packet))
+				func(ptr, packet.size());
+		}
+
+		/**
 		 * Return true if submit queue can hold another packet
 		 */
 		bool ready_to_submit()
@@ -873,6 +887,20 @@ class Genode::Packet_stream_sink : private Packet_stream_base
 		 */
 		Content_type *packet_content(Packet_descriptor packet) {
 			return Packet_stream_base::packet_content<Content_type>(packet); }
+
+		/**
+		 * Apply a functor to packet content, functor is passed
+		 * a pointer to a buffer and the size of buffer.
+		 *
+		 * If the packet does not represent a valid buffer region
+		 * the functor will not be called.
+		 */
+		template<typename FUNC>
+		void apply_payload(Packet_descriptor packet, FUNC const func)
+		{
+			if (Content_type *ptr = _packet_content<Content_type>(packet))
+				func(ptr, packet.size());
+		}
 
 		/**
 		 * Returns true if no further acknowledgements can be submitted

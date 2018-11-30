@@ -209,12 +209,16 @@ struct Write_test : Test
 
 	bool compare(Block::Packet_descriptor &r, Block::Packet_descriptor &w)
 	{
-		signed char *dst = (signed char*)_session.tx()->packet_content(w),
-		            *src = (signed char*)_session.tx()->packet_content(r);
-		for (Genode::size_t i = 0; i < blk_sz; i++)
-			if (dst[i] != src[i])
-				return false;
-		return true;
+		bool result = false;
+		_session.tx()->apply_payload(r, [&] (char const *src, Genode::size_t) {
+			_session.tx()->apply_payload(w, [&] (char *dst, Genode::size_t) {
+				for (Genode::size_t i = 0; i < blk_sz; i++)
+					if (dst[i] != src[i])
+						return;
+				result = true;
+			});
+		});
+		return result;
 	}
 
 	void compare()
@@ -245,10 +249,12 @@ struct Write_test : Test
 			                                                     *blk_sz),
 			                    Block::Packet_descriptor::WRITE,
 			                    r.block_number(), r.block_count());
-			signed char *dst = (signed char*)_session.tx()->packet_content(w),
-			            *src = (signed char*)_session.tx()->packet_content(r);
-			for (Genode::size_t i = 0; i < blk_sz; i++)
-				dst[i] = src[i] + val;
+			_session.tx()->apply_payload(r, [&] (char const *src, Genode::size_t) {
+				_session.tx()->apply_payload(w, [&] (char *dst, Genode::size_t) {
+					for (Genode::size_t i = 0; i < blk_sz; i++)
+						dst[i] = src[i] + val;
+				});
+			});
 			_session.tx()->submit_packet(w);
 			_session.tx()->release_packet(r);
 		}

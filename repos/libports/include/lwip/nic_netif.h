@@ -131,25 +131,21 @@ class Lwip::Nic_netif
 			auto &rx = *_nic.rx();
 
 			while (rx.packet_avail() && rx.ready_to_ack()) {
+				Nic::Packet_descriptor pkt = rx.get_packet();
+				rx.apply_payload(pkt, [&] (char *payload, size_t len) {
+					Nic_netif_pbuf *nic_pbuf = new (_pbuf_alloc)
+						Nic_netif_pbuf(*this, pkt);
 
-				Nic::Packet_descriptor packet = rx.get_packet();
+					pbuf* p = pbuf_alloced_custom(
+						PBUF_RAW, len, PBUF_REF,
+						&nic_pbuf->p, payload, len);
+					LINK_STATS_INC(link.recv);
 
-				Nic_netif_pbuf *nic_pbuf = new (_pbuf_alloc)
-					Nic_netif_pbuf(*this, packet);
-
-				pbuf* p = pbuf_alloced_custom(
-					PBUF_RAW,
-					packet.size(),
-					PBUF_REF,
-					&nic_pbuf->p,
-					rx.packet_content(packet),
-					packet.size());
-				LINK_STATS_INC(link.recv);
-
-				if (_netif.input(p, &_netif) != ERR_OK) {
-					Genode::error("error forwarding Nic packet to lwIP");
-					pbuf_free(p);
-				}
+					if (_netif.input(p, &_netif) != ERR_OK) {
+						Genode::error("error forwarding Nic packet to lwIP");
+						pbuf_free(p);
+					}
+				});
 			}
 		}
 
@@ -317,12 +313,13 @@ class Lwip::Nic_netif
 			 * We iterate over the pbuf chain until we have read the entire
 			 * pbuf into the packet.
 			 */
-			char *dst = tx.packet_content(packet);
-			for(struct pbuf *q = p; q != 0; q = q->next) {
-				char const *src = (char*)q->payload;
-				Genode::memcpy(dst, src, q->len);
-				dst += q->len;
-			}
+			tx.apply_payload(packet, [&] (char *dst, size_t) {
+				for(struct pbuf *q = p; q != 0; q = q->next) {
+					char const *src = (char*)q->payload;
+					Genode::memcpy(dst, src, q->len);
+					dst += q->len;
+				}
+			});
 
 			tx.submit_packet(packet);
 			LINK_STATS_INC(link.xmit);

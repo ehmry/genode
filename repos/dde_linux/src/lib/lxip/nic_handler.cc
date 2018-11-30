@@ -74,9 +74,9 @@ class Nic_client
 			       count++ < MAX_PACKETS)
 			{
 				Nic::Packet_descriptor p = _nic.rx()->get_packet();
-				try { net_driver_rx(_nic.rx()->packet_content(p), p.size()); }
-				catch (Genode::Packet_descriptor::Invalid_packet) {
-					Genode::error("received invalid Nic packet"); }
+				_nic.rx()->apply_payload(
+					p, [] (char *payload, Genode::size_t len) {
+						net_driver_rx(payload, len); });
 				_nic.rx()->acknowledge_packet(p);
 			}
 
@@ -181,9 +181,9 @@ int net_tx(void* addr, unsigned long len)
 {
 	try {
 		Nic::Packet_descriptor packet = _nic_client->nic()->tx()->alloc_packet(len);
-		void* content                 = _nic_client->nic()->tx()->packet_content(packet);
-
-		Genode::memcpy((char *)content, addr, len);
+		_nic_client->nic()->tx()->apply_payload(
+			packet, [&addr] (char *payload, Genode::size_t len) {
+				Genode::memcpy(payload, addr, len); });
 		_nic_client->nic()->tx()->submit_packet(packet);
 
 		return 0;

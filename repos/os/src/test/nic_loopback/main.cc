@@ -148,9 +148,9 @@ struct Test::Roundtrip : Base
 		log("allocated tx packet ", tx_packet);
 
 		/* fill packet with pattern */
-		char *tx_content = nic.tx()->packet_content(tx_packet);
-		for (unsigned i = 0; i < PACKET_SIZE; i++)
-			tx_content[i] = _pattern();
+		nic.tx()->apply_payload(tx_packet, [&] (char *tx_content, size_t) {
+			for (unsigned i = 0; i < PACKET_SIZE; i++)
+				tx_content[i] = _pattern(); });
 
 		if (!nic.tx()->ready_to_submit())
 			abort(__func__, ": submit queue is unexpectedly full");
@@ -199,13 +199,14 @@ struct Test::Roundtrip : Base
 				abort(__func__, ": unexpected offset of received packet");
 
 			/* compare original and echoed packets */
-			char const * const rx_content = nic.rx()->packet_content(rx_packet);
-			for (unsigned i = 0; i < PACKET_SIZE; i++)
-				if (rx_content[i] != _pattern()) {
-					log("rx_content[", i, "]: ", Char(rx_content[i]));
-					log("pattern: ", Char(_pattern()));
-					abort(__func__, ":sent and echoed packets have different content");
-				}
+			nic.rx()->apply_payload(rx_packet, [&] (char const *rx_content, size_t) {
+				for (unsigned i = 0; i < PACKET_SIZE; i++)
+					if (rx_content[i] != _pattern()) {
+						log("rx_content[", i, "]: ", Char(rx_content[i]));
+						log("pattern: ", Char(_pattern()));
+						abort(__func__, ":sent and echoed packets have different content");
+					}
+			});
 
 			if (!nic.rx()->ack_slots_free())
 				abort(__func__, ": acknowledgement queue is unexpectedly full");

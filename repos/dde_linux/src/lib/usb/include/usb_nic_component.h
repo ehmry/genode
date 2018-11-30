@@ -131,8 +131,8 @@ class Usb_nic::Session_component : public Nic::Session_component
 				}
 
 				/* copy packet to current data pos */
-				try { Genode::memcpy(work_skb.data, _tx.sink()->packet_content(packet), packet.size()); }
-				catch (Genode::Packet_descriptor::Invalid_packet) { }
+				_tx.sink()->apply_payload(packet, [&] (char const *content, size_t len) {
+					Genode::memcpy(work_skb.data, content, len); });
 				/* call fixup on dummy SKB */
 				_device->tx_fixup(&work_skb);
 				/* advance to next slot */
@@ -161,7 +161,10 @@ class Usb_nic::Session_component : public Nic::Session_component
 				return true;
 			}
 
-			bool ret = _device->tx((addr_t)_tx.sink()->packet_content(packet), packet.size());
+			bool ret = false;
+
+			_rx.source()->apply_payload(packet, [&] (char *content, size_t len) {
+				ret = _device->tx((addr_t)content, len); });
 			_tx.sink()->acknowledge_packet(packet);
 
 			return ret;
@@ -209,7 +212,8 @@ class Usb_nic::Session_component : public Nic::Session_component
 
 			try {
 				Packet_descriptor p =_rx.source()->alloc_packet(size);
-				Genode::memcpy(_rx.source()->packet_content(p), (void*)virt, size);
+				_rx.source()->apply_payload(p, [&] (char *content, size_t len) {
+					Genode::memcpy(content, (void*)virt, len); });
 				_rx.source()->submit_packet(p);
 			} catch (...) {
 				/* drop */

@@ -67,9 +67,13 @@ struct Main
 			if (!pkt.succeeded()) {
 				throw Read_request_failed(); }
 
-			char const *rom_src = rom.local_addr<char>() + i * blk_sz;
-			if (strcmp(rom_src, src.packet_content(pkt), rom.size())) {
-				throw Files_differ(); }
+			bool consistent = false;
+			src.apply_payload(pkt, [&] (char const *payload, size_t) {
+				char const *rom_src = rom.local_addr<char>() + i * blk_sz;
+				consistent = strcmp(rom_src, payload, rom.size()) == 0;
+			});
+			if (!consistent)
+				throw Files_differ();
 
 			src.release_packet(pkt);
 		}

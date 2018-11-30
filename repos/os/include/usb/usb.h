@@ -254,10 +254,9 @@ class Usb::Interface : public Meta_data
 			_handler.release(p);
 		}
 
-		void *content(Packet_descriptor &p)
-		{
-			return _handler.content(p);
-		}
+		template<typename FUNC>
+		void apply_payload(Packet_descriptor &packet, FUNC const &func) {
+			_handler.apply_payload(packet, func); }
 
 		/******************************
 		 ** Interface to USB service **
@@ -512,7 +511,8 @@ class Usb::Device : public Meta_data
 			p.string.length = 128;
 
 			Sync_completion sync(_handler, p);
-			target->copy(p.string.length, _handler.content(p), _md_alloc);
+			_handler.apply_payload(p, [&] (char *payload, size_t) {
+				target->copy(p.string.length, payload, _md_alloc); });
 		}
 
 		/**

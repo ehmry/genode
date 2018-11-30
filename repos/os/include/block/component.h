@@ -121,10 +121,9 @@ class Block::Session_component : public Block::Session_component_base,
 						                 _rq_phys + packet.offset(),
 						                 _p_to_handle);
 					else
-						_driver.read(packet.block_number(),
-						             packet.block_count(),
-						             tx_sink()->packet_content(packet),
-						             _p_to_handle);
+						tx_sink()->apply_payload(packet, [&] (char *content, size_t) {
+							_driver.read(packet.block_number(), packet.block_count(),
+							             content, _p_to_handle); });
 					break;
 
 				case Block::Packet_descriptor::WRITE:
@@ -138,10 +137,9 @@ class Block::Session_component : public Block::Session_component_base,
 						                  _rq_phys + packet.offset(),
 						                  _p_to_handle);
 					else
-						_driver.write(packet.block_number(),
-						              packet.block_count(),
-						              tx_sink()->packet_content(packet),
-						              _p_to_handle);
+						tx_sink()->apply_payload(packet, [&] (char const *content, size_t) {
+							_driver.write(packet.block_number(), packet.block_count(),
+							              content, _p_to_handle); });
 					break;
 
 				default:
@@ -151,9 +149,6 @@ class Block::Session_component : public Block::Session_component_base,
 				_req_queue_full = true;
 			} catch (Driver::Io_error) {
 				_ack_packet(_p_to_handle);
-			} catch (Genode::Packet_descriptor::Invalid_packet) {
-				_p_to_handle = Packet_descriptor();
-				Genode::error("dropping invalid Block packet");
 			}
 		}
 
