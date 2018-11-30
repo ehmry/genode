@@ -402,10 +402,11 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>
 					return;
 				}
 
-				size_t const n = min(packet.length(), _file_size - _file_seek);
-				memcpy(_file_ds.local_addr<char>()+_file_seek,
-				       _fs.tx()->packet_content(packet), n);
-				_file_seek += n;
+				_fs.tx()->apply_payload(packet, [&] (char const *payload, size_t len) {
+					size_t const n = min(len, _file_size - _file_seek);
+					memcpy(_file_ds.local_addr<char>()+_file_seek, payload, n);
+					_file_seek += n;
+				});
 				return;
 			}
 

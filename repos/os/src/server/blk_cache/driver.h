@@ -182,9 +182,11 @@ class Driver : public Block::Driver
 
 				/* when reading, write result into cache */
 				if (p.operation() == Block::Packet_descriptor::READ)
-					_cache.write(_blk.tx()->packet_content(p),
-					             p.block_count() * _blk_sz,
-					             p.block_number() * _blk_sz);
+					_blk.tx()->apply_payload(p, [&] (char const *payload,
+					                                 Genode::size_t) {
+						_cache.write(payload,
+						             p.block_count()  * _blk_sz,
+						             p.block_number() * _blk_sz); });
 
 				/* loop through the list of requests, and ack all related */
 				for (Request *r = _r_list.first(), *r_to_handle = r; r;

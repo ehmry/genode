@@ -28,8 +28,9 @@ void Packet_handler::_ready_to_submit()
 	/* as long as packets are available, and we can ack them */
 	while (sink()->packet_avail()) {
 		_packet = sink()->get_packet();
-		if (!_packet.size() || !sink()->packet_valid(_packet)) continue;
-		handle_ethernet(sink()->packet_content(_packet), _packet.size());
+		sink()->apply_payload(
+			_packet, [&] (char *payload, Genode::size_t len) {
+				handle_ethernet(payload, len); });
 
 		if (!sink()->ready_to_ack()) {
 			Genode::warning("ack state FULL");
@@ -108,8 +109,9 @@ void Packet_handler::send(Ethernet_frame *eth, Genode::size_t size)
 	try {
 		/* copy and submit packet */
 		Packet_descriptor packet  = source()->alloc_packet(size);
-		char             *content = source()->packet_content(packet);
-		Genode::memcpy((void*)content, (void*)eth, size);
+		source()->apply_payload(
+			packet, [eth] (char *payload, Genode::size_t len) {
+				Genode::memcpy(payload, (void*)eth, len); });
 		source()->submit_packet(packet);
 	} catch(Packet_stream_source< ::Nic::Session::Policy>::Packet_alloc_failed) {
 		Genode::warning("Packet dropped");

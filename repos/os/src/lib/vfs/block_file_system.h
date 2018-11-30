@@ -126,7 +126,8 @@ class Vfs::Block_file_system : public Single_file_system
 					Block::Packet_descriptor p(packet, op, nr, packet_count);
 
 					if (write)
-						Genode::memcpy(_tx_source->packet_content(p), buf, packet_size);
+						_tx_source->apply_payload(p, [&] (char *payload, Genode::size_t len) {
+							Genode::memcpy(payload, buf, Genode::min(len, sz)); });
 
 					_tx_source->submit_packet(p);
 					p = _tx_source->get_acked_packet();
@@ -138,7 +139,8 @@ class Vfs::Block_file_system : public Single_file_system
 					}
 
 					if (!write)
-						Genode::memcpy(buf, _tx_source->packet_content(p), packet_size);
+						_tx_source->apply_payload(p, [&] (char const *payload, Genode::size_t) {
+							Genode::memcpy(buf, payload, sz); });
 
 					_tx_source->release_packet(p);
 					return packet_size;

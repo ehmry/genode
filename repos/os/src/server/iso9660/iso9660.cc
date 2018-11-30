@@ -84,7 +84,13 @@ class Iso::Sector {
 		 * Return address of packet content
 		 */
 		template <typename T>
-		T addr() { return reinterpret_cast<T>(_source.packet_content(_p)); }
+		T addr()
+		{
+			T result = 0;
+			_source.apply_payload(_p, [&result] (char *payload, size_t) {
+				result = reinterpret_cast<T>(payload); });
+			return result;
+		}
 
 		static size_t blk_size() { return BLOCK_SIZE; }
 

@@ -150,12 +150,13 @@ namespace File_system {
 			packet = source.get_acked_packet();
 			success = packet.succeeded();
 
-			size_t const read_num_bytes =
-				Genode::min(packet.length(), curr_packet_size);
+			size_t read_num_bytes = 0;
 
-			/* copy-out payload into destination buffer */
-			Genode::memcpy(dst, source.packet_content(packet), read_num_bytes);
-
+			source.apply_payload(packet, [&] (char const *payload, size_t) {
+				/* copy-out payload into destination buffer */
+				Genode::memcpy(dst, payload, read_num_bytes);
+				read_num_bytes = Genode::min(packet.length(), curr_packet_size);
+			});
 			source.release_packet(packet);
 
 			/* prepare next iteration */
@@ -203,7 +204,8 @@ namespace File_system {
 				       seek_offset);
 
 			/* copy-out source buffer into payload */
-			Genode::memcpy(source.packet_content(packet), src, curr_packet_size);
+			source.apply_payload(packet, [&] (char *payload, size_t) {
+				Genode::memcpy(payload, src, curr_packet_size); });
 
 			/* pass packet to server side */
 			source.submit_packet(packet);

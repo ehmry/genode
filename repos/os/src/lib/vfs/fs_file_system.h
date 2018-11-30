@@ -131,7 +131,8 @@ class Vfs::Fs_file_system : public File_system
 
 				::File_system::Session::Tx::Source &source = *_fs.tx();
 
-				memcpy(dst, source.packet_content(packet), read_num_bytes);
+				source.apply_payload(packet, [&] (char const *payload, Genode::size_t) {
+					memcpy(dst, payload, read_num_bytes); });
 
 				queued_read_state  = Handle_state::Queued_state::IDLE;
 				queued_read_packet = ::File_system::Packet_descriptor();
@@ -510,7 +511,8 @@ class Vfs::Fs_file_system : public File_system
 
 			file_size const read_num_bytes = min(packet_out.length(), count);
 
-			memcpy(buf, source.packet_content(packet_out), read_num_bytes);
+			source.apply_payload(packet_out, [&] (char const *payload, Genode::size_t) {
+				memcpy(buf, payload, read_num_bytes); });
 
 			source.release_packet(packet_out);
 
@@ -536,7 +538,8 @@ class Vfs::Fs_file_system : public File_system
 				                            count,
 				                            seek_offset);
 
-				memcpy(source.packet_content(packet_in), buf, count);
+				source.apply_payload(packet_in, [&] (char *payload, Genode::size_t) {
+					memcpy(payload, buf, count); });
 
 				/* pass packet to server side */
 				source.submit_packet(packet_in);

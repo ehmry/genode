@@ -120,15 +120,10 @@ void Nic_loopback::Session_component::_handle_packet_stream()
 
 		/* obtain packet */
 		Packet_descriptor const packet_from_client = _tx.sink()->get_packet();
-		if (!packet_from_client.size() || !_tx.sink()->packet_valid(packet_from_client)) {
-			warning("received invalid packet");
-			_rx.source()->release_packet(packet_to_client);
-			continue;
-		}
 
-		memcpy(_rx.source()->packet_content(packet_to_client),
-		       _tx.sink()->packet_content(packet_from_client),
-		       packet_from_client.size());
+		_tx.sink()->apply_payload(packet_from_client, [&] (char const *src, size_t src_len) {
+			_rx.source()->apply_payload(packet_to_client, [&] (char *dst, size_t dst_len) {
+				memcpy(dst, src, min(src_len, dst_len)); }); });
 
 		packet_to_client = Packet_descriptor(packet_to_client.offset(),
 		                                     packet_from_client.size());

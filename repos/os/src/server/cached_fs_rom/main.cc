@@ -220,9 +220,10 @@ struct Cached_fs_rom::Transfer final
 				_seek = _size;
 			} else {
 				size_t const n = min(packet.length(), _size - pkt_seek);
-				memcpy(_cached_rom.ram_ds.local_addr<char>()+pkt_seek,
-				       _fs.tx()->packet_content(packet), n);
-				_seek = pkt_seek+n;
+				_fs.tx()->apply_payload(packet, [&] (char const *payload, size_t) {
+					memcpy(_cached_rom.ram_ds.local_addr<char>()+pkt_seek, payload, n);
+					_seek = pkt_seek+n;
+				});
 			}
 
 			if (completed())

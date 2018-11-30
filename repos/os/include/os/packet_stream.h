@@ -544,13 +544,10 @@ class Genode::Packet_stream_base
 		}
 
 		template<typename CONTENT_TYPE>
-		CONTENT_TYPE *packet_content(Packet_descriptor packet)
+		CONTENT_TYPE *_packet_content(Packet_descriptor packet)
 		{
-			if (!packet.size()) return nullptr;
-
 			if (!packet_valid(packet) || packet.size() < sizeof(CONTENT_TYPE))
-				throw Packet_descriptor::Invalid_packet();
-
+				return nullptr;
 			return (CONTENT_TYPE *)((Genode::addr_t)_ds_local_base + packet.offset());
 		}
 };
@@ -711,8 +708,27 @@ class Genode::Packet_stream_source : private Packet_stream_base
 		 * \throw Packet_descriptor::Invalid_packet  raise an exception if
 		                                             the packet is invalid
 		 */
-		Content_type *packet_content(Packet_descriptor packet) {
-			return Packet_stream_base::packet_content<Content_type>(packet); }
+		Content_type *packet_content(Packet_descriptor packet)
+		{
+			Content_type *p = _packet_content<Content_type>(packet);
+			if (p == nullptr && packet.size() > 0)
+				throw Genode::Packet_descriptor::Invalid_packet();
+			return p;
+		}
+
+		/**
+		 * Apply a functor to packet content, functor is passed
+		 * a pointer to a buffer and the size of buffer.
+		 *
+		 * If the packet does not represent a valid buffer region
+		 * the functor will not be called.
+		 */
+		template<typename FUNC>
+		void apply_payload(Packet_descriptor packet, FUNC const func)
+		{
+			if (Content_type *ptr = _packet_content<Content_type>(packet))
+				func(ptr, packet.size());
+		}
 
 		/**
 		 * Return true if submit queue can hold another packet
@@ -871,8 +887,27 @@ class Genode::Packet_stream_sink : private Packet_stream_base
 		 * \throw Packet_descriptor::Invalid_packet  raise an exception if
 		                                             the packet is invalid
 		 */
-		Content_type *packet_content(Packet_descriptor packet) {
-			return Packet_stream_base::packet_content<Content_type>(packet); }
+		Content_type *packet_content(Packet_descriptor packet)
+		{
+			Content_type *p = _packet_content<Content_type>(packet);
+			if (p == nullptr && packet.size() > 0)
+				throw Genode::Packet_descriptor::Invalid_packet();
+			return p;
+		}
+
+		/**
+		 * Apply a functor to packet content, functor is passed
+		 * a pointer to a buffer and the size of buffer.
+		 *
+		 * If the packet does not represent a valid buffer region
+		 * the functor will not be called.
+		 */
+		template<typename FUNC>
+		void apply_payload(Packet_descriptor packet, FUNC const func)
+		{
+			if (Content_type *ptr = _packet_content<Content_type>(packet))
+				func(ptr, packet.size());
+		}
 
 		/**
 		 * Returns true if no further acknowledgements can be submitted

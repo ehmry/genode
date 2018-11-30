@@ -35,11 +35,11 @@ class Fs_log::Session_component : public Genode::Rpc_object<Genode::Log_session>
 {
 	private:
 
-		char _label_buf[MAX_LABEL_LEN];
-		Genode::size_t const _label_len;
+		typedef Genode::String<Log_session::String::MAX_SIZE> String;
 
-		File_system::Session          &_fs;
-		File_system::File_handle const _handle;
+		File_system::Session           &_fs;
+		File_system::File_handle const  _handle;
+		String                   const  _label;
 
 	public:
 
@@ -47,12 +47,9 @@ class Fs_log::Session_component : public Genode::Rpc_object<Genode::Log_session>
 		                  File_system::File_handle  handle,
 		                  char               const *label)
 		:
-			_label_len(Genode::strlen(label) ? Genode::strlen(label)+3 : 0),
-			_fs(fs), _handle(handle)
-		{
-			if (_label_len)
-				Genode::snprintf(_label_buf, MAX_LABEL_LEN, "[%s] ", label);
-		}
+			_fs(fs), _handle(handle),
+			_label(Genode::strlen(label) ? String("[", label, "] ") : "")
+		{ }
 
 		~Session_component()
 		{
@@ -85,8 +82,6 @@ class Fs_log::Session_component : public Genode::Rpc_object<Genode::Log_session>
 				return 0;
 			}
 
-			size_t msg_len = strlen(msg.string());
-
 			File_system::Session::Tx::Source &source = *_fs.tx();
 
 			File_system::Packet_descriptor packet = source.get_acked_packet();
@@ -94,35 +89,25 @@ class Fs_log::Session_component : public Genode::Rpc_object<Genode::Log_session>
 			if (packet.operation() == File_system::Packet_descriptor::SYNC)
 				_fs.close(packet.handle());
 
+			size_t msg_len = strlen(msg.string());
+			size_t pkt_len = 0;
+			source.apply_payload(packet, [&] (char *buf, size_t len) {
+				if (_label == "") {
+					pkt_len = min(len, msg_len);
+					memcpy(buf, msg.string(), pkt_len);
+				} else {
+					String tmp(_label, msg.string());
+					pkt_len = min(len, tmp.length()-1);
+					memcpy(buf, tmp.string(), pkt_len);
+					msg_len = msg_len - (_label.length()-1);
+				}
+			});
+
 			packet = File_system::Packet_descriptor(
 				packet, _handle, File_system::Packet_descriptor::WRITE,
-				msg_len, File_system::SEEK_TAIL);
-
-			char *buf = source.packet_content(packet);
-
-			if (_label_len) {
-				memcpy(buf, _label_buf, _label_len);
-
-				if (_label_len+msg_len > Log_session::String::MAX_SIZE) {
-					packet.length(msg_len);
-					source.submit_packet(packet);
-
-					packet =  File_system::Packet_descriptor(
-						source.get_acked_packet(),
-				       _handle, File_system::Packet_descriptor::WRITE,
-				       msg_len, File_system::SEEK_TAIL);
-
-					buf = source.packet_content(packet);
-
-				} else {
-					buf += _label_len;
-					packet.length(_label_len+msg_len);
-				}
-			}
-
-			memcpy(buf, msg.string(), msg_len);
-
+				pkt_len, File_system::SEEK_TAIL);
 			source.submit_packet(packet);
+
 			return msg_len;
 		}
 };
