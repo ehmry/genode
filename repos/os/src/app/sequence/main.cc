@@ -11,9 +11,10 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#include <init/child_policy.h>
+#include <os/static_rom_session.h>
+#include <os/single_session_service.h>
+#include <base/child.h>
 #include <base/attached_rom_dataspace.h>
-#include <os/child_policy_dynamic_rom.h>
 #include <base/sleep.h>
 #include <base/child.h>
 #include <base/component.h>
@@ -50,8 +51,18 @@ struct Sequence::Child : Genode::Child_policy
 
 	Binary_name const _binary_name = _start_binary();
 
-	Child_policy_dynamic_rom_file _config_policy {
-		_env.rm(), "config", _env.ep().rpc_ep(), &_env.pd() };
+	Xml_node _config_node() const
+	{
+		return _start_node.has_sub_node("config")
+			? _start_node.sub_node("config")
+			: Xml_node("<config/>");
+	}
+
+	Genode::Static_rom_session _config_session {
+		_env.ep().rpc_ep(), _env.pd(), _env.rm(), _config_node() };
+
+	Genode::Single_session_service<Genode::Rom_session>
+		_config_service { _config_session.cap() };
 
 	class Parent_service : public Genode::Parent_service
 	{
@@ -82,12 +93,7 @@ struct Sequence::Child : Genode::Child_policy
 		_env(env),
 		_start_node(start_node),
 		_exit_transmitter(exit_handler)
-	{
-		if (_have_config) {
-			Xml_node config_node = start_node.sub_node("config");
-			_config_policy.load(config_node.addr(), config_node.size());
-		}
-	}
+	{ }
 
 	~Child()
 	{
@@ -104,21 +110,28 @@ struct Sequence::Child : Genode::Child_policy
 
 	Binary_name binary_name() const override { return _binary_name; }
 
-	/**
-	 * Provide a "config" ROM if configured to do so,
-	 * otherwise forward directly to the parent.
-	 */
-	Service &resolve_session_request(Service::Name       const &name,
-	                                 Session_state::Args const &args)
+	Route resolve_session_request(Genode::Service::Name const &name,
+	                              Genode::Session_label const &label) override
 	{
-		if (_have_config) {
-			Service *s = _config_policy.resolve_session_request(
-				name.string(), args.string());
-			if (s)
-				return *s;
+		using namespace Genode;
+
+		if (name == Rom_session::service_name() &&
+		    label.last_element() == "config")
+		{
+			return Route { _config_service.service(), label, false };
 		}
 
-		return *new (_services_heap) Parent_service(_parent_services, _env, name);
+		Parent_service *service = nullptr;
+		_parent_services.for_each([&] (Parent_service &s) {
+			if (service || s.name() != name) return;
+			service = &s;
+		});
+
+		if (!service)
+			service = new (_services_heap)
+				Parent_service(_parent_services, _env, name);
+
+		return Route { *service, label, false };
 	}
 
 	/**
