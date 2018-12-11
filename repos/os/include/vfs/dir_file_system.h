@@ -533,19 +533,11 @@ class Vfs::Dir_file_system : public File_system
 			return false;
 		}
 
-		/**
-		 * Return true if specified path is a directory
-		 *
-		 * \noapi
-		 * \deprecated  use 'directory instead
-		 */
-		bool is_directory(char const *path) { return directory(path); }
-
 		char const *leaf_path(char const *path) override
 		{
 			path = _sub_path(path);
 			if (!path)
-				return 0;
+				return nullptr;
 
 			if (strlen(path) == 0)
 				return path;
@@ -556,7 +548,7 @@ class Vfs::Dir_file_system : public File_system
 					return leaf_path;
 			}
 
-			return 0;
+			return nullptr;
 		}
 
 		Open_result open(char const  *path,
@@ -695,6 +687,9 @@ class Vfs::Dir_file_system : public File_system
 				return OPENDIR_ERR_LOOKUP_FAILED;
 
 			if (create) {
+				if (leaf_path(path) != nullptr)
+					return OPENDIR_ERR_NODE_ALREADY_EXISTS;
+
 				auto opendir_fn = [&] (File_system &fs, char const *path)
 				{
 					Vfs_handle *tmp_handle;
