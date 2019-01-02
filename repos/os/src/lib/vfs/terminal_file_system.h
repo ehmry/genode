@@ -57,8 +57,10 @@ class Vfs::Terminal_file_system : public Single_file_system
 			Read_result read(char *dst, file_size count,
 			                 file_size &out_count) override
 			{
-				if (!terminal.avail())
+				if (!terminal.avail()) {
+					notifying = true;
 					return READ_QUEUED;
+				}
 
 				out_count = terminal.read(dst, count);
 				return READ_OK;
@@ -180,13 +182,7 @@ class Vfs::Terminal_file_system : public Single_file_system
 
 		bool check_unblock(Vfs_handle *, bool rd, bool wr, bool) override
 		{
-			if (rd && (_terminal.avail() > 0))
-				return true;
-
-			if (wr)
-				return true;
-
-			return false;
+			return ((rd && _terminal.avail()) || wr);
 		}
 };
 
