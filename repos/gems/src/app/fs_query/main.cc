@@ -128,7 +128,7 @@ struct Fs_query::Watched_directory
 };
 
 
-struct Fs_query::Main : Vfs::Watch_response_handler
+struct Fs_query::Main : Vfs::Response_handler
 {
 	Env &_env;
 
@@ -139,9 +139,9 @@ struct Fs_query::Main : Vfs::Watch_response_handler
 	Vfs::Global_file_system_factory _fs_factory { _heap };
 
 	/**
-	 * Vfs::Watch_response_handler interface
+	 * Vfs::Response_handler interface
 	 */
-	void handle_watch_response(Vfs::Vfs_watch_handle::Context*) override
+	void notify() override
 	{
 		Signal_transmitter(_config_handler).submit();
 	}
@@ -150,17 +150,11 @@ struct Fs_query::Main : Vfs::Watch_response_handler
 	{
 		Main &_main;
 
-		struct Io_response_dummy : Vfs::Io_response_handler {
-			void handle_io_response(Vfs::Vfs_handle::Context*) override { }
-		} _io_dummy { };
-
 		Vfs_env(Main &main) : _main(main) { }
 
 		Genode::Env                 &env()           override { return _main._env; }
 		Allocator                   &alloc()         override { return _main._heap; }
 		Vfs::File_system            &root_dir()      override { return _main._root_dir_fs; }
-		Vfs::Io_response_handler    &io_handler()    override { return _io_dummy; }
-		Vfs::Watch_response_handler &watch_handler() override { return _main; }
 
 	} _vfs_env { *this };
 
