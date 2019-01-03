@@ -14,7 +14,7 @@
 
 /* Genode includes */
 #include <timer_session/connection.h>
-#include <os/timed_semaphore.h>
+#include <base/timed_semaphore.h>
 #include <base/thread.h>
 #include <base/component.h>
 
