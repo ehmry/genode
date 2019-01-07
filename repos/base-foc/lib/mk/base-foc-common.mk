@@ -13,3 +13,4 @@ SRC_CC += rpc_dispatch_loop.cc
 SRC_CC += thread.cc thread_bootstrap.cc thread_myself.cc utcb.cc
 SRC_CC += capability.cc
 SRC_CC += signal_source_client.cc
+SRC_CC += stack_area_addr.cc
