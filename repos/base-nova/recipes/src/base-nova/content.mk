@@ -18,5 +18,5 @@ content:
 	  mv lib/mk/spec/$$spec/ld-nova.mk   lib/mk/spec/$$spec/ld.mk; \
 	  done;
 	sed -i "s/ld-nova/ld/"           src/lib/ld/nova/target.mk
-	sed -i "s/nova_timer_drv/timer/" src/drivers/timer/target.mk
+	sed -i "s/nova_timer_drv/timer/" src/timer/target.mk
 

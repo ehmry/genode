@@ -35,5 +35,5 @@ src/tool/elfloader: src/kernel/sel4
 content:
 	mv lib/mk/spec/arm/ld-sel4.mk lib/mk/spec/arm/ld.mk;
 	sed -i "s/ld-sel4/ld/"          src/lib/ld/sel4/target.mk
-	sed -i "s/wand_quad_timer_drv/timer/" src/drivers/timer/epit/wand_quad/target.inc
+	sed -i "s/wand_quad_timer_drv/timer/" src/timer/epit/wand_quad/target.inc
 

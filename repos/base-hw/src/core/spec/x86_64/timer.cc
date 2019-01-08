@@ -16,7 +16,7 @@
 #include <hw/spec/x86_64/x86_64.h>
 
 /* Genode includes */
-#include <drivers/timer/util.h>
+#include <timer/util.h>
 
 /* core includes */
 #include <kernel/timer.h>

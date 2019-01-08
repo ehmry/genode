@@ -1,5 +1,5 @@
 # build program images
-build { core init drivers/timer test/timer_accuracy }
+build { core init timer test/timer_accuracy }
 
 # create directory where boot files are written to
 create_boot_directory

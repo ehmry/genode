@@ -7,10 +7,10 @@ src/bootstrap:
 
 content: generalize_target_names
 
-generalize_target_names: lib/mk src/lib src/drivers/timer
+generalize_target_names: lib/mk src/lib src/timer
 	for spec in arm riscv x86_64; do \
 	  mv lib/mk/spec/$$spec/ld-hw.mk lib/mk/spec/$$spec/ld.mk; \
 	  done;
 	sed -i "s/ld-hw/ld/"           src/lib/ld/hw/target.mk
-	sed -i "s/hw_timer_drv/timer/" src/drivers/timer/target.mk
+	sed -i "s/hw_timer_drv/timer/" src/timer/target.mk
 

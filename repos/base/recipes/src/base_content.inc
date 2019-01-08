@@ -2,9 +2,9 @@
 # Common content rules shared among all base-<kernel> source archives
 #
 
-content: src/include src/core src/lib src/drivers/timer lib/mk LICENSE
+content: src/include src/core src/lib src/timer lib/mk LICENSE
 
-src/include src/core src/lib src/drivers/timer lib/mk:
+src/include src/core src/lib src/timer lib/mk:
 	mkdir -p $@
 	cp -r $(GENODE_DIR)/repos/base/$@/* $@
 	cp -r $(REP_DIR)/$@/* $@

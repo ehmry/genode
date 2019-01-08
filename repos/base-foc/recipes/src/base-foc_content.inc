@@ -29,5 +29,5 @@ content:
 	  mv lib/mk/spec/$$spec/ld-foc.mk lib/mk/spec/$$spec/ld.mk; \
 	  done;
 	sed -i "s/ld-foc/ld/"           src/lib/ld/foc/target.mk
-	sed -i "s/foc_timer_drv/timer/" src/drivers/timer/target.mk
+	sed -i "s/foc_timer_drv/timer/" src/timer/target.mk
 

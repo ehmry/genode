@@ -22,5 +22,5 @@ content:
 	  mv lib/mk/spec/$$spec/ld-fiasco.mk lib/mk/spec/$$spec/ld.mk; \
 	  done;
 	sed -i "s/ld-fiasco/ld/"     src/lib/ld/fiasco/target.mk
-	sed -i "s/fiasco_timer_drv/timer/" src/drivers/timer/target.mk
+	sed -i "s/fiasco_timer_drv/timer/" src/timer/target.mk
 

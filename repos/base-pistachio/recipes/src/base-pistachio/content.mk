@@ -22,5 +22,5 @@ content:
 	  mv lib/mk/spec/$$spec/ld-pistachio.mk lib/mk/spec/$$spec/ld.mk; \
 	  done;
 	sed -i "s/ld-pistachio/ld/"     src/lib/ld/pistachio/target.mk
-	sed -i "s/pit_timer_drv/timer/" src/drivers/timer/pit/target.inc
+	sed -i "s/pit_timer_drv/timer/" src/timer/pit/target.inc
 
