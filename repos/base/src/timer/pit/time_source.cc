@@ -13,7 +13,7 @@
  */
 
 /* Genode includes */
-#include <timer/util.h>
+#include <drivers/timer/util.h>
 
 /* local includes */
 #include <time_source.h>

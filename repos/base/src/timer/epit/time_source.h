@@ -19,7 +19,7 @@
 /* Genode includes */
 #include <irq_session/connection.h>
 #include <os/attached_mmio.h>
-#include <timer/util.h>
+#include <drivers/timer/util.h>
 
 /* local includes */
 #include <signalled_time_source.h>
