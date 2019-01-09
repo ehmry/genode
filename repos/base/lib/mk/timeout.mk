@@ -8,4 +8,4 @@ LIBS += alarm
 
 INC_DIR += $(BASE_DIR)/src/include
 
-vpath % $(REP_DIR)/src/lib/timeout
+vpath % $(call select_from_repositories,src/lib/timeout)
