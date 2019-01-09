@@ -12,5 +12,5 @@ generalize_target_names: lib/mk src/lib src/timer
 	  mv lib/mk/spec/$$spec/ld-hw.mk lib/mk/spec/$$spec/ld.mk; \
 	  done;
 	sed -i "s/ld-hw/ld/"           src/lib/ld/hw/target.mk
-	sed -i "s/hw_timer_drv/timer/" src/timer/target.mk
+	sed -i "s/hw_timer_drv/timer/" src/timer/hw/target.mk
 
