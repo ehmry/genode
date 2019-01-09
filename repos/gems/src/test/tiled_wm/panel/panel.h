@@ -30,7 +30,7 @@
 
 /* local includes */
 #include <util.h>
-#include "icon.h" /* local copy to workaround missing "vtable for Icon" */
+#include <icon.h> /* build-dir copy of qoost/icon.h works around missing "vtable for Icon" */
 
 
 class Panel_button : public Compound_widget<QPushButton, QHBoxLayout>
