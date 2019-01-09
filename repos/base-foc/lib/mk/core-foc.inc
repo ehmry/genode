@@ -3,6 +3,7 @@ GEN_CORE_DIR = $(BASE_DIR)/src/core
 LIBS        += base-foc-common syscall-foc cxx
 
 SRC_CC      += stack_area.cc \
+               stack_area_addr.cc \
                core_log.cc \
                core_log_out.cc \
                core_region_map.cc \
