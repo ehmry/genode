@@ -37,6 +37,9 @@ struct Menu_view::Button_widget : Widget, Animator::Item
 
 	Padding padding { 9, 9, 2, 1 };
 
+	Palette default_palette { };
+	Palette hovered_palette { };
+
 	Area _space() const
 	{
 		return Area(margin.horizontal() + padding.horizontal(),
@@ -55,18 +58,23 @@ struct Menu_view::Button_widget : Widget, Animator::Item
 		margin = { 4, 4, 4, 4 };
 	}
 
-	void update(Xml_node node)
+	void update(Xml_node node, Palette const &) override
 	{
 		bool const new_hovered  = _enabled(node, "hovered");
 		bool const new_selected = _enabled(node, "selected");
 
 		if (new_selected) {
 			default_texture = _factory.styles.texture(node, "selected");
+			default_palette = _factory.styles.palette(node, "selected");
 			hovered_texture = _factory.styles.texture(node, "hselected");
+			hovered_palette = _factory.styles.palette(node, "hselected");
 		} else {
 			default_texture = _factory.styles.texture(node, "default");
+			default_palette = _factory.styles.palette(node, "default");
 			hovered_texture = _factory.styles.texture(node, "hovered");
+			hovered_palette = _factory.styles.palette(node, "hovered");
 		}
+
 
 		if (new_hovered != hovered) {
 
@@ -81,7 +89,10 @@ struct Menu_view::Button_widget : Widget, Animator::Item
 		hovered  = new_hovered;
 		selected = new_selected;
 
-		_update_children(node);
+		if (hovered)
+			_update_children(node, hovered_palette);
+		else
+			_update_children(node, default_palette);
 
 		_children.for_each([&] (Widget &child) {
 			child.geometry(Rect(Point(margin.left + padding.left,
@@ -146,7 +157,6 @@ struct Menu_view::Button_widget : Widget, Animator::Item
 			w.size(Area(geometry().w() - _space().w(),
 			            geometry().h() - _space().h())); });
 	}
-
 
 	/******************************
 	 ** Animator::Item interface **

@@ -106,6 +106,7 @@ class Menu_view::Widget : public List_model<Widget>::Element
 		struct Model_update_policy : List_model<Widget>::Update_policy
 		{
 			Widget_factory &_factory;
+			Palette palette { };
 
 			Model_update_policy(Widget_factory &factory) : _factory(factory) { }
 
@@ -119,7 +120,7 @@ class Menu_view::Widget : public List_model<Widget>::Element
 				throw Unknown_element_type();
 			}
 
-			void update_element(Widget &w, Xml_node node) { w.update(node); }
+			void update_element(Widget &w, Xml_node node) { w.update(node, palette); }
 
 			static bool element_matches_xml_node(Widget const &w, Xml_node node)
 			{
@@ -130,8 +131,9 @@ class Menu_view::Widget : public List_model<Widget>::Element
 
 		} _model_update_policy { _factory };
 
-		inline void _update_children(Xml_node node)
+		inline void _update_children(Xml_node node, Palette const &palette)
 		{
+			_model_update_policy.palette = palette;
 			_children.update_from_xml(_model_update_policy, node);
 		}
 
@@ -210,7 +212,7 @@ class Menu_view::Widget : public List_model<Widget>::Element
 
 		bool has_name(Name const &name) const { return name == _name; }
 
-		virtual void update(Xml_node node) = 0;
+		virtual void update(Xml_node node, Palette const &palette) = 0;
 
 		virtual Area min_size() const = 0;
 

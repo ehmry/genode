@@ -109,9 +109,9 @@ struct Menu_view::Box_layout_widget : Widget
 		       _direction(node.has_type("vbox") ? VERTICAL : HORIZONTAL)
 	{ }
 
-	void update(Xml_node node) override
+	void update(Xml_node node, Palette const &palette) override
 	{
-		_update_children(node);
+		_update_children(node, palette);
 
 		/*
 		 * Apply layout to the children

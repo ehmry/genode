@@ -146,6 +146,8 @@ struct Menu_view::Main
 
 	Genode::Reporter _hover_reporter = { _env, "hover" };
 
+	Palette const _root_palette { };
+
 	bool _schedule_redraw = false;
 
 	/**
@@ -198,7 +200,7 @@ void Menu_view::Main::_handle_dialog_update()
 	try {
 		Xml_node dialog_xml(_dialog_rom.local_addr<char>());
 
-		_root_widget.update(dialog_xml);
+		_root_widget.update(dialog_xml, _root_palette);
 
 		_root_widget.size(_root_widget_size());
 	} catch (...) {
