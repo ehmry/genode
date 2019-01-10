@@ -22,6 +22,7 @@ namespace Menu_view { struct Label_widget; }
 struct Menu_view::Label_widget : Widget
 {
 	Text_painter::Font const *font = nullptr;
+	Palette text_palette { };
 
 	enum { LABEL_MAX_LEN = 256 };
 
@@ -33,9 +34,10 @@ struct Menu_view::Label_widget : Widget
 		Widget(factory, node, unique_id)
 	{ }
 
-	void update(Xml_node node)
+	void update(Xml_node node, Palette const &palette)
 	{
 		font = _factory.styles.font(node);
+		text_palette = palette;
 		text = Decorator::string_attribute(node, "text", Text(""));
 	}
 
@@ -63,7 +65,7 @@ struct Menu_view::Label_widget : Widget
 
 		Text_painter::paint(pixel_surface,
 		                    Text_painter::Position(centered.x(), centered.y()),
-		                    *font, Color(0, 0, 0), text.string());
+		                    *font, text_palette.foreground, text.string());
 
 		Text_painter::paint(alpha_surface,
 		                    Text_painter::Position(centered.x(), centered.y()),

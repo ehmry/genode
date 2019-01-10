@@ -46,9 +46,9 @@ struct Menu_view::Float_widget : Widget
 		child.geometry(Rect(Point(x, y), Area(w, h)));
 	}
 
-	void update(Xml_node node) override
+	void update(Xml_node node, Palette const &palette) override
 	{
-		_update_children(node);
+		_update_children(node, palette);
 
 		_north = node.attribute_value("north", false),
 		_south = node.attribute_value("south", false),

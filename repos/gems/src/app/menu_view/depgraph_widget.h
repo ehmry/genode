@@ -443,7 +443,7 @@ struct Menu_view::Depgraph_widget : Widget
 		_children.destroy_all_elements(_model_update_policy);
 	}
 
-	void update(Xml_node node) override
+	void update(Xml_node node, Palette const &palette) override
 	{
 		/* update depth direction */
 		{

@@ -37,7 +37,7 @@ struct Menu_view::Root_widget : Widget
 		return result;
 	}
 
-	void update(Xml_node node) override
+	void update(Xml_node node, Palette const &palette) override
 	{
 		char const *dialog_tag = "dialog";
 
@@ -51,7 +51,7 @@ struct Menu_view::Root_widget : Widget
 			return;
 		}
 
-		_update_children(node);
+		_update_children(node, palette);
 	}
 
 	Area min_size() const override

@@ -23,7 +23,16 @@
 /* local includes */
 #include "types.h"
 
-namespace Menu_view { struct Style_database; }
+namespace Menu_view {
+	struct Palette;
+	class Style_database;
+}
+
+
+struct Menu_view::Palette
+{
+	Color foreground { 0x00, 0x00, 0x00 };
+};
 
 
 class Menu_view::Style_database
@@ -82,6 +91,15 @@ class Menu_view::Style_database
 			catch (...) { throw Reading_failed(); }
 		};
 
+		struct Palette_entry : List<Palette_entry>::Element
+		{
+			Path const path;
+			Palette palette;
+
+			Palette_entry(Path const &path, Palette palette)
+			: path(path), palette(palette) { }
+		};
+
 		Ram_session     &_ram;
 		Region_map      &_rm;
 		Allocator       &_alloc;
@@ -93,6 +111,7 @@ class Menu_view::Style_database
 		 */
 		List<Texture_entry> mutable _textures;
 		List<Font_entry>    mutable _fonts;
+		List<Palette_entry> mutable _palettes;
 
 		template <typename T>
 		T const *_lookup(List<T> &list, char const *path) const
@@ -172,6 +191,39 @@ class Menu_view::Style_database
 			}
 
 			return nullptr;
+		}
+
+		Palette const palette(Xml_node node, char const *name) const
+		{
+			typedef String<64> Style;
+			Style const style = node.attribute_value("style", Style("default"));
+			Path path("/styles/", node.type(), "/", style, "/", name, ".palette");
+
+			if (Palette_entry const *p = _lookup(_palettes, path.string()))
+				return p->palette;
+
+			/*
+			 * Load and remember colors
+			 */
+			Palette palette;
+
+			try {
+				::File palette_file(path.string(), _alloc);
+				Xml_node palette_xml(palette_file.data<char const>(),
+				                     palette_file.size());
+
+				palette_xml.attribute("foreground").value(&palette.foreground);
+			}
+			catch (Reading_failed) { }
+			catch (...) {
+				Genode::error("failed to parse pallet at '", path, "'");
+			}
+
+			Palette_entry *p = new (_alloc) Palette_entry(path, palette);
+
+			_palettes.insert(p);
+
+			return palette;
 		}
 };
 

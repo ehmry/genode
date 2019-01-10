@@ -25,6 +25,8 @@ struct Menu_view::Frame_widget : Widget
 
 	Padding padding {  2,  2, 2, 2 };
 
+	Palette palette { };
+
 	Area _space() const
 	{
 		return Area(margin.horizontal() + padding.horizontal(),
@@ -38,11 +40,13 @@ struct Menu_view::Frame_widget : Widget
 		margin = { 4, 4, 4, 4 };
 	}
 
-	void update(Xml_node node) override
+	void update(Xml_node node, Palette const &) override
 	{
 		texture = _factory.styles.texture(node, "background");
+		palette = _factory.styles.palette(node, "background");
 
-		_update_children(node);
+		/* this widget determines the palette of its children */
+		_update_children(node, palette);
 
 		/*
 		 * layout
