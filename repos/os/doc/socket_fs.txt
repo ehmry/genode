@@ -1,0 +1,332 @@
+                  =========
+                  Socket_fs
+                  =========
+
+
+Socket_fs is a file-system interface to UDP and TCP sockets over
+IP. A socket is represented by a directory populated with control files.
+The lifetime of a socket is bound to the handles on these control files,
+when all handles on a socket are closed the socket is automatically
+destroyed.
+
+Global files
+############
+
+new_socket
+==========
+
+UDP and TCP sockets are created by opening and reading the
+file '/udp/new_socket' and '/tcp/new_socket' respectively.
+Handles on `new_socket` must remain open until an additional
+handle is opened on a control file within the socket directory
+read from `new_socket.
+
+read
+~~~~
+Read the location of the socket directory for the given handle.
+Read may queue until the IP stack has been initialized and configured
+with an IP address.
+
+write
+~~~~~
+Invalid.
+
+read_ready
+~~~~~~~~~~
+True.
+
+
+nameserver
+==========
+A special file found at the root of socket_fs that contains the IP
+address of a classical DNS server. This file may be populated by
+the IP stack during autoconfiguration or it may be configured
+statically. The UDP port number is ommited and assumed to be 53.
+
+read
+~~~~
+Read the IP address of a DNS server.
+
+write
+~~~~~
+Invalid.
+
+read_ready
+~~~~~~~~~~
+True.
+
+
+UDP control files
+#################
+
+bind
+====
+
+read
+~~~~
+Read local UDP port and IP address.
+
+write
+~~~~~
+Bind the local UDP port and IP address.
+
+read_ready
+~~~~~~~~~~
+True.
+
+
+connect
+=======
+read
+~~~~
+Read remote address.
+
+write
+~~~~~
+Set the remote address of the socket for the remainder
+of its lifetime. packets received not originated from
+this address will be dropped rather than queued.
+
+read_ready
+~~~~~~~~~~
+True.
+
+
+data
+====
+
+read
+~~~~
+Read from received packet queue. A single packet may be read in
+multiple passes with a short read indicating the end of a packet.
+
+write
+~~~~~
+Send a packet immediately.
+
+read_ready
+~~~~~~~~~~
+True if received packet is queued.
+
+
+listen
+======
+Invalid for UDP.
+
+
+local
+=====
+
+read
+~~~~
+Read local address.
+
+write
+~~~~~
+Invalid.
+
+read_ready
+~~~~~~~~~~
+True.
+
+
+peek
+====
+
+read
+~~~~
+Peek from received packet queue.
+
+write
+~~~~~
+Invalid.
+
+read_ready
+~~~~~~~~~~
+True if a received packet is queued.
+
+
+remote
+======
+
+read
+~~~~
+Reads the remote address of the next queued packet. If the
+socket has been "connected" the read is immediate, otherwise
+the read will queue until a packet is received.
+
+write
+~~~~~
+Set the remote address to which the next packet will be sent.
+Invalid if socket is in a connected state.
+
+read_ready
+~~~~~~~~~~
+True if a received packet is queued.
+
+
+
+TCP control files
+#################
+
+accept_socket
+=============
+The accept_socket file is the initial handle on a socket created
+from an incoming TCP connection. If this handle is closed before
+additional handles on opened on the accepted socket, the socket
+will be destroyed.
+
+read
+~~~~
+Accept an incoming TCP connection and read the location of its
+socket directory. Read will queue until there is an incoming
+connection to accept. Further reads on the same handle will
+return the same location. 
+
+write
+~~~~~
+Invalid.
+
+read_ready
+~~~~~~~~~~
+Return true if there is a incoming TCP connection on this socket.
+
+
+accept
+======
+read
+~~~~
+Read the number of pending TCP connections on this socket.
+
+write
+~~~~~
+Invalid.
+
+read_ready
+~~~~~~~~~~
+True if a connection is pending.
+
+bind
+====
+read
+~~~~
+Read the local socket address, zero-read if the socket is closed.
+
+write
+~~~~~
+Bind the socket to an address, invalid if socket is already bound.
+
+read_ready
+~~~~~~~~~~
+True if the socket is bound or connected.
+
+connect
+=======
+read
+~~~~
+Reads the string "connected", "connection refused", or "unknown error".
+
+write
+~~~~~
+Initiate TCP connection to the specified address.
+
+read_ready
+~~~~~~~~~~
+True if the socket is in a connected or error state.
+
+data
+====
+read
+~~~~
+Dequeue and read data from the receive buffer. Acknowledge
+the number of bytes read to the remote host.
+
+write
+~~~~~
+Write data to send buffer and immediately submit.
+Block until all data is processed.
+
+read_ready
+~~~~~~~~~~
+False if the receive buffer is empy and
+the connection is in an idle state.
+
+listen
+======
+read
+~~~~
+Read the size of the TCP connection backlog as a decimal string.
+
+write
+~~~~~
+Set the size of the incoming TCP connection backlog.
+
+read_ready
+~~~~~~~~~~
+
+local
+=====
+read
+~~~~
+Read the local socket address, zero-read if the socket is closed.
+
+write
+~~~~~
+Invalid.
+
+read_ready
+~~~~~~~~~~
+True.
+
+peek
+====
+read
+~~~~
+Peek and read data from the receive buffer.
+
+write
+~~~~~
+Invalid.
+
+read_ready
+~~~~~~~~~~
+False if the receive buffer is empy and the connection is in an idle state.
+
+remote
+======
+read
+~~~~
+Read the remote address if the socket is connected, zero-read if the socket has been closed.
+
+write
+~~~~~
+Invalid.
+
+read_ready
+~~~~~~~~~~
+False if the socket is unconnected or listening for new connections.
+
+
+Examples
+########
+
+DNS lookup over plaintext UDP
+=============================
+
+Source: https://github.com/ehmry/nim-genode/blob/master/src/genode/asyncnet.nim
+
+* Read nameserver IP address from '/nameserver'.
+* Open handle at '/udp/new_socket' and read socket location.
+  Handle is left open for the duration of the operation.
+* Write address IP address of nameserver apppended with ':53'
+  to '$socket_dir/connect'. This shall disambiguate writes
+  and reads to '$sock_dir/data'.
+* Marshal DNS question and write '$socket_dir/data' in a single pass.
+* Read and parse DNS answer message from '$socket_dir/data'.
+  The response will not be immediate and thus requires a loop to
+  asynchrously read the response packet. The message may be read
+  in multiple passes.
+* (Repeat the previous two steps as necessary)
+* Close the orignal handle on '/udp/new_socket' and any other
+  handles on the socket control files. The socket context is
+  destroyed.
