@@ -1,0 +1,12 @@
+_/raw/drivers_net_appliance-pc
+_/src/acpi_drv
+_/src/ahci_drv
+_/src/boot_fb_drv
+_/src/driver_manager
+_/src/init
+_/src/ipxe_nic_drv
+_/src/platform_drv
+_/src/report_rom
+_/src/usb_block_drv
+_/src/usb_drv
+_/src/vesa_drv
