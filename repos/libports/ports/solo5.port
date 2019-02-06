@@ -1,12 +1,12 @@
 LICENSE   := ISC
-VERSION   := HEAD
+VERSION   := 0.4.1
 DOWNLOADS := solo5.archive
 
 OWNER := Solo5
 REPO  := solo5
-REV   := 58e855e149b069174b97176dcc0cba077e8a7440
+REV   := b571ac5d16657b9fbf0739fbc82575ec3b90925a
 URL(solo5) := https://github.com/$(OWNER)/$(REPO)/archive/$(REV).tar.gz
-SHA(solo5) := b90e727a75b447caa5668c4babf306e1d34c0d1534665900f09d559ef47366a9
+SHA(solo5) := 28610748eca6e4fc338edd1364fd11b69025bf0757421b77b27c641693b2c91f
 DIR(solo5) := src/lib/solo5
 
 DIRS := include/solo5
