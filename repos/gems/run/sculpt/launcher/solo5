@@ -1,0 +1,42 @@
+<launcher pkg="solo5">
+
+	<!--
+		Uncomment the services required by your unikernel
+		in the "config" and "route" sections below.
+
+		To use a binary and block device image from the local
+		file-system, see the "solo5_loader" launccher.
+	  -->
+
+	<config>
+		<solo5 cmdline="Hello Sculpt!"/>
+		<!-- <rtc/>   -->
+		<!-- <nic/>   -->
+		<!-- <block/> -->
+	</config>
+
+	<route>
+
+	<!--
+		<service name="ROM" label="unikernel.solo5">
+			<child name="solo5_loader"/> </service>
+	-->
+
+	<!--
+		<service name="Rtc">
+			<parent/> </service>
+	-->
+
+	<!--
+		<service name="Nic">
+			<child name="nic_router"/> </service>
+	-->
+
+	<!--
+		<service name="Block">
+			<child name="solo5_loader"/> </service>
+	-->
+
+	</route>
+
+</launcher>
