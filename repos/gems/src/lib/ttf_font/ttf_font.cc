@@ -190,9 +190,10 @@ Ttf_font::Glyph_buffer::render_shifted(Codepoint      const c,
 		for (unsigned i = 0; i < dst_width*height; i++)
 			_values[i].value = _lut.value[_values[i].value];
 
+	unsigned vpos = (int)baseline + y0;
 	return Glyph { .width   = width,
 	               .height  = height,
-	               .vpos    = (unsigned)((int)baseline + y0),
+	               .vpos    = vpos ? vpos+PAD_Y : 0,
 	               .advance = scale*advance,
 	               .values  = _values };
 }
