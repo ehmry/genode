@@ -194,6 +194,8 @@ class Noux::Child : public Rpc_object<Session>,
 		/**
 		 * Command line arguments
 		 */
+		enum { ARGS_DS_SIZE = sizeof(Sysio::Args) };
+
 		Args_dataspace _args;
 
 		/**
@@ -241,8 +243,6 @@ class Noux::Child : public Rpc_object<Session>,
 
 			throw Invalid_fd();
 		}
-
-		enum { ARGS_DS_SIZE = 4096 };
 
 		/**
 		 * Let specified child inherit our file descriptors
