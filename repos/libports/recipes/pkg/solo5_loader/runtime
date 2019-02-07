@@ -1,0 +1,49 @@
+<runtime ram="8M" caps="384" binary="init">
+
+	<requires> <file-system/> </requires>
+	<provides> <block/> <rom/> </provides>
+
+	<content>
+		<rom label="fs_block"/>
+		<rom label="fs_rom"/>
+		<rom label="init"/>
+		<rom label="ld.lib.so"/>
+	</content>
+
+	<config>
+		<parent-provides>
+			<service name="CPU"/>
+			<service name="LOG"/>
+			<service name="PD"/>
+			<service name="RM"/>
+			<service name="ROM"/>
+			<service name="File_system"/>
+		</parent-provides>
+		<default-route>
+			<any-service> <parent/> </any-service>
+		</default-route>
+		<default caps="128"/>
+
+		<service name="Block">
+			<default-policy> <child name="fs_block"/> </default-policy>
+		</service>
+
+		<service name="ROM">
+			<default-policy> <child name="fs_rom"/> </default-policy>
+		</service>
+
+		<start name="fs_block">
+			<resource name="RAM" quantum="3M"/>
+			<provides> <service name="Block"/> </provides>
+			<config>
+				<default-policy file="/block.image" writeable="yes"/>
+			</config>
+		</start>
+
+		<start name="fs_rom">
+			<resource name="RAM" quantum="1G"/>
+			<provides> <service name="ROM"/> </provides>
+		</start>
+
+	</config>
+</runtime>

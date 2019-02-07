@@ -1,0 +1,16 @@
+<launcher pkg="solo5_loader" ram="8M">
+	<!--
+		This file represents a subsystem that serves ROM and Block from a
+		File_system service.
+
+		A large unikernel binary will require more RAM quota, see ram="..." above.
+	--->
+	<route>
+		<service name="File_system">
+			<!--
+				Route the File_system session to the "chroot" child with
+				a root directory passed via label="..."
+			-->
+			<child name="chroot" label="solo5"/> </service>
+	</route>
+</launcher>
