@@ -1,0 +1,11 @@
+<runtime ram="32M" caps="96" binary="unikernel.solo5">
+
+	<content>
+		<rom label="ld.lib.so"/>
+		<rom label="solo5.lib.so"/>
+		<rom label="unikernel.solo5"/>
+	</content>
+
+	<config/>
+
+</runtime>
