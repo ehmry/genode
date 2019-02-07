@@ -695,6 +695,7 @@ set default_test_pkgs {
 	test-pthread
 	test-python
 	test-ram_fs_chunk
+	test-rdrand
 	test-read_only_rom
 	test-reconstructible
 	test-registry
