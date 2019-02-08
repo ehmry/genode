@@ -20,8 +20,10 @@
 
 struct Char_cell
 {
+	/* XXX: maybe not the most correct kind of whitespace... */
+	Genode::Codepoint codepoint { ' ' };
+
 	unsigned char attr;
-	unsigned char ascii;
 	unsigned char color;
 
 	enum { ATTR_COLIDX_MASK = 0x07U,
@@ -31,14 +33,14 @@ struct Char_cell
 
 	enum { COLOR_MASK = 0x3f }; /* 111111 */
 
-	Char_cell() : attr(0), ascii(0), color(0) { }
+	Char_cell() : attr(0), color(0) { }
 
-	Char_cell(unsigned char c, Font_face f,
+	Char_cell(Genode::Codepoint c, Font_face f,
 	          int colidx, bool inv, bool highlight)
 	:
+		codepoint(c),
 		attr(f.attr_bits() | (inv ? ATTR_INVERSE : 0)
 		                   | (highlight ? ATTR_HIGHLIGHT : 0)),
-		ascii(c),
 		color(colidx & COLOR_MASK)
 	{ }
 
@@ -184,7 +186,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			if (_irm == INSERT)
 				_missing("insert mode");
 
-			switch (c.ascii()) {
+			switch (c.value) {
 
 			case '\n': /* 10 */
 				_new_line();
@@ -215,10 +217,10 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 				}
 
 			default:
-				if (c.ascii() > 0x1f) {
+				if (c.value > 0x1f) {
 					Cursor_guard guard(*this);
 					_char_cell_array.set_cell(_cursor_pos.x, _cursor_pos.y,
-					                          Char_cell(c.ascii(), Font_face::REGULAR,
+					                          Char_cell(c, Font_face::REGULAR,
 					                          _color_index, _inverse, _highlight));
 					_cursor_pos.x++;
 				}

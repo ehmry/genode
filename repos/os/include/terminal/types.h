@@ -15,34 +15,17 @@
 #define _TERMINAL__TYPES_H_
 
 /* Genode includes */
+#include <util/utf8.h>
 #include <util/interface.h>
 
 namespace Terminal {
-
-	struct Character;
+	typedef Genode::Codepoint Character;
 	struct Boundary;
 	struct Offset;
 	struct Position;
 	struct Character_array;
 	template <unsigned, unsigned> class Static_character_array;
 }
-
-
-/*
- * The character definition is wrapped in a compound data structure to make
- * the implementation easily changeable to unicode later.
- */
-struct Terminal::Character
-{
-	unsigned char c;
-
-	Character() : c(0) { }
-	Character(unsigned char c) : c(c) { }
-
-	bool valid() const { return c != 0; }
-
-	unsigned char ascii() const { return c; }
-};
 
 
 struct Terminal::Boundary

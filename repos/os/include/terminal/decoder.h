@@ -452,8 +452,10 @@ class Terminal::Decoder
 
 		Decoder(Character_screen &screen) : _screen(screen) { }
 
-		void insert(unsigned char c)
+		void insert(Character character)
 		{
+			char c = (char)character.value;
+
 			switch (_state) {
 
 			case STATE_IDLE:
@@ -467,7 +469,7 @@ class Terminal::Decoder
 				/* handle special characters */
 
 				/* handle normal characters */
-				_screen.output(c);
+				_screen.output(character);
 
 				break;
 
