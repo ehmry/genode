@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2011-2017 Genode Labs GmbH
+ * Copyright (C) 2011-2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -24,7 +24,7 @@ namespace Terminal { struct Character_screen; }
  */
 struct Terminal::Character_screen : Genode::Interface
 {
-	virtual void output(Character c) = 0;
+	virtual void output(Codepoint c) = 0;
 
 	/*******************
 	 ** VT Operations **

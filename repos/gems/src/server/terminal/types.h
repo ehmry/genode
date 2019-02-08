@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2018 Genode Labs GmbH
+ * Copyright (C) 2018-2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -34,7 +34,7 @@ namespace Terminal {
 
 	struct Character_consumer : Interface
 	{
-		virtual void consume_character(Character c) = 0;
+		virtual void consume_character(Codepoint c) = 0;
 	};
 }
 
