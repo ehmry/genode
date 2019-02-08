@@ -36,13 +36,11 @@ struct Terminal::Character
 {
 	Genode::uint16_t value;
 
-	Character() : value(' ') { }
+	Character() : value(0) { }
 	Character(Codepoint cp)
 	: value(cp.value < 1<<16 ? cp.value : 0) { }
 
 	bool valid() const { return value != 0; }
-
-	Codepoint codepoint() const { return Codepoint { value }; }
 };
 
 
