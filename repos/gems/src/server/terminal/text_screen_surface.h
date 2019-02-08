@@ -199,7 +199,7 @@ class Terminal::Text_screen_surface
 
 						Char_cell     cell  = _cell_array.get_cell(column, line);
 
-						_font.apply_glyph(cell.codepoint, [&] (Glyph_painter::Glyph const &glyph) {
+						_font.apply_glyph(cell.codepoint(), [&] (Glyph_painter::Glyph const &glyph) {
 
 							Color_palette::Highlighted const highlighted { cell.highlight() };
 							Color_palette::Inverse     const inverse     { cell.inverse() };
@@ -265,7 +265,7 @@ class Terminal::Text_screen_surface
 			}
 		}
 
-		void apply_character(Codepoint c)
+		void apply_character(Character c)
 		{
 			/* submit character to sequence decoder */
 			_decoder.insert(c);

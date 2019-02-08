@@ -24,7 +24,7 @@ namespace Terminal { struct Character_screen; }
  */
 struct Terminal::Character_screen : Genode::Interface
 {
-	virtual void output(Codepoint c) = 0;
+	virtual void output(Character c) = 0;
 
 	/*******************
 	 ** VT Operations **

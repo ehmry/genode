@@ -34,7 +34,7 @@ namespace Terminal {
 
 	struct Character_consumer : Interface
 	{
-		virtual void consume_character(Codepoint c) = 0;
+		virtual void consume_character(Character c) = 0;
 	};
 }
 

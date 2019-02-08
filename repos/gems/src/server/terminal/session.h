@@ -105,7 +105,8 @@ class Terminal::Session_component : public Rpc_object<Session, Session_component
 			unsigned i = 0;
 			for (Utf8_ptr utf8(src); utf8.complete() && i < max; ) {
 
-				_character_consumer.consume_character(utf8.codepoint());
+				_character_consumer.consume_character(
+					Terminal::Character(utf8.codepoint()));
 
 				i += utf8.length();
 				if (i >= max)

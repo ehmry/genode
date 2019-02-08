@@ -453,9 +453,9 @@ class Terminal::Decoder
 
 		Decoder(Character_screen &screen) : _screen(screen) { }
 
-		void insert(Codepoint character)
+		void insert(Character character)
 		{
-			Genode::uint32_t c = character.value;
+			auto const c = character.value;
 
 			switch (_state) {
 

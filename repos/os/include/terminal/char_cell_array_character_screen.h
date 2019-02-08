@@ -20,8 +20,7 @@
 
 struct Char_cell
 {
-	/* construct as whitespace (the ASCII one) */
-	Terminal::Codepoint codepoint { 0x20 };
+	Genode::uint16_t value { ' ' };
 
 	unsigned char attr;
 	unsigned char color;
@@ -35,10 +34,10 @@ struct Char_cell
 
 	Char_cell() : attr(0), color(0) { }
 
-	Char_cell(Terminal::Codepoint c, Font_face f,
+	Char_cell(Terminal::Character c, Font_face f,
 	          int colidx, bool inv, bool highlight)
 	:
-		codepoint(c),
+		value(c.value),
 		attr(f.attr_bits() | (inv ? ATTR_INVERSE : 0)
 		                   | (highlight ? ATTR_HIGHLIGHT : 0)),
 		color(colidx & COLOR_MASK)
@@ -58,6 +57,9 @@ struct Char_cell
 	void clear_cursor() { attr &= ~ATTR_CURSOR; }
 
 	bool has_cursor() const { return attr & ATTR_CURSOR; }
+
+	Terminal::Codepoint codepoint() const {
+		return Terminal::Codepoint { value }; }
 };
 
 
@@ -181,7 +183,7 @@ class Char_cell_array_character_screen : public Terminal::Character_screen
 			_cursor_pos.y = Genode::min(_boundary.height - 1, pos.y);
 		}
 
-		void output(Terminal::Codepoint c)
+		void output(Terminal::Character c)
 		{
 			if (_irm == INSERT)
 				_missing("insert mode");

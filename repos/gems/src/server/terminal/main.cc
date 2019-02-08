@@ -119,7 +119,7 @@ struct Terminal::Main : Character_consumer
 	/**
 	 * Character_consumer interface, called from 'Terminal::Session_component'
 	 */
-	void consume_character(Codepoint c) override
+	void consume_character(Character c) override
 	{
 		// XXX distinguish between normal and alternative display mode (smcup)
 		if (_text_screen_surface.constructed())

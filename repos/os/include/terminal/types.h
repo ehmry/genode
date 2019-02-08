@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2011-2019 Genode Labs GmbH
+ * Copyright (C) 2011-2017 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -15,17 +15,35 @@
 #define _TERMINAL__TYPES_H_
 
 /* Genode includes */
-#include <util/utf8.h>
 #include <util/interface.h>
 
 namespace Terminal {
 	using Genode::Codepoint;
+	struct Character;
 	struct Boundary;
 	struct Offset;
 	struct Position;
 	struct Character_array;
 	template <unsigned, unsigned> class Static_character_array;
 }
+
+
+/*
+ * The character definition is wrapped in a compound data structure to make
+ * the implementation easily changeable to unicode later.
+ */
+struct Terminal::Character
+{
+	Genode::uint16_t value;
+
+	Character() : value(' ') { }
+	Character(Codepoint cp)
+	: value(cp.value < 1<<16 ? cp.value : 0) { }
+
+	bool valid() const { return value != 0; }
+
+	Codepoint codepoint() const { return Codepoint { value }; }
+};
 
 
 struct Terminal::Boundary
@@ -78,12 +96,12 @@ struct Terminal::Character_array : Genode::Interface
 	/**
 	 * Assign character to specified position
 	 */
-	virtual void set(Position const &pos, Codepoint c) = 0;
+	virtual void set(Position const &pos, Character c) = 0;
 
 	/**
 	 * Request character at specified position
 	 */
-	virtual Codepoint get(Position const &pos) const = 0;
+	virtual Character get(Position const &pos) const = 0;
 
 	/**
 	 * Return array boundary
@@ -97,25 +115,25 @@ class Terminal::Static_character_array : public Character_array
 {
 	private:
 
-		Codepoint      _array[HEIGHT][WIDTH];
+		Character      _array[HEIGHT][WIDTH];
 		Boundary const _boundary;
 
 	public:
 
 		Static_character_array() : _boundary(WIDTH, HEIGHT) { }
 
-		void set(Position const &pos, Codepoint c)
+		void set(Position const &pos, Character c)
 		{
 			if (pos.lies_within(_boundary))
 				_array[pos.y][pos.x] = c;
 		}
 
-		Codepoint get(Position const &pos) const
+		Character get(Position const &pos) const
 		{
 			if (pos.lies_within(_boundary))
 				return _array[pos.y][pos.x];
 			else
-				return Codepoint();
+				return Character();
 		}
 
 		Boundary boundary() const { return _boundary; }
