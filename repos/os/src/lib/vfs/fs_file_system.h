@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (C) 2012-2017 Genode Labs GmbH
+ * Copyright (C) 2012-2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -503,9 +503,12 @@ class Vfs::Fs_file_system : public File_system
 
 			if (!packet_out.succeeded()) {
 				/* could be EOF or a real error */
-				::File_system::Status status = _fs.status(handle.file_handle());
-				if (seek_offset < status.size)
-					Genode::warning("unexpected failure on file-system read");
+				try {
+					::File_system::Status status = _fs.status(handle.file_handle());
+					if (seek_offset < status.size)
+						Genode::warning("unexpected failure on file-system read");
+				}
+				catch (...) { }
 			}
 
 			file_size const read_num_bytes = min(packet_out.length(), count);
@@ -666,9 +669,10 @@ class Vfs::Fs_file_system : public File_system
 				                           _fs, _env.io_handler());
 				status = _fs.status(node);
 			}
-			catch (::File_system::Lookup_failed) { return STAT_ERR_NO_ENTRY; }
-			catch (Genode::Out_of_ram)           { return STAT_ERR_NO_PERM;  }
-			catch (Genode::Out_of_caps)          { return STAT_ERR_NO_PERM;  }
+			catch (::File_system::Lookup_failed)  { return STAT_ERR_NO_ENTRY; }
+			catch (::File_system::Invalid_handle) { return STAT_ERR_NO_ENTRY; }
+			catch (Genode::Out_of_ram)            { return STAT_ERR_NO_PERM;  }
+			catch (Genode::Out_of_caps)           { return STAT_ERR_NO_PERM;  }
 
 			out = Stat();
 
@@ -761,21 +765,19 @@ class Vfs::Fs_file_system : public File_system
 			Fs_handle_guard node_guard(*this, _fs, node, _handle_space, _fs,
 			                           _env.io_handler());
 
-			::File_system::Status status = _fs.status(node);
-
-			return status.size / sizeof(::File_system::Directory_entry);
+			try {
+				::File_system::Status status = _fs.status(node);
+				return status.size / sizeof(::File_system::Directory_entry);
+			}
+			catch (...) { return 0; }
 		}
 
 		bool directory(char const *path) override
 		{
 			try {
-				::File_system::Node_handle node = _fs.node(path);
-				Fs_handle_guard node_guard(*this, _fs, node, _handle_space,
-				                           _fs, _env.io_handler());
-
-				::File_system::Status status = _fs.status(node);
-
-				return status.directory();
+				::File_system::Dir_handle handle = _fs.dir(path, false);
+				_fs.close(handle);
+				return true;
 			}
 			catch (...) { return false; }
 		}
