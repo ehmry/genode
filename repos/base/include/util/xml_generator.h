@@ -417,6 +417,13 @@ class Genode::Xml_generator
 			_curr_node->append_sanitized(str, str_len == ~0UL ? strlen(str) : str_len);
 		}
 
+		template <typename STRING>
+		void append_sanitized(STRING const &content)
+		{
+			_curr_node->append_sanitized(
+				content.string(), content.length()-1);
+		}
+
 		size_t used() const { return _out_buffer.used(); }
 };
 
