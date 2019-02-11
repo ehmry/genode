@@ -89,6 +89,8 @@ class Vfs_server::Session_component : private Session_resources,
 {
 	private:
 
+		unsigned _rpc_count = 0;
+
 		Node_space _node_space { };
 
 		Genode::Signal_handler<Session_component> _process_packet_handler;
@@ -446,6 +448,8 @@ class Vfs_server::Session_component : private Session_resources,
 		 */
 		~Session_component()
 		{
+			Genode::log(_label, " RPC count: ", _rpc_count);
+
 			while (_node_space.apply_any<Node>([&] (Node &node) {
 				_close(node); })) { }
 		}
@@ -512,6 +516,8 @@ class Vfs_server::Session_component : private Session_resources,
 
 		Dir_handle dir(::File_system::Path const &path, bool create) override
 		{
+			_rpc_count++;
+
 			if (create && (!_writable))
 				throw Permission_denied();
 
@@ -540,6 +546,8 @@ class Vfs_server::Session_component : private Session_resources,
 		File_handle file(Dir_handle dir_handle, Name const &name,
 		                 Mode fs_mode, bool create) override
 		{
+			_rpc_count++;
+
 			if ((create || (fs_mode & WRITE_ONLY)) && (!_writable))
 				throw Permission_denied();
 
@@ -555,6 +563,8 @@ class Vfs_server::Session_component : private Session_resources,
 
 		Symlink_handle symlink(Dir_handle dir_handle, Name const &name, bool create) override
 		{
+			_rpc_count++;
+
 			if (create && !_writable) throw Permission_denied();
 
 			return _apply(dir_handle, [&] (Directory &dir) {
@@ -570,6 +580,8 @@ class Vfs_server::Session_component : private Session_resources,
 
 		Node_handle node(::File_system::Path const &path) override
 		{
+			_rpc_count++;
+
 			char const *path_str = path.string();
 
 			_assert_valid_path(path_str);
@@ -590,6 +602,8 @@ class Vfs_server::Session_component : private Session_resources,
 
 		Watch_handle watch(::File_system::Path const &path) override
 		{
+			_rpc_count++;
+
 			char const *path_str = path.string();
 
 			_assert_valid_path(path_str);
@@ -622,6 +636,8 @@ class Vfs_server::Session_component : private Session_resources,
 
 		void close(Node_handle handle) override
 		{
+			_rpc_count++;
+
 			try { _apply_node(handle, [&] (Node &node) {
 				_close(node);
 			}); } catch (::File_system::Invalid_handle) { }
@@ -629,6 +645,8 @@ class Vfs_server::Session_component : private Session_resources,
 
 		Status status(Node_handle node_handle) override
 		{
+			_rpc_count++;
+
 			::File_system::Status fs_stat;
 
 			_apply_node(node_handle, [&] (Node &node) {
@@ -665,6 +683,8 @@ class Vfs_server::Session_component : private Session_resources,
 
 		void unlink(Dir_handle dir_handle, Name const &name) override
 		{
+			_rpc_count++;
+
 			if (!_writable) throw Permission_denied();
 
 			_apply(dir_handle, [&] (Directory &dir) {
@@ -680,6 +700,8 @@ class Vfs_server::Session_component : private Session_resources,
 
 		void truncate(File_handle file_handle, file_size_t size) override
 		{
+			_rpc_count++;
+
 			_apply(file_handle, [&] (File &file) {
 				file.truncate(size); });
 		}
@@ -687,6 +709,8 @@ class Vfs_server::Session_component : private Session_resources,
 		void move(Dir_handle from_dir_handle, Name const &from_name,
 		          Dir_handle to_dir_handle,   Name const &to_name) override
 		{
+			_rpc_count++;
+
 			if (!_writable)
 				throw Permission_denied();
 
@@ -709,7 +733,7 @@ class Vfs_server::Session_component : private Session_resources,
 			});
 		}
 
-		void control(Node_handle, Control) override { }
+		void control(Node_handle, Control) override { _rpc_count++; }
 };
 
 /**
