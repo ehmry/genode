@@ -1197,7 +1197,10 @@ Vfs::Lxip_socket_dir::_accept_new_socket(Vfs::File_system &fs,
 
 	catch (Genode::Out_of_ram)  { res = Open_result::OPEN_ERR_OUT_OF_RAM;  }
 	catch (Genode::Out_of_caps) { res = Open_result::OPEN_ERR_OUT_OF_CAPS; }
-	catch (...) { Genode::error("unhandle error during accept"); }
+	catch (...) {
+		Genode::error("unhandled error during Lxip accept");
+		throw;
+	}
 
 	kfree(new_sock);
 	return res;

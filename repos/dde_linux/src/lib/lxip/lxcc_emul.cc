@@ -402,12 +402,12 @@ class Avl_page : public Genode::Avl_node<Avl_page>
 		{
 			_addr =(Genode::addr_t)kmalloc(size, 0);
 			if (!_addr)
-				throw -1;
+				throw Genode::Out_of_ram(); /* XXX out of caps? */
 
 			_page = (struct page *) kzalloc(sizeof(struct page), 0);
 			if (!_page) {
 				kfree((void *)_addr);
-				throw -2;
+				throw Genode::Out_of_ram(); /* XXX out of caps? */
 			}
 
 			_page->addr = (void *)_addr;
