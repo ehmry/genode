@@ -128,19 +128,11 @@ static void resolve_symlinks(char const *path, Absolute_path &resolved_path)
 			 * path elements get added and a new iteration starts.
 			 */
 			if (!symlink_resolved_in_this_iteration) {
-				struct stat stat_buf;
-				int res;
-				FNAME_FUNC_WRAPPER_GENERIC(res = , stat, next_iteration_working_path.base(), &stat_buf);
-				if (res == -1) {
-					throw Symlink_resolve_error();
-				}
-				if (S_ISLNK(stat_buf.st_mode)) {
-					FNAME_FUNC_WRAPPER_GENERIC(res = , readlink,
-					                           next_iteration_working_path.base(),
-					                           symlink_target, sizeof(symlink_target) - 1);
-					if (res < 1)
-						throw Symlink_resolve_error();
-
+				int res = 0;
+				FNAME_FUNC_WRAPPER_GENERIC(res = , readlink,
+				                           next_iteration_working_path.base(),
+				                           symlink_target, sizeof(symlink_target) - 1);
+				if (res > 0) {
 					/* zero terminate target */
 					symlink_target[res] = 0;
 
@@ -540,10 +532,8 @@ extern "C" int _open(const char *pathname, int flags, ::mode_t mode)
 	}
 
 	new_fdo = plugin->open(resolved_path.base(), flags);
-	if (!new_fdo) {
-		Genode::error("plugin()->open(\"", pathname, "\") failed");
-		return -1;
-	}
+	if (!new_fdo)
+		return Errno(ENOENT);
 	new_fdo->path(resolved_path.base());
 
 	return new_fdo->libc_fd;
@@ -598,6 +588,8 @@ extern "C" ssize_t read(int libc_fd, void *buf, ::size_t count)
 
 extern "C" ssize_t readlink(const char *path, char *buf, ::size_t bufsiz)
 {
+	// TODO: return EINVAL
+
 	try {
 		Absolute_path resolved_path;
 		resolve_symlinks_except_last_element(path, resolved_path);
