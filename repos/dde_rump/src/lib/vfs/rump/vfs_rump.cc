@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (C) 2014-2018 Genode Labs GmbH
+ * Copyright (C) 2014-2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -20,6 +20,7 @@
 #include <vfs/vfs_handle.h>
 #include <timer_session/connection.h>
 #include <os/path.h>
+#include <util/xml_generator.h>
 
 extern "C" {
 #include <sys/cdefs.h>
@@ -29,6 +30,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/mount.h>
 #include <sys/resource.h>
 #include <sys/event.h>
 #include <sys/time.h>
@@ -48,6 +50,8 @@ static void _rump_sync()
 	/* sync Genode back-end */
 	rump_io_backend_sync();
 }
+
+static char const *STATS_PATH = "/control/stats";
 
 static char const *fs_types[] = { RUMP_MOUNT_CD9660, RUMP_MOUNT_EXT2FS,
                                   RUMP_MOUNT_FFS, RUMP_MOUNT_MSDOS,
@@ -92,6 +96,57 @@ class Vfs::Rump_file_system : public File_system
 			}
 		};
 
+		void _generate_stats_file()
+		{
+			enum { XML_BUF_SIZE = 0x1000 };
+
+			char xml_buf[XML_BUF_SIZE] { 0 };
+
+			Genode::Xml_generator gen(xml_buf, sizeof(xml_buf), "stats", [&] () {
+				struct statvfs stats;
+				int err = rump_sys_statvfs1("/", &stats, ST_WAIT);
+				if (err != 0) {
+					gen.attribute("error", err);
+					return;
+				}
+
+				gen.node("size", [&] () {
+					gen.attribute(   "block", stats.f_bsize);
+					gen.attribute("fragment", stats.f_frsize);
+					gen.attribute( "optimal", stats.f_iosize);
+				});
+
+				gen.node("blocks", [&] () {
+					gen.attribute(    "total", stats.f_blocks);
+					gen.attribute(     "free", stats.f_bfree);
+					gen.attribute("available", stats.f_bavail);
+					gen.attribute( "reserved", stats.f_bresvd);
+				});
+
+				gen.node("nodes", [&] () {
+					gen.attribute(    "total", stats.f_files);
+					gen.attribute(     "free", stats.f_ffree);
+					gen.attribute("available", stats.f_favail);
+					gen.attribute( "reserved", stats.f_fresvd);
+				});
+
+				gen.node("sync", [&] () {
+					gen.attribute( "reads", stats.f_syncreads);
+					gen.attribute("writes", stats.f_syncwrites);
+				});
+
+				gen.node("async", [&] () {
+					gen.attribute( "reads", stats.f_asyncreads);
+					gen.attribute("writes", stats.f_asyncwrites);
+				});
+			});
+
+			int fd = rump_sys_open(STATS_PATH, O_WRONLY | O_CREAT | O_TRUNC);
+			if (0 <= fd)
+				rump_sys_write(fd, xml_buf, gen.used());
+			rump_sys_close(fd);
+		}
+
 		class Rump_vfs_file_handle :
 			public Rump_vfs_handle, public Rump_vfs_file_handles::Element
 		{
@@ -126,7 +181,8 @@ class Vfs::Rump_file_system : public File_system
 				}
 
 				Read_result read(char *buf, file_size buf_size,
-				                 file_size seek_offset, file_size &out_count) override
+				                 file_size seek_offset,
+				                 file_size &out_count) override
 				{
 					ssize_t n = rump_sys_pread(_fd, buf, buf_size, seek_offset);
 					if (n == -1) switch (errno) {
@@ -407,12 +463,20 @@ class Vfs::Rump_file_system : public File_system
 				0 : RUMP_MNT_RDONLY;
 
 			args.fspec =  (char *)GENODE_DEVICE;
-			if (rump_sys_mount(fs_type.string(), "/", opts, &args, sizeof(args)) == -1) {
+			if (rump_sys_mkdir("/content", 0777)) {
+				Genode::error("failed to create content directory");
+				throw Genode::Exception();
+			}
+			if (rump_sys_mkdir("/control", 0777)) {
+				Genode::error("failed to create control directory");
+				throw Genode::Exception();
+			}
+			if (rump_sys_mount(fs_type.string(), "/content", opts, &args, sizeof(args)) == -1) {
 				Genode::error("Mounting '",fs_type,"' file system failed (",errno,")");
 				throw Genode::Exception();
 			}
 
-			Genode::log(fs_type," file system mounted");
+			Genode::log(fs_type," file system mounted at /content");
 		}
 
 		/***************************
@@ -521,6 +585,13 @@ class Vfs::Rump_file_system : public File_system
 			bool create = mode & OPEN_MODE_CREATE;
 			if (create)
 				mode |= O_CREAT;
+
+			if (strcmp(path, STATS_PATH) == 0) {
+				if (mode & OPEN_MODE_WRONLY) {
+					return OPEN_ERR_NO_PERM;
+				}
+				_generate_stats_file();
+			}
 
 			int fd = rump_sys_open(path, mode);
 			if (fd == -1) switch (errno) {
