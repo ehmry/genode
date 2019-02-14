@@ -36,7 +36,8 @@ struct Test_failed : Genode::Exception { };
 	if (condition) { \
 		printf(#operation " succeeded\n"); \
 	} else { \
-		printf(#operation " failed, " #ret "=%ld, errno=%d\n", (long)ret, errno); \
+		int err = errno; \
+		printf(#operation " failed, " #ret "=%ld, errno=%d %s\n", (long)ret, err, strerror(err)); \
 		throw Test_failed(); \
 	}
 

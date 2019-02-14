@@ -54,11 +54,11 @@ build $build_components
 
 create_boot_directory
 
-set depot_pkgs "genodelabs/src/[base_src] genodelabs/src/init"
+set depot_pkgs "[depot_user]/src/[base_src] [depot_user]/src/init"
 
-lappend_if $use_ahci       depot_pkgs genodelabs/src/ahci_drv
-lappend_if $use_ram_block  depot_pkgs genodelabs/src/ram_block
-lappend_if $use_vfs_server depot_pkgs genodelabs/src/vfs
+lappend_if $use_ahci       depot_pkgs [depot_user]/src/ahci_drv
+lappend_if $use_ram_block  depot_pkgs [depot_user]/src/ram_block
+lappend_if $use_vfs_server depot_pkgs [depot_user]/src/vfs
 
 import_from_depot {*}$depot_pkgs
 
@@ -93,7 +93,7 @@ set config {
 append_if [have_include "power_on/qemu"] config {
 			<write-read size="1M" buffer_size="8K"/>}
 append config {
-			<libc stdout="/dev/log" stderr="/dev/log"/>
+			<libc stdout="/dev/log" stderr="/dev/log" cwd="/tmp"/>
 			<vfs>
 				<dir name="dev"> <log/> </dir>}
 if {$use_vfs_server} {
@@ -137,14 +137,14 @@ append_if $use_ram_block config {
 
 append_if $use_vfs_server config "
 	<start name=\"vfs\" caps=\"200\">
-		<resource name=\"RAM\" quantum=\"8M\" />
+		<resource name=\"RAM\" quantum=\"9M\" />
 		<provides><service name=\"File_system\"/></provides>
 		<config>
 			<vfs>
 				<dir name=\"dev\"> <log/> </dir>}
 				$test_vfs_config
 			</vfs>
-			<policy label_prefix=\"test-libc_vfs\" writeable=\"yes\"/>
+			<policy label_prefix=\"test-libc_vfs\" writeable=\"yes\" root=\"/\"/>
 		</config>
 	</start>"
 

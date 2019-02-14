@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (C) 2014-2018 Genode Labs GmbH
+ * Copyright (C) 2014-2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -20,6 +20,7 @@
 #include <vfs/vfs_handle.h>
 #include <timer_session/connection.h>
 #include <os/path.h>
+#include <util/xml_generator.h>
 
 extern "C" {
 #include <sys/cdefs.h>
@@ -29,6 +30,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/mount.h>
 #include <sys/resource.h>
 #include <sys/event.h>
 #include <sys/time.h>
@@ -49,6 +51,8 @@ static void _rump_sync()
 	rump_io_backend_sync();
 }
 
+static char const *STATS_PATH = "/control/stats";
+
 static char const *fs_types[] = { RUMP_MOUNT_CD9660, RUMP_MOUNT_EXT2FS,
                                   RUMP_MOUNT_FFS, RUMP_MOUNT_MSDOS,
                                   RUMP_MOUNT_NTFS, RUMP_MOUNT_UDF, 0 };
@@ -60,8 +64,32 @@ class Vfs::Rump_file_system : public File_system
 		enum { BUFFER_SIZE = 4096 };
 
 		typedef Genode::Path<MAX_PATH_LEN> Path;
+		typedef String<63> Name;
 
 		Vfs::Env &_env;
+
+		Name const _name;
+
+		static
+		Path _dot_path(Name const &name)
+		{
+			char buf[Name::capacity()] { 0 };
+			unsigned i = 0;
+			buf[i++] = '.';
+			for (char const *s = name.string(); *s && i < sizeof(buf); s++) {
+				if (*s == '/') {
+					Genode::error("invalid file-system name \"", name, "\"");
+					throw Genode::Exception();
+				}
+				buf[i++] = *s;
+			}
+			return Name(Genode::Cstring(buf, i));
+		}
+
+		Path const _meta_path { _dot_path(_name) };
+		Path const _stats_path { "stats", _meta_path.string() };
+
+		Path const _data_path { _name.string() };
 
 		struct Rump_vfs_dir_handle;
 		struct Rump_watch_handle;
@@ -126,7 +154,8 @@ class Vfs::Rump_file_system : public File_system
 				}
 
 				Read_result read(char *buf, file_size buf_size,
-				                 file_size seek_offset, file_size &out_count) override
+				                 file_size seek_offset,
+				                 file_size &out_count) override
 				{
 					ssize_t n = rump_sys_pread(_fd, buf, buf_size, seek_offset);
 					if (n == -1) switch (errno) {
@@ -341,6 +370,80 @@ class Vfs::Rump_file_system : public File_system
 			}
 		};
 
+		bool _match_meta_prefix(char const *path)
+		{
+			Path other(path);
+			while (!other.has_single_element()) {
+				other.strip_last_element();
+				if (other == _meta_path) return true;
+			}
+			return false;
+		}
+
+		bool _match_data_prefix(char const *path)
+		{
+			Path other(path);
+			while (!other.has_single_element()) {
+				other.strip_last_element();
+				if (other == _data_path) return true;
+			}
+			return false;
+		}
+
+		void _generate_stats_file()
+		{
+			enum { XML_BUF_SIZE = 0x1000 };
+
+			char xml_buf[XML_BUF_SIZE] { 0 };
+
+			Genode::Xml_generator gen(xml_buf, sizeof(xml_buf), "stats", [&] () {
+				struct statvfs stats;
+				int err = rump_sys_statvfs1(_data_path.string(), &stats, ST_WAIT);
+				if (err != 0) {
+					gen.attribute("error", err);
+					return;
+				}
+
+				gen.node("size", [&] () {
+					gen.attribute(   "block", stats.f_bsize);
+					gen.attribute("fragment", stats.f_frsize);
+					gen.attribute( "optimal", stats.f_iosize);
+				});
+
+				gen.node("blocks", [&] () {
+					gen.attribute(    "total", stats.f_blocks);
+					gen.attribute(     "free", stats.f_bfree);
+					gen.attribute("available", stats.f_bavail);
+					gen.attribute( "reserved", stats.f_bresvd);
+				});
+
+				gen.node("nodes", [&] () {
+					gen.attribute(    "total", stats.f_files);
+					gen.attribute(     "free", stats.f_ffree);
+					gen.attribute("available", stats.f_favail);
+					gen.attribute( "reserved", stats.f_fresvd);
+				});
+
+				gen.node("sync", [&] () {
+					gen.attribute( "reads", stats.f_syncreads);
+					gen.attribute("writes", stats.f_syncwrites);
+				});
+
+				gen.node("async", [&] () {
+					gen.attribute( "reads", stats.f_asyncreads);
+					gen.attribute("writes", stats.f_asyncwrites);
+				});
+			});
+
+			int fd = rump_sys_open(_stats_path.string(), O_WRONLY | O_CREAT | O_TRUNC);
+			if (0 <= fd) {
+				rump_sys_write(fd, xml_buf, gen.used());
+				rump_sys_close(fd);
+			} else {
+				Genode::error("failed to write file-system statistics to ", _stats_path);
+			}
+		}
+
 		/**
 		 * We define our own fs arg structure to fit all sizes, we assume that 'fspec'
 		 * is the only valid argument and all other fields are unused.
@@ -389,7 +492,7 @@ class Vfs::Rump_file_system : public File_system
 	public:
 
 		Rump_file_system(Vfs::Env &env, Xml_node const &config)
-		: _env(env)
+		: _env(env), _name(config.attribute_value("name", Name("rump")))
 		{
 			typedef Genode::String<16> Fs_type;
 
@@ -407,12 +510,23 @@ class Vfs::Rump_file_system : public File_system
 				0 : RUMP_MNT_RDONLY;
 
 			args.fspec =  (char *)GENODE_DEVICE;
-			if (rump_sys_mount(fs_type.string(), "/", opts, &args, sizeof(args)) == -1) {
+			if (rump_sys_mkdir(_data_path.string(), 0777)) {
+				Genode::warning("failed to create internal \"", _data_path, "\" directory");
+			}
+			if (rump_sys_mkdir(_meta_path.string(), 0777)) {
+				Genode::warning("failed to create internal \"", _meta_path, "\" directory");
+			}
+			
+			int err = rump_sys_mount(fs_type.string(), _data_path.string(),
+			                         opts, &args, sizeof(args));
+			if (err == -1) {
 				Genode::error("Mounting '",fs_type,"' file system failed (",errno,")");
 				throw Genode::Exception();
 			}
 
-			Genode::log(fs_type," file system mounted");
+			rump_sys_close(
+				rump_sys_open(_stats_path.string(), O_WRONLY | O_CREAT));
+			Genode::log(fs_type," file system mounted at \"", _data_path, "\"");
 		}
 
 		/***************************
@@ -519,8 +633,18 @@ class Vfs::Rump_file_system : public File_system
 		{
 			/* OPEN_MODE_CREATE (or O_EXC) will not work */
 			bool create = mode & OPEN_MODE_CREATE;
-			if (create)
+			if (create) {
+				if (!_match_data_prefix(path))
+					return OPEN_ERR_NO_PERM;
 				mode |= O_CREAT;
+			}
+
+			if (_stats_path == path) {
+				if (mode & OPEN_MODE_WRONLY) {
+					return OPEN_ERR_NO_PERM;
+				}
+				_generate_stats_file();
+			}
 
 			int fd = rump_sys_open(path, mode);
 			if (fd == -1) switch (errno) {
@@ -558,6 +682,11 @@ class Vfs::Rump_file_system : public File_system
 				path = "/";
 
 			if (create) {
+				if (_meta_path == path || _data_path == path)
+					return OPENDIR_ERR_NODE_ALREADY_EXISTS;
+				if (!_match_data_prefix(path))
+					return OPENDIR_ERR_PERMISSION_DENIED;
+
 				if (rump_sys_mkdir(path, 0777) != 0) switch (::errno) {
 				case ENAMETOOLONG: return OPENDIR_ERR_NAME_TOO_LONG;
 				case EACCES:       return OPENDIR_ERR_PERMISSION_DENIED;
@@ -602,6 +731,9 @@ class Vfs::Rump_file_system : public File_system
 	                             Vfs_handle **handle, Allocator &alloc) override
 	    {
 			if (create) {
+				if (!_match_data_prefix(path))
+					return OPENLINK_ERR_PERMISSION_DENIED;
+
 				if (rump_sys_symlink("", path) != 0) switch (errno) {
 				case EEXIST:       return OPENLINK_ERR_NODE_ALREADY_EXISTS;
 				case ENOENT:       return OPENLINK_ERR_LOOKUP_FAILED;
@@ -673,6 +805,9 @@ class Vfs::Rump_file_system : public File_system
 
 		Unlink_result unlink(char const *path) override
 		{
+			if (strcmp(path, STATS_PATH, MAX_PATH_LEN) == 0)
+				return UNLINK_ERR_NO_PERM;
+
 			struct stat s;
 			if (rump_sys_lstat(path, &s) == -1)
 				return UNLINK_ERR_NO_ENTRY;
