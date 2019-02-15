@@ -164,20 +164,22 @@ bool Cpu::interrupt(unsigned const irq_id)
 Cpu_job & Cpu::schedule()
 {
 	/* update scheduler */
+	time_t quota = _timer.update_time();
 	Job & old_job = scheduled_job();
 	old_job.exception(*this);
+	_timer.process_timeouts();
+	_scheduler.update(quota);
 
-	if (_scheduler.need_to_schedule()) {
-		time_t quota = _timer.update_time();
-		_timer.process_timeouts();
-		_scheduler.update(quota);
-		quota = _scheduler.head_quota();
-		_timer.set_timeout(this, quota);
-		_timer.schedule_timeout();
-	}
+	/* get new job */
+	Job & new_job = scheduled_job();
+	quota = _scheduler.head_quota();
+
+	_timer.set_timeout(this, quota);
+
+	_timer.schedule_timeout();
 
 	/* return new job */
-	return scheduled_job();
+	return new_job;
 }
 
 
@@ -193,9 +195,9 @@ addr_t Cpu::stack_start() {
 Cpu::Cpu(unsigned const id, Pic & pic,
          Inter_processor_work_list & global_work_list)
 :
-	_id(id), _pic(pic), _timer(*this),
+	_id(id), _pic(pic), _timer(_id),
 	_scheduler(&_idle, _quota(), _fill()), _idle(*this),
-	_ipi_irq(*this),
+	_ipi_irq(*this), _timer_irq(_timer.interrupt_id(), *this),
 	_global_work_list(global_work_list)
 { _arch_init(); }
 

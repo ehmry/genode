@@ -16,7 +16,6 @@
 
 /* base-hw includes */
 #include <kernel/types.h>
-#include <kernel/irq.h>
 
 /* Genode includes */
 #include <util/list.h>
@@ -26,7 +25,6 @@
 
 namespace Kernel
 {
-	class Cpu;
 	class Timeout;
 	class Timer;
 }
@@ -59,13 +57,13 @@ class Kernel::Timeout : Genode::List<Timeout>::Element
 /**
  * A timer manages a continuous time and timeouts on it
  */
-class Kernel::Timer : public Kernel::Irq
+class Kernel::Timer
 {
 	private:
 
 		using Driver = Timer_driver;
 
-		Cpu &                 _cpu;
+		unsigned const        _cpu_id;
 		Driver                _driver;
 		time_t                _time = 0;
 		bool                  _time_period = false;
@@ -84,12 +82,11 @@ class Kernel::Timer : public Kernel::Irq
 
 	public:
 
-		Timer(Cpu & cpu);
+		Timer(unsigned cpu_id);
 
 		void schedule_timeout();
 
 		time_t update_time();
-
 		void process_timeouts();
 
 		void set_timeout(Timeout * const timeout, time_t const duration);
@@ -105,8 +102,6 @@ class Kernel::Timer : public Kernel::Irq
 		static void init_cpu_local();
 
 		time_t time() const { return _time; }
-
-		void occurred() override;
 };
 
 #endif /* _CORE__KERNEL__TIMER_H_ */

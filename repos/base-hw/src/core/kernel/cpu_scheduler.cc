@@ -129,8 +129,6 @@ void Cpu_scheduler::_quota_adaption(Share * const s, unsigned const q)
 
 void Cpu_scheduler::update(unsigned q)
 {
-	_need_to_schedule = false;
-
 	/* do not detract the quota if the head context was removed even now */
 	if (_head) {
 		unsigned const r = _trim_consumption(q);
@@ -151,25 +149,17 @@ bool Cpu_scheduler::ready_check(Share * const s1)
 
 	ready(s1);
 	Share * s2 = _head;
-	if (!s1->_claim) {
-		_need_to_schedule = s2 == _idle;
-	} else if (!_head_claims) {
-		_need_to_schedule = true;
-	} else if (s1->_prio != s2->_prio) {
-		_need_to_schedule = s1->_prio > s2->_prio;
-	} else {
-		for (; s2 && s2 != s1; s2 = _share(Claim_list::next(s2))) ;
-		_need_to_schedule = !s2;
-	}
-	return _need_to_schedule;
+	if (!s1->_claim) { return s2 == _idle; }
+	if (!_head_claims) { return 1; }
+	if (s1->_prio != s2->_prio) { return s1->_prio > s2->_prio; }
+	for (; s2 && s2 != s1; s2 = _share(Claim_list::next(s2))) ;
+	return !s2;
 }
 
 
 void Cpu_scheduler::ready(Share * const s)
 {
 	assert(!s->_ready && s != _idle);
-
-	_need_to_schedule = true;
 
 	s->_ready = 1;
 	s->_fill = _fill;
@@ -184,9 +174,6 @@ void Cpu_scheduler::ready(Share * const s)
 void Cpu_scheduler::unready(Share * const s)
 {
 	assert(s->_ready && s != _idle);
-
-	_need_to_schedule = true;
-
 	s->_ready = 0;
 	_fills.remove(s);
 	if (!s->_quota) { return; }
