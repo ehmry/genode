@@ -14,7 +14,6 @@
 
 /* Genode includes */
 #include <base/env.h>
-#include <base/printf.h>
 #include <base/log.h>
 #include <util/misc_math.h>
 
@@ -108,10 +107,14 @@ void *memset(void *s, int c, size_t n) {
 
 void q_printf(char const *fmt, ...)
 {
-	va_list va;
-	va_start(va, fmt);
-	Genode::vprintf(fmt, va);
-	va_end(va);
+	enum { BUF_SIZE = 128 };
+	char buf[BUF_SIZE] { };
+	va_list args;
+	va_start(args, fmt);
+	Genode::String_console sc(buf, BUF_SIZE);
+	sc.vprintf(fmt, args);
+	Genode::log(Genode::Cstring(buf));
+	va_end(args);
 }
 
 

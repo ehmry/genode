@@ -17,6 +17,7 @@
 
 #include <base/stdint.h>
 #include <base/signal.h>
+#include <base/allocator.h>
 
 namespace Qemu {
 
