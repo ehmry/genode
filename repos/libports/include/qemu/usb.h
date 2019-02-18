@@ -103,7 +103,7 @@ namespace Qemu {
 	 * \return Pointer to Controller object that is used to access the xHCI device state
 	 */
 	Controller *usb_init(Timer_queue &tq, Pci_device &pd,
-	                     Genode::Signal_receiver &sr,
+	                     Genode::Entrypoint &ep,
 	                     Genode::Allocator &, Genode::Env &);
 
 	/**
