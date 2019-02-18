@@ -207,8 +207,9 @@ install_config {
 			<binary name="init"/>
 			<route>
 				<service name="ROM">   <parent/>    </service>
-				<service name="CPU">   <parent/>    </service>
 				<service name="PD">    <parent/>    </service>
+				<service name="RM">    <parent/>    </service>
+				<service name="CPU">   <parent/>    </service>
 				<service name="LOG">   <parent/>    </service>
 				<service name="Timer"> <child name="timer"/> </service>
 			</route>
@@ -290,6 +291,8 @@ if {$failure_timeout == 0} {
 	puts stderr "Warning: could not determine failure timeout, discharge timeout"
 	set failure_timeout 1000
 }
+
+append qemu_args " -nographic "
 
 run_genode_until $expected_pattern $failure_timeout
 
