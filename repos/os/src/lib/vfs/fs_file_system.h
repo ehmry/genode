@@ -95,6 +95,9 @@ class Vfs::Fs_file_system : public File_system
 
 				file_size const max_packet_size = source.bulk_buffer_size() / 2;
 				file_size const clipped_count = min(max_packet_size, count);
+				if (clipped_count != count) {
+					Genode::warning("clipped read size from ", count, " to ", clipped_count);
+				}
 
 				::File_system::Packet_descriptor p;
 				try {
@@ -638,7 +641,7 @@ class Vfs::Fs_file_system : public File_system
 			_fs(_env.env(), _fs_packet_alloc,
 			    _label.string(), _root.string(),
 			    config.attribute_value("writeable", true),
-			    ::File_system::DEFAULT_TX_BUF_SIZE)
+			    config.attribute_value("buffer_size", (Genode::size_t)::File_system::DEFAULT_TX_BUF_SIZE))
 		{
 			_fs.sigh_ack_avail(_ack_handler);
 			_fs.sigh_ready_to_submit(_ready_handler);
