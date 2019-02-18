@@ -1,5 +1,5 @@
 ADA_RT_DIR  := $(call port_dir,$(GENODE_DIR)/repos/libports/ports/ada-runtime)
-ADA_ALI_DIR := $(call port_dir,$(GENODE_DIR)/repos/libports/ports/ada-runtime-alis)/ada-runtime-alis/alis
+ADA_ALI_DIR := $(call port_dir,$(GENODE_DIR)/repos/libports/ports/ada-runtime)/ada-runtime-alis/alis
 
 MIRROR_FROM_ADA_RT_DIR := \
 	$(addprefix ada-runtime/contrib/gcc-6.3.0/,\
