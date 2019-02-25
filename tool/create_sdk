@@ -77,7 +77,7 @@ SPECS(x86_64) := x86 x86_64 64bit
 ifneq (${SPECS(${PLATFORM})},)
 
 GENODE_API_PKG_NAMES = \
-	base so os \
+	base so os gems \
 	audio_in_session \
 	audio_out_session \
 	block_session \
@@ -99,15 +99,19 @@ GENODE_API_PKG_NAMES = \
 	vfs \
 
 CONTRIB_API_PKG_NAMES = \
+	egl_api \
 	libc \
 	stdcxx \
+	zlib \
 
 SDK_BIN_PKG_NAME = \
 	base-linux \
-	vfs \
+	egl_api \
 	libc \
 	posix \
 	stdcxx \
+	vfs \
+	zlib \
 
 include $(GENODE_DIR)/tool/depot/mk/front_end.inc
 
