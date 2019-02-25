@@ -1,0 +1,17 @@
+create_boot_directory
+
+set app_config {
+	<start name="noux" caps="256">
+		<resource name="RAM" quantum="8M"/>
+		<config verbose="yes">
+			<fstab> <tar name="pkgconf.tar" /> </fstab>
+			<start name="/bin/pkgconf"> <arg value="--help"/> </start>
+		</config>
+	</start>
+}
+
+set build_components { noux-pkg/pkgconf }
+
+set boot_modules { pkgconf.tar }
+
+source ${genode_dir}/repos/ports/run/noux-no-fork.inc

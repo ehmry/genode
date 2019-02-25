@@ -1,0 +1,7 @@
+LICENSE   := pkgconf
+VERSION   := 1.1.0
+DOWNLOADS := pkgconf.archive
+
+URL(pkgconf) := https://distfiles.dereferenced.org/pkgconf/pkgconf-$(VERSION).tar.xz
+SHA(pkgconf) := 5f1ef65d73a880fa5e7012102a17f7b32010e5e46139aed85851a541ba828a63
+DIR(pkgconf) := src/noux-pkg/pkgconf
