@@ -1,52 +1,22 @@
-build { core init timer noux server/log_terminal
-        lib/libc_noux noux-pkg/coreutils }
-
 create_boot_directory
 
-install_config {
-	<config verbose="yes">
-		<parent-provides>
-			<service name="ROM"/>
-			<service name="LOG"/>
-			<service name="RM"/>
-			<service name="CPU"/>
-			<service name="PD"/>
-			<service name="IRQ"/>
-			<service name="IO_MEM"/>
-			<service name="IO_PORT"/>
-		</parent-provides>
-		<default-route>
-			<any-service> <any-child/> <parent/> </any-service>
-		</default-route>
-		<default caps="100"/>
-		<start name="timer">
-			<resource name="RAM" quantum="1M"/>
-			<provides><service name="Timer"/></provides>
-		</start>
-		<start name="terminal">
-			<binary name="log_terminal" />
-			<resource name="RAM" quantum="1M"/>
-			<provides><service name="Terminal"/></provides>
-		</start>
-		<start name="noux" caps="500">
-			<resource name="RAM" quantum="1G"/>
-			<config verbose="yes">
-				<fstab> <tar name="coreutils.tar" /> </fstab>
-				<start name="/bin/ls"> <arg value="-Rla"/> </start>
-			</config>
-		</start>
-	</config>
+import_from_depot [depot_user]/src/coreutils
+
+set app_config {
+	<start name="noux" caps="500">
+		<resource name="RAM" quantum="8M"/>
+		<config verbose="yes">
+			<fstab> <tar name="coreutils.tar" /> </fstab>
+			<start name="/bin/ls"> <arg value="-Rla"/> </start>
+		</config>
+	</start>
 }
 
-build_boot_image {
-	core init timer log_terminal ld.lib.so noux libc.lib.so vfs.lib.so libm.lib.so
-	libc_noux.lib.so coreutils.tar posix.lib.so
+set build_components { noux lib/libc_noux }
+
+set boot_modules {
+	libc_noux.lib.so
+	noux
 }
 
-append qemu_args " -nographic -serial mon:stdio "
-
-if {[have_spec x86_64]} {
-	# coreutils.tar is really huge when built for x86_64
-}
-
-run_genode_until {child "noux" exited with exit value 0.*\n} 30
+source ${genode_dir}/repos/ports/run/noux-no-fork.inc
