@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+ <xs:include schemaLocation="base_types.xsd"/>
+
+ <xs:complexType name="template_service">
+  <xs:choice minOccurs="0" maxOccurs="unbounded"/>
+  <xs:attribute name="label" type="Session_label" />
+ </xs:complexType>
+
+ <xs:complexType name="template_services">
+  <xs:choice minOccurs="0" maxOccurs="unbounded">
+   <xs:element name="audio_in" type="template_service"/>
+   <xs:element name="audio_out" type="template_service"/>
+   <xs:element name="block" type="template_service"/>
+   <xs:element name="file_system" type="template_service"/>
+   <xs:element name="framebuffer" type="template_service"/>
+   <xs:element name="input" type="template_service"/>
+   <xs:element name="log" type="template_service"/>
+   <xs:element name="nic" type="template_service"/>
+   <xs:element name="nitpicker" type="template_service"/>
+   <xs:element name="report" type="template_service"/>
+   <xs:element name="rom" type="template_service"/>
+   <xs:element name="rtc" type="template_service"/>
+   <xs:element name="terminal" type="template_service"/>
+  </xs:choice>
+ </xs:complexType>
+
+ <xs:element name="runtime">
+  <xs:complexType>
+
+   <xs:choice minOccurs="0" maxOccurs="unbounded">
+
+    <xs:element name="requires" type="template_services"/>
+
+    <xs:element name="provides" type="template_services"/>
+
+    <xs:element name="content">
+     <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="rom">
+         <xs:complexType>
+          <xs:attribute name="label" type="xs:string" />
+         </xs:complexType>
+        </xs:element>
+      </xs:choice>
+     </xs:complexType>
+    </xs:element>
+
+    <xs:element name="config">
+     <xs:complexType>
+      <xs:sequence>
+       <xs:any minOccurs="0" maxOccurs="unbounded" processContents="skip" />
+      </xs:sequence>
+      <xs:anyAttribute processContents="skip"/>
+     </xs:complexType>
+    </xs:element>
+
+   </xs:choice>
+
+   <xs:attribute name="ram"    type="Number_of_bytes" />
+   <xs:attribute name="caps"   type="xs:positiveInteger" />
+   <xs:attribute name="binary" type="xs:string" />
+
+  </xs:complexType>
+ </xs:element>
+</xs:schema>
