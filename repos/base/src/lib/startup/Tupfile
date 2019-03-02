@@ -1,0 +1,15 @@
+include_rules
+
+: foreach *.cc |> !cxx |> {obj}
+
+ifeq (@(TUP_ARCH),i386)
+	: foreach spec/x86_32/*.s |> !asm |> {obj}
+endif
+ifeq (@(TUP_ARCH),x86_64)
+	: foreach spec/x86_64/*.s |> !asm |> {obj}
+endif
+ifeq (@(TUP_ARCH),arm64)
+	: foreach spec/arm_64/*.s |> !asm |> {obj}
+endif
+
+: {obj} |> !ar |> startup.lib.a $(BASE_DIR)/<base-libs>

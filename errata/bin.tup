@@ -1,0 +1,14 @@
+ifeq ($(BIN_NAME),)
+error BIN_NAME is empty
+endif
+
+ifeq ($(BIN_VERSION),)
+error BIN_VERSION is empty
+endif
+
+: |> !bin |>
+	# Finalize the metadata with the macro defined in the
+	# ../Tuprules.tup. The macro cannot be defined here
+	# because the "include" directive is not available for
+	# relative paths during "include_rules" so this file
+	# cannot be included by intermediate Tuprules.tup.

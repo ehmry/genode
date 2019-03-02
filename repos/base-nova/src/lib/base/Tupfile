@@ -1,0 +1,46 @@
+ifeq (@(BUILD_NOVA),y)
+
+include_rules
+INCLUDES += -I$(BASE_DIR)/src/include
+
+BASE_LIB_DIR = $(BASE_DIR)/src/lib/base
+
+include $(BASE_DIR)/src/lib/base/common.tup
+
+COMMON_SRC_CC += \
+	$(BASE_DIR)/src/lib/base/child_process.cc \
+	$(BASE_DIR)/src/lib/base/thread.cc \
+	$(BASE_DIR)/src/lib/base/thread_myself.cc \
+	$(BASE_DIR)/src/lib/base/trace.cc \
+	capability.cc \
+	cap_map.cc \
+	ipc.cc \
+	region_map_client.cc \
+	rpc_entrypoint.cc \
+	signal_transmitter.cc \
+	sleep.cc \
+	stack_area_addr.cc \
+	stack.cc \
+	vm_session.cc \
+
+: foreach $(COMMON_SRC_CC) |> !cxx |> nova-%B.o {base-common-obj}
+
+: {base-common-obj} |> !ar |> base-nova-common.lib.a $(REP_DIR)/<base-common>
+
+SRC_CC += \
+	rpc_cap_alloc.cc \
+	thread_start.cc \
+	$(BASE_LIB_DIR)/default_log.cc \
+	$(BASE_LIB_DIR)/env_deprecated.cc \
+	$(BASE_LIB_DIR)/stack_area.cc \
+	$(BASE_LIB_DIR)/env_reinit.cc \
+	$(BASE_LIB_DIR)/main_thread_cap.cc \
+	$(BASE_LIB_DIR)/heartbeat.cc \
+	$(BASE_LIB_DIR)/cache.cc \
+	$(BASE_LIB_DIR)/signal.cc \
+
+: foreach $(SRC_CC) |> !cxx |> {base-obj}
+
+: {base-obj} |> !ar |> base-nova.lib.a
+
+endif

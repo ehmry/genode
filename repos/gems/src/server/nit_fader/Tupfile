@@ -1,0 +1,12 @@
+TARGET_NAME = nit_fader
+include_rules
+
+INCLUDES += -I.
+INCLUDES += -I$(REP_DIR)/../demo/include
+
+BLIT = $(GENODE_DIR)/repos/os/src/lib/blit/blit.lib.a
+
+: foreach *.cc |> !cxx |> %B.o {obj}
+: {obj} $(BLIT) |> !prg |> {bin}
+: {bin} |> !collect_bin |>
+include &(BIN_RULES)

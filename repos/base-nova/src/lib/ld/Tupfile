@@ -1,0 +1,64 @@
+ifeq (@(BUILD_NOVA),y)
+
+TARGET_NAME = base-nova
+include_rules
+INCLUDES += -I$(BASE_DIR)/src/include
+
+LDSO_DIR = $(BASE_DIR)/src/lib/ldso
+
+ifeq (@(TUP_ARCH),x86_64)
+LDSO_SPEC_DIR = $(LDSO_DIR)/spec/x86_64
+endif
+
+INCLUDES += -I$(LDSO_SPEC_DIR)
+INCLUDES += -I$(LDSO_DIR)/include
+
+DEFINES += -fPIC
+
+: foreach $(LDSO_DIR)/*.cc |> !cxx |> {obj}
+: foreach $(LDSO_SPEC_DIR)/*.s |> !asm |> {obj}
+
+LDFLAGS += -shared --eh-frame-hdr
+
+: $(BASE_DIR)/lib/symbols/ld \
+	|> \
+		echo -e '{\n\tglobal:' >> %o; \
+		sed -n "s/^\(\w\+\) .*/\t\t\1;/p" %f >> %o; \
+		echo -e "\tlocal: *;\n};" >> %o; \
+	|> symbol.map
+
+LDFLAGS += -Bsymbolic-functions --version-script=symbol.map
+
+ifeq (@(TUP_ARCH),x86_32)
+LDFLAGS += -T$(LDSO_DIR)/linux-32.ld
+else
+LDFLAGS += --entry=_start
+LDFLAGS += -T$(LDSO_DIR)/linker.ld
+endif
+
+LDFLAGS += -gc-sections -z max-page-size=0x1000
+LDFLAGS += -T$(BASE_DIR)/src/ld/genode_rel.ld \
+
+BASE_LIBS += \
+	$(BASE_DIR)/src/lib/alarm/alarm.lib.a \
+	$(REP_DIR)/src/lib/base/base-nova-common.lib.a \
+	$(REP_DIR)/src/lib/base/base-nova.lib.a \
+	$(BASE_DIR)/src/lib/cxx/cxx.lib.a \
+	$(BASE_DIR)/src/lib/ldso/startup/ldso-startup.lib.a \
+	$(BASE_DIR)/src/lib/startup/startup.lib.a \
+	$(BASE_DIR)/src/lib/timeout/timeout.lib.a \
+
+: $(BASE_LIBS) {obj} | symbol.map \
+|> \
+	$(LD) -o %o \
+	$(LD_MARCH) $(LDFLAGS) \
+	--whole-archive --start-group \
+	%f \
+	--end-group --no-whole-archive \
+	$(LIBGCC) \
+|> ld.lib.so $(REP_DIR)/<ld> {bin}
+
+: {bin} |> !collect_bin |>
+include &(BIN_RULES)
+
+endif

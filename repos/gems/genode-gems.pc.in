@@ -1,0 +1,8 @@
+includedir=@includedir@
+
+Name: gems
+Description: Genode gems repository
+URL: https://genode.org/
+Version: @VERSION@
+Requires: genode-os
+Cflags: -I${includedir}

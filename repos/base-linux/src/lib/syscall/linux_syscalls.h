@@ -47,7 +47,7 @@
 #include <linux/futex.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sched.h>
+#include <linux/sched.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
 #include <sys/socket.h>

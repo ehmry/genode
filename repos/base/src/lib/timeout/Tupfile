@@ -1,0 +1,4 @@
+include_rules
+INCLUDES += $(REP_DIR)/src/include
+: foreach *.cc |> !cxx |> {obj}
+: {obj} |> !ar |> %d.lib.a

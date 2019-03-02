@@ -1,0 +1,4 @@
+Name: VFS
+Description: Genode Virtual File-System library
+Version: @VERSION@
+Libs: -l:vfs.lib.so

@@ -1,0 +1,74 @@
+# DANGER: any source or header here may be ovelayed by $(BASE_DIR)
+
+include_rules
+
+INCLUDES += -I$(REP_DIR)/src/include
+INCLUDES += -I$(REP_DIR)/src/lib/syscall
+INCLUDES += -I$(BASE_DIR)/src/include
+
+export HOST_LIBC
+	# an environmental variable set by nix-shell
+INCLUDES += -I$HOST_LIBC/include
+
+BASE_LIB_DIR = $(BASE_DIR)/src/lib/base
+
+COMMON_SRC_CC += \
+	$(BASE_DIR)/src/lib/base/allocator_avl.cc \
+	$(BASE_DIR)/src/lib/base/avl_tree.cc \
+	$(BASE_DIR)/src/lib/base/child.cc \
+	$(BASE_DIR)/src/lib/base/component.cc \
+	$(BASE_DIR)/src/lib/base/console.cc \
+	$(BASE_DIR)/src/lib/base/elf_binary.cc \
+	$(BASE_DIR)/src/lib/base/entrypoint.cc \
+	$(BASE_DIR)/src/lib/base/env_session_id_space.cc \
+	$(BASE_DIR)/src/lib/base/heap.cc \
+	$(BASE_DIR)/src/lib/base/lock.cc \
+	$(BASE_DIR)/src/lib/base/log.cc \
+	$(BASE_DIR)/src/lib/base/output.cc \
+	$(BASE_DIR)/src/lib/base/raw_output.cc \
+	$(BASE_DIR)/src/lib/base/registry.cc \
+	$(BASE_DIR)/src/lib/base/root_proxy.cc \
+	$(BASE_DIR)/src/lib/base/session_state.cc \
+	$(BASE_DIR)/src/lib/base/signal_common.cc \
+	$(BASE_DIR)/src/lib/base/slab.cc \
+	$(BASE_DIR)/src/lib/base/sliced_heap.cc \
+	$(BASE_DIR)/src/lib/base/stack_allocator.cc \
+	$(BASE_DIR)/src/lib/base/stack_protector.cc \
+	$(BASE_LIB_DIR)/capability.cc \
+	$(BASE_LIB_DIR)/rpc_dispatch_loop.cc \
+	$(BASE_LIB_DIR)/rpc_entrypoint.cc \
+	$(BASE_LIB_DIR)/sleep.cc \
+	$(BASE_LIB_DIR)/trace.cc \
+	$(BASE_LIB_DIR)/vm_session.cc \
+	child_process.cc \
+	debug.cc \
+	ipc.cc \
+	region_map_client.cc \
+	region_map_mmap.cc \
+	rm_session_client.cc \
+	thread_env.cc \
+
+: foreach $(COMMON_SRC_CC) |> !cxx |> %B.o {base-common-obj}
+
+: {base-common-obj} |> !ar |> base-linux-common.lib.a
+
+SRC_CC += \
+	$(BASE_LIB_DIR)/capability_space.cc \
+	$(BASE_LIB_DIR)/default_log.cc \
+	$(BASE_LIB_DIR)/env_deprecated.cc \
+	$(BASE_LIB_DIR)/heartbeat.cc \
+	$(BASE_LIB_DIR)/main_thread_cap.cc \
+	$(BASE_LIB_DIR)/rpc_cap_alloc.cc \
+	$(BASE_LIB_DIR)/signal.cc \
+	$(BASE_LIB_DIR)/signal_transmitter.cc \
+	$(BASE_LIB_DIR)/stack_area.cc \
+	$(BASE_LIB_DIR)/thread.cc \
+	$(BASE_LIB_DIR)/thread_myself.cc \
+	attach_stack_area.cc \
+	capability_raw.cc \
+	env_reinit.cc \
+	platform_env.cc \
+	thread_linux.cc \
+
+: foreach $(SRC_CC) |> !cxx |> {base-obj}
+: {base-obj} |> !ar |> base-linux.lib.a

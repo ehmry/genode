@@ -1,0 +1,9 @@
+include_rules
+
+ifdef NIX_OUTPUTS_DEV
+SED_FLAGS += -e "s|@includedir@|@(NIX_OUTPUTS_DEV)/include/gems|"
+else
+SED_FLAGS += -e "s|@includedir@|`nix-store --add $(REP_DIR)/include`|"
+endif
+
+: *.pc.in |> !sed_pkgconfig_file |>

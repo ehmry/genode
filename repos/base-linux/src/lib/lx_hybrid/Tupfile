@@ -1,0 +1,13 @@
+include_rules
+include $(REP_DIR)/src/lib/syscall/headers.tup
+
+INCLUDES += -I$(REP_DIR)/src/include
+INCLUDES += -I$(BASE_DIR)/src/include
+
+STATIC_LIBS = \
+	../base/base-linux-common.lib.a \
+	$(BASE_DIR)/src/lib/timeout/timeout.lib.a \
+
+: foreach *.cc $(BASE_DIR)/src/lib/cxx/new_delete.cc |> !cxx |> {obj}
+: foreach *.c |> !cc |> {obj}
+: {obj} $(STATIC_LIBS) |> !ar |> %d.lib.a

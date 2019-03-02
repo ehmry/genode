@@ -1,0 +1,70 @@
+include_rules
+
+DEFINES = -ffunction-sections -fno-strict-aliasing -g -fPIC
+	# drop the standard defines to avoid -nostdinc
+
+: foreach *.cc |> !cxx |> {supc++}
+
+#
+# Prevent symbols of the gcc support libs from being discarded during 'ld -r'
+#
+KEEP_SYMBOLS = \
+	-u __cxa_guard_acquire \
+	-u __dynamic_cast \
+	-u __cxa_throw_bad_array_new_length \
+	-u __cxa_current_exception_type \
+	-u _ZTVN10__cxxabiv116__enum_type_infoE \
+	-u _ZN10__cxxabiv121__vmi_class_type_infoD0Ev \
+	-u _ZTVN10__cxxabiv119__pointer_type_infoE \
+	-u _ZTSN10__cxxabiv120__function_type_infoE \
+
+LIBCXX_GCC = \
+	`$(CXX) $(CC_MARCH) -print-file-name=libsupc++.a` \
+	`$(CXX) $(CC_MARCH) -print-file-name=libgcc_eh.a` \
+
+: {supc++} |> $(LD) $(LD_MARCH) $(KEEP_SYMBOLS) -r %f $(LIBCXX_GCC) -o %o |> supc++.tmp
+
+#
+# Here we define all symbols we want to hide in libsupc++ and libgcc_eh
+#
+LOCAL_SYMBOLS = \
+	--localize-symbol=abort \
+	--localize-symbol=calloc \
+	--localize-symbol=fputc \
+	--localize-symbol=fputs \
+	--localize-symbol=free \
+	--localize-symbol=fwrite \
+	--localize-symbol=malloc \
+	--localize-symbol=memcmp \
+	--localize-symbol=realloc \
+	--localize-symbol=sprintf \
+	--localize-symbol=stderr \
+	--localize-symbol=__stderrp \
+	--localize-symbol=strcat \
+	--localize-symbol=strcmp \
+	--localize-symbol=strcpy \
+	--localize-symbol=strlen \
+	--localize-symbol=strncmp \
+
+#
+# Symbols we wrap (see unwind.cc)
+#
+EH_SYMBOLS = \
+	_Unwind_Resume \
+	_Unwind_Complete \
+	_Unwind_DeleteException \
+
+#
+# Additional functions for ARM
+#
+EH_SYMBOLS += \
+	__aeabi_unwind_cpp_pr0 \
+	__aeabi_unwind_cpp_pr1 \
+
+REDEF_SYMBOLS = `echo $(EH_SYMBOLS) | awk -v RS=' ' '{ print "--redefine-sym "$1"=_cxx_"$1 }'`
+
+: supc++.tmp |> $(OBJCOPY) $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++.o {obj}
+
+: foreach *.c |> !cc |> {obj}
+
+: {obj} |> !ar |> cxx.lib.a $(BASE_DIR)/<base-libs>

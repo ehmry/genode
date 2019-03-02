@@ -1,0 +1,7 @@
+TARGET_NAME = vfs_import
+
+include_rules
+: foreach *.cc |> !cxx |> %B.o {obj}
+: {obj} |  |> !lib |> vfs_import.lib.so {bin}
+: {bin} |> !collect_bin |>
+include &(BIN_RULES)

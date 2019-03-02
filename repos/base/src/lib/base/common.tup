@@ -1,0 +1,25 @@
+# Portions of base library shared by core and non-core processes
+
+COMMON_SRC_CC += \
+	$(BASE_DIR)/src/lib/base/allocator_avl.cc \
+	$(BASE_DIR)/src/lib/base/avl_tree.cc \
+	$(BASE_DIR)/src/lib/base/child.cc \
+	$(BASE_DIR)/src/lib/base/component.cc \
+	$(BASE_DIR)/src/lib/base/console.cc \
+	$(BASE_DIR)/src/lib/base/elf_binary.cc \
+	$(BASE_DIR)/src/lib/base/entrypoint.cc \
+	$(BASE_DIR)/src/lib/base/env_session_id_space.cc \
+	$(BASE_DIR)/src/lib/base/heap.cc \
+	$(BASE_DIR)/src/lib/base/lock.cc \
+	$(BASE_DIR)/src/lib/base/log.cc \
+	$(BASE_DIR)/src/lib/base/output.cc \
+	$(BASE_DIR)/src/lib/base/raw_output.cc \
+	$(BASE_DIR)/src/lib/base/registry.cc \
+	$(BASE_DIR)/src/lib/base/rm_session_client.cc \
+	$(BASE_DIR)/src/lib/base/root_proxy.cc \
+	$(BASE_DIR)/src/lib/base/session_state.cc \
+	$(BASE_DIR)/src/lib/base/signal_common.cc \
+	$(BASE_DIR)/src/lib/base/slab.cc \
+	$(BASE_DIR)/src/lib/base/sliced_heap.cc \
+	$(BASE_DIR)/src/lib/base/stack_allocator.cc \
+	$(BASE_DIR)/src/lib/base/stack_protector.cc \
