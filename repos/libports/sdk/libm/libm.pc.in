@@ -1,0 +1,5 @@
+Name: Libm
+Description: Genode C mathematic library
+URL: https://genode.org/
+Version: @SDK_VERSION@
+Libs: -l:libm.lib.so

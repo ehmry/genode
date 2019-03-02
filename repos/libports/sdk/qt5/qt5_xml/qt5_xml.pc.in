@@ -1,0 +1,6 @@
+includedir=@includedir@/qt5_xml
+libdir=@libdir@
+
+Name: QtXml
+Cflags: -I${includedir} -I${includedir}/QtXml
+Libs: -L${libdir} -l:qt5_xml.lib.so

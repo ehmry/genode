@@ -1,0 +1,13 @@
+include_rules
+
+SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
+
+: qt5gui.pc.in |> |> !sed_pkgconfig_file |>
+
+CONTRIB_DIR = `$(PORTS_CURRENT) qt5`
+
+TAR_FLAGS += --transform='s|/include/|/include/qt5gui/|'
+
+TAR_FLAGS += -C $(CONTRIB_DIR) include/QtGui
+
+include $(SDK_TAR_INCLUDE)

@@ -1,0 +1,16 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+CONTRIB_DIR = `$(PORTS_CURRENT) zlib`
+
+SED_FLAGS += -e 's|@VERSION@|$(SDK_VERSIONS)|'
+SED_FLAGS += -e 's|^Libs:.*|Libs: -l:zlib.lib.so|'
+SED_FLAGS += -e 's|{includedir}$|{includedir}/zlib|'
+
+SED_FLAGS += $(CONTRIB_DIR)/src/lib/zlib/zlib.pc.in
+
+: |> !sed_pkgconfig_flags |>
+
+TAR_FLAGS += -C $(CONTRIB_DIR) include/zlib
+
+include $(SDK_TAR_INCLUDE)

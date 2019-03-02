@@ -1,0 +1,6 @@
+includedir=@includedir@/qt5_svg
+libdir=@libdir@
+
+Name: QtSvg
+Cflags: -I${includedir} -I${includedir}/QtSvg
+Libs: -L${libdir} -l:qt5_svg.lib.so

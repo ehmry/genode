@@ -1,0 +1,11 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+CONTRIB_DIR = `$(PORTS_CURRENT) mesa`
+
+SED_FLAGS += mesa.pc.in
+: |> !sed_pkgconfig_flags |>
+
+TAR_FLAGS += --transform='s|/include/|/include/mesa/|'
+TAR_FLAGS += -C $(CONTRIB_DIR) include
+include $(SDK_TAR_INCLUDE)

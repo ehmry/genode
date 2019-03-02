@@ -1,0 +1,4 @@
+includedir=@includedir@/qt5gui
+
+Name: QtGui
+Cflags: -DQT_GUI_LIB -I${includedir} -I${includedir}/QtGui

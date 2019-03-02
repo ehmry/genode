@@ -1,0 +1,24 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+SED_FLAGS_arm64 += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/arm_64|'
+
+SED_FLAGS_i386 += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_32 -I${includedir}/spec/x86|'
+
+SED_FLAGS_x86_64 += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_64 -I${includedir}/spec/x86|'
+
+
+: libc.pc.in |> !sed_pkgconfig_file |>
+
+CONTRIB_DIR = `$(PORTS_CURRENT) libc`
+
+TAR_FLAGS += --transform='s|/include/spec/arm_64/libc/|/include/libc/spec/arm_64/|'
+TAR_FLAGS += --transform='s|/include/spec/arm/libc/|/include/libc/spec/arm/|'
+TAR_FLAGS += --transform='s|/include/spec/x86_32/libc/|/include/libc/spec/x86_32/|'
+TAR_FLAGS += --transform='s|/include/spec/x86_64/libc/|/include/libc/spec/x86_64/|'
+TAR_FLAGS += --transform='s|/include/spec/x86/libc/|/include/libc/spec/x86/|'
+TAR_FLAGS += --transform='s|/include/libc/component.h|/include/libc/libc/component.h|'
+TAR_FLAGS += -C $(REP_DIR) include/libc
+TAR_FLAGS += -C $(CONTRIB_DIR) include
+
+include $(SDK_TAR_INCLUDE)

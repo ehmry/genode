@@ -1,0 +1,9 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+: *.pc.in |> !sed_pkgconfig_file |>
+
+TAR_FLAGS += --transform='s|/include/|/include/qt5_xml/|'
+TAR_FLAGS += -C $(CONTRIB_DIR) include/QtXml
+
+include $(SDK_TAR_INCLUDE)

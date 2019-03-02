@@ -1,0 +1,3 @@
+libdir=@libdir@
+
+Libs: -L${libdir} -l:qt_component.lib.so

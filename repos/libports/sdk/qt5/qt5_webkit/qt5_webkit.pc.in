@@ -1,0 +1,6 @@
+includedir=@includedir@/qt5_webkit
+libdir=@libdir@
+
+Name: QtWebKit
+Cflags: -I${includedir} -I${includedir}/QtWebKit
+Libs: -L${libdir} -l:qt5_webkit.lib.so

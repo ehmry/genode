@@ -1,0 +1,4 @@
+includedir=@includedir@
+
+Name: Qt5Core
+Cflags: -DQT_CORE_LIB -I${includedir} -I${includedir}/QtCore

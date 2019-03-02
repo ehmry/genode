@@ -1,0 +1,5 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+: vfs.pc.in |> !sed_pkgconfig_file |>
+include $(SDK_TAR_INCLUDE)

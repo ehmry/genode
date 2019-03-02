@@ -1,0 +1,17 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+CONTRIB_DIR = `$(PORTS_CURRENT) mesa`
+
+SED_FLAGS += -e 's|@GL_PC_REQ_PRIV@||'
+SED_FLAGS += -e 's|@PACKAGE_VERSION@||'
+SED_FLAGS += -e 's|-EGL|-l:egl.lib.so|'
+SED_FLAGS += -e 's|@GL_PC_LIB_PRIV@||'
+SED_FLAGS += -e 's|@GL_PC_CFLAGS@||'
+
+SED_FLAGS += $(CONTRIB_DIR)/src/lib/mesa/src/egl/main/egl.pc.in
+: |> !sed_pkgconfig_flags |>
+
+TAR_FLAGS += --transform='s|/include/|/include/egl/|'
+TAR_FLAGS += -C $(CONTRIB_DIR) include/EGL include/KHR
+include $(SDK_TAR_INCLUDE)

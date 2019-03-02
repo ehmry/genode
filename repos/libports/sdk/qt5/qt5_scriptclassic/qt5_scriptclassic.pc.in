@@ -1,0 +1,6 @@
+includedir=@includedir@/qt5_scriptclassic
+libdir=@libdir@
+
+Name: QtScript
+Cflags: -I${includedir} -I${includedir}/QtScript
+Libs: -L${libdir} -l:qt5_scriptclassic.lib.so

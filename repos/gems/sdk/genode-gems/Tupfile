@@ -1,0 +1,8 @@
+include_rules
+
+: *.pc.in |> !sed_pkgconfig_file |>
+
+TAR_FLAGS += --transform='s|/include/|/include/genode-gems/|'
+TAR_FLAGS += -C $(REP_DIR) include
+
+include $(SDK_TAR_INCLUDE)

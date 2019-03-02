@@ -1,0 +1,2 @@
+CONTRIB_DIR = `$(PORTS_CURRENT) qt5`
+SYMBOLS_DIR = $(CONTRIB_DIR)/lib/symbols

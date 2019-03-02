@@ -1,0 +1,19 @@
+include_rules
+
+SED_FLAGS += -e 's|@TOOLCHAIN_DIR@|/opt/genode/toolchain-19.05|'
+
+SED_FLAGS_arm64 += -e 's|@TOOL_PREFIX@|genode-arm-|'
+SED_FLAGS_arm64 += -e 's|@SPEC_INCLUDES@| -I${includedir}/spec/arm_64 -I${includedir}/spec/64bit|'
+
+SED_FLAGS_i386 += -e 's|@TOOL_PREFIX@|genode-x86-|'
+SED_FLAGS_i386 += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_32 -I${includedir}/spec/x86 -I${includedir}/spec/32bit|'
+
+SED_FLAGS_x86_64 += -e 's|@TOOL_PREFIX@|genode-x86-|'
+SED_FLAGS_x86_64 += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_64 -I${includedir}/spec/x86 -I${includedir}/spec/64bit|'
+
+: foreach *.pc.in |> !sed_pkgconfig_file |>
+
+TAR_FLAGS += --transform='s|/include/|/include/genode-base/|'
+TAR_FLAGS += -C $(REP_DIR) include
+
+include $(SDK_TAR_INCLUDE)

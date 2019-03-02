@@ -1,0 +1,10 @@
+include_rules
+
+SED_FLAGS_CMAKE += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
+SED_FLAGS_CMAKE += -e 's|@SDK_PREFIX@|$(SDK_PREFIX)|'
+
+ifeq ($(ARCH),x86_64)
+SED_FLAGS_CMAKE += -e 's|@COMPILER_PREFIX@|/usr/local/genode-gcc/bin/genode-x86-|'
+endif
+
+: Toolchain.cmake.in |> sed $(SED_FLAGS_CMAKE) %f > %o |> %B

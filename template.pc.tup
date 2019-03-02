@@ -1,0 +1,13 @@
+TEMPLATE_FILE = $(TUP_CWD)/template.pc.in
+
+: $(TEMPLATE_FILE) | $(LOCAL_LIB_PREFIX)/*.lib.so \
+	|> ^ Generate %d^ sed 's|%%d|%d|' %f > %o \
+		|> $(LOCAL_PKGCONFIG_PREFIX)/arm64/%d.pc
+
+: $(TEMPLATE_FILE) | $(LOCAL_LIB_PREFIX)/*.lib.so \
+	|> ^ Generate %d^ sed 's|%%d|%d|' %f > %o \
+		|> $(LOCAL_PKGCONFIG_PREFIX)/x86_32/%d.pc
+
+: $(TEMPLATE_FILE) | $(LOCAL_LIB_PREFIX)/*.lib.so \
+	|> ^ Generate %d^ sed 's|%%d|%d|' %f > %o \
+		|> $(LOCAL_PKGCONFIG_PREFIX)/x86_64/%d.pc

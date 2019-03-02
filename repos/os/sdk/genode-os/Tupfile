@@ -1,0 +1,17 @@
+include_rules
+
+SED_FLAGS += -e 's|@TOOLCHAIN_DIR@|/usr/local/genode-gcc|'
+
+SED_FLAGS_arm64 += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/arm_64 -I${includedir}/spec/64bit|'
+
+SED_FLAGS_i386 += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_32 -I${includedir}/spec/x86 -I${includedir}/spec/32bit|'
+
+SED_FLAGS_x86_64 += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_64 -I${includedir}/spec/x86 -I${includedir}/spec/64bit|'
+
+: genode-os.pc.in |> !sed_pkgconfig_file |>
+
+TAR_FLAGS += --transform='s|/include/|/include/genode-os/|'
+
+TAR_FLAGS += -C $(REP_DIR) include
+
+include $(SDK_TAR_INCLUDE)

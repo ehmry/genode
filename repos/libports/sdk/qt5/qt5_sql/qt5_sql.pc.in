@@ -1,0 +1,6 @@
+includedir=@includedir@/qt5_sql
+libdir=@libdir@
+
+Name: QtSql
+Cflags: -I${includedir} -I${includedir}/QtSql
+Libs: -L${libdir} -l:qt5_sql.lib.so

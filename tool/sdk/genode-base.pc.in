@@ -12,4 +12,4 @@ Name: genode-base
 Description: Genode base compiler definitions
 URL: https://genode.org/
 Version: !VERSION!
-Cflags: -nostdinc -fPIC -I${prefix}/include/genode -I${toolchaindir}/lib/gcc/x86_64-pc-elf/6.3.0/include
+Cflags: -nostdinc -fPIC -I${prefix}/include/genode -I${toolchaindir}/lib/gcc/x86_64-pc-elf/8.3.0/include

@@ -1,0 +1,6 @@
+includedir=@includedir@
+libdir=@libdir@
+
+Name: QtGui
+Cflags: -DQT_GUI_LIB -I${includedir} -I${includedir}/QtGui
+Libs: -L${libdir} -l:qt5_gui.lib.so

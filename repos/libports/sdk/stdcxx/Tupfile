@@ -1,0 +1,11 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+CONTRIB_DIR = `$(PORTS_CURRENT) stdcxx`
+
+: stdcxx.pc.in |> !sed_pkgconfig_file |>
+
+TAR_FLAGS += -C $(REP_DIR) include/stdcxx
+TAR_FLAGS += -C $(CONTRIB_DIR) include/stdcxx
+
+include $(SDK_TAR_INCLUDE)

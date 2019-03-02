@@ -1,0 +1,17 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+CONTRIB_DIR = `$(PORTS_CURRENT) libpng`
+
+SED_FLAGS += -e 's|@PNGLIB_MAJOR@||'
+SED_FLAGS += -e 's|@PNGLIB_MINOR@||'
+SED_FLAGS += -e 's|@PNGLIB_VERSION@||'
+SED_FLAGS += -e 's|-lpng|-l:libpng.lib.so|'
+SED_FLAGS += -e 's|@LIBS@|libc|'
+
+SED_FLAGS += $(CONTRIB_DIR)/src/lib/libpng/libpng.pc.in
+: |> !sed_pkgconfig_flags |>
+
+TAR_FLAGS += -C $(CONTRIB_DIR) include/libpng
+
+include $(SDK_TAR_INCLUDE)

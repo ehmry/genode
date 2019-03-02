@@ -1,0 +1,5 @@
+Name: ld
+Description: Genode dynamic loader
+URL: https://genode.org/
+Version: @SDK_VERSION@
+Libs: -l:ld.lib.so

@@ -1,0 +1,6 @@
+includedir=@includedir@/qt5_webkitwidgets
+libdir=@libdir@
+
+Name: QtWebKitWidgets
+Cflags: -DQT_WIDGETS_LIB -I${includedir} -I${includedir}/QtWebKitWidgets
+Libs: -L${libdir} -l:qt5_webkitwidgets.lib.so

@@ -1,0 +1,12 @@
+include_rules
+
+: egl_api.pc.in |> !sed_pkgconfig_file |>
+
+CONTRIB_DIR = `$(PORTS_CURRENT) egl_api`
+
+TAR_FLAGS += --transform='s|/include/|/include/egl_api/|'
+
+TAR_FLAGS += -C $(REP_DIR) include/EGL
+TAR_FLAGS += -C $(CONTRIB_DIR) include
+
+include $(SDK_TAR_INCLUDE)

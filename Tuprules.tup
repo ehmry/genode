@@ -1,0 +1,66 @@
+.gitignore
+GENODE_DIR = $(TUP_CWD)
+BASE_DIR = $(GENODE_DIR)/repos/base
+
+SDK_VERSION = 19.05
+	# TODO: these are configuration settings
+
+LOCAL_LIB_PREFIX = lib
+LOCAL_PKGCONFIG_PREFIX = pkgconfig
+
+SDK_PREFIX = /opt/genode/sdk-$(SDK_VERSION)
+SDK_INCLUDE_PREFIX = $(SDK_PREFIX)/include
+SDK_LIB_PREFIX = $(SDK_PREFIX)/$(LOCAL_LIB_PREFIX)
+SDK_PKGCONFIG_PREFIX = $(SDK_PREFIX)/$(LOCAL_PKGCONFIG_PREFIX)
+
+SDK_DIR = $(GENODE_DIR)/sdk
+
+!ln = |> ^ LN %o -> %f^ ln -s %f %o |>
+!cp = |> ^ CP %o^ cp %f %o |>
+
+!tar = |> tar cf %o %f $(TAR_FLAGS) |>
+
+SED_PKGCONFIG_FLAGS += -e 's|@exec_prefix@|$(SDK_PREFIX)|'
+SED_PKGCONFIG_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
+SED_PKGCONFIG_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
+SED_PKGCONFIG_FLAGS += -e 's|@sharedlibdir@|@libdir@|'
+SED_PKGCONFIG_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
+
+SED_FLAGS_arm64 += -e 's|@libdir@|$(SDK_LIB_PREFIX)/arm64|'
+SED_FLAGS_i386 += -e 's|@libdir@|$(SDK_LIB_PREFIX)/x86_32|'
+SED_FLAGS_x86_64 += -e 's|@libdir@|$(SDK_LIB_PREFIX)/x86_64|'
+
+!sed_pkgconfig_file = |> ^ SED %B^ \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) $(SED_FLAGS_arm64) %f \
+		> $(LOCAL_PKGCONFIG_PREFIX)/arm64/%B; \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) $(SED_FLAGS_i386) %f \
+		> $(LOCAL_PKGCONFIG_PREFIX)/x86_32/%B; \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) $(SED_FLAGS_x86_64) %f \
+		> $(LOCAL_PKGCONFIG_PREFIX)/x86_64/%B; \
+|> $(LOCAL_PKGCONFIG_PREFIX)/arm64/%B \
+   $(LOCAL_PKGCONFIG_PREFIX)/x86_32/%B \
+   $(LOCAL_PKGCONFIG_PREFIX)/x86_64/%B \
+   <artifacts>
+
+!sed_pkgconfig_flags = |> ^ SED %d.pc^ \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) $(SED_FLAGS_arm64) \
+		> $(LOCAL_PKGCONFIG_PREFIX)/arm64/%d.pc; \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) $(SED_FLAGS_i386) \
+		> $(LOCAL_PKGCONFIG_PREFIX)/x86_32/%d.pc; \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) $(SED_FLAGS_x86_64) \
+		> $(LOCAL_PKGCONFIG_PREFIX)/x86_64/%d.pc; \
+|> $(LOCAL_PKGCONFIG_PREFIX)/arm64/%d.pc \
+   $(LOCAL_PKGCONFIG_PREFIX)/x86_32/%d.pc \
+   $(LOCAL_PKGCONFIG_PREFIX)/x86_64/%d.pc \
+   <artifacts>
+
+PORTS_CURRENT = $(GENODE_DIR)/tool/ports/current
+
+SDK_ABI_INCLUDE = $(TUP_CWD)/abi.tup
+SDK_TAR_INCLUDE = $(TUP_CWD)/tar.tup
+SDK_PKGCONFIG_TEMPLATE_INCLUDE = $(TUP_CWD)/template.pc.tup
+
+CC  = /usr/local/genode-gcc/bin/genode-x86-gcc
+CXX = /usr/local/genode-gcc/bin/genode-x86-g++
+AR  = /usr/local/genode-gcc/bin/genode-x86-ar
+LD  = /usr/local/genode-gcc/bin/genode-x86-ld

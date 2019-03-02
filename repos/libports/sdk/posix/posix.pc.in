@@ -1,0 +1,6 @@
+Name: POSIX entrypoint
+Description: Genode POSIX entrypoint library
+URL: https://genode.org/
+Version: @SDK_VERSION@
+Requires.private: libc
+Libs: -l:posix.lib.so
