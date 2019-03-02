@@ -1,0 +1,3 @@
+[submodule "repos/base-nova/src/NOVA"]
+	path = repos/base-nova/src/NOVA
+	url = git://depot.h4ck.me/srv/git/NOVA

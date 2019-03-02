@@ -1,0 +1,159 @@
+.gitignore
+
+OUTPUTS_OUT=$(TUP_CWD)/out
+OUTPUTS_DEV=$(TUP_CWD)/dev
+
+ifeq (@(TUP_ARCH),i386)
+CC_MARCH = -march=i686 -m32
+LD_MARCH = -melf_i386
+AS_MARCH = -march=i686 --32
+endif
+
+ifeq (@(TUP_ARCH),x86_64)
+TOOL_CHAIN_PREFIX=genode-x86-
+CC_MARCH = -m64 -mcmodel=large
+LD_MARCH = -melf_x86_64
+endif
+
+ifeq (@(TUP_ARCH),arm_v8)
+CC_MARCH = -march=armv8-a
+endif
+
+OUT_BIN_DIR = $(OUTPUTS_OUT)/bin
+
+GENODE_DIR = $(TUP_CWD)
+
+LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
+
+!prg = | $(GENODE_DIR)/<lib> $(GENODE_DIR)/<pkg-config> \
+|> ^o LD %o^ \
+	$(LD) $(LD_MARCH) $(LDFLAGS) \
+	-L$(LIB_DIR) \
+	`$(PKG_CONFIG) --libs $(LIBS) genode-prg` \
+	%f \
+	$(LIBGCC) \
+	-o %o \
+|> %d
+
+!lib = | $(GENODE_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LD_MARCH) %f $(LDFLAGS) `$(PKG_CONFIG) --libs genode-lib $(LIBS)` -L$(LIB_DIR) -o %o |>
+
+ifeq ($(BIN_NAME),)
+BIN_NAME = $(TARGET_NAME)
+endif
+
+ifdef DEPOT_VERSION
+DEPOT_VERSION = @(DEPOT_VERSION)
+else
+DEPOT_VERSION = current
+endif
+
+BIN_VERSION=$(DEPOT_VERSION)
+
+BIN_DIR = $(OUT_BIN_DIR)/$(BIN_NAME)/$(DEPOT_VERSION)
+	# Destination for locally defined binary package
+
+!bin = |> |>
+	# Macro invoked in BIN_RULES
+
+&BIN_RULES = errata/bin.tup
+	# Rules for finalizing a locally defined binary package
+
+!collect_bin = |> ^ COLLECT %b^ \
+	$STRIP -o %o %f \
+|> $(OUT_BIN_DIR)/$(BIN_NAME)/%b $(OUTPUTS_OUT)/<bin>
+
+export CC
+export CXX
+export LD
+
+CC = $CC
+CXX = $CXX
+LD= $LD
+OBJCOPY = $OBJCOPY
+
+CXXFLAGS += -Wno-undefined-bool-conversion -Wno-unknown-attributes -Wsystem-headers -Werror
+#CXXFLAGS +=  -Wno-unused-command-line-argument
+
+export NIX_PATH
+NIX_BUILD = nix-build --option substitute no
+
+LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
+
+LIB_DIR = $(OUTPUTS_DEV)/lib
+PKG_CONFIG_DIR = $(OUTPUTS_DEV)/lib/pkgconfig
+PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR) pkg-config
+
+DEFINES += -g
+OLEVEL = -O0
+
+!ir = | $(GENODE_DIR)/<pkg-config> |> clang $(OLEVEL) $(DEFINES) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(INCLUDES) -S -emit-llvm %f |> %B.ll
+
+!asm = |> ^ CC %b^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(DEFINES) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) -D__ASSEMBLY__ $(INCLUDES) -c %f -o %o |> %B.o
+
+!cc = | $(GENODE_DIR)/<pkg-config> |> ^o CC %f^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(DEFINES) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS) $(LIBS_CFLAGS)` $(INCLUDES) -c -fPIC %f -o %o |> %B.o
+
+!cxx = | $(GENODE_DIR)/<pkg-config> |> ^o CXX %b^ @(CC_WRAPPER) $(CXX) $(OLEVEL) $(DEFINES) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(INCLUDES) -c -fPIC %f -o %o |> %B.o
+
+!ld = | $(GENODE_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LDFLAGS) `$(PKG_CONFIG) --libs $(LIBS)` --whole-archive --start-group %f --no-whole-archive --end-group -o %o |>
+
+export STRIP
+!strip = |> $STRIP -o %o %f |>
+
+!ln = |> ln -s %f %o |>
+
+&LD_SCRIPT_SO = repos/base/src/ld/genode_rel.ld
+
+ifeq (@(TUP_ARCH),x86_64)
+	ASM_SYM_DEPENDENCY = movq \1@GOTPCREL(%rip), %rax
+else
+	ASM_SYM_DEPENDENCY = .long \1
+endif
+
+!abi_stub = |> ^ STUB %o^\
+	sed \
+		-e "s/^\(\w\+\) D \(\w\+\)\$/.data; .global \1; .type \1,%%object; .size \1,\2; \1:/" \
+		-e "s/^\(\w\+\) V/.data; .weak \1; .type \1,%%object; \1:/" \
+		-e "s/^\(\w\+\) T/.text; .global \1; .type \1,%%function; \1:/" \
+		-e "s/^\(\w\+\) R \(\w\+\)\$/.section .rodata; .global \1; .type \1,%%object; .size \1,\2; \1:/" \
+		-e "s/^\(\w\+\) W/.text; .weak \1; .type \1,%%function; \1:/" \
+		-e "s/^\(\w\+\) B \(\w\+\)\$/.bss; .global \1; .type \1,%%object; .size \1,\2; \1:/" \
+		-e "s/^\(\w\+\) U/.text; .global \1; $(ASM_SYM_DEPENDENCY)/" \
+		%f \
+	| $(CC) -x assembler -c - -o tmp.o; \
+	$(LD) -o %o \
+		-shared \
+		-T &(LD_SCRIPT_SO) \
+		tmp.o; \
+	rm tmp.o; \
+|> $(OUTPUTS_DEV)/lib/%B.lib.so $(GENODE_DIR)/<lib>
+
+!dhall = |> ^b dhall > %o^ dhall |>
+
+ifeq (@(TUP_ARCH),i386)
+AS_MARCH = -march=i686 --32
+endif
+
+BASE_DIR = $(GENODE_DIR)/repos/base
+&BASE_DIR = repos/base
+
+!incbin = |> ^ incbin %f^ \
+	export SYM=_binary_`echo %f | sed 's/\./_/g'`; \
+	echo ".global ${SYM}_start, ${SYM}_end; .data; .align 4; ${SYM}_start:; .incbin \"%f\"; ${SYM}_end:" \
+		| llvm-mc -filetype=obj - > %o \
+|> binary_%b.o
+
+export AR
+!ar = |> ^ MERGE %o^ $AR -rcs %o %f |>
+
+export TOOLCHAIN_DIR
+SED_FLAGS += -e "s|@DEPOT_VERSION@|$(DEPOT_VERSION)|"
+
+!sed_pkgconfig_file = |> ^o SED %B^ \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) < %f > %o; \
+	pkg-config --validate %o; \
+|> $(PKG_CONFIG_DIR)/%B $(GENODE_DIR)/<pkg-config>
+
+!sed_pkgconfig_flags = |> ^o SED %d.pc^ \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) > %o; \
+	pkg-config --validate %o; \
+|> $(PKG_CONFIG_DIR)/%d.pc $(GENODE_DIR)/<pkg-config>

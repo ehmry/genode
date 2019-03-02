@@ -1,0 +1,6 @@
+Name: blit
+Description: Genode blitting library
+URL: https://genode.org/
+Version: @VERSION@
+Requires: genode-os
+Libs: -l:blit.lib.a

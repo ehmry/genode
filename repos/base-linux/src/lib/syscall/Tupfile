@@ -1,0 +1,22 @@
+include_rules
+
+SPEC_DIR=
+
+ifeq (@(TUP_ARCH),i386)
+	SPEC_DIR = spec/x86_32
+endif
+
+ifeq (@(TUP_ARCH),x86_64)
+	SPEC_DIR = spec/x86_64
+endif
+
+ifeq (@(TUP_ARCH),arm)
+	SPEC_DIR = spec/arm
+endif
+
+ifeq ($(SPEC_DIR),)
+	error syscall library is missing rules for @(TUP_ARCH)
+endif
+
+: foreach $(SPEC_DIR)/*.S |> !asm |> {obj}
+: {obj} |> !ar |> syscall-linux.lib.a

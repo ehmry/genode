@@ -1,0 +1,2 @@
+include &(BASE_DIR)/Tuprules.tup
+REP_DIR = $(TUP_CWD)

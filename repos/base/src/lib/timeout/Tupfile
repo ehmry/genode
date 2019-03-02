@@ -1,0 +1,17 @@
+include_rules
+INCLUDES += $(REP_DIR)/src/include
+
+SRC_CC += \
+	duration.cc \
+	timeout.cc \
+	timer_connection.cc \
+	timer_connection_timestamp.cc \
+
+ifeq (@(TUP_ARCH),arm)
+	SRC_CC += arm/timer_connection_time.cc
+else
+	SRC_CC += timer_connection_time.cc
+endif
+
+: foreach $(SRC_CC) |> !cxx |> {obj}
+: {obj} |> !ar |> %d.lib.a

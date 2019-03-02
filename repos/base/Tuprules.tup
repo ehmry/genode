@@ -1,0 +1,52 @@
+REP_DIR = $(TUP_CWD)
+
+ifeq (@(TUP_ARCH),i386)
+INCLUDES += -I$(BASE_DIR)/include/spec/x86_32
+INCLUDES += -I$(BASE_DIR)/include/spec/x86
+INCLUDES += -I$(BASE_DIR)/include/spec/32bit
+endif
+
+ifeq (@(TUP_ARCH),x86_64)
+INCLUDES += -I$(BASE_DIR)/include/spec/x86_64
+INCLUDES += -I$(BASE_DIR)/include/spec/x86
+INCLUDES += -I$(BASE_DIR)/include/spec/64bit
+endif
+
+ifeq (@(TUP_ARCH),arm64)
+INCLUDES += -I$(BASE_DIR)/include/spec/arm_64
+INCLUDES += -I$(BASE_DIR)/include/spec/64bit
+endif
+
+INCLUDES += -I$(BASE_DIR)/include
+
+# Override base macros to bypass pkg-config
+
+DEFINES += \
+	-ffunction-sections \
+	-fno-strict-aliasing \
+	-fPIC \
+	-g \
+	-nostdinc \
+	-Wall \
+
+CXXFLAGS += \
+	-std=gnu++17 \
+
+GCC_INCLUDE = -I`$(CC) -print-file-name=include`
+
+!cc = |> ^ COMPILE %b^ \
+	@(CC_WRAPPER) $(CC) $(DEFINES) $(OLEVEL) \
+	$(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) \
+	$(INCLUDES) $(GCC_INCLUDE) $(CC_MARCH) \
+	-c %f -o %o \
+|> %B.o
+
+!cxx = |> ^ COMPILE %b^ \
+	@(CC_WRAPPER) $(CXX) $(DEFINES) $(OLEVEL) \
+	$(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) \
+	$(INCLUDES) $(GCC_INCLUDE) $(CC_MARCH) \
+	-c %f -o %o \
+|> %B.o
+
+!ld = |> ^ MERGE %o^ $(LD) \
+	$(LDFLAGS) --whole-archive --start-group %f --end-group --no-whole-archive -o %o |>

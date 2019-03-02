@@ -1,0 +1,12 @@
+includedir=@includedir@
+cc=@cc@
+cxx=@cxx@
+ld=@ld@
+ar=@ar@
+ranlib=@ranlib@
+
+Name: base
+Description: Genode base repository
+URL: https://genode.org/
+Version: @VERSION@
+Cflags: -I${includedir} @spec_includes@ -I@toolchainincludedir@

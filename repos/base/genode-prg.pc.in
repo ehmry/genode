@@ -1,0 +1,8 @@
+lddir=@lddir@
+
+Name: genode-prg
+Description: Flags for dynamically-linked Genode programs
+URL: https://genode.org/
+Version: @VERSION@
+Requires: ld
+Libs: -gc-sections -z max-page-size=0x1000 --dynamic-list=${lddir}/genode_dyn.dl -nostdlib -Ttext=0x01000000 --dynamic-linker=ld.lib.so --eh-frame-hdr -rpath-link=. -T${lddir}/genode_dyn.ld

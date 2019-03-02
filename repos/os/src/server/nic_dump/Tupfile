@@ -1,0 +1,10 @@
+TARGET_NAME = nic_dump
+INCLUDES += -I.
+include_rules
+
+: foreach *.cc |> !cxx |> %B.o {obj}
+: foreach ../../lib/net/*.cc |> !cxx |> %B.o {obj}
+
+: {obj} |> !prg |> {bin}
+: {bin} |> !collect_bin |>
+include &(BIN_RULES)

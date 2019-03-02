@@ -1,0 +1,8 @@
+includedir=@includedir@
+
+Name: os
+Description: Genode os repository
+URL: https://genode.org/
+Version: @VERSION@
+Requires: genode-base
+Cflags: @spec_includes@ -I${includedir}

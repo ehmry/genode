@@ -1,0 +1,27 @@
+
+include_rules
+
+BLIT_DIR = $(GENODE_DIR)/repos/os/src/lib/blit
+
+ifeq (@(TUP_ARCH),i386)
+BLIT_INCLUDES += -Ispec/x86_32
+BLIT_INCLUDES += -Ispec/x86
+endif
+
+ifeq (@(TUP_ARCH),x86_64)
+BLIT_INCLUDES += -Ispec/x86_64
+BLIT_INCLUDES += -Ispec/x86
+endif
+
+ifeq (@(TUP_ARCH),arm)
+BLIT_INCLUDES += -Ispec/arm
+endif
+
+ifeq ($(BLIT_INCLUDES),)
+error blit library not yet ported to @(TUP_ARCH)
+endif
+
+INCLUDES += $(BLIT_INCLUDES)
+
+: foreach *.cc |> !cxx |> {obj}
+: {obj} |> !ar |> %d.lib.a
