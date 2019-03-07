@@ -1,0 +1,19 @@
+include_rules
+
+: $(BASE_DIR)/src/ld/genode.ld |> !cp |> $(SDK_DIR)/ld/%b {ld}
+: $(BASE_DIR)/src/ld/genode_dyn.dl |> !cp |> $(SDK_DIR)/ld/%b {ld}
+: $(BASE_DIR)/src/ld/genode_dyn.ld |> !cp |> $(SDK_DIR)/ld/%b {ld}
+: $(BASE_DIR)/src/ld/genode_rel.ld |> !cp |> $(SDK_DIR)/ld/%b {ld}
+
+: $(BASE_DIR)/src/lib/ldso/startup/startup.cc |> ^ CC %f^ \
+	$(CXX) -c %f -o %o -fPIC |> %B.o
+
+: startup.o |> ^ MERGE %o^ \
+	$(AR) -rcs %o %f |> $(SDK_LIB_DIR)/ldso-startup.lib.a $(SDK_DIR)/<libraries>
+
+: {ld} $(SDK_DIR)/<libraries> $(SDK_DIR)/<pkgconfigs> $(SDK_DIR)/<api_tarballs> |> \
+	tar cf %o --transform='s|^|$(SDK_PREFIX)/|' -C sdk . ; \
+	for t in %<api_tarballs>; do \
+		tar --concatenate -f %o $t; \
+	done \
+|> sdk.tar

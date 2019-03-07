@@ -1,0 +1,8 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
+SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
+SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
+
+: foreach *.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/%B $(SDK_DIR)/<pkgconfigs>

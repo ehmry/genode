@@ -1,0 +1,13 @@
+include_rules
+
+SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
+
+: qt5widgets.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/%B $(SDK_DIR)/<pkgconfigs>
+
+CONTRIB_DIR = `$(PORTS_CURRENT) qt5`
+
+TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/qt5widgets/|'
+
+TAR_FLAGS += -C $(CONTRIB_DIR)/include QtWidgets
+
+: |> !tar |> api.tar $(SDK_DIR)/<api_tarballs>

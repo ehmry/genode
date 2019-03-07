@@ -1,0 +1,13 @@
+includedir=@includedir@/genode-base
+toolchaindir=@TOOLCHAIN_DIR@
+cc=${toolchaindir}/bin/genode-x86-gcc
+cxx=${toolchaindir}/bin/genode-x86-g++
+ld=${toolchaindir}/bin/genode-x86-ld
+ar=${toolchaindir}/bin/genode-x86-ar
+ranlib=${toolchaindir}/bin/genode-x86-ranlib
+
+Name: base
+Description: Genode base library
+URL: https://genode.org/
+Version: @SDK_VERSION@
+Cflags: -std=gnu++11 -nostdinc -fPIC -I${includedir} @SPEC_INCLUDES@ -I${toolchaindir}/lib/gcc/x86_64-pc-elf/6.3.0/include

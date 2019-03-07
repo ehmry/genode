@@ -1,0 +1,12 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
+SED_FLAGS += -e 's|@exec_prefix@|$(SDK_PREFIX)|'
+SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
+SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
+
+SED_FLAGS += mesa.pc.in
+: |> sed $(SED_FLAGS) > %o |> $(SDK_PKGCONFIG_DIR)/%d.pc $(SDK_DIR)/<pkgconfigs>
+
+: |> !tar_all_contrib_headers |>

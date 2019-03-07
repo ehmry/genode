@@ -1,0 +1,23 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+: |> !tar_contrib_headers |>
+
+CONTRIB_DIR = `$(PORTS_CURRENT) libpng`
+
+SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
+SED_FLAGS += -e 's|@exec_prefix@|$(SDK_PREFIX)|'
+SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
+SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
+SED_FLAGS += -e 's|@PNGLIB_MAJOR@||'
+SED_FLAGS += -e 's|@PNGLIB_MINOR@||'
+SED_FLAGS += -e 's|@PNGLIB_VERSION@||'
+SED_FLAGS += -e 's|-lpng|-l:libpng.lib.so|'
+SED_FLAGS += -e 's|@LIBS@|libc|'
+
+SED_FLAGS += $(CONTRIB_DIR)/src/lib/libpng/libpng.pc.in
+:  |> sed $(SED_FLAGS) > %o |> $(SDK_PKGCONFIG_DIR)/libpng.pc $(SDK_DIR)/<pkgconfigs>
+
+TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/libpng/|'
+TAR_FLAGS += -C $(CONTRIB_DIR)/include/libpng .
+
+: |> !tar |> api.tar $(SDK_DIR)/<api_tarballs>

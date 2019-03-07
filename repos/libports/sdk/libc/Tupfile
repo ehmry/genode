@@ -1,0 +1,27 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
+SED_FLAGS += -e 's|@exec_prefix@|$(SDK_PREFIX)|'
+SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
+SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
+SED_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
+
+ifeq ($(ARCH),x86_32)
+	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_32|'
+endif
+
+ifeq ($(ARCH),x86_64)
+	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_64|'
+endif
+
+: libc.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/libc.pc $(SDK_DIR)/<pkgconfigs>
+
+CONTRIB_DIR = `$(PORTS_CURRENT) libc`
+
+TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/libc/|'
+
+TAR_FLAGS += -C $(REP_DIR)/include libc
+TAR_FLAGS += -C $(CONTRIB_DIR)/include/libc .
+
+: |> !tar |> api.tar $(SDK_DIR)/<api_tarballs>

@@ -1,0 +1,7 @@
+includedir=@includedir@/genode-os
+
+Name: os
+Description: Genode os API
+URL: https://genode.org/
+Version: @SDK_VERSION@
+Cflags: -I${includedir} @SPEC_INCLUDES@

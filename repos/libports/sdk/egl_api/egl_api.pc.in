@@ -1,0 +1,6 @@
+prefix=@prefix@
+includedir=@includedir@/egl_api
+
+Name: EGL
+Description: EGL API headers
+Cflags: -I${includedir}
