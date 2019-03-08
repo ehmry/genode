@@ -1,12 +1,13 @@
 include_rules
+include $(SDK_ABI_INCLUDE)
 
 SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
 
-: qt5widgets.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/%B $(SDK_DIR)/<pkgconfigs>
+: *.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/%B $(SDK_DIR)/<pkgconfigs>
 
 CONTRIB_DIR = `$(PORTS_CURRENT) qt5`
 
-TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/qt5widgets/|'
+TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/qt5_widgets/|'
 
 TAR_FLAGS += -C $(CONTRIB_DIR)/include QtWidgets
 

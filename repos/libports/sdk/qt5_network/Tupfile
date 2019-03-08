@@ -1,0 +1,15 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
+SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
+
+: *.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/%B $(SDK_DIR)/<pkgconfigs>
+
+CONTRIB_DIR = `$(PORTS_CURRENT) qt5`
+
+TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/qt5_network/|'
+
+TAR_FLAGS += -C $(CONTRIB_DIR)/include QtNetwork
+
+: |> !tar |> api.tar $(SDK_DIR)/<api_tarballs>

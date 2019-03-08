@@ -1,4 +1,0 @@
-includedir=@includedir@/qt5widgets
-
-Name: QtWidgets
-Cflags: -DQT_WIDGETS_LIB -I${includedir} -I${includedir}/QtWidgets

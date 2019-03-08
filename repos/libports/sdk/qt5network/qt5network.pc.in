@@ -1,4 +1,0 @@
-includedir=@includedir@/qt5network
-
-Name: QtNetwork
-Cflags: -I${includedir} -I${includedir}/QtNetwork

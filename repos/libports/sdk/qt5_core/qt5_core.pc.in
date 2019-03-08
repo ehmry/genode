@@ -1,0 +1,6 @@
+includedir=@includedir@/qt5_core
+libdir=@libdir@
+
+Name: Qt5Core
+Cflags: -DQT_CORE_LIB -I${includedir} -I${includedir}/QtCore
+Libs: -L${libdir} -l:qt5_core.lib.so
