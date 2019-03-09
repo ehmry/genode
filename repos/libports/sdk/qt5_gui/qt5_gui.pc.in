@@ -1,4 +1,4 @@
-includedir=@includedir@/qt5gui
+includedir=@includedir@/qt5_gui
 libdir=@libdir@
 
 Name: QtGui
