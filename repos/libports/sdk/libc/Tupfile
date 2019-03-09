@@ -8,11 +8,11 @@ SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
 SED_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
 
 ifeq ($(ARCH),x86_32)
-	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_32|'
+	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_32/libc|'
 endif
 
 ifeq ($(ARCH),x86_64)
-	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_64|'
+	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_64/libc|'
 endif
 
 : libc.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/libc.pc $(SDK_DIR)/<pkgconfigs>
@@ -23,5 +23,6 @@ TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/libc/|'
 
 TAR_FLAGS += -C $(REP_DIR)/include libc
 TAR_FLAGS += -C $(CONTRIB_DIR)/include/libc .
+TAR_FLAGS += -C $(CONTRIB_DIR)/include spec
 
 : |> !tar |> api.tar $(SDK_DIR)/<api_tarballs>
