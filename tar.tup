@@ -1,0 +1,1 @@
+: lib/* pkgconfig/* |> ^ Assemble %o^ tar cf %o --transform='s|^|$(SDK_PREFIX)/|' %f $(TAR_FLAGS) |> %d.sdk.tar $(SDK_DIR)/<api_tarballs>

@@ -1,0 +1,8 @@
+include_rules
+include $(SDK_ABI_INCLUDE)
+
+SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
+
+: *.pc.in |> !sed |> pkgconfig/%d.pc
+
+include $(SDK_TAR_INCLUDE)

@@ -3,39 +3,26 @@ GENODE_DIR = $(TUP_CWD)
 BASE_DIR = $(GENODE_DIR)/repos/base
 
 ARCH = x86_64
-VERSION = 19.02
+VERSION = 19.02-r1
 
-SDK_PREFIX = /opt/genode-sdk-$(ARCH)
+SDK_PREFIX = /opt/genode/sdk-$(VERSION)
 SDK_INCLUDE_PREFIX = $(SDK_PREFIX)/include
 SDK_LIB_PREFIX = $(SDK_PREFIX)/lib
 
 SDK_DIR = $(GENODE_DIR)/sdk
-SDK_API_DIR = $(SDK_DIR)/api
-SDK_LIB_DIR = $(SDK_DIR)/lib
-SDK_PKGCONFIG_DIR = $(SDK_DIR)/pkgconfig
 
 !ln = |> ^ LN %o -> %f^ ln -s %f %o |>
 !cp = |> ^ CP %o^ cp %f %o |>
 
 !sed = |> sed $(SED_FLAGS) %f > %o |>
 
-!tar = |> tar cf %o $(TAR_FLAGS) |>
+!tar = |> tar cf %o %f $(TAR_FLAGS) |>
 
 PORTS_CURRENT = $(GENODE_DIR)/tool/ports/current
 
-!tar_contrib_headers = |> \
-	tar cf %o \
-		--transform='s|^|$(SDK_INCLUDE_PREFIX)/|' \
-		-C `$(GENODE_DIR)/tool/ports/current %d`/include %d \
-|> %d.api.tar $(SDK_DIR)/<api_tarballs>
-
-!tar_all_contrib_headers = |> \
-	tar cf %o \
-		--transform='s|^|$(SDK_INCLUDE_PREFIX)/%d/|' \
-		-C `$(GENODE_DIR)/tool/ports/current %d`/include . \
-|> %d.api.tar $(SDK_DIR)/<api_tarballs>
-
 SDK_ABI_INCLUDE = $(TUP_CWD)/abi.tup
+SDK_TAR_INCLUDE = $(TUP_CWD)/tar.tup
+SDK_PKGCONFIG_TEMPLATE_INCLUDE = $(TUP_CWD)/template.pc.tup
 
 CC  = /usr/local/genode-gcc/bin/genode-x86-gcc
 CXX = /usr/local/genode-gcc/bin/genode-x86-g++

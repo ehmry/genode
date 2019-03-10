@@ -1,0 +1,3 @@
+TEMPLATE_FILE = $(TUP_CWD)/template.pc.in
+
+: $(TEMPLATE_FILE) | lib/*.lib.so |> ^ Generate %d^ sed 's|%%d|%d|' %f > %o |> pkgconfig/%d.pc
