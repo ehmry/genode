@@ -1,6 +1,6 @@
-includedir=@includedir@/qt5_sql
+includedir=@includedir@/QtSql
 libdir=@libdir@
 
 Name: QtSql
-Cflags: -I${includedir} -I${includedir}/QtSql
+Cflags: -I${includedir}
 Libs: -L${libdir} -l:qt5_sql.lib.so

@@ -1,12 +1,16 @@
 include_rules
 include $(SDK_ABI_INCLUDE)
 
+CONTRIB_DIR = `$(PORTS_CURRENT) mesa`
+
 SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
 SED_FLAGS += -e 's|@exec_prefix@|$(SDK_PREFIX)|'
 SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
 SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
 
 SED_FLAGS += mesa.pc.in
-: |> sed $(SED_FLAGS) > %o |> $(SDK_PKGCONFIG_DIR)/%d.pc $(SDK_DIR)/<pkgconfigs>
+: |> sed $(SED_FLAGS) > %o |> pkgconfig/%d.pc
 
-: |> !tar_all_contrib_headers |>
+TAR_FLAGS += --transform='s|/include/|/include/mesa/|'
+TAR_FLAGS += -C $(CONTRIB_DIR) include
+include $(SDK_TAR_INCLUDE)

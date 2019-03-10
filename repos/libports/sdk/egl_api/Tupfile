@@ -6,13 +6,12 @@ SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
 SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
 
 SED_FLAGS += egl_api.pc.in
-: |> sed $(SED_FLAGS) > %o |> $(SDK_PKGCONFIG_DIR)/%d.pc $(SDK_DIR)/<pkgconfigs>
+: |> sed $(SED_FLAGS) > %o |> pkgconfig/%d.pc
 
 CONTRIB_DIR = `$(PORTS_CURRENT) egl_api`
 
-TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/egl_api/|'
+TAR_FLAGS += --transform='s|/include/|/include/egl_api/|'
+TAR_FLAGS += -C $(REP_DIR) include/EGL
+TAR_FLAGS += -C $(CONTRIB_DIR) include
 
-TAR_FLAGS += -C $(REP_DIR)/include EGL
-TAR_FLAGS += -C $(CONTRIB_DIR)/include .
-
-: |> !tar |> api.tar $(SDK_DIR)/<api_tarballs>
+: pkgconfig/* |> tar cf %o %f --transform='s|^|$(SDK_PREFIX)/|' $(TAR_FLAGS) |> %d.tar $(SDK_DIR)/<api_tarballs>

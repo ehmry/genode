@@ -13,9 +13,8 @@ SED_FLAGS += -e 's|^Libs:.*|-l:zlib.lib.so|'
 
 SED_FLAGS += $(CONTRIB_DIR)/src/lib/zlib/zlib.pc.in
 
-: |> sed $(SED_FLAGS) > %o |> $(SDK_PKGCONFIG_DIR)/%d.pc $(SDK_DIR)/<pkgconfigs>
+: |> sed $(SED_FLAGS) > %o |> pkgconfig/%d.pc
 
-TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/|'
-TAR_FLAGS += -C $(CONTRIB_DIR)/include zlib
+TAR_FLAGS += -C $(CONTRIB_DIR) include/zlib
 
-: |> !tar |> api.tar $(SDK_DIR)/<api_tarballs>
+include $(SDK_TAR_INCLUDE)

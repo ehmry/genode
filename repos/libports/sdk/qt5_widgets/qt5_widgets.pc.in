@@ -1,6 +1,6 @@
-includedir=@includedir@/qt5_widgets
+includedir=@includedir@/QtWidgets
 libdir=@libdir@
 
 Name: QtWidgets
-Cflags: -DQT_WIDGETS_LIB -I${includedir} -I${includedir}/QtWidgets
+Cflags: -DQT_WIDGETS_LIB -I${includedir}
 Libs: -L${libdir} -l:qt5_widgets.lib.so

@@ -3,4 +3,6 @@ include $(SDK_ABI_INCLUDE)
 
 SED_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
 
-: libm.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/%B $(SDK_DIR)/<pkgconfigs>
+: libm.pc.in |> !sed |> pkgconfig/%d.pc
+
+include $(SDK_TAR_INCLUDE)

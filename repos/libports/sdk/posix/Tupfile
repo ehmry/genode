@@ -1,2 +1,4 @@
 include_rules
 include $(SDK_ABI_INCLUDE)
+include $(SDK_PKGCONFIG_TEMPLATE_INCLUDE)
+include $(SDK_TAR_INCLUDE)

@@ -19,4 +19,4 @@ LD_SCRIPT_SO = $(BASE_DIR)/src/ld/genode_rel.ld
 	--whole-archive --start-group \
 	$(LIB_SO_DEPS) %f \
 	--end-group --no-whole-archive \
-|> $(SDK_LIB_DIR)/%d.lib.so $(SDK_DIR)/<libraries>
+|> lib/%d.lib.so

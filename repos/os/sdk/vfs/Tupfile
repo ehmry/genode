@@ -4,4 +4,6 @@ include $(SDK_ABI_INCLUDE)
 SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
 SED_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
 
-: vfs.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/%d.pc $(SDK_DIR)/<pkgconfigs>
+: vfs.pc.in |> !sed |> pkgconfig/%d.pc
+
+include $(SDK_TAR_INCLUDE)

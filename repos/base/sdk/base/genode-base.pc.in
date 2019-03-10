@@ -10,4 +10,4 @@ Name: base
 Description: Genode base library
 URL: https://genode.org/
 Version: @SDK_VERSION@
-Cflags: -std=gnu++11 -nostdinc -fPIC -I${includedir} @SPEC_INCLUDES@ -I${toolchaindir}/lib/gcc/x86_64-pc-elf/6.3.0/include
+Cflags: -nostdinc -fPIC -I${includedir} @SPEC_INCLUDES@ -I${toolchaindir}/lib/gcc/x86_64-pc-elf/6.3.0/include

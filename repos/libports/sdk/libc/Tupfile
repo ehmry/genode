@@ -1,6 +1,8 @@
 include_rules
 include $(SDK_ABI_INCLUDE)
 
+CONTRIB_DIR = `$(PORTS_CURRENT) libc`
+
 SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
 SED_FLAGS += -e 's|@exec_prefix@|$(SDK_PREFIX)|'
 SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
@@ -15,14 +17,11 @@ ifeq ($(ARCH),x86_64)
 	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_64/libc|'
 endif
 
-: libc.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/libc.pc $(SDK_DIR)/<pkgconfigs>
+: libc.pc.in |> !sed |> pkgconfig/%d.pc
 
-CONTRIB_DIR = `$(PORTS_CURRENT) libc`
+TAR_FLAGS += --transform='s|/include/spec/|/include/libc/spec/|'
+TAR_FLAGS += --transform='s|/libc/component.h|/libc/libc/component.h|'
+TAR_FLAGS += -C $(REP_DIR) include/libc
+TAR_FLAGS += -C $(CONTRIB_DIR) include
 
-TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/libc/|'
-
-TAR_FLAGS += -C $(REP_DIR)/include libc
-TAR_FLAGS += -C $(CONTRIB_DIR)/include/libc .
-TAR_FLAGS += -C $(CONTRIB_DIR)/include spec
-
-: |> !tar |> api.tar $(SDK_DIR)/<api_tarballs>
+include $(SDK_TAR_INCLUDE)

@@ -1,6 +1,6 @@
-includedir=@includedir@/qt5_network
+includedir=@includedir@/QtNetwork
 libdir=@libdir@
 
 Name: QtNetwork
-Cflags: -I${includedir} -I${includedir}/QtNetwork
+Cflags: -I${includedir}
 Libs: -L${libdir} -l:qt5_network.lib.so

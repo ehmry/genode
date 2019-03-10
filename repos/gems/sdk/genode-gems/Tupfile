@@ -1,11 +1,10 @@
 include_rules
 
+TAR_FLAGS += --transform='s|/include/|/include/genode-gems/|'
 SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
 
-: foreach *.pc.in |> !sed |> $(SDK_PKGCONFIG_DIR)/%B $(SDK_DIR)/<pkgconfigs>
+: foreach *.pc.in |> !sed |> pkgconfig/%d.pc
 
-TAR_FLAGS += --transform='s|^|$(SDK_INCLUDE_PREFIX)/genode-gems/|'
+TAR_FLAGS += -C $(REP_DIR) include
 
-TAR_FLAGS += -C $(REP_DIR)/include .
-
-: |> !tar |> api.tar $(SDK_DIR)/<api_tarballs>
+: pkgconfig/* |> tar cf %o --transform='s|^|$(SDK_PREFIX)/|' %f $(TAR_FLAGS) |> %d.tar $(SDK_DIR)/<api_tarballs>
