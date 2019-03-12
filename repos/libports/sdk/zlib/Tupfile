@@ -3,17 +3,11 @@ include $(SDK_ABI_INCLUDE)
 
 CONTRIB_DIR = `$(PORTS_CURRENT) zlib`
 
-SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
-SED_FLAGS += -e 's|@exec_prefix@|$(SDK_PREFIX)|'
-SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
-SED_FLAGS += -e 's|@sharedlibdir@|$(SDK_LIB_PREFIX)|'
-SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)/zlib|'
 SED_FLAGS += -e 's|@VERSION@|$(SDK_VERSIONS)|'
 SED_FLAGS += -e 's|^Libs:.*|-l:zlib.lib.so|'
 
 SED_FLAGS += $(CONTRIB_DIR)/src/lib/zlib/zlib.pc.in
-
-: |> sed $(SED_FLAGS) > %o |> pkgconfig/%d.pc
+: |> !sed_pkgconfig_flags |>
 
 TAR_FLAGS += -C $(CONTRIB_DIR) include/zlib
 

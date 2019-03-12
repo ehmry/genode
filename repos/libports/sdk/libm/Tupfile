@@ -1,8 +1,6 @@
 include_rules
 include $(SDK_ABI_INCLUDE)
 
-SED_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
-
-: libm.pc.in |> !sed |> pkgconfig/%d.pc
+: *.pc.in |> !sed_pkgconfig_file |>
 
 include $(SDK_TAR_INCLUDE)

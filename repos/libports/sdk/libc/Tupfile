@@ -3,12 +3,6 @@ include $(SDK_ABI_INCLUDE)
 
 CONTRIB_DIR = `$(PORTS_CURRENT) libc`
 
-SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
-SED_FLAGS += -e 's|@exec_prefix@|$(SDK_PREFIX)|'
-SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
-SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
-SED_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
-
 ifeq ($(ARCH),x86_32)
 	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_32/libc|'
 endif
@@ -17,7 +11,7 @@ ifeq ($(ARCH),x86_64)
 	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/x86_64/libc|'
 endif
 
-: libc.pc.in |> !sed |> pkgconfig/%d.pc
+: *.pc.in |> !sed_pkgconfig_file |>
 
 TAR_FLAGS += --transform='s|/include/spec/|/include/libc/spec/|'
 TAR_FLAGS += --transform='s|/libc/component.h|/libc/libc/component.h|'

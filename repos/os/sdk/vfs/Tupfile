@@ -1,9 +1,8 @@
 include_rules
 include $(SDK_ABI_INCLUDE)
 
-SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
 SED_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
 
-: vfs.pc.in |> !sed |> pkgconfig/%d.pc
+: *.pc.in |> !sed_pkgconfig_file |>
 
 include $(SDK_TAR_INCLUDE)

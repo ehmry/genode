@@ -14,7 +14,7 @@ SED_FLAGS += -e 's|@GL_PC_LIB_PRIV@||'
 SED_FLAGS += -e 's|@GL_PC_CFLAGS@||'
 
 SED_FLAGS += $(CONTRIB_DIR)/src/lib/mesa/src/egl/main/egl.pc.in
-: |> sed $(SED_FLAGS) > %o |> pkgconfig/%d.pc
+: |> !sed_pkgconfig_flags |>
 
 TAR_FLAGS += -C $(CONTRIB_DIR) include/EGL
 include $(SDK_TAR_INCLUDE)

@@ -1,8 +1,5 @@
 include_rules
 
-SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
-SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
-SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
 SED_FLAGS += -e 's|@TOOLCHAIN_DIR@|/usr/local/genode-gcc|'
 
 ifeq ($(ARCH),x86_32)
@@ -13,9 +10,9 @@ ifeq ($(ARCH),x86_64)
 	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/64bit -I${includedir}/spec/x86 -I${includedir}/spec/x86_64|'
 endif
 
-: genode-os.pc.in |> !sed |> pkgconfig/%d.pc
+: *.pc.in |> !sed_pkgconfig_file |>
 
 TAR_FLAGS += --transform='s|/include/|/include/genode-os/|'
 TAR_FLAGS += -C $(REP_DIR) include
 
-: pkgconfig/* |> tar cf %o --transform='s|^|$(SDK_PREFIX)/|' %f $(TAR_FLAGS) |> %d.tar $(SDK_DIR)/<api_tarballs>
+include $(SDK_TAR_INCLUDE)

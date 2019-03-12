@@ -14,9 +14,19 @@ SDK_DIR = $(GENODE_DIR)/sdk
 !ln = |> ^ LN %o -> %f^ ln -s %f %o |>
 !cp = |> ^ CP %o^ cp %f %o |>
 
-!sed = |> sed $(SED_FLAGS) %f > %o |>
-
 !tar = |> tar cf %o %f $(TAR_FLAGS) |>
+
+SED_PKGCONFIG_FLAGS += -e 's|@exec_prefix@|$(SDK_PREFIX)|'
+SED_PKGCONFIG_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
+SED_PKGCONFIG_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
+SED_PKGCONFIG_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
+SED_PKGCONFIG_FLAGS += -e 's|@sharedlibdir@|$(SDK_LIB_PREFIX)|'
+SED_PKGCONFIG_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
+
+!sed_pkgconfig_file = |> \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) %f > %o |> pkgconfig/%B <artifacts>
+!sed_pkgconfig_flags = |> \
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) > %o |> pkgconfig/%d.pc <artifacts>
 
 PORTS_CURRENT = $(GENODE_DIR)/tool/ports/current
 

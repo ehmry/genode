@@ -1,10 +1,7 @@
 include_rules
 include $(SDK_ABI_INCLUDE)
 
-SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
-SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
-
-: *.pc.in |> !sed |> pkgconfig/%d.pc
+: *.pc.in |> !sed_pkgconfig_file |>
 
 CONTRIB_DIR = `$(PORTS_CURRENT) qt5`
 

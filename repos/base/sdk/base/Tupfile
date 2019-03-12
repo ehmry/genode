@@ -13,9 +13,9 @@ ifeq ($(ARCH),x86_64)
 	SED_FLAGS += -e 's|@SPEC_INCLUDES@|-I${includedir}/spec/64bit -I${includedir}/spec/x86 -I${includedir}/spec/x86_64|'
 endif
 
-: foreach *.pc.in |> !sed |> pkgconfig/%B
+: foreach *.pc.in |> !sed_pkgconfig_file |>
 
 TAR_FLAGS += --transform='s|/include/|/include/genode-base/|'
 TAR_FLAGS += -C $(REP_DIR) include
 
-: pkgconfig/* |> tar cf %o --transform='s|^|$(SDK_PREFIX)/|' %f $(TAR_FLAGS) |> %d.tar $(SDK_DIR)/<api_tarballs>
+include $(SDK_TAR_INCLUDE)
