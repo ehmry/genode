@@ -271,7 +271,7 @@ For inspiration, please follow the postings at
 
 :Disposable Firefox VMs:
 
-  Use a minimalistic Tinycore-Linux system to run Firefox in memory with
+  Use a minimalistic Tinycore-Linux system to run Firefox in memory without
   access to any persistent storage:
 
   [https://genodians.org/alex-ab/2019-03-06-disposal-browser-vm]
