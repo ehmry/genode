@@ -8,9 +8,10 @@ LD_SCRIPT_SO = $(BASE_DIR)/src/ld/genode_rel.ld
 	-e "s/^\(\w\+\) W/.text; .weak \1; .type \1,%%function; \1:/p" \
 	-e "s/^\(\w\+\) B \(\w\+\)\$/.bss; .global \1; .type \1,%%object; .size \1,\2; \1:/p" \
 	-e "s/^\(\w\+\) U/.text; .global \1; $(ASM_SYM_DEPENDENCY)/p" \
-	../../lib/symbols/%d > %o |> %d.symbols.s {asm}
+	../../lib/symbols/%d > %o |> $(SDK_LIB_PREFIX)/%d.symbols.s {asm}
 
-: {asm} |> ^ ASSEMBLE %o^ $(CC) -c %f -o %o |> %b.o {obj}
+: {asm} |> ^ ASSEMBLE %o^ $(CC) -c %f -o %o \
+	|> $(SDK_LIB_PREFIX)/%b.o {obj}
 
 : {obj} |> ^ MERGE %d.lib.so^ $(LD) \
 	-o %o \
@@ -19,4 +20,4 @@ LD_SCRIPT_SO = $(BASE_DIR)/src/ld/genode_rel.ld
 	--whole-archive --start-group \
 	$(LIB_SO_DEPS) %f \
 	--end-group --no-whole-archive \
-|> lib/%d.lib.so <artifacts>
+|> $(SDK_LIB_PREFIX)/%d.lib.so <artifacts>
