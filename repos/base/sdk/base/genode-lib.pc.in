@@ -1,6 +1,6 @@
 prefix=@prefix@
 lddir=${prefix}/ld
-libdir=${prefix}/lib
+libdir=@libdir@
 toolchaindir=@TOOLCHAIN_DIR@
 
 Name: genode-lib

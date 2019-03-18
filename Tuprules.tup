@@ -5,10 +5,13 @@ BASE_DIR = $(GENODE_DIR)/repos/base
 ARCH = x86_64
 VERSION = 19.02-r1
 
+LOCAL_LIB_PREFIX = lib/$(ARCH)
+LOCAL_PKGCONFIG_PREFIX = pkgconfig/$(ARCH)
+
 SDK_PREFIX = /opt/genode/sdk-$(VERSION)
 SDK_INCLUDE_PREFIX = $(SDK_PREFIX)/include
-SDK_LIB_PREFIX = $(SDK_PREFIX)/$(ARCH)/lib
-SDK_PKGCONFIG_PREFIX = $(SDK_PREFIX)/$(ARCH)/pkgconfig
+SDK_LIB_PREFIX = $(SDK_PREFIX)/$(LOCAL_LIB_PREFIX)
+SDK_PKGCONFIG_PREFIX = $(SDK_PREFIX)/$(LOCAL_PKGCONFIG_PREFIX)
 
 SDK_DIR = $(GENODE_DIR)/sdk
 
@@ -25,9 +28,12 @@ SED_PKGCONFIG_FLAGS += -e 's|@sharedlibdir@|$(SDK_LIB_PREFIX)|'
 SED_PKGCONFIG_FLAGS += -e 's|@SDK_VERSION@|$(SDK_VERSION)|'
 
 !sed_pkgconfig_file = |> \
-	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) %f > %o |> $(SDK_PKGCONFIG_PREFIX)/%B <artifacts>
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) %f > %o \
+|> $(LOCAL_PKGCONFIG_PREFIX)/%B <artifacts>
+
 !sed_pkgconfig_flags = |> \
-	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) > %o |> $(SDK_PKGCONFIG_PREFIX)/%d.pc <artifacts>
+	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) > %o \
+|> $(LOCAL_PKGCONFIG_PREFIX)/%d.pc <artifacts>
 
 PORTS_CURRENT = $(GENODE_DIR)/tool/ports/current
 

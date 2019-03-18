@@ -1,8 +1,5 @@
 include_rules
 
-SED_FLAGS += -e 's|@prefix@|$(SDK_PREFIX)|'
-SED_FLAGS += -e 's|@libdir@|$(SDK_LIB_PREFIX)|'
-SED_FLAGS += -e 's|@includedir@|$(SDK_INCLUDE_PREFIX)|'
 SED_FLAGS += -e 's|@TOOLCHAIN_DIR@|/usr/local/genode-gcc|'
 
 ifeq ($(ARCH),x86_32)

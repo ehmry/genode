@@ -1,6 +1,14 @@
 include_rules
 include $(SDK_ABI_INCLUDE)
 
+: $(BASE_DIR)/src/lib/ldso/startup/startup.cc |> ^ CC %f^ \
+	$(CXX) -fPIC -c %f -o %o |> $(LOCAL_LIB_PREFIX)/%B.o {startup_objs}
+
+: {startup_objs} |> ^ MERGE %o^ \
+	$(AR) -rcs %o %f |> $(LOCAL_LIB_PREFIX)/ldso-startup.lib.a <artifacts>
+
 : *.pc.in |> !sed_pkgconfig_file |>
+
+TAR_FLAGS += -C $(BASE_DIR)/src ld
 
 include $(SDK_TAR_INCLUDE)

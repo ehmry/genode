@@ -4,6 +4,7 @@ include $(SDK_ABI_INCLUDE)
 CONTRIB_DIR = `$(PORTS_CURRENT) zlib`
 
 SED_FLAGS += -e 's|@VERSION@|$(SDK_VERSIONS)|'
+SED_FLAGS += -e 's|^Cflags: -I${includedir}$|Cflags: -I${includedir}/zlib|'
 SED_FLAGS += -e 's|^Libs:.*|-l:zlib.lib.so|'
 
 SED_FLAGS += $(CONTRIB_DIR)/src/lib/zlib/zlib.pc.in
