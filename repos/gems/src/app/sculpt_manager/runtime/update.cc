@@ -45,8 +45,7 @@ void Sculpt::gen_update_start_content(Xml_generator &xml)
 		gen_parent_rom_route(xml, "depot_download_manager");
 		gen_parent_rom_route(xml, "report_rom");
 		gen_parent_rom_route(xml, "vfs");
-		gen_parent_rom_route(xml, "lxip.lib.so");
-		gen_parent_rom_route(xml, "vfs_lxip.lib.so");
+		gen_parent_rom_route(xml, "vfs_lwip.lib.so");
 		gen_parent_rom_route(xml, "posix.lib.so");
 		gen_parent_rom_route(xml, "libssh.lib.so");
 		gen_parent_rom_route(xml, "libssl.lib.so");
