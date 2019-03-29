@@ -24,44 +24,14 @@ namespace Sculpt {
 					fn(Storage_target { device.label, partition.number }); }); });
 	}
 
-	void gen_nit_fb_start(Xml_generator &, Rom_name const &);
-	void gen_terminal_start(Xml_generator &, Rom_name const &, Rom_name const &,
+	void gen_terminal_start(Xml_generator &, Rom_name const &,
 	                        File_browser_version);
 	void gen_noux_start(Xml_generator &, Rom_name const &, Rom_name const &,
 	                    Storage_devices const &, Ram_fs_state const &, File_browser_version);
 }
 
 
-void Sculpt::gen_nit_fb_start(Xml_generator &xml, Rom_name const &name)
-{
-	gen_common_start_content(xml, name, Cap_quota{100}, Ram_quota{18*1024*1024});
-
-	gen_named_node(xml, "binary", "nit_fb");
-
-	xml.node("provides", [&] () {
-		gen_service_node<Framebuffer::Session>(xml, [&] () {});
-		gen_service_node<Input::Session>(xml, [&] () {});
-	});
-
-	xml.node("config", [&] () { });
-
-	xml.node("route", [&] () {
-
-		gen_service_node<Nitpicker::Session>(xml, [&] () {
-			xml.node("parent", [&] () {
-				xml.attribute("label", String<64>("leitzentrale -> ", name)); }); });
-
-		gen_parent_rom_route(xml, "nit_fb");
-		gen_parent_rom_route(xml, "ld.lib.so");
-		gen_parent_route<Cpu_session> (xml);
-		gen_parent_route<Pd_session>  (xml);
-		gen_parent_route<Log_session> (xml);
-	});
-}
-
-
 void Sculpt::gen_terminal_start(Xml_generator &xml, Rom_name const &name,
-                                Rom_name const &nit_fb_name,
                                 File_browser_version version)
 {
 	xml.attribute("version", version.value);
@@ -73,11 +43,9 @@ void Sculpt::gen_terminal_start(Xml_generator &xml, Rom_name const &name,
 	gen_provides<Terminal::Session>(xml);
 
 	xml.node("route", [&] () {
-		gen_service_node<Framebuffer::Session>(xml, [&] () {
-			gen_named_node(xml, "child", nit_fb_name); });
-
-		gen_service_node<Input::Session>(xml, [&] () {
-			gen_named_node(xml, "child", nit_fb_name);  });
+		gen_service_node<Nitpicker::Session>(xml, [&] () {
+			xml.node("parent", [&] () {
+				xml.attribute("label", String<64>("leitzentrale -> ", name)); }); });
 
 		gen_parent_rom_route(xml, "terminal");
 		gen_parent_rom_route(xml, "ld.lib.so");
@@ -214,13 +182,9 @@ void Sculpt::gen_file_browser(Xml_generator &xml,
                               File_browser_version version)
 {
 	xml.node("start", [&] () {
-		gen_nit_fb_start(xml, "inspect"); });
+		gen_terminal_start(xml, "inspect", version); });
 
 	xml.node("start", [&] () {
-		gen_terminal_start(xml, "inspect terminal", "inspect",
-		                   version); });
-
-	xml.node("start", [&] () {
-		gen_noux_start(xml, "inspect noux", "inspect terminal",
+		gen_noux_start(xml, "inspect noux", "inspect ",
 		               devices, ram_fs_state, version); });
 }

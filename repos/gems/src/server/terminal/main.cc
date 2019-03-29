@@ -21,6 +21,7 @@
 #include <base/attached_rom_dataspace.h>
 #include <base/attached_ram_dataspace.h>
 #include <input/event.h>
+#include <nitpicker_session/connection.h>
 #include <gems/vfs.h>
 #include <gems/vfs_font.h>
 #include <gems/cached_font.h>
@@ -77,10 +78,11 @@ struct Terminal::Main : Character_consumer
 	Signal_handler<Main> _config_handler {
 		_env.ep(), *this, &Main::_handle_config };
 
-	Input::Connection _input { _env };
 	Timer::Connection _timer { _env };
 
-	Framebuffer _framebuffer { _env, _config_handler };
+	Nitpicker::Connection _nitpicker { _env };
+
+	Framebuffer _framebuffer { _env, _nitpicker, _config_handler };
 
 	typedef Pixel_rgb565 PT;
 
@@ -143,7 +145,7 @@ struct Terminal::Main : Character_consumer
 	{
 		_timer .sigh(_flush_handler);
 		_config.sigh(_config_handler);
-		_input .sigh(_input_handler);
+		_nitpicker.input()->sigh(_input_handler);
 
 		_handle_config();
 
@@ -250,7 +252,7 @@ void Terminal::Main::_handle_config()
 
 void Terminal::Main::_handle_input()
 {
-	_input.for_each_event([&] (Input::Event const &event) {
+	_nitpicker.input()->for_each_event([&] (Input::Event const &event) {
 
 		event.handle_press([&] (Input::Keycode, Codepoint codepoint) {
 
