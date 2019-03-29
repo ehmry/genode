@@ -26,13 +26,21 @@ class Terminal::Framebuffer
 {
 	private:
 
+		typedef Nitpicker::Session::Command Command;
+
 		Env &_env;
 
-		::Framebuffer::Connection _fb { _env, ::Framebuffer::Mode() };
+		Nitpicker::Connection &_nitpicker;
+
+		::Framebuffer::Session &_fb
+			{ *_nitpicker.framebuffer() };
 
 		Constructible<Attached_dataspace> _ds { };
 
 		::Framebuffer::Mode _mode { };
+
+		Nitpicker::Session::View_handle const _view_handle
+			{ _nitpicker.create_view() };
 
 	public:
 
@@ -41,10 +49,13 @@ class Terminal::Framebuffer
 		 *
 		 * \param mode_sigh  signal handler to be triggered on mode changes
 		 */
-		Framebuffer(Env &env, Signal_context_capability mode_sigh) : _env(env)
+		Framebuffer(Env &env,
+		            Nitpicker::Connection &np,
+		            Signal_context_capability mode_sigh)
+		: _env(env), _nitpicker(np)
 		{
 			switch_to_new_mode();
-			_fb.mode_sigh(mode_sigh);
+			_nitpicker.mode_sigh(mode_sigh);
 		}
 
 		unsigned w() const { return _mode.width(); }
@@ -64,7 +75,7 @@ class Terminal::Framebuffer
 		 */
 		bool mode_changed() const
 		{
-			::Framebuffer::Mode _new_mode = _fb.mode();
+			::Framebuffer::Mode _new_mode = _nitpicker.mode();
 
 			return _new_mode.width()  != _mode.width()
 			    || _new_mode.height() != _mode.height();
@@ -81,10 +92,20 @@ class Terminal::Framebuffer
 			 * the dataspace update - the mode information may correspond to
 			 * the next pending mode at the server while we are operating on
 			 * the old (possibly too small) dataspace.
+			 *
+			 * TODO:clip the geometry down to the nearest character-cell
 			 */
-			_mode = _fb.mode();
-			if (_mode.width() && _mode.height())
+			::Framebuffer::Mode mode = _nitpicker.mode();
+			if (mode.width() && mode.height()) {
+				_nitpicker.buffer(mode, false);
+				_mode = _fb.mode();
 				_ds.construct(_env.rm(), _fb.dataspace());
+
+				using namespace Nitpicker;
+				Rect rect(Point(0,0), Area(_mode.width(), _mode.height()));
+				_nitpicker.enqueue<Command::Geometry>(_view_handle, rect);
+				_nitpicker.execute();
+			}
 		}
 };
 

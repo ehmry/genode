@@ -3,6 +3,7 @@ os
 framebuffer_session
 input_session
 nitpicker_gfx
+nitpicker_session
 terminal_session
 timer_session
 vfs
