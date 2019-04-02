@@ -73,16 +73,26 @@ struct Terminal::Main : Character_consumer
 
 	Color_palette _color_palette { };
 
+	/*
+	 * Adapt terminal to font or framebuffer mode changes
+	 */
+	void _adjust_geometry();
+
 	void _handle_config();
+
+	void _handle_mode();
 
 	Signal_handler<Main> _config_handler {
 		_env.ep(), *this, &Main::_handle_config };
+
+	Signal_handler<Main> _mode_handler {
+		_env.ep(), *this, &Main::_handle_mode };
 
 	Timer::Connection _timer { _env };
 
 	Nitpicker::Connection _nitpicker { _env };
 
-	Framebuffer _framebuffer { _env, _nitpicker, _config_handler };
+	Framebuffer _framebuffer { _env, _nitpicker };
 
 	typedef Pixel_rgb565 PT;
 
@@ -145,38 +155,18 @@ struct Terminal::Main : Character_consumer
 	{
 		_timer .sigh(_flush_handler);
 		_config.sigh(_config_handler);
-		_nitpicker.input()->sigh(_input_handler);
-
 		_handle_config();
+
+		_nitpicker.input()->sigh(_input_handler);
+		_nitpicker.mode_sigh(_mode_handler);
 
 		/* announce service at our parent */
 		_env.parent().announce(_env.ep().manage(_root));
 	}
 };
 
-
-void Terminal::Main::_handle_config()
+void Terminal::Main::_adjust_geometry()
 {
-	_config.update();
-
-	Xml_node const config = _config.xml();
-
-	_color_palette.apply_config(config);
-
-	_font.destruct();
-
-	_root_dir.apply_config(config.sub_node("vfs"));
-
-	Cached_font::Limit const cache_limit {
-		config.attribute_value("cache", Number_of_bytes(256*1024)) };
-
-	_font.construct(_heap, _root_dir, cache_limit);
-
-	/*
-	 * Adapt terminal to font or framebuffer mode changes
-	 */
-	_framebuffer.switch_to_new_mode();
-
 	/*
 	 * Distinguish the case where the framebuffer change affects the character
 	 * grid size from the case where merely the pixel position of the character
@@ -232,6 +222,8 @@ void Terminal::Main::_handle_config()
 		} else {
 			_text_screen_surface->geometry(new_geometry);
 		}
+
+		_framebuffer.switch_to_new_view(new_geometry.used_pixels());
 	}
 	catch (Text_screen_surface<PT>::Geometry::Invalid) {
 
@@ -243,10 +235,62 @@ void Terminal::Main::_handle_config()
 		 */
 		_text_screen_surface.destruct();
 		_terminal_size = Area(0, 0);
+
+		_framebuffer.switch_to_new_view(_terminal_size);
 	}
 
 	_root.notify_resized(Session::Size(_terminal_size.w(), _terminal_size.h()));
 	_schedule_flush();
+}
+
+void Terminal::Main::_handle_config()
+{
+	_config.update();
+
+	Xml_node const config = _config.xml();
+
+	_color_palette.apply_config(config);
+
+	_font.destruct();
+
+	_root_dir.apply_config(config.sub_node("vfs"));
+
+	Cached_font::Limit const cache_limit {
+		config.attribute_value("cache", Number_of_bytes(256*1024)) };
+
+	_font.construct(_heap, _root_dir, cache_limit);
+
+	Area char_box = _font->font().bounding_box();
+
+	unsigned config_width  = config.attribute_value("initial_columns", 80U);
+	unsigned config_height = config.attribute_value("initial_rows", 24U);
+
+	Area area(config_width * char_box.w(),
+	          config_height * char_box.h());
+
+	_framebuffer.switch_to_new_mode(area);
+	_adjust_geometry();
+}
+
+
+void Terminal::Main::_handle_mode()
+{
+	::Framebuffer::Mode new_mode = _nitpicker.mode();
+
+	Area char_box = _font->font().bounding_box();
+
+	unsigned w = new_mode.width();
+	unsigned h = new_mode.height();
+	if (!(w&h)) {
+		_root.notify_resized(Session::Size(0,0));
+		return;
+	}
+
+	w -= w % char_box.w();
+	h -= h % char_box.h();
+
+	_framebuffer.switch_to_new_mode(Area(w,h));
+	_adjust_geometry();
 }
 
 

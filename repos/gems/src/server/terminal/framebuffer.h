@@ -37,7 +37,7 @@ class Terminal::Framebuffer
 
 		Constructible<Attached_dataspace> _ds { };
 
-		::Framebuffer::Mode _mode { };
+		::Framebuffer::Mode _fb_mode { };
 
 		Nitpicker::Session::View_handle const _view_handle
 			{ _nitpicker.create_view() };
@@ -46,20 +46,12 @@ class Terminal::Framebuffer
 
 		/**
 		 * Constructor
-		 *
-		 * \param mode_sigh  signal handler to be triggered on mode changes
 		 */
-		Framebuffer(Env &env,
-		            Nitpicker::Connection &np,
-		            Signal_context_capability mode_sigh)
-		: _env(env), _nitpicker(np)
-		{
-			switch_to_new_mode();
-			_nitpicker.mode_sigh(mode_sigh);
-		}
+		Framebuffer(Env &env, Nitpicker::Connection &np)
+		: _env(env), _nitpicker(np) { }
 
-		unsigned w() const { return _mode.width(); }
-		unsigned h() const { return _mode.height(); }
+		unsigned w() const { return _fb_mode.width(); }
+		unsigned h() const { return _fb_mode.height(); }
 
 		template <typename PT>
 		PT *pixel() { return _ds->local_addr<PT>(); }
@@ -69,19 +61,7 @@ class Terminal::Framebuffer
 			_fb.refresh(rect.x1(), rect.y1(), rect.w(), rect.h());
 		}
 
-		/**
-		 * Return true if the framebuffer mode differs from the current
-		 * terminal size.
-		 */
-		bool mode_changed() const
-		{
-			::Framebuffer::Mode _new_mode = _nitpicker.mode();
-
-			return _new_mode.width()  != _mode.width()
-			    || _new_mode.height() != _mode.height();
-		}
-
-		void switch_to_new_mode()
+		void switch_to_new_mode(Area area)
 		{
 			/*
 			 * The mode information must be obtained before updating the
@@ -92,20 +72,25 @@ class Terminal::Framebuffer
 			 * the dataspace update - the mode information may correspond to
 			 * the next pending mode at the server while we are operating on
 			 * the old (possibly too small) dataspace.
-			 *
-			 * TODO:clip the geometry down to the nearest character-cell
 			 */
-			::Framebuffer::Mode mode = _nitpicker.mode();
-			if (mode.width() && mode.height()) {
-				_nitpicker.buffer(mode, false);
-				_mode = _fb.mode();
-				_ds.construct(_env.rm(), _fb.dataspace());
+			::Framebuffer::Mode mode(
+				area.w(), area.h(),
+				::Framebuffer::Mode::RGB565);
+			_nitpicker.buffer(mode, false);
+			_fb_mode = _fb.mode();
+			_ds.construct(_env.rm(), _fb.dataspace());
+		}
 
-				using namespace Nitpicker;
-				Rect rect(Point(0,0), Area(_mode.width(), _mode.height()));
-				_nitpicker.enqueue<Command::Geometry>(_view_handle, rect);
-				_nitpicker.execute();
-			}
+		void switch_to_new_view(Area area)
+		{
+			using namespace Nitpicker;
+			Area next_area(
+				min((unsigned)_fb_mode.width(),  area.w()),
+				min((unsigned)_fb_mode.height(), area.h()));
+
+			_nitpicker.enqueue<Command::Geometry>(
+				_view_handle, Rect(Point(0,0), next_area));
+			_nitpicker.execute();
 		}
 };
 

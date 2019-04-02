@@ -72,7 +72,8 @@ class Terminal::Text_screen_surface
 			 */
 			Area used_pixels() const
 			{
-				return Area((columns*char_width.value)>>8, lines*char_height);
+				return Area(((columns*char_width.value)>>8)+2, (lines*char_height)+2);
+				/* there is a single-pixel border around the grid */
 			}
 
 			/**
