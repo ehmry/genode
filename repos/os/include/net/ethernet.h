@@ -65,10 +65,13 @@ class Net::Ethernet_frame
 
 		/**
 		 * Id representing encapsulated protocol.
+		 *
+		 * See https://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.txt
 		 */
 		enum class Type : Genode::uint16_t {
 			IPV4 = 0x0800,
 			ARP  = 0x0806,
+			IPV6 = 0x86dd,
 		};
 
 		template <typename T>

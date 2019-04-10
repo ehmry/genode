@@ -15,6 +15,7 @@
 #include <net/ethernet.h>
 #include <net/arp.h>
 #include <net/ipv4.h>
+#include <net/ipv6.h>
 #include <base/output.h>
 
 
@@ -27,6 +28,9 @@ void Net::Ethernet_frame::print(Genode::Output &output) const
 		break;
 	case Ethernet_frame::Type::IPV4:
 		Genode::print(output, *reinterpret_cast<Ipv4_packet const *>(_data));
+		break;
+	case Ethernet_frame::Type::IPV6:
+		Genode::print(output, *reinterpret_cast<Ipv6_packet const *>(_data));
 		break;
 	default: ; }
 }

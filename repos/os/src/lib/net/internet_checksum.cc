@@ -40,12 +40,12 @@ uint16_t Net::internet_checksum(uint16_t const *addr,
 }
 
 
-uint16_t Net::internet_checksum_pseudo_ip(uint16_t        const *ip_data,
-                                          size_t                 ip_data_sz,
-                                          uint16_t               ip_data_sz_be,
-                                          Ipv4_packet::Protocol  ip_prot,
-                                          Ipv4_address          &ip_src,
-                                          Ipv4_address          &ip_dst)
+uint16_t Net::internet_checksum_pseudo_ip(uint16_t const *ip_data,
+                                          size_t          ip_data_sz,
+                                          uint16_t        ip_data_sz_be,
+                                          Ip_protocol     ip_prot,
+                                          Ipv4_address   &ip_src,
+                                          Ipv4_address   &ip_dst)
 {
 	/*
 	 * Add up pseudo IP header:

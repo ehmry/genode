@@ -27,7 +27,7 @@ namespace Net {
 	Genode::uint16_t internet_checksum_pseudo_ip(Genode::uint16_t const *addr,
 	                                             Genode::size_t          size,
 	                                             Genode::uint16_t        size_be,
-	                                             Ipv4_packet::Protocol   ip_prot,
+	                                             Ip_protocol             ip_prot,
 	                                             Ipv4_address           &ip_src,
 	                                             Ipv4_address           &ip_dst);
 }

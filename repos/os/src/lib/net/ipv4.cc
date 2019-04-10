@@ -28,13 +28,13 @@ void Net::Ipv4_packet::print(Genode::Output &output) const
 {
 	Genode::print(output, "\033[32mIPV4\033[0m ", src(), " > ", dst(), " ");
 	switch (protocol()) {
-	case Protocol::TCP:
+	case Ip_protocol::TCP:
 		Genode::print(output, *reinterpret_cast<Tcp_packet const *>(_data));
 		break;
-	case Protocol::UDP:
+	case Ip_protocol::UDP:
 		Genode::print(output, *reinterpret_cast<Udp_packet const *>(_data));
 		break;
-	case Protocol::ICMP:
+	case Ip_protocol::ICMP:
 		Genode::print(output, *reinterpret_cast<Icmp_packet const *>(_data));
 		break;
 	default: ; }

@@ -45,5 +45,5 @@ void Net::Tcp_packet::update_checksum(Ipv4_address ip_src,
 	_checksum = 0;
 	_checksum = internet_checksum_pseudo_ip((uint16_t*)this, tcp_size,
 	                                        host_to_big_endian((uint16_t)tcp_size),
-	                                        Ipv4_packet::Protocol::TCP, ip_src, ip_dst);
+	                                        Ip_protocol::TCP, ip_src, ip_dst);
 }
