@@ -88,6 +88,9 @@ class Nic_switch::Session_component : private Session_resources,
 
 		void _send(Ethernet_frame &eth, Genode::size_t const size)
 		{
+			while (source().ack_avail())
+				source().release_packet(source().get_acked_packet());
+
 			Genode::log(_label, " rcv ", eth);
 
 			Nic::Packet_descriptor packet = source().alloc_packet(size);

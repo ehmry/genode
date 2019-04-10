@@ -28,6 +28,8 @@
 /* Genode includes */
 #include <nic/packet_allocator.h>
 #include <nic_session/connection.h>
+#include <base/heap.h>
+#include <util/xml_node.h>
 #include <base/log.h>
 
 namespace Lwip {
@@ -155,6 +157,12 @@ class Lwip::Nic_netif
 
 		void configure(Genode::Xml_node const &config)
 		{
+			if (config.attribute_value("ipv6", false)) {
+				Genode::log("configuring lwIP IPv6 interface automatically");
+				netif_create_ip6_linklocal_address(&_netif, true);
+				netif_set_ip6_autoconfig_enabled(&_netif, true);
+			}
+
 			if (config.attribute_value("dhcp", false)) {
 
 				err_t err = dhcp_start(&_netif);
@@ -163,7 +171,11 @@ class Lwip::Nic_netif
 				else
 					Genode::error("failed to configure lwIP interface with DHCP, error ", -err);
 
-			} else /* get addressing from config */ {
+			}
+
+			typedef Genode::String<IPADDR_STRLEN_MAX> Str;
+			Str ip_str = config.attribute_value("ip_addr", Str());
+			if (ip_str != "") /* get addressing from config */ {
 				typedef Genode::String<IPADDR_STRLEN_MAX> Str;
 				Str ip_str = config.attribute_value("ip_addr", Str());
 				ip_addr_t ipaddr;
