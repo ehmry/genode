@@ -18,9 +18,10 @@
 
 #include <util/avl_tree.h>
 #include <util/list.h>
-#include <address_node.h>
+#include "address_node.h"
 
-namespace Net {
+namespace Nic_switch {
+	using namespace Net;
 
 	/*
 	 * The Vlan is a database containing all clients

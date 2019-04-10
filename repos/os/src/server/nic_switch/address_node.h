@@ -23,7 +23,8 @@
 #include <net/ipv4.h>
 #include <net/ipv6.h>
 
-namespace Net {
+namespace Nic_switch {
+	using namespace Net;
 
 	/* Forward declaration */
 	class Session_component;
@@ -43,7 +44,7 @@ namespace Net {
 
 
 template <typename ADDRESS>
-class Net::Address_node : public Genode::Avl_node<Address_node<ADDRESS> >,
+class Nic_switch::Address_node : public Genode::Avl_node<Address_node<ADDRESS> >,
                           public Genode::List<Address_node<ADDRESS> >::Element
 {
 	private:

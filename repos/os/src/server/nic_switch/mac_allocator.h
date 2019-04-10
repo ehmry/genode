@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2010-2017 Genode Labs GmbH
+ * Copyright (C) 2010-2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -15,18 +15,21 @@
 #define _MAC_ALLOCATOR_H_
 
 /* Genode includes */
-#include <base/exception.h>
 #include <net/mac_address.h>
+#include <base/exception.h>
 
-namespace Net { class Mac_allocator; }
+namespace Nic_switch {
+	using namespace Net;
+	class Mac_allocator;
+}
 
 
-class Net::Mac_allocator
+class Nic_switch::Mac_allocator
 {
 	private:
 
-		Mac_address const _base;
-		bool              _free[sizeof(_base.addr[0]) << 8];
+		Mac_address _base;
+		bool        _free[sizeof(_base.addr[0]) << 8];
 
 	public:
 
@@ -34,6 +37,7 @@ class Net::Mac_allocator
 
 		Mac_allocator(Mac_address base) : _base(base)
 		{
+			_base.addr[1] |= 3;
 			Genode::memset(&_free, true, sizeof(_free));
 		}
 

@@ -1,4 +1,3 @@
-TARGET   = nic_switch
-LIBS    += base net
-SRC_CC  += component.cc main.cc nic.cc packet_handler.cc
-INC_DIR += $(PRG_DIR)
+TARGET  = nic_switch
+LIBS   += base net
+SRC_CC += main.cc
