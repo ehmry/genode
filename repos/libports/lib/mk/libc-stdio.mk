@@ -1,6 +1,9 @@
 LIBC_STDIO_DIR = $(LIBC_DIR)/lib/libc/stdio
 
-SRC_C = $(notdir $(wildcard $(LIBC_STDIO_DIR)/*.c))
+#FILTER_OUT = xprintf_errno.c xprintf_quote.c
+# this file pulls in weird headers
+
+SRC_C = $(filter-out $(FILTER_OUT),$(notdir $(wildcard $(LIBC_STDIO_DIR)/*.c)))
 
 include $(REP_DIR)/lib/mk/libc-common.inc
 

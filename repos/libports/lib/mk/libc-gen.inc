@@ -11,6 +11,24 @@ FILTER_OUT_C += \
 # the following is a wrapper over rusage, which we cannot provide
 FILTER_OUT_C += clock.c
 
+# avoid chacha20 dependency for simplicity's sake
+FILTER_OUT_C += arc4random.c
+
+# we implement this ourselves
+FILTER_OUT_C += isatty.c
+
+FILTER_OUT_C += \
+	disklabel.c \
+	exect.c \
+	cap_sandboxed.c \
+	getutxent.c \
+	pututxline.c \
+	readpassphrase.c \
+	sem_new.c \
+	utxdb.c \
+	trivial-getcontextx.c \
+	scandir_b.c \
+
 SRC_C = $(filter-out $(FILTER_OUT_C),$(notdir $(wildcard $(LIBC_GEN_DIR)/*.c)))
 
 # 'sysconf.c' includes the local 'stdtime/tzfile.h'

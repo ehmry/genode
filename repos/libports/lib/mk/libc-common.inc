@@ -30,6 +30,8 @@ CC_CXX_OPT += -Wall
 #
 CC_OPT += -DPIC
 
+CC_OPT += -D__NO_TLS
+
 #
 # Use libc import rules also for building the libc itself
 #

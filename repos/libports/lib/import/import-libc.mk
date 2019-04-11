@@ -31,6 +31,10 @@ INC_DIR += $(LIBC_PORT_DIR)/include/libc
 INC_DIR += $(LIBC_PORT_DIR)/$(LIBC_ARCH_INC_DIR)
 endif
 
+ifeq ($(filter-out $(SPECS),x86),)
+	INC_DIR += $(LIBC_PORT_DIR)/include/spec/x86/libc
+endif
+
 #
 # Genode-specific supplements to standard libc headers
 #
@@ -45,7 +49,7 @@ CC_OPT += -D__FreeBSD__=8
 #
 # Provide C99 API functions (needed for C++11 in stdcxx at least)
 #
-CC_OPT += -D__ISO_C_VISIBLE=1999
+#CC_OPT += -D__ISO_C_VISIBLE=1999
 
 #
 # Prevent gcc-4.4.5 from generating code for the family of 'sin' and 'cos'
@@ -53,3 +57,8 @@ CC_OPT += -D__ISO_C_VISIBLE=1999
 # or 'sincosf', which is a GNU extension, not provided by our libc.
 #
 CC_OPT += -fno-builtin-sin -fno-builtin-cos -fno-builtin-sinf -fno-builtin-cosf
+
+#
+# No thread-local locale
+#
+CC_OPT += -D__NO_TLS

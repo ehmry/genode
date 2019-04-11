@@ -3,7 +3,7 @@
 #
 LIBS   = libc-string libc-locale libc-stdlib libc-stdio libc-gen libc-gdtoa \
          libc-inet libc-stdtime libc-regex libc-compat libc-setjmp libc-mem \
-         libc-resolv libc-isc libc-nameser libc-net libc-rpc \
+         libc-resolv libc-isc libc-nameser libc-net libc-rpc libc-sys libc-tzcode \
 
 LIBS  += base vfs
 
@@ -19,6 +19,8 @@ SRC_CC = atexit.cc dummies.cc rlimit.cc sysctl.cc \
          socket_operations.cc task.cc socket_fs_plugin.cc syscall.cc \
          getpwent.cc
 
+# sysctl.cc
+
 #
 # Pthreads
 #
@@ -27,11 +29,18 @@ SRC_CC += semaphore.cc rwlock.cc \
 
 CC_OPT_sysctl += -Wno-write-strings
 
+#
+# FreeBSD headers use the C99 restrict keyword
+#
+CXX_DEF += -Drestrict=""
+
 INC_DIR += $(REP_DIR)/src/lib/libc
 INC_DIR += $(REP_DIR)/src/lib/libc/include
 
 # needed for base/internal/unmanaged_singleton.h
 INC_DIR += $(BASE_DIR)/src/include
+
+INC_DIR += $(BASE_DIR)/sys
 
 #
 # Files from string library that are not included in libc-raw_string because
@@ -48,4 +57,4 @@ vpath % $(LIBC_DIR)/lib/libc/string
 # Shared library, for libc we need symbol versioning
 #
 SHARED_LIB  = yes
-LD_OPT     += --version-script=$(REP_DIR)/src/lib/libc/Version.def
+LD_OPT     += --version-script=$(LIBC_DIR)/lib/libc/Versions.def

@@ -23,7 +23,6 @@
 
 namespace Libc { time_t read_rtc(); }
 
-
 extern "C" __attribute__((weak))
 int clock_gettime(clockid_t clk_id, struct timespec *ts)
 {

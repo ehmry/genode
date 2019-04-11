@@ -44,7 +44,7 @@ using namespace Libc;
  */
 extern "C" int
 __attribute__((weak))
-poll(struct pollfd fds[], nfds_t nfds, int timeout)
+__sys_poll(struct pollfd fds[], nfds_t nfds, int timeout)
 {
 	nfds_t i;
 	int ret, fd, maxfd = 0;
