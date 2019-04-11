@@ -75,7 +75,7 @@ class Genode::Lru_cache : Noncopyable
 
 				bool _higher(KEY const &other) const
 				{
-					return Tag::_key.value > other.value;
+					return Tag::_key > other;
 				}
 
 				unsigned _importance(Time now) const
@@ -97,7 +97,7 @@ class Genode::Lru_cache : Noncopyable
 				template <typename FN>
 				bool try_apply(KEY const &key, FN const &fn)
 				{
-					if (Tag::_key.value == key.value) {
+					if (Tag::_key == key) {
 						fn(*this);
 						return true;
 					}
