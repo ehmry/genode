@@ -186,13 +186,8 @@ not be your intention, please adjust the hash file manually.
 
 endef
 
-
-ifeq ($(UPDATE_VERSIONS),)
-HASH_MISMATCH_CMD = $(ECHO) "$(subst $(NEWLINE),\n,$(HASH_OUT_OF_DATE_MESSAGE))"; false
-else
 HASH_MISMATCH_CMD = version=$(next_version); \
                     echo "$$version $$hash" > $(RECIPE_HASH_FILE);
-endif
 
 #
 # Check the consistency between the hash of the archive recipe and the actual

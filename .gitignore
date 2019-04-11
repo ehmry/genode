@@ -3,6 +3,8 @@
 *.swp
 *.rej
 
+hash
+
 /build
 /contrib
 /depot

@@ -11,8 +11,8 @@
 #
 # Set undefined CUSTOM_ tools to their default values
 #
-CUSTOM_CC       ?= $(CROSS_DEV_PREFIX)gcc
-CUSTOM_CXX      ?= $(CROSS_DEV_PREFIX)g++
+CUSTOM_CC       ?= ccache $(CROSS_DEV_PREFIX)gcc
+CUSTOM_CXX      ?= ccache $(CROSS_DEV_PREFIX)g++
 CUSTOM_CPP      ?= $(CROSS_DEV_PREFIX)cpp
 CUSTOM_CXX_LIB  ?= $(CUSTOM_CXX)
 CUSTOM_LD       ?= $(CROSS_DEV_PREFIX)ld
