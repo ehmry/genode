@@ -29,7 +29,15 @@ namespace Nic_switch {
 	using namespace Net;
 	using namespace Genode;
 	class Root;
-	struct Main; 
+	struct Main;
+}
+
+
+bool operator > (Net::Ipv6_address const a,
+                 Net::Ipv6_address const b)
+{
+	return Genode::memcmp(
+			a.addr, b.addr, sizeof(Net::Ipv6_address::addr)) > 0;
 }
 
 
@@ -39,15 +47,11 @@ class Nic_switch::Root : public Genode::Root_component<Nic_switch::Session_compo
 
 		Genode::Env            &_env;
 		Attached_rom_dataspace  _config_rom  { _env, "config" };
+		Network                 _network { _env };
 		Interface_registry      _interface_registry { };
-		Net::Mac_address        _proxy_mac { };
-		Mac_allocator           _mac_alloc { Mac_address() };
 
 		void _handle_config()
 		{
-			_proxy_mac = _config_rom.xml()
-				.attribute_value("mac", _proxy_mac);
-			Genode::log("proxy MAC is ", _proxy_mac);
 		}
 
 	protected:
@@ -56,21 +60,8 @@ class Nic_switch::Root : public Genode::Root_component<Nic_switch::Session_compo
 		{
 			using namespace Genode;
 
-			Session_label  const label  { label_from_args(args) };
-			Session_policy const policy { label, _config_rom.xml() };
-
-			Mac_address mac { policy.attribute_value("mac", Mac_address()) };
-
-			if (mac == Mac_address() || mac == _proxy_mac) {
-				try { mac = _mac_alloc.alloc(); }
-				catch (Mac_allocator::Alloc_failed) {
-					Genode::warning("MAC address allocation failed!");
-					throw Service_denied();
-				}
-			} else if (_mac_alloc.mac_managed_by_allocator(mac)) {
-				Genode::warning("MAC address already in use");
-				throw Service_denied();
-			}
+			Session_label  label  { label_from_args(args) };
+			Session_policy policy { label, _config_rom.xml() };
 
 			auto *session =  new (md_alloc())
 				Session_component(_env.ep(), _env.ram(), _env.rm(),
@@ -78,9 +69,9 @@ class Nic_switch::Root : public Genode::Root_component<Nic_switch::Session_compo
 				                  cap_quota_from_args(args),
 				                  Tx_size{Arg_string::find_arg(args, "tx_buf_size").ulong_value(0)},
 				                  Rx_size{Arg_string::find_arg(args, "rx_buf_size").ulong_value(0)},
+				                  _network,
 				                  _interface_registry,
-				                  label, mac);
-			Genode::log(mac, " assigned to ", label);
+				                  label);
 			return session;
 		}
 
@@ -93,7 +84,6 @@ class Nic_switch::Root : public Genode::Root_component<Nic_switch::Session_compo
 				env.ep(), md_alloc),
 			_env(env)
 		{
-			_proxy_mac.addr[1] = 3;
 			_handle_config();
 		}
 };

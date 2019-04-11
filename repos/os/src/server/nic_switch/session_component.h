@@ -15,6 +15,9 @@
 #ifndef _SESSION_COMPONENT_H_
 #define _SESSION_COMPONENT_H_
 
+/* local includes */
+#include "network.h"
+
 /* Genode includes */
 #include <net/ethernet.h>
 #include <net/size_guard.h>
@@ -70,6 +73,7 @@ class Nic_switch::Session_component : private Session_resources,
 {
 	private:
 
+		Network            &_network;
 		Interface_registry &_interface_registry;
 
 		Interface_registry::Element _interface_element
@@ -78,7 +82,9 @@ class Nic_switch::Session_component : private Session_resources,
 		Genode::Io_signal_handler<Session_component> _packet_handler;
 
 		Genode::Session_label const _label;
-		Nic::Mac_address      const _mac;
+
+		Mac_address const _client_mac { _network.mac_alloc.alloc() };
+		Mac_address const  _local_mac { _network.mac_alloc.alloc() };
 
 		Nic::Packet_stream_sink<::Nic::Session::Policy> &sink() {
 			return *_tx.sink(); }
@@ -99,14 +105,67 @@ class Nic_switch::Session_component : private Session_resources,
 			source().submit_packet(packet);
 		}
 
+		void _handle_ipv6(Ethernet_frame &eth,
+		                  Size_guard &size_guard,
+		                  Genode::size_t const size)
+		{
+			(void)size;
+			Ipv6_packet &ip = eth.data<Ipv6_packet>(size_guard);
+
+			/* 4.1
+			 * if the packet is ipv6, check the neighbor cache
+			 * for the source address and create a STALE entry if
+			 * it was not found.
+			 *
+			 * if the packet is ipv6 and ICMP ND, the ICMP must be
+			 * proxied, that is, the link-layer addresses within
+			 * the ICMP payload must be modified
+			 *
+			 * if the packet is multicast then forward the packet
+			 * out all interfaces on the same link with a new
+			 * link-layer header
+			 *
+			 * when any other IPV6 packet is recieved it is forwarded
+			 * with a new link-layer header to the interface associated
+			 * with the next hop in the neighbor cache. if no entry
+			 * exists, drop the packet
+			 */
+
+			/* 4.1.3.
+			 * ICMP ND packets must update the neighbor cache
+			 */
+
+			if (!ip.src().unspecified()) {
+				auto hit = [&] (Neighbor &) { };
+				auto miss = [&] (Neighbor_cache::Missing_element &missing) {
+					auto mac = eth.src();
+					auto state = Neighbor::STALE;
+					Genode::log("create STALE neighbor ", ip.src());
+					missing.construct(*this, mac, state);
+				};
+				_network.neighbors.try_apply(ip.src(), hit, miss);
+			}
+
+			if (ip.protocol() == Ip_protocol::ICMP6) {
+				Genode::warning("replace ICMPv6 link-layer addresses");
+			}
+		}
+
 		void _handle_ethernet(Ethernet_frame &eth,
 		                      Size_guard &size_guard,
 		                      Genode::size_t const size)
 		{
-			(void)size_guard;
-			_interface_registry.for_each([&] (Session_component &other) {
-				if (&other != this) other._send(eth, size);
-			});
+			switch (eth.type()) {
+			case Ethernet_frame::Type::IPV6:
+				_handle_ipv6(eth, size_guard, size); break;
+			default:
+				/* drop packet */
+				/* send it out anyway */
+				_interface_registry.for_each([&] (Session_component &other) {
+					if (&other != this) other._send(eth, size);
+				});
+				break;
+			}
 		}
 
 		bool _handle_packet(Nic::Packet_descriptor const &pkt)
@@ -143,9 +202,9 @@ class Nic_switch::Session_component : private Session_resources,
 		                  Genode::Cap_quota      cap_quota,
 		                  Tx_size                tx_size,
 		                  Rx_size                rx_size,
+		                  Network               &network,
 		                  Interface_registry    &interface_registry,
-		                  Genode::Session_label const &label,
-		                  Nic::Mac_address       mac)
+		                  Genode::Session_label const &label)
 		:
 			Session_resources(ram, region_map,
 			                  ram_quota, cap_quota,
@@ -153,15 +212,16 @@ class Nic_switch::Session_component : private Session_resources,
 			Nic::Session_rpc_object(region_map,
 			                        _tx_ds.cap(), _rx_ds.cap(),
 			                        &_rx_pkt_alloc, ep.rpc_ep()),
+			_network(network),
 			_interface_registry(interface_registry),
 			_packet_handler(ep, *this, &Session_component::_handle_packets),
-			_label(label), _mac(mac)
+			_label(label)
 		{
 			_tx.sigh_packet_avail(_packet_handler);
 			_tx.sigh_ready_to_ack(_packet_handler);
 		}
 
-		Nic::Mac_address mac_address() override { return _mac; }
+		Nic::Mac_address mac_address() override { return _client_mac; }
 
 		bool link_state() override { return true; }
 
