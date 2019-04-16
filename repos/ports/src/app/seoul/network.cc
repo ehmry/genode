@@ -24,11 +24,11 @@
 
 
 Seoul::Network::Network(Genode::Env &env, Genode::Heap &heap,
-                        Synced_motherboard &mb)
+                        Synced_motherboard &mb, unsigned client)
 :
 	_motherboard(mb), _tx_block_alloc(&heap),
-	_nic(env, &_tx_block_alloc, BUF_SIZE, BUF_SIZE),
-	_packet_avail(env.ep(), *this, &Network::_handle_packets)
+	_nic(env, &_tx_block_alloc, BUF_SIZE, BUF_SIZE, Genode::String<8>("eth", client).string()),
+	_packet_avail(env.ep(), *this, &Network::_handle_packets), _client(client)
 {
 	_nic.rx_channel()->sigh_packet_avail(_packet_avail);
 }
@@ -43,7 +43,7 @@ void Seoul::Network::_handle_packets()
 		/* send it to the network bus */
 		char * rx_content = _nic.rx()->packet_content(rx_packet);
 		_forward_pkt = rx_content;
-		MessageNetwork msg((unsigned char *)rx_content, rx_packet.size(), 0);
+		MessageNetwork msg((unsigned char *)rx_content, rx_packet.size(), _client);
 		_motherboard()->bus_network.send(msg);
 		_forward_pkt = 0;
 

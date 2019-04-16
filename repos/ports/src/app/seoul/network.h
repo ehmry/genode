@@ -51,6 +51,7 @@ class Seoul::Network
 
 		Genode::Signal_handler<Network> const _packet_avail;
 		void const *                          _forward_pkt = nullptr;
+		unsigned const                        _client;
 
 		void _handle_packets();
 
@@ -62,7 +63,7 @@ class Seoul::Network
 
 	public:
 
-		Network(Genode::Env &, Genode::Heap &, Synced_motherboard &);
+		Network(Genode::Env &, Genode::Heap &, Synced_motherboard &, unsigned);
 
 		Nic::Mac_address mac_address() { return _nic.mac_address(); }
 

@@ -902,8 +902,10 @@ class Machine : public StaticReceiver<Machine>
 
 		bool                   _alloc_fb_mem = false; /* For detecting FB alloc message */
 		Genode::Pd_connection *_pd_vcpus     = nullptr;
-		Seoul::Network        *_nic          = nullptr;
 		Rtc::Session          *_rtc          = nullptr;
+
+		enum { MAX_NICS = 4 };
+		Seoul::Network        *_nics[MAX_NICS] { nullptr };
 
 		/*
 		 * Noncopyable
@@ -1102,20 +1104,20 @@ class Machine : public StaticReceiver<Machine>
 				}
 			case MessageHostOp::OP_GET_MAC:
 				{
-					if (_nic) {
-						Logging::printf("Solely one network connection supported\n");
+					if (_nics[msg.client]) {
+						Logging::printf("Nic %u is already intitialized\n", msg.client);
 						return false;
 					}
 
 					try {
-						_nic = new (_heap) Seoul::Network(_env, _heap,
-						                                  _motherboard);
+						_nics[msg.client] = new (_heap)
+							Seoul::Network(_env, _heap, _motherboard, msg.client);
 					} catch (...) {
 						Logging::printf("Creating network connection failed\n");
 						return false;
 					}
 
-					Nic::Mac_address mac = _nic->mac_address();
+					Nic::Mac_address mac = _nics[msg.client]->mac_address();
 
 					Logging::printf("Mac address: %2x:%2x:%2x:%2x:%2x:%2x\n",
 					                mac.addr[0], mac.addr[1], mac.addr[2],
@@ -1202,14 +1204,14 @@ class Machine : public StaticReceiver<Machine>
 		{
 			if (msg.type != MessageNetwork::PACKET) return false;
 
-			if (!_nic)
+			if (!_nics[msg.client])
 				return false;
 
 			Genode::Lock::Guard guard(*utcb_lock());
 
 			Vmm::Utcb_guard utcb_guard(utcb_backup);
 
-			return _nic->transmit(msg.buffer, msg.len);
+			return _nics[msg.client]->transmit(msg.buffer, msg.len);
 		}
 
 		bool receive(MessagePciConfig &msg)
