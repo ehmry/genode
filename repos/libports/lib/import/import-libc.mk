@@ -58,7 +58,4 @@ CC_OPT += -D__FreeBSD__=8
 #
 CC_OPT += -fno-builtin-sin -fno-builtin-cos -fno-builtin-sinf -fno-builtin-cosf
 
-#
-# No thread-local locale
-#
-CC_OPT += -D__NO_TLS
+CC_OPT += -D__GENODE__

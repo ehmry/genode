@@ -17,6 +17,7 @@ __inet_ntop T
 __inet_pton T
 __isthreaded B 4
 __mb_cur_max D 8
+___mb_cur_max D 50
 __res_init T
 __res_query T
 __res_state T
@@ -145,6 +146,7 @@ fchown W
 fclose T
 fcloseall W
 fcntl T
+fdatasync T
 fdevname T
 fdevname_r T
 fdopen T

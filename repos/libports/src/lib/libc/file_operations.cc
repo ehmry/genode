@@ -391,12 +391,16 @@ extern "C" int __sys_fsync(int libc_fd) {
 	FD_FUNC_WRAPPER(fsync, libc_fd); }
 
 
+extern "C" int fdatasync(int libc_fd) {
+	FD_FUNC_WRAPPER(fsync, libc_fd); }
+
+
 extern "C" int ftruncate(int libc_fd, ::off_t length) {
 	FD_FUNC_WRAPPER(ftruncate, libc_fd, length); }
 
 
 extern "C" int __sys_ftruncate(int libc_fd, ::off_t length) {
-	ftruncate(libc_fd, length); }
+	return ftruncate(libc_fd, length); }
 
 
 extern "C" ssize_t _getdirentries(int libc_fd, char *buf, ::size_t nbytes, ::off_t *basep) {

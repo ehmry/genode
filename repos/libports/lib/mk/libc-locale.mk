@@ -1,6 +1,9 @@
 LIBC_LOCALE_DIR = $(LIBC_DIR)/lib/libc/locale
 
-FILTER_OUT = c16rtomb.c c32rtomb_iconv.c mbrtoc16_iconv.c mbrtoc32_iconv.c
+CC_OPT += -D_Thread_local=""
+
+FILTER_OUT = \
+	c16rtomb.c c32rtomb_iconv.c mbrtoc16_iconv.c mbrtoc32_iconv.c \
 
 SRC_C = $(filter-out $(FILTER_OUT),$(notdir $(wildcard $(LIBC_LOCALE_DIR)/*.c)))
 

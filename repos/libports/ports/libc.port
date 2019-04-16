@@ -19,11 +19,12 @@ TAR_OPT(libc) += usr/src/sys/net
 TAR_OPT(libc) += usr/src/sys/netinet
 TAR_OPT(libc) += usr/src/sys/netinet6
 TAR_OPT(libc) += usr/src/sys/bsm
+TAR_OPT(libc) += usr/src/sys/riscv
 TAR_OPT(libc) += usr/src/sys/vm
-TAR_OPT(libc) += usr/src/sys/arm/include
-TAR_OPT(libc) += usr/src/sys/x86/include
-TAR_OPT(libc) += usr/src/sys/i386/include
-TAR_OPT(libc) += usr/src/sys/amd64/include
+TAR_OPT(libc) += usr/src/sys/arm
+TAR_OPT(libc) += usr/src/sys/x86
+TAR_OPT(libc) += usr/src/sys/i386
+TAR_OPT(libc) += usr/src/sys/amd64
 TAR_OPT(libc) += usr/src/lib/msun
 TAR_OPT(libc) += usr/src/contrib/gdtoa
 TAR_OPT(libc) += usr/src/contrib/libc-vis
@@ -65,7 +66,7 @@ PATCHES := $(sort $(wildcard $(REP_DIR)/$(D)/patches/*.patch))
 DIRS := include/libc
 DIR_CONTENT(include/libc) := \
     $(addprefix $(D)/include/,\
-                strings.h limits.h string.h ctype.h _ctype.h runetype.h \
+                strings.h limits.h string.h ctype.h _ctype.h \
                 stdlib.h stdio.h signal.h unistd.h wchar.h time.h sysexits.h \
                 resolv.h wctype.h locale.h langinfo.h regex.h paths.h ieeefp.h \
                 inttypes.h fstab.h netdb.h ar.h memory.h res_update.h \
@@ -75,7 +76,8 @@ DIR_CONTENT(include/libc) := \
                 db.h grp.h nsswitch.h pthread_np.h pwd.h ttyent.h \
                 stringlist.h glob.h a.out.h elf-hints.h nlist.h spawn.h \
                 readpassphrase.h setjmp.h elf.h ulimit.h utime.h wordexp.h \
-                complex.h semaphore.h xlocale.h uchar.h iconv.h termios.h)  \
+                complex.h semaphore.h uchar.h iconv.h termios.h \
+                xlocale.h runetype.h)  \
     $(addprefix $(D)/sys/sys/,\
                 syslog.h fcntl.h stdint.h sched.h ktrace.h \
                 _semaphore.h) \
@@ -148,8 +150,7 @@ DIR_CONTENT(include/libc/sys) := \
                 conf.h disk_zone.h)
 
 DIRS += include/libc/xlocale
-DIR_CONTENT(include/libc/xlocale) := \
-	$(D)/include/xlocale/*.h
+DIR_CONTENT(include/libc/xlocale) := $(D)/include/xlocale/*.h
 
 #
 # CPU-architecture-specific headers
@@ -235,14 +236,18 @@ $(D)/include/rpcsvc/nis_object.x : $(DOWNLOADS)
 	@$(MSG_GENERATE)$(notdir $@)
 	$(VERBOSE)rpcgen -C -h -DWANT_NFS3 $< -o $@
 
-#generated_rpcsvc_files := \
+generated_rpcsvc_files := \
+    $(D)/include/rpc/rpcb_prot.h \
+    $(addprefix $(D)/include/rpcsvc/,\
+                nis.h)
+
+
 #    $(addprefix $(D)/include/rpcsvc/,\
 #                nfs_prot.h nlm_prot.h rstat.h ypupdate_prot.h \
 #                crypt.h nis_cache.h pmap_prot.h rwall.h yp.h \
 #                key_prot.h nis_callback.h rex.h sm_inter.h ypxfrd.h \
 #                klm_prot.h nis_object.h rnusers.h spray.h \
 #                mount.h nis.h rquota.h yppasswd.h) \
-#    $(D)/include/rpc/rpcb_prot.h \
 
 $(generated_rpcsvc_files:.h=.x): $(DOWNLOADS)
 
