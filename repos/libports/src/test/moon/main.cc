@@ -146,6 +146,8 @@ struct Moon::Main
 
 			lua_close(lua);
 		});
+
+		env.parent().exit(0);
 	}
 };
 

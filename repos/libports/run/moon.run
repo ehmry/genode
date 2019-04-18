@@ -2,7 +2,7 @@
 # Lua C++ library test
 #
 
-build "core init timer test/moon"
+build "core init timer app/lua app/sequence test/moon"
 
 create_boot_directory
 
@@ -20,26 +20,41 @@ install_config {
 	<default-route>
 		<any-service> <parent/> <any-child/> </any-service>
 	</default-route>
-	<default caps="100"/>
+	<default caps="128"/>
 	<start name="timer">
 		<resource name="RAM" quantum="1M"/>
 		<provides> <service name="Timer"/> </provides>
 	</start>
-	<start name="test-moon">
+	<start name="sequence">
 		<resource name="RAM" quantum="1G"/>
 		<config>
-			<vfs> <dir name="dev"> <log/> </dir> </vfs>
-			<libc stdout="/dev/log"/>
+			<start name="test-moon">
+				<config>
+					<vfs> <dir name="dev"> <log/> </dir> </vfs>
+					<libc stdout="/dev/log"/>
+				</config>
+			</start>
+			<start name="lua">
+				<config>
+					<vfs>
+						<dir name="dev"> <log/> </dir>
+						<inline name="test.lua">print 'Lua tests complete'</inline>
+					</vfs>
+					<libc stdin="/test.lua" stdout="/dev/log" stderr="/dev/log"/>
+					<arg value="lua"/>
+					<arg value="-"/>
+				</config>
+			</start>
 		</config>
 	</start>
 </config>
 }
 
 build_boot_image {
-	core init timer test-moon
-	ld.lib.so libc.lib.so vfs.lib.so libm.lib.so
+	core init timer test-moon lua sequence
+	ld.lib.so libc.lib.so vfs.lib.so libm.lib.so posix.lib.so
 }
 
 append qemu_args " -nographic "
 
-run_genode_until {.*test-moon.*Finished\..*} 40
+run_genode_until {.*Lua tests complete.*} 40
