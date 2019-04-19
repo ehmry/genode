@@ -5,12 +5,13 @@
  */
 
 /*
- * Copyright (C) 2018 Genode Labs GmbH
+ * Copyright (C) 2018-2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
  */
 
+#include <vfs/dir_file_system.h>
 #include <vfs/file_system_factory.h>
 #include <vfs/types.h>
 #include <log_session/connection.h>
@@ -66,15 +67,7 @@ class Vfs_audit::File_system : public Vfs::File_system
 		template <typename... ARGS>
 		inline void _log(ARGS &&... args) { _audit_log.log(args...); }
 
-		Vfs::File_system &_root_dir;
-
-		Absolute_path const _audit_path;
-
-		/**
-		 * Expand a path to lay within the audit path
-		 */
-		inline Absolute_path _expand(char const *path) {
-			return Absolute_path(path+1, _audit_path.string()); }
+		Dir_file_system _root_dir;
 
 		struct Handle final : Vfs_handle
 		{
@@ -105,12 +98,11 @@ class Vfs_audit::File_system : public Vfs::File_system
 
 	public:
 
-		File_system(Vfs::Env &env, Genode::Xml_node config)
+		File_system(Vfs::Env &env, Genode::Xml_node config,
+		            File_system_factory &fs_factory)
 		:
 			_audit_log(env.env(), config.attribute_value("label", Genode::String<64>("audit")).string()),
-			_root_dir(env.root_dir()),
-		  	_audit_path(config.attribute_value(
-				"path", Genode::String<Absolute_path::capacity()>()).string())
+			_root_dir(env, config, fs_factory)
 		{ }
 
 		const char* type() override { return "audit"; }
@@ -122,13 +114,13 @@ class Vfs_audit::File_system : public Vfs::File_system
 		Genode::Dataspace_capability dataspace(const char *path) override
 		{
 			_log(__func__, " ", path);
-			return _root_dir.dataspace(_expand(path).string());
+			return _root_dir.dataspace(path);
 		}
 
 		void release(char const *path, Dataspace_capability ds) override
 		{
 			_log(__func__, " ", path);
-			return _root_dir.release(_expand(path).string(), ds);
+			return _root_dir.release(path, ds);
 		}
 
 		Open_result open(const char *path, unsigned int mode, Vfs::Vfs_handle **out, Genode::Allocator &alloc) override
@@ -141,7 +133,7 @@ class Vfs_audit::File_system : public Vfs::File_system
 			catch (Genode::Out_of_caps) { return OPEN_ERR_OUT_OF_CAPS; }
 
 			Open_result r = _root_dir.open(
-				_expand(path).string(), mode, &local_handle->audit, alloc);
+				path, mode, &local_handle->audit, alloc);
 
 			if (r == OPEN_OK)
 				*out = local_handle;
@@ -161,7 +153,7 @@ class Vfs_audit::File_system : public Vfs::File_system
 			catch (Genode::Out_of_caps) { return OPENDIR_ERR_OUT_OF_CAPS; }
 
 			Opendir_result r = _root_dir.opendir(
-				_expand(path).string(), create, &local_handle->audit, alloc);
+				path, create, &local_handle->audit, alloc);
 
 			if (r == OPENDIR_OK)
 				*out = local_handle;
@@ -183,34 +175,34 @@ class Vfs_audit::File_system : public Vfs::File_system
 		Stat_result stat(const char *path, Vfs::Directory_service::Stat &buf) override
 		{
 			_log(__func__, " ", path);
-			return _root_dir.stat(_expand(path).string(), buf);
+			return _root_dir.stat(path, buf);
 		}
 
 		Unlink_result unlink(const char *path) override
 		{
 			_log(__func__, " ", path);
-			return _root_dir.unlink(_expand(path).string());
+			return _root_dir.unlink(path);
 		}
 
 		Rename_result rename(const char *from , const char *to) override
 		{
 			_log(__func__, " ", from, " ", to);
-			return _root_dir.rename(_expand(from).string(), _expand(to).string());
+			return _root_dir.rename(from, to);
 		}
 
 		file_size num_dirent(const char *path) override
 		{
-			return _root_dir.num_dirent(_expand(path).string());
+			return _root_dir.num_dirent(path);
 		}
 
 		bool directory(char const *path) override
 		{
-			return _root_dir.directory(_expand(path).string());
+			return _root_dir.directory(path);
 		}
 
 		const char* leaf_path(const char *path) override
 		{
-			return _root_dir.leaf_path(_expand(path).string());
+			return _root_dir.leaf_path(path);
 		}
 
 		/**********************
@@ -295,8 +287,14 @@ extern "C" Vfs::File_system_factory *vfs_file_system_factory(void)
 	{
 		Vfs::File_system *create(Vfs::Env &env, Genode::Xml_node config) override
 		{
+			/*
+			 * use a new instance of the built-in FS factory
+			 * because the initial factory cannot be accessed here
+			 */
+			static Vfs::Global_file_system_factory standard_factory(env.alloc());
+
 			return new (env.alloc())
-				Vfs_audit::File_system(env, config);
+				Vfs_audit::File_system(env, config, standard_factory);
 		}
 	};
 

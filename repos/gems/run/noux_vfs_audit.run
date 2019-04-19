@@ -4,7 +4,6 @@ build {
 	lib/libc_noux
 	noux
 	noux-pkg/coreutils
-	server/vfs
 	lib/vfs/audit
 }
 
@@ -30,23 +29,15 @@ install_config {
 			<resource name="RAM" quantum="1M"/>
 			<provides><service name="Timer"/></provides>
 		</start>
-		<start name="vfs">
-			<resource name="RAM" quantum="2M"/>
-			<provides><service name="File_system"/></provides>
-			<config>
-				<vfs>
-					<dir name="coreutils">
-						<tar name="coreutils.tar" /> </dir>
-					<dir name="audit">
-						<audit path="coreutils"/> </dir>
-				</vfs>
-				<default-policy root="audit"/>
-			</config>
-		</start>
 		<start name="noux">
 			<resource name="RAM" quantum="16M"/>
-			<config verbose="yes" stdin="/null" stdout="/log" stderr="/log">
-				<fstab> <null/> <log/> <fs/> </fstab>
+			<config verbose="yes" stdin="/dev/null" stdout="/dev/log" stderr="/dev/log">
+				<fstab>
+					<audit>
+						<dir name="dev"> <null/> <log/> </dir>
+						<tar name="coreutils.tar"/>
+					</audit>
+				</fstab>
 				<start name="/bin/uname"> <arg value="-a"/> </start>
 			</config>
 		</start>
@@ -63,7 +54,6 @@ build_boot_image {
 	sequence
 	timer
 	vfs_audit.lib.so
-	vfs
 }
 
 append qemu_args " -nographic -serial mon:stdio "
