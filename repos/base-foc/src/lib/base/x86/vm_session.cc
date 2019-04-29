@@ -387,9 +387,11 @@ struct Vcpu : Genode::Thread
 						}
 
 						/* consume notification */
-						Fiasco::l4_cap_idx_t tid = native_thread().kcap;
-						Fiasco::l4_cap_idx_t irq = tid + Fiasco::TASK_VCPU_IRQ_CAP;
-						l4_irq_receive(irq, L4_IPC_NEVER);
+						while (vcpu->sticky_flags) {
+							Fiasco::l4_cap_idx_t tid = native_thread().kcap;
+							Fiasco::l4_cap_idx_t irq = tid + Fiasco::TASK_VCPU_IRQ_CAP;
+							l4_irq_receive(irq, L4_IPC_RECV_TIMEOUT_0);
+						}
 					}
 
 					state.exit_reason = reason & 0xff;
@@ -636,7 +638,7 @@ struct Vcpu : Genode::Thread
 			state.sp.value(vmcb->state_save_area.rsp);
 
 			state.ip.value(vmcb->state_save_area.rip);
-			state.ip_len.value(state.ip_len.value()); /* unsupported on AMD */
+			state.ip_len.value(0); /* unsupported on AMD */
 
 			state.dr7.value(vmcb->state_save_area.dr7);
 
@@ -768,12 +770,14 @@ struct Vcpu : Genode::Thread
 			using Fiasco::l4_vm_vmx_write;
 
 			if (state.ax.valid() || state.cx.valid() || state.dx.valid() ||
-			    state.bx.valid() || state.bp.valid() || state.di.valid() ||
-			    state.si.valid()) {
+			    state.bx.valid()) {
 				vcpu->r.ax = state.ax.value();
 				vcpu->r.cx = state.cx.value();
 				vcpu->r.dx = state.dx.value();
 				vcpu->r.bx = state.bx.value();
+			}
+
+			if (state.bp.valid() || state.di.valid() || state.si.valid()) {
 				vcpu->r.bp = state.bp.value();
 				vcpu->r.di = state.di.value();
 				vcpu->r.si = state.si.value();
@@ -975,13 +979,16 @@ struct Vcpu : Genode::Thread
 		                      Fiasco::l4_vcpu_state_t *vcpu)
 		{
 			if (state.ax.valid() || state.cx.valid() || state.dx.valid() ||
-			    state.bx.valid() || state.bp.valid() || state.di.valid() ||
-			    state.si.valid()) {
+			    state.bx.valid()) {
+
 				vmcb->state_save_area.rax = state.ax.value();
 				vcpu->r.ax = state.ax.value();
 				vcpu->r.cx = state.cx.value();
 				vcpu->r.dx = state.dx.value();
 				vcpu->r.bx = state.bx.value();
+			}
+
+			if (state.bp.valid() || state.di.valid() || state.si.valid()) {
 				vcpu->r.bp = state.bp.value();
 				vcpu->r.di = state.di.value();
 				vcpu->r.si = state.si.value();
