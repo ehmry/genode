@@ -211,6 +211,7 @@ class Vcpu : public StaticReceiver<Vcpu>
 				case 0x00 ... 0x1f: _svm_cr(); break;
 				case 0x62: _irqwin(); break;
 				case 0x64: _irqwin(); break;
+				case 0x6e: _svm_rdtsc(); break;
 				case 0x72: _svm_cpuid(); break;
 				case 0x78: _svm_hlt(); break;
 				case 0x7b: _svm_ioio(); break;
@@ -335,6 +336,9 @@ class Vcpu : public StaticReceiver<Vcpu>
 			case 0x62: /* _irqwin - SMI */
 			case 0x64: /* _irqwin */
 				mtd = MTD_IRQ;
+				break;
+			case 0x6e: /* _svm_rdtsc */
+				mtd = MTD_RIP_LEN | MTD_GPR_ACDB | MTD_TSC | MTD_STATE;
 				break;
 			case 0x7b: /* _svm_ioio */
 				mtd = MTD_RIP_LEN | MTD_QUAL | MTD_GPR_ACDB | MTD_STATE;
@@ -528,6 +532,7 @@ class Vcpu : public StaticReceiver<Vcpu>
 		void _svm_startup()
 		{
 			_handle_vcpu(NO_SKIP, CpuMessage::TYPE_CHECK_IRQ);
+			_state.ctrl_primary.value(_rdtsc_exit ? (1U << 14) : 0);
 		}
 
 		void _svm_npt()
@@ -544,7 +549,7 @@ class Vcpu : public StaticReceiver<Vcpu>
 		void _svm_invalid()
 		{
 			_handle_vcpu(NO_SKIP, CpuMessage::TYPE_SINGLE_STEP);
-			_state.ctrl_primary.value(1 << 18 /* cpuid */);
+			_state.ctrl_primary.value(1 << 18 /* cpuid */ | (_rdtsc_exit ? (1U << 14) : 0));
 			_state.ctrl_secondary.value(1 << 0  /* vmrun */);
 		}
 
@@ -577,6 +582,12 @@ class Vcpu : public StaticReceiver<Vcpu>
 		{
 			_state.ip_len.value(1);
 			_vmx_hlt();
+		}
+
+		void _svm_rdtsc()
+		{
+			_state.ip_len.value(2);
+			_handle_vcpu(SKIP, CpuMessage::TYPE_RDTSC);
 		}
 
 		void _svm_msr()
