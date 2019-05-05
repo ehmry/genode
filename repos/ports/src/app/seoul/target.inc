@@ -11,7 +11,10 @@ SRC_CC += console.cc keyboard.cc network.cc disk.cc
 SRC_BIN = mono.tff
 
 MODEL_SRC_CC    += $(notdir $(wildcard $(SEOUL_CONTRIB_DIR)/model/*.cc))
+
 EXECUTOR_SRC_CC += $(notdir $(wildcard $(SEOUL_CONTRIB_DIR)/executor/*.cc))
+
+HOST_SRC_CC    += $(notdir $(wildcard $(SEOUL_CONTRIB_DIR)/genode/host/*.cc))
 
 ifneq ($(filter x86_64, $(SPECS)),)
 CC_CXX_OPT += -mcmodel=large
@@ -19,6 +22,8 @@ endif
 
 SRC_CC += $(filter-out $(FILTER_OUT),$(addprefix model/,$(MODEL_SRC_CC)))
 SRC_CC += $(filter-out $(FILTER_OUT),$(addprefix executor/,$(EXECUTOR_SRC_CC)))
+
+SRC_CC += $(addprefix host/,$(HOST_SRC_CC))
 
 INC_DIR += $(SEOUL_CONTRIB_DIR)/include
 INC_DIR += $(SEOUL_GENODE_DIR)/include
@@ -32,5 +37,6 @@ CC_CXX_OPT += -mssse3
 CC_OPT_PIC :=
 
 vpath %.cc  $(SEOUL_CONTRIB_DIR)
+vpath %.cc  $(SEOUL_CONTRIB_DIR)/genode
 vpath %.cc  $(REP_DIR)/src/app/seoul
 vpath %.tff $(REP_DIR)/src/app/seoul

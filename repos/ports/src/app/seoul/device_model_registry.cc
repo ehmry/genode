@@ -103,3 +103,4 @@ MODEL_INFO_NO_ARG(vbios)
 MODEL_INFO_NO_ARG(lapic)
 
 MODEL_INFO(hostsink, "host_dev", "buffer")
+MODEL_INFO(terminal, "host_dev")

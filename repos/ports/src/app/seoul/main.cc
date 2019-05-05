@@ -75,6 +75,8 @@
 #include "disk.h"
 
 
+Genode::Env *_seoul_env { nullptr };
+
 enum { verbose_debug = false };
 enum { verbose_npt   = false };
 enum { verbose_io    = false };
@@ -1399,6 +1401,8 @@ extern void heap_init_env(Genode::Heap *);
 
 void Component::construct(Genode::Env &env)
 {
+	_seoul_env = &env;
+
 	Genode::addr_t vm_size;
 	unsigned       colocate = 1; /* by default co-locate VM and VMM in same PD */
 
