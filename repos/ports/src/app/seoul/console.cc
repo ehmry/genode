@@ -229,7 +229,6 @@ bool Seoul::Console::receive(MessageMemRegion &msg)
 
 	if (reactivate) {
 		if (!fb_state.active) fb_state.active = true;
-		Logging::printf("Reactivating text buffer loop.\n");
 
 		MessageTimer msg(_timer, _unsynchronized_motherboard.clock()->abstime(1, 1000));
 		_unsynchronized_motherboard.bus_timer.send(msg);
@@ -295,8 +294,6 @@ unsigned Seoul::Console::_handle_fb()
 
 		fb_state.unchanged = 0;
 		fb_state.active = false;
-
-		Logging::printf("Deactivated text buffer loop.\n");
 
 		return 0;
 	}
