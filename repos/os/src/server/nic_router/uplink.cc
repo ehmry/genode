@@ -148,12 +148,12 @@ Net::Uplink_interface::Uplink_interface(Env                 &env,
 
 	/* initialize link state handling */
 	Nic::Connection::link_state_sigh(_link_state_handler);
-	_link_state = link_state();
+	_link_state = session_link_state();
 }
 
 
 void Net::Uplink_interface::_handle_link_state()
 {
-	_link_state = link_state();
+	_link_state = session_link_state();
 	_interface.handle_link_state();
 }

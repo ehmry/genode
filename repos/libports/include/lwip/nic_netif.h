@@ -94,6 +94,8 @@ class Lwip::Nic_netif
 		Genode::Io_signal_handler<Nic_netif> _link_state_handler;
 		Genode::Io_signal_handler<Nic_netif> _rx_packet_handler;
 
+		bool _dhcp { false };
+
 	public:
 
 		void free_pbuf(Nic_netif_pbuf &pbuf)
@@ -118,11 +120,20 @@ class Lwip::Nic_netif
 			 * on then it should use 'set_link_callback'
 			 */
 
-			if (_nic.link_state()) {
+			switch (_nic.session_link_state()) {
+			case Nic::Session::LINK_UP:
 				netif_set_link_up(&_netif);
-				/* XXX: DHCP? */
-			} else {
+				if (_dhcp) {
+					err_t err = dhcp_start(&_netif);
+					if (err != ERR_OK)
+						Genode::error("failed to configure lwIP interface with DHCP, error ", -err);
+				} else {
+					dhcp_inform(&_netif);
+				}
+				break;
+			case Nic::Session::LINK_DOWN:
 				netif_set_link_down(&_netif);
+				break;
 			}
 		}
 
@@ -155,15 +166,11 @@ class Lwip::Nic_netif
 
 		void configure(Genode::Xml_node const &config)
 		{
-			if (config.attribute_value("dhcp", false)) {
-
-				err_t err = dhcp_start(&_netif);
-				if (err == ERR_OK)
-					Genode::log("configuring lwIP interface with DHCP");
-				else
-					Genode::error("failed to configure lwIP interface with DHCP, error ", -err);
-
-			} else /* get addressing from config */ {
+			_dhcp = config.attribute_value("dhcp", false);
+			if (_dhcp) {
+				Genode::log("configuring lwIP interface with DHCP");
+			} else {
+				/* get addressing from config */
 				typedef Genode::String<IPADDR_STRLEN_MAX> Str;
 				Str ip_str = config.attribute_value("ip_addr", Str());
 				ip_addr_t ipaddr;
@@ -195,9 +202,6 @@ class Lwip::Nic_netif
 						ipaddr_aton(str.string(), &ip);
 						netif_set_gw(&_netif, ip_2_ip4(&ip));
 					}
-
-					/* inform DHCP servers of our fixed IP address */
-					dhcp_inform(&_netif);
 				}
 			}
 		}
@@ -207,7 +211,7 @@ class Lwip::Nic_netif
 		          Genode::Xml_node config)
 		:
 			_pbuf_alloc(alloc), _nic_tx_alloc(&alloc),
-			_nic(env, &_nic_tx_alloc,
+			_nic(env, _nic_tx_alloc,
 			     BUF_SIZE, BUF_SIZE,
 			     config.attribute_value("label", Genode::String<160>("lwip")).string()),
 			_link_state_handler(env.ep(), *this, &Nic_netif::handle_link_state),
@@ -229,10 +233,12 @@ class Lwip::Nic_netif
 
 			netif_set_default(&_netif);
 			netif_set_up(&_netif);
+
 			configure(config);
 			netif_set_status_callback(
 				&_netif, nic_netif_status_callback);
 			nic_netif_status_callback(&_netif);
+			handle_link_state();
 		}
 
 		virtual ~Nic_netif() { }

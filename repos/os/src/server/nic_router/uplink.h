@@ -143,7 +143,7 @@ class Net::Uplink_interface : public Uplink_interface_base,
 			BUF_SIZE = Nic::Session::QUEUE_SIZE * PKT_SIZE,
 		};
 
-		bool                                     _link_state { false };
+		Link_state                               _link_state { LINK_DOWN };
 		Genode::Signal_handler<Uplink_interface> _link_state_handler;
 		Net::Interface                           _interface;
 

@@ -283,7 +283,7 @@ class Net::Session_component : private Session_component_base,
 				void report(Genode::Xml_generator &xml) const override { _session_env.report(xml); };
 		};
 
-		bool                                   _link_state { true };
+		Link_state                             _link_state { LINK_DOWN };
 		Interface_policy                       _interface_policy;
 		Interface                              _interface;
 		Genode::Ram_dataspace_capability const _ram_ds;
@@ -307,7 +307,12 @@ class Net::Session_component : private Session_component_base,
 		 ******************/
 
 		Mac_address mac_address() override { return _interface.mac(); }
-		bool link_state() override { return _interface.link_state(); }
+
+		void link_state(Link_state) override { }
+
+		Link_state session_link_state() override {
+			return _interface.link_state(); }
+
 		void link_state_sigh(Genode::Signal_context_capability sigh) override {
 			_interface.session_link_state_sigh(sigh); }
 

@@ -46,10 +46,10 @@ class Nic_client
 
 		void _link_state()
 		{
-			bool const link_state = _nic.link_state();
-			ic_link_state = link_state;
+			Nic::Session::Link_state const link_state = _nic.session_link_state();
+			ic_link_state = (link_state == Nic::Session::LINK_UP);
 
-			if (link_state == false || lxip_do_dhcp() == false)
+			if (link_state == Nic::Session::LINK_DOWN || lxip_do_dhcp() == false)
 				return;
 
 			Lx::timer_update_jiffies();
@@ -122,7 +122,7 @@ class Nic_client
 			_link_state_change(env.ep(), *this, &Nic_client::_link_state),
 			_tick(ticker)
 		{
-			ic_link_state = _nic.link_state();
+			ic_link_state = (_nic.session_link_state() == Nic::Session::LINK_UP);
 
 			_nic.rx_channel()->sigh_ready_to_ack(_sink_ack);
 			_nic.rx_channel()->sigh_packet_avail(_sink_submit);

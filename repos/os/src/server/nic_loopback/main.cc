@@ -58,10 +58,12 @@ class Nic_loopback::Session_component : public Nic::Session_component
 			return result;
 		}
 
-		bool link_state() override
+		void link_state(Link_state) override { }
+
+		Link_state session_link_state() override
 		{
-			/* XXX always return true, for now */
-			return true;
+			/* XXX always return up, for now */
+			return LINK_UP;
 		}
 
 		void _handle_packet_stream() override;

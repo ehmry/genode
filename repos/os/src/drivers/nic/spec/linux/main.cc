@@ -230,8 +230,10 @@ class Linux_session_component : public Nic::Session_component
 			_rx_thread.start();
 		}
 
-	bool link_state() override              { return true; }
-	Nic::Mac_address mac_address() override { return _mac_addr; }
+	Link_state session_link_state() override { return LINK_UP;   }
+	Nic::Mac_address mac_address()  override { return _mac_addr; }
+
+	void link_state(Link_state) override { }
 };
 
 

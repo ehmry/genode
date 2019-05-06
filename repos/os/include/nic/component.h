@@ -153,9 +153,14 @@ class Nic::Session_component : Communication_buffers, public Session_rpc_object
 		}
 
 		/**
+		 * Update the current link state
+		 */
+		void link_state(Link_state) override = 0;
+
+		/**
 		 * Return the current link state
 		 */
-		bool link_state() override = 0;
+		Link_state session_link_state() override = 0;
 
 		/**
 		 * Return the MAC address of the device

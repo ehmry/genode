@@ -55,22 +55,19 @@ append config {
 	<start name="nic_drv">
 		<binary name="} [nic_drv_binary] {"/>
 		<resource name="RAM" quantum="4M"/>
-		<provides><service name="Nic"/></provides>
 	</start>
 
 	<start name="nic_bridge" caps="200">
 		<resource name="RAM" quantum="24M"/>
 		<provides><service name="Nic"/></provides>
 		<config verbose="yes" mac="02:02:02:02:42:00">
+			<policy label_prefix="nic_drv" uplink="yes"/>
 			<policy label_prefix="client_1"/>
 			<policy label_prefix="server_1" ip_addr="10.0.2.55"/>
 			<policy label_prefix="server_2" ip_addr="10.0.2.56" mac="02:02:02:02:23:00"/>
 			<policy label_prefix="client_2"                     mac="02:02:02:02:79:00"/>
+			<default-policy/>
 		</config>
-		<route>
-			<service name="Nic"> <child name="nic_drv"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>
 	</start>
 
 	<start name="server_1">

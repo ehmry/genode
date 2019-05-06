@@ -103,6 +103,10 @@ class Net::Interface : private Interface_list::Element
 	friend class List<Interface>;
 	friend class Genode::List<Interface>;
 
+	public:
+
+		typedef Nic::Session::Link_state Link_state;
+
 	private:
 
 		using Signal_handler            = Genode::Signal_handler<Interface>;
@@ -129,7 +133,7 @@ class Net::Interface : private Interface_list::Element
 
 		Packet_stream_sink                   &_sink;
 		Packet_stream_source                 &_source;
-		bool                                 &_session_link_state;
+		Link_state                           &_session_link_state;
 		Signal_context_capability             _session_link_state_sigh   { };
 		Signal_handler                        _sink_ack;
 		Signal_handler                        _sink_submit;
@@ -384,7 +388,7 @@ class Net::Interface : private Interface_list::Element
 		          Interface_list         &interfaces,
 		          Packet_stream_sink     &sink,
 		          Packet_stream_source   &source,
-		          bool                   &session_link_state,
+		          Link_state             &session_link_state,
 		          Interface_policy       &policy);
 
 		virtual ~Interface();
@@ -440,7 +444,7 @@ class Net::Interface : private Interface_list::Element
 
 		void attach_to_domain_finish();
 
-		bool link_state() const;
+		Link_state link_state() const;
 
 		void handle_link_state();
 
