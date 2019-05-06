@@ -192,7 +192,7 @@ static void irq_handler(void *p)
 	while ((iobuf = netdev_rx_dequeue(net_dev))) {
 		dde_lock_leave();
 		if (rx_callback)
-			rx_callback(1, iobuf->data, iob_len(iobuf));
+			rx_callback(iobuf->data, iob_len(iobuf));
 		dde_lock_enter();
 		free_iob(iobuf);
 	}
@@ -224,6 +224,11 @@ void dde_ipxe_nic_register_callbacks(dde_ipxe_nic_rx_cb rx_cb,
                                      dde_ipxe_nic_link_cb link_cb)
 {
 	dde_lock_enter();
+
+	if (rx_callback || link_callback) {
+		LOG("iPXE callbacks registered twice, disabling device!");
+		dde_lock_enter(); /* deadlock */
+	}
 
 	rx_callback   = rx_cb;
 	link_callback = link_cb;
@@ -257,11 +262,8 @@ int dde_ipxe_nic_link_state(unsigned if_index)
 }
 
 
-int dde_ipxe_nic_tx(unsigned if_index, const char *packet, unsigned packet_len)
+int dde_ipxe_nic_tx(const char *packet, unsigned packet_len)
 {
-	if (if_index != 1)
-		return -1;
-
 	dde_lock_enter();
 
 	struct io_buffer *iobuf = alloc_iob(packet_len);
@@ -282,11 +284,8 @@ int dde_ipxe_nic_tx(unsigned if_index, const char *packet, unsigned packet_len)
 }
 
 
-int dde_ipxe_nic_get_mac_addr(unsigned if_index, unsigned char *out_mac_addr)
+int dde_ipxe_nic_get_mac_addr(unsigned char *out_mac_addr)
 {
-	if (if_index != 1)
-		return -1;
-
 	dde_lock_enter();
 
 	out_mac_addr[0] = net_dev->hw_addr[0];

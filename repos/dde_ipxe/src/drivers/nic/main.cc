@@ -2,171 +2,179 @@
  * \brief  NIC driver based on iPXE
  * \author Christian Helmuth
  * \author Sebastian Sumpf
+ * \author Emery Hemingway
  * \date   2011-11-17
  */
 
 /*
- * Copyright (C) 2011-2017 Genode Labs GmbH
+ * Copyright (C) 2011-2019 Genode Labs GmbH
  *
  * This file is distributed under the terms of the GNU General Public License
  * version 2.
  */
 
 /* Genode */
-#include <base/component.h>
-#include <base/env.h>
+#include <nic/packet_allocator.h>
+#include <nic_session/connection.h>
+#include <base/attached_rom_dataspace.h>
 #include <base/heap.h>
+#include <base/component.h>
 #include <base/log.h>
-#include <nic/component.h>
-#include <nic/root.h>
 
 #include <dde_ipxe/support.h>
 #include <dde_ipxe/nic.h>
 
-using namespace Genode;
+namespace Nic_drv {
+	using namespace Genode;
+	using namespace Nic;
 
-class Ipxe_session_component  : public Nic::Session_component
+	struct Main;
+}
+
+
+struct Nic_drv::Main
 {
-	public:
+	enum {
+		PACKET_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE,
+		BUF_SIZE    = 128 * PACKET_SIZE,
+	};
 
-		static Ipxe_session_component *instance;
+	static Nic_drv::Main *instance;
 
-	private:
+	Genode::Env  &_env;
+	Genode::Heap  _heap { _env.ram(), _env.rm() };
 
-		Nic::Mac_address _mac_addr;
-
-		static void _rx_callback(unsigned    if_index,
-		                         const char *packet,
-		                         unsigned    packet_len)
-		{
-			if (instance)
-				instance->_receive(packet, packet_len);
-		}
-
-		static void _link_callback()
-		{
-			if (instance)
-				instance->_link_state_changed();
-		}
-
-		bool _send()
-		{
-			using namespace Genode;
-
-			if (!_tx.sink()->ready_to_ack())
-				return false;
-
-			if (!_tx.sink()->packet_avail())
-				return false;
-
-			Packet_descriptor packet = _tx.sink()->get_packet();
-			if (!packet.size()) {
-				Genode::warning("Invalid tx packet");
-				return true;
-			}
-
-			if (link_state()) {
-				if (dde_ipxe_nic_tx(1, _tx.sink()->packet_content(packet), packet.size()))
-					Genode::warning("Sending packet failed!");
-			}
-
-			_tx.sink()->acknowledge_packet(packet);
-			return true;
-		}
-
-		void _receive(const char *packet, unsigned packet_len)
-		{
-			_handle_packet_stream();
-
-			if (!_rx.source()->ready_to_submit())
-				return;
-
-			try {
-				Nic::Packet_descriptor p = _rx.source()->alloc_packet(packet_len);
-				Genode::memcpy(_rx.source()->packet_content(p), packet, packet_len);
-				_rx.source()->submit_packet(p);
-			} catch (...) {
-				Genode::warning(__func__, ": failed to process received packet");
-			}
-		}
-
-		void _handle_packet_stream() override
-		{
-			while (_rx.source()->ack_avail())
-				_rx.source()->release_packet(_rx.source()->get_acked_packet());
-
-			while (_send()) ;
-		}
-
-	public:
-
-		Ipxe_session_component(Genode::size_t const tx_buf_size,
-		                       Genode::size_t const rx_buf_size,
-		                       Genode::Allocator   &rx_block_md_alloc,
-		                       Genode::Env         &env)
-		: Session_component(tx_buf_size, rx_buf_size, Genode::CACHED,
-		                    rx_block_md_alloc, env)
-		{
-			instance = this;
-
-			dde_ipxe_nic_register_callbacks(_rx_callback, _link_callback);
-
-			dde_ipxe_nic_get_mac_addr(1, _mac_addr.addr);
-
-			Genode::log("MAC address ", _mac_addr);
-		}
-
-		~Ipxe_session_component()
-		{
-			instance = nullptr;
-			dde_ipxe_nic_unregister_callbacks();
-		}
-
-		/**************************************
-		 ** Nic::Session_component interface **
-		 **************************************/
-
-		Nic::Mac_address mac_address() override { return _mac_addr; }
-
-		bool link_state() override
-		{
-			return dde_ipxe_nic_link_state(1);
-		}
-};
-
-
-Ipxe_session_component *Ipxe_session_component::instance;
-
-
-struct Main
-{
-	Env  &_env;
-
-	Heap  _heap { _env.ram(), _env.rm() };
-
-	Nic::Root<Ipxe_session_component> root {_env, _heap };
-
-	Main(Env &env) : _env(env)
+	Mac_address ipxe_init()
 	{
-		Genode::log("--- iPXE NIC driver started ---");
+		Mac_address mac { };
 
-		Genode::log("-- init iPXE NIC");
+		Genode::log("--- init iPXE NIC ---");
 
 		/* pass Env to backend */
 		dde_support_init(_env, _heap);
 
-		if (!dde_ipxe_nic_init()) {
+		if (dde_ipxe_nic_init() < 1) {
 			Genode::error("could not find usable NIC device");
+			_env.parent().exit(~0);
+		} else {
+			dde_ipxe_nic_get_mac_addr(mac.addr);
 		}
 
-		_env.parent().announce(_env.ep().manage(root));
+		return mac;
 	}
+
+	Mac_address const _mac = ipxe_init();
+
+	Nic::Packet_allocator _nic_tx_alloc { &_heap };
+
+	Nic::Connection _nic
+		{ _env, _mac, _nic_tx_alloc, BUF_SIZE, BUF_SIZE };
+
+	Io_signal_handler<Main> _nic_packets_handler
+		{ _env.ep(), *this, &Main::_handle_nic_packets };
+
+	Io_signal_handler<Main> _nic_link_handler
+		{ _env.ep(), *this, &Main::_handle_nic_link };
+
+	Nic::Session::Link_state _link_state { Nic::Session::LINK_DOWN };
+
+	void _handle_nic_link()
+	{
+		Nic::Session::Link_state session_link =
+			_nic.session_link_state();
+
+		if (session_link == Nic::Session::LINK_UP)
+		{
+			if (dde_ipxe_nic_link_state()) {
+				_link_state = Nic::Session::LINK_UP;
+			} else {
+				_link_state = Nic::Session::LINK_DOWN;
+				_nic.link_state(_link_state);
+			}
+		} else {
+			_link_state = Nic::Session::LINK_DOWN;
+		}
+	}
+
+	void _handle_nic_packets()
+	{
+		auto &rx = *_nic.rx();
+		while (rx.packet_avail() && rx.ready_to_ack()) {
+			/* XXX: loop may starve iPXE driver */
+			Nic::Packet_descriptor const nic_pkt = rx.get_packet();
+			if (_link_state == Nic::Session::LINK_UP)
+				dde_ipxe_nic_tx(rx.packet_content(nic_pkt), nic_pkt.size());
+			rx.acknowledge_packet(nic_pkt);
+		}
+	}
+
+	static
+	void ipxe_rx_callback(const char *packet, unsigned packet_len) {
+		if (instance) instance->ipxe_receive(packet, packet_len); }
+
+	void ipxe_receive(const char *packet,
+	                  unsigned    packet_len)
+	{
+		if (_link_state == Nic::Session::LINK_DOWN) return;
+
+		auto &tx = *_nic.tx();
+
+		/* flush acknowledgements */
+		while (tx.ack_avail())
+			tx.release_packet(tx.get_acked_packet());
+
+		if (!tx.ready_to_submit()) return;
+
+		Nic::Packet_descriptor nic_pkt = tx.alloc_packet(packet_len);
+
+		memcpy(tx.packet_content(nic_pkt), packet, packet_len);
+		tx.submit_packet(nic_pkt);
+	}
+
+	static
+	void ipxe_link_callback() {
+		if (instance) instance->ipxe_link_state_changed(); }
+
+	void ipxe_link_state_changed()
+	{
+		_nic.link_state(dde_ipxe_nic_link_state()
+			? Nic::Session::LINK_UP : Nic::Session::LINK_DOWN);
+	}
+
+	Main(Genode::Env &env) : _env(env)
+	{
+		if (_mac != _nic.mac_address()) {
+			error("Nic service does not acknowledge device MAC address");
+			env.parent().exit(~0);
+			return;
+		}
+
+		instance = this;
+
+		/* set Nic session signal handlers */
+		_nic.rx_channel()->sigh_packet_avail(_nic_packets_handler);
+		_nic.rx_channel()->sigh_ready_to_ack(_nic_packets_handler);
+		_nic.link_state_sigh(_nic_link_handler);
+
+		dde_ipxe_nic_register_callbacks(
+			ipxe_rx_callback, ipxe_link_callback);
+
+		ipxe_link_state_changed();
+
+		log("--- iPXE NIC driver started for ", _mac, " ---");
+	}
+
+	~Main() { dde_ipxe_nic_unregister_callbacks(); }
 };
+
+
+Nic_drv::Main *Nic_drv::Main::instance { nullptr };
+
 
 void Component::construct(Genode::Env &env)
 {
 	/* XXX execute constructors of global statics */
 	env.exec_static_constructors();
 
-	static Main main(env);
+	static Nic_drv::Main inst { env };
 }

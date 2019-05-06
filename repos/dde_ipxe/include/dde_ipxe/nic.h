@@ -30,7 +30,7 @@ typedef void (*dde_ipxe_nic_link_cb)(void);
  * \param   packet      buffer containing the packet
  * \param   packet_len  packet length
  */
-typedef void (*dde_ipxe_nic_rx_cb)(unsigned if_index, const char *packet, unsigned packet_len);
+typedef void (*dde_ipxe_nic_rx_cb)(const char *packet, unsigned packet_len);
 
 /**
  * Register packet reception callback
@@ -53,13 +53,12 @@ extern void dde_ipxe_nic_unregister_callbacks();
 /**
  * Send packet
  *
- * \param   if_index    index of the network interface to be used for sending
  * \param   packet      buffer containing the packet
  * \param   packet_len  packet length
  *
  * \return  0 on success, -1 otherwise
  */
-extern int dde_ipxe_nic_tx(unsigned if_index, const char *packet, unsigned packet_len);
+extern int dde_ipxe_nic_tx(const char *packet, unsigned packet_len);
 
 /**
  * Get MAC address of device
@@ -69,16 +68,14 @@ extern int dde_ipxe_nic_tx(unsigned if_index, const char *packet, unsigned packe
  *
  * \return  0 on success, -1 otherwise
  */
-extern int dde_ipxe_nic_get_mac_addr(unsigned if_index, unsigned char *out_mac_addr);
+extern int dde_ipxe_nic_get_mac_addr(unsigned char *out_mac_addr);
 
 /**
  * Get current link-state of device
  *
- * \param  if_index  index of the receiving network interface
- *
  * \return 1 if link is up, 0 if no link is detected
  */
-extern int dde_ipxe_nic_link_state(unsigned if_index);
+extern int dde_ipxe_nic_link_state();
 
 /**
  * Initialize network sub-system
