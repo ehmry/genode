@@ -1,15 +1,18 @@
 /*
- * \brief  NIC handler
- * \author Stefan Kalkowski
- * \date   2013-05-24
+ * \brief  Proxy-ARP uplink session
+ * \author Emery Hemingway
+ * \date   2019-05-14
  */
 
 /*
- * Copyright (C) 2013-2017 Genode Labs GmbH
+ * Copyright (C) 2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
  */
+
+#include "uplink.h"
+#include "component.h"
 
 #include <base/env.h>
 #include <net/ethernet.h>
@@ -18,15 +21,28 @@
 #include <net/udp.h>
 #include <net/dhcp.h>
 
-#include <component.h>
-
 using namespace Net;
 using namespace Genode;
 
-
-bool Net::Nic::handle_arp(Ethernet_frame &eth,
-                          Size_guard     &size_guard)
+void Uplink_component::link_state(Link_state state)
 {
+	_link_state = state;
+	if (_link_sigh.valid())
+		Genode::Signal_transmitter(_link_sigh).submit();
+
+	/* iterate through the list of clients */
+	Mac_address_node *node = _vlan.mac_list.first();
+	while (node) {
+		node->component().link_state_changed();
+		node = node->next();
+	}
+}
+
+bool Net::Uplink::handle_arp(Ethernet_frame &eth,
+                             Size_guard     &size_guard)
+{
+	if (!_session.constructed()) return true;
+
 	/* ignore broken packets */
 	Arp_packet &arp = eth.data<Arp_packet>(size_guard);
 	if (!arp.ethernet_ipv4())
@@ -66,8 +82,8 @@ bool Net::Nic::handle_arp(Ethernet_frame &eth,
 }
 
 
-bool Net::Nic::handle_ip(Ethernet_frame &eth,
-                         Size_guard     &size_guard)
+bool Net::Uplink::handle_ip(Ethernet_frame &eth,
+                            Size_guard     &size_guard)
 {
 	/* is it an UDP packet ? */
 	Ipv4_packet &ip = eth.data<Ipv4_packet>(size_guard);
@@ -119,22 +135,4 @@ bool Net::Nic::handle_ip(Ethernet_frame &eth,
 		}
 	}
 	return true;
-}
-
-
-Net::Nic::Nic(Genode::Env         &env,
-              Genode::Heap        &heap,
-              Net::Vlan           &vlan,
-              bool          const &verbose,
-              Session_label const &label)
-: Packet_handler(env.ep(), vlan, label, verbose),
-  _tx_block_alloc(&heap),
-  _nic(env, &_tx_block_alloc, BUF_SIZE, BUF_SIZE),
-  _mac(_nic.mac_address().addr)
-{
-	_nic.rx_channel()->sigh_ready_to_ack(_sink_ack);
-	_nic.rx_channel()->sigh_packet_avail(_sink_submit);
-	_nic.tx_channel()->sigh_ack_avail(_source_ack);
-	_nic.tx_channel()->sigh_ready_to_submit(_source_submit);
-	_nic.link_state_sigh(_client_link_state);
 }

@@ -66,17 +66,12 @@ append config {
 			<policy label_prefix="server_1" ip_addr="10.0.2.55"/>
 			<policy label_prefix="server_2" ip_addr="10.0.2.56" mac="02:02:02:02:23:00"/>
 			<policy label_prefix="client_2"                     mac="02:02:02:02:79:00"/>
-			<default-policy/>
 		</config>
 	</start>
 
 	<start name="server_1">
 		<binary name="test-lwip_httpsrv"/>
 		<resource name="RAM" quantum="32M"/>
-		<route>
-			<service name="Nic"> <child name="nic_bridge"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>
 		<config port="80">
 			<vfs>
 				<dir name="socket">
@@ -91,10 +86,6 @@ append config {
 	<start name="server_2">
 		<binary name="test-lwip_httpsrv"/>
 		<resource name="RAM" quantum="32M"/>
-		<route>
-			<service name="Nic"> <child name="nic_bridge"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>
 		<config port="80">
 			<vfs>
 				<dir name="socket">
@@ -109,10 +100,6 @@ append config {
 	<start name="client_1" caps="120">
 		<binary name="test-http_clnt"/>
 		<resource name="RAM" quantum="32M"/>
-		<route>
-			<service name="Nic"> <child name="nic_bridge"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>
 		<config server_ip="10.0.2.55" server_port="80">
 			<vfs>
 				<dir name="socket"> <lwip dhcp="yes"/> </dir>
@@ -125,10 +112,6 @@ append config {
 	<start name="client_2" caps="120">
 		<binary name="test-http_clnt"/>
 		<resource name="RAM" quantum="32M"/>
-		<route>
-			<service name="Nic"> <child name="nic_bridge"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>
 		<config server_ip="10.0.2.56" server_port="80">
 			<vfs>
 				<dir name="socket"> <lwip dhcp="yes"/> </dir>
@@ -141,10 +124,6 @@ append config {
 	<start name="client_3" caps="120">
 		<binary name="test-http_clnt"/>
 		<resource name="RAM" quantum="32M"/>
-		<route>
-			<service name="Nic"> <child name="nic_bridge"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
-		</route>
 		<config server_ip="10.0.2.56" server_port="80">
 			<vfs>
 				<dir name="socket"> <lwip dhcp="yes"/> </dir>

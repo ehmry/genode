@@ -44,7 +44,7 @@ bool Session_component::handle_arp(Ethernet_frame &eth,
 		if (node)
 			node = node->find_by_address(arp.dst_ip());
 		if (!node) {
-			arp.src_mac(_nic.mac());
+			arp.src_mac(_uplink.mac());
 		}
 	}
 	return true;
@@ -82,8 +82,8 @@ void Session_component::finalize_packet(Ethernet_frame *eth,
 		node->component().send(eth, size);
 	else {
 		/* set our MAC as sender */
-		eth->src(_nic.mac());
-		_nic.send(eth, size);
+		eth->src(_uplink.mac());
+		_uplink.send(eth, size);
 	}
 }
 
@@ -97,9 +97,6 @@ void Session_component::_unset_ipv4_node()
 }
 
 
-bool Session_component::link_state() { return _nic.link_state(); }
-
-
 void Session_component::set_ipv4_address(Ipv4_address ip_addr)
 {
 	_unset_ipv4_node();
@@ -108,28 +105,30 @@ void Session_component::set_ipv4_address(Ipv4_address ip_addr)
 }
 
 
-Session_component::Session_component(Genode::Ram_allocator       &ram,
+Session_component::Session_component(Session_space               &space,
+                                     Session_space::Id            id,
+                                     Genode::Ram_allocator       &ram,
                                      Genode::Region_map          &rm,
                                      Genode::Entrypoint          &ep,
                                      Genode::Ram_quota            ram_quota,
                                      Genode::Cap_quota            cap_quota,
-                                     Genode::size_t               tx_buf_size,
-                                     Genode::size_t               rx_buf_size,
+                                     Nic::Session::Tx_size        tx_buf_size,
+                                     Nic::Session::Rx_size        rx_buf_size,
                                      Mac_address                  vmac,
-                                     Net::Nic                    &nic,
+                                     Net::Uplink                 &uplink,
                                      bool                  const &verbose,
                                      Genode::Session_label const &label,
                                      Ip_addr               const &ip_addr)
-: Stream_allocator(ram, rm, ram_quota, cap_quota),
-  Stream_dataspaces(ram, tx_buf_size, rx_buf_size),
-  Session_rpc_object(rm,
-                     Stream_dataspaces::tx_ds,
-                     Stream_dataspaces::rx_ds,
-                     Stream_allocator::range_allocator(), ep.rpc_ep()),
-  Packet_handler(ep, nic.vlan(), label, verbose),
+: Session_resources(ram, rm,
+                    ram_quota, cap_quota,
+                    tx_buf_size, rx_buf_size),
+  Session_rpc_object(rm, _tx_ds.cap(), _rx_ds.cap(),
+                     &_packet_alloc, ep.rpc_ep()),
+  Packet_handler(ep, uplink.vlan(), label, verbose),
+  _sessions_elem(*this, space, id),
   _mac_node(*this, vmac),
   _ipv4_node(*this),
-  _nic(nic)
+  _uplink(uplink)
 {
 	vlan().mac_tree.insert(&_mac_node);
 	vlan().mac_list.insert(&_mac_node);
@@ -158,18 +157,3 @@ Session_component::~Session_component() {
 	vlan().mac_list.remove(&_mac_node);
 	_unset_ipv4_node();
 }
-
-
-Net::Root::Root(Genode::Env       &env,
-                Net::Nic          &nic,
-                Genode::Allocator &md_alloc,
-                bool        const &verbose,
-                Genode::Xml_node   config)
-:
-	Genode::Root_component<Session_component>(env.ep(), md_alloc),
-	_mac_alloc(Mac_address(config.attribute_value("mac", Mac_address(DEFAULT_MAC)))),
-	_env(env),
-	_nic(nic),
-	_config(config),
-	_verbose(verbose)
-{ }

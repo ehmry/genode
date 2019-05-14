@@ -170,11 +170,6 @@ append_if $use_nic_router config {
 
 		</config>
 		<route>
-			<service name="Nic"> }
-append_if $use_nic_router config "
-				<child name=\"$network_driver\"/>"
-append_if $use_nic_router config {
-			</service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 	</start>
@@ -184,19 +179,16 @@ append_if $use_nic_bridge config {
 	<start name="nic_bridge">
 		<resource name="RAM" quantum="5M"/>
 		<provides><service name="Nic"/></provides>
-		<config mac="} $bridge_mac {">}
+		<config mac="} $bridge_mac {">
+			<policy label_prefix="nic_drv" uplink="yes"/>
+			<policy label_prefix="wifi_drv" uplink="yes"/>}
 append_if [expr $use_nic_bridge && [have_spec linux]] config "
 			<policy label_prefix=\"netserver_genode\" ip_addr=\"$lx_ip_addr\"/>"
 append_if $use_nic_bridge config {
 			<default-policy/>
 		</config>
 		<route>
-			<service name="Nic"> }
-append_if $use_nic_bridge config "
-			<child name=\"$network_driver\"/>"
-append_if $use_nic_bridge config {
-			</service>
-			<any-service> <parent/> <any-child/> </any-service>
+			<any-service> <parent/> </any-service>
 		</route>
 	</start> }
 
@@ -207,10 +199,7 @@ proc usb_drv_ram_quota {} {
 
 append_if $use_usb_driver config {
 	<start name="usb_drv" caps="120">
-		<resource name="RAM" quantum="} [usb_drv_ram_quota] {"/>
-		<provides>
-			<service name="Nic"/>
-		</provides>}
+		<resource name="RAM" quantum="} [usb_drv_ram_quota] {"/>}
 append_if $use_usb_driver config "
 		<config uhci=\"$use_usb_11\" ehci=\"$use_usb_20\" xhci=\"$use_usb_30\">"
 append_if $use_usb_driver config {
@@ -228,7 +217,6 @@ append_if $use_nic_driver config {
 	<start name="nic_drv" caps="130" } [nic_drv_ld_attr] {>
 		<binary name="} [nic_drv_binary] {"/>
 		<resource name="RAM" quantum="20M"/>
-		<provides><service name="Nic"/></provides>
 		} [nic_drv_config] {
 	</start>}
 
@@ -266,7 +254,6 @@ append_if $use_wifi_driver config {
 	</start>
 	<start name="wifi_drv" caps="300">
 		<resource name="RAM" quantum="24M"/>
-		<provides> <service name="Nic"/> </provides>
 		<config>
 			<libc stdout="/dev/null" stderr="/dev/log" rtc="/dev/rtc"/>
 			<vfs>

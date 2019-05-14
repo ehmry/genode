@@ -1,10 +1,10 @@
-The NIC bridge provides multiple sessions of the 'Nic' service while using a
-single 'Nic' session for forwarding requests. It implements a flavour of the
-Proxy-ARP protocol (rfc1027). That means it allocates a virtual MAC address for
-each client. Whenever a client sends a packet, NIC bridge changes the sender's
-MAC address to the one it memorized for the client. Moreover, it monitors DHCP
-packets, and tracks the IP addresses assigned to each of its clients. Whenever
-ARP packets come from the outside, NIC bridge will answer them with the
+The NIC bridge provides multiple sessions of the 'Nic' service with a blessed
+client acting as a uplink. It implements a flavour of the Proxy-ARP protocol
+(rfc1027). That means it allocates a virtual MAC address for each client.
+Whenever a client sends a packet, NIC bridge changes the sender's MAC address
+to the one it memorized for the client. Moreover, it monitors DHCP packets,
+and tracks the IP addresses assigned to each of its clients. Whenever ARP
+packets come from the outside, NIC bridge will answer them with the
 corresponding MAC address.
 
 By adding a 'mac' attribute to the 'nic_bridge' config node: one can define the
@@ -14,12 +14,13 @@ For example:
 Note that the least relevant byte will be ignored. NIC bridge will use it for
 enumerating its clients, starting from 0.
 
-A fixed MAC can be configured per client of the NIC bridge using the '<policy>'
-tag. For example:
+A fixed MAC can be configured per client of the NIC bridge and an uplinks
+identified using the '<policy>' tag. For example:
 
 !<start name="nic_bridge">
 !  ...
 !  <config>
+!    <policy label_prefix="nic_drv" uplink="yes"/>
 !    <policy label_prefix="lighttpd" mac="02:02:02:01:23:45"/>
 !  </config>
 !</start>
@@ -31,7 +32,13 @@ Normally, NIC bridge is expected to be used in scenarios where an DHCP server
 is available. However, there are situations where the use of static IPs for
 virtual NICs is useful. For example, when using the NIC bridge to create a
 virtual network between the lighttpd web server and the Arora web browser, both
-running as Genode processes without real network connectivity.
+running as Genode processes without real network connectivity. However, the
+link-state of the entire bridge is determined by the current upstream client.
+
+At least one client must be acting as an upstream, and only one client may
+act as an upstream at once. When an upstream session requests is made while an
+upstream is active the session request will be defered until the active upstream
+disconnects. This enables uplink fallback behavior.
 
 The static IP can be configured per client of the NIC bridge using a '<policy>'
 node of the configuration. Of course, the client needs to configure its TCP/IP
@@ -41,6 +48,7 @@ a static address to a client with the session label "lighttpd".
 !<start name="nic_bridge">
 !  ...
 !  <config>
+!    ...
 !    <policy label_prefix="lighttpd" ip_addr="10.0.2.55"/>
 !  </config>
 !</start>

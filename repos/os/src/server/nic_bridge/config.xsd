@@ -20,6 +20,7 @@
 					<xs:extension base="Session_policy">
 						<xs:attribute name="ip_addr" type="Ipv4_address" />
 						<xs:attribute name="mac"     type="Mac_address" />
+						<xs:attribute name="uplink"  type="Boolean" />
 					</xs:extension>
 					</xs:complexContent>
 					</xs:complexType>

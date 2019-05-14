@@ -26,6 +26,7 @@
 namespace Net {
 
 	class Packet_handler;
+	class Uplink_component;
 
 	using ::Nic::Packet_stream_sink;
 	using ::Nic::Packet_stream_source;
@@ -37,6 +38,8 @@ namespace Net {
  */
 class Net::Packet_handler
 {
+	friend Uplink_component;
+
 	private:
 
 		Packet_descriptor      _packet { };
@@ -77,10 +80,10 @@ class Net::Packet_handler
 
 	protected:
 
-		Genode::Signal_handler<Packet_handler> _sink_ack;
-		Genode::Signal_handler<Packet_handler> _sink_submit;
-		Genode::Signal_handler<Packet_handler> _source_ack;
-		Genode::Signal_handler<Packet_handler> _source_submit;
+		Genode::Io_signal_handler<Packet_handler> _sink_ack;
+		Genode::Io_signal_handler<Packet_handler> _sink_submit;
+		Genode::Io_signal_handler<Packet_handler> _source_ack;
+		Genode::Io_signal_handler<Packet_handler> _source_submit;
 		Genode::Signal_handler<Packet_handler> _client_link_state;
 
 	public:
