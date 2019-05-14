@@ -138,11 +138,6 @@ class Net::Uplink_interface : public Uplink_interface_base,
 {
 	private:
 
-		enum {
-			PKT_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE,
-			BUF_SIZE = Nic::Session::QUEUE_SIZE * PKT_SIZE,
-		};
-
 		Link_state                               _link_state { LINK_DOWN };
 		Genode::Signal_handler<Uplink_interface> _link_state_handler;
 		Net::Interface                           _interface;

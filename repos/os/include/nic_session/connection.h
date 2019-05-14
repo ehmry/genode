@@ -23,7 +23,18 @@ namespace Nic { struct Connection; }
 
 struct Nic::Connection : Genode::Connection<Session>, Session_client
 {
-	enum { RAM_QUOTA = 32*1024*sizeof(long) };
+	enum {
+		RAM_QUOTA = 32*1024*sizeof(long),
+		DEFAULT_BUFFER_SIZE = 256 * 1600,
+	};
+
+	static constexpr
+	Tx_size default_tx_size() {
+		return Tx_size{DEFAULT_BUFFER_SIZE}; }
+
+	static constexpr
+	Rx_size default_rx_size() {
+		return Rx_size{DEFAULT_BUFFER_SIZE}; }
 
 	/**
 	 * Constructor for software interfaces
@@ -35,16 +46,16 @@ struct Nic::Connection : Genode::Connection<Session>, Session_client
 	 */
 	Connection(Genode::Env             &env,
 	           Genode::Range_allocator &tx_block_alloc,
-	           Genode::size_t           tx_buf_size,
-	           Genode::size_t           rx_buf_size,
+	           Tx_size                  tx_buf_size,
+	           Rx_size                  rx_buf_size,
 	           char const              *label = "")
 	:
 		Genode::Connection<Session>(env,
 			session(env.parent(),
 			        "ram_quota=%ld, cap_quota=%ld, "
 			        "tx_buf_size=%ld, rx_buf_size=%ld, label=\"%s\"",
-			        RAM_QUOTA + tx_buf_size + rx_buf_size,
-			        CAP_QUOTA, tx_buf_size, rx_buf_size, label)),
+			        RAM_QUOTA + tx_buf_size.value + rx_buf_size.value,
+			        CAP_QUOTA, tx_buf_size.value, rx_buf_size.value, label)),
 		Session_client(cap(), tx_block_alloc, env.rm())
 	{ }
 
@@ -61,8 +72,8 @@ struct Nic::Connection : Genode::Connection<Session>, Session_client
 	Connection(Genode::Env             &env,
 	           Mac_address              mac_address,
 	           Genode::Range_allocator &tx_block_alloc,
-	           Genode::size_t           tx_buf_size,
-	           Genode::size_t           rx_buf_size,
+	           Tx_size                  tx_buf_size,
+	           Rx_size                  rx_buf_size,
 	           char const              *label = "")
 	:
 		Genode::Connection<Session>(env,
@@ -70,8 +81,8 @@ struct Nic::Connection : Genode::Connection<Session>, Session_client
 			        "ram_quota=%ld, cap_quota=%ld, "
 			        "tx_buf_size=%ld, rx_buf_size=%ld, "
 			        "mac=\"%s\", label=\"%s\"",
-			        RAM_QUOTA + tx_buf_size + rx_buf_size,
-			        CAP_QUOTA, tx_buf_size, rx_buf_size,
+			        RAM_QUOTA + tx_buf_size.value + rx_buf_size.value,
+			        CAP_QUOTA, tx_buf_size.value, rx_buf_size.value,
 			        Genode::String<24>(mac_address).string(), label)),
 		Session_client(cap(), tx_block_alloc, env.rm())
 	{ }

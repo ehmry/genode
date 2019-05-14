@@ -50,15 +50,14 @@ class Net::Nic
 
 		using Signal_handler = Genode::Signal_handler<Nic>;
 
-		enum { PKT_SIZE = ::Nic::Packet_allocator::DEFAULT_PACKET_SIZE };
-		enum { BUF_SIZE = ::Nic::Session::QUEUE_SIZE * PKT_SIZE };
-
 		Genode::Env            &_env;
 		Genode::Allocator      &_alloc;
 		Nic_handler            &_handler;
 		bool             const &_verbose;
 		::Nic::Packet_allocator _pkt_alloc     { &_alloc };
-		::Nic::Connection       _nic           { _env, &_pkt_alloc, BUF_SIZE, BUF_SIZE };
+		::Nic::Connection       _nic           { _env, &_pkt_alloc,
+		                                         Nic::Connection::default_tx_size(),
+		                                         Nic::Connection::default_rx_size() };
 		Signal_handler          _sink_ack      { _env.ep(), *this, &Nic::_ack_avail };
 		Signal_handler          _sink_submit   { _env.ep(), *this, &Nic::_ready_to_submit };
 		Signal_handler          _source_ack    { _env.ep(), *this, &Nic::_ready_to_ack };

@@ -91,12 +91,7 @@ class Nic_client
 {
 	private:
 
-		enum {
-			PACKET_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE,
-			BUF_SIZE    = Nic::Session::QUEUE_SIZE * PACKET_SIZE,
-		};
-
-		Nic::Packet_allocator  *_tx_block_alloc;
+		Nic::Packet_allocator  &_tx_block_alloc;
 		Nic::Connection         _nic;
 
 		enum { NIC_EP_STACK = 32u << 10, };
@@ -108,7 +103,7 @@ class Nic_client
 		Genode::Signal_handler<Nic_client> _rx_ready_to_ack_dispatcher;
 		Genode::Signal_handler<Nic_client> _destruct_dispatcher;
 
-		bool _link_up = false;
+		Nic::Session::Link_state _link_state { Nic::Session::LINK_DOWN };
 
 		/* VM <-> device driver (down) <-> nic_client (up) <-> nic session */
 		PPDMINETWORKDOWN   _down_rx;
@@ -136,11 +131,12 @@ class Nic_client
 
 		void _handle_link_state()
 		{
-			_link_up = _nic.link_state();
-
-			_down_rx_config->pfnSetLinkState(_down_rx_config,
-			                                 _link_up ? PDMNETWORKLINKSTATE_UP
-			                                          : PDMNETWORKLINKSTATE_DOWN);
+			_link_state = _nic.session_link_state();
+			_down_rx_config->pfnSetLinkState(
+				_down_rx_config,
+				(_link_state == Nic::Session::LINK_UP)
+					? PDMNETWORKLINKSTATE_UP
+					: PDMNETWORKLINKSTATE_DOWN);
 		}
 
 		void _handle_destruct()
@@ -196,8 +192,11 @@ class Nic_client
 
 		Nic_client(Genode::Env &env, PDRVNIC drvtap, char const *label)
 		:
-			_tx_block_alloc(_packet_allocator()),
-			_nic(env, _tx_block_alloc, BUF_SIZE, BUF_SIZE, label),
+			_tx_block_alloc(*_packet_allocator()),
+			_nic(env, _tx_block_alloc,
+			     Nic::Connection::default_tx_size(),
+			     Nic::Connection::default_rx_size(),
+			     label),
 			_ep(env, NIC_EP_STACK, "nic_ep", Genode::Affinity::Location()),
 			_link_state_dispatcher(_ep, *this, &Nic_client::_handle_link_state),
 			_rx_packet_avail_dispatcher(_ep, *this, &Nic_client::_handle_rx_packet_avail),
@@ -206,13 +205,15 @@ class Nic_client
 			_down_rx(drvtap->pIAboveNet),
 			_down_rx_config(drvtap->pIAboveConfig)
 		{
+			_handle_link_state();
+
 			Genode::Signal_transmitter(_pthread_reg_sigh).submit();
 		}
 
 		~Nic_client()
 		{
 			/* XXX Libc::pthread_free(&_pthread); */
-			destroy(vmm_heap(), _tx_block_alloc);
+			destroy(vmm_heap(), &_tx_block_alloc);
 		}
 
 		void enable_signals()
@@ -230,7 +231,8 @@ class Nic_client
 
 		int send_packet(void *packet, uint32_t packet_len)
 		{
-			if (!_link_up) { return VERR_NET_DOWN; }
+			if (_link_state == Nic::Session::LINK_DOWN)
+				return VERR_NET_DOWN;
 
 			Nic::Packet_descriptor tx_packet = _alloc_tx_packet(packet_len);
 

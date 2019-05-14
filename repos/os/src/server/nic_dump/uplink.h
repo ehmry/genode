@@ -30,11 +30,6 @@ class Net::Uplink : public Nic::Packet_allocator,
 {
 	private:
 
-		enum {
-			PKT_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE,
-			BUF_SIZE = Nic::Session::QUEUE_SIZE * PKT_SIZE,
-		};
-
 		/********************
 		 ** Net::Interface **
 		 ********************/

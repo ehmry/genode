@@ -58,7 +58,9 @@ class Net::Nic
 		Nic_handler            &_handler;
 		bool             const &_verbose;
 		::Nic::Packet_allocator _pkt_alloc     { &_alloc };
-		::Nic::Connection       _nic           { _env, &_pkt_alloc, BUF_SIZE, BUF_SIZE };
+		::Nic::Connection       _nic           { _env, &_pkt_alloc,
+		                                         Nic::Session::Tx_size{BUF_SIZE},
+		                                         Nic::Session::Rx_size{BUF_SIZE} };
 		Signal_handler          _sink_ack      { _env.ep(), *this, &Nic::_ack_avail };
 		Signal_handler          _sink_submit   { _env.ep(), *this, &Nic::_ready_to_submit };
 		Signal_handler          _source_ack    { _env.ep(), *this, &Nic::_ready_to_ack };

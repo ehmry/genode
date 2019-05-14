@@ -34,11 +34,6 @@ namespace Nic_drv {
 
 struct Nic_drv::Main
 {
-	enum {
-		PACKET_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE,
-		BUF_SIZE    = 128 * PACKET_SIZE,
-	};
-
 	static Nic_drv::Main *instance;
 
 	Genode::Env  &_env;
@@ -67,8 +62,12 @@ struct Nic_drv::Main
 
 	Nic::Packet_allocator _nic_tx_alloc { &_heap };
 
-	Nic::Connection _nic
-		{ _env, _mac, _nic_tx_alloc, BUF_SIZE, BUF_SIZE };
+	Nic::Connection _nic {
+		_env, _mac, _nic_tx_alloc,
+		Nic::Connection::default_tx_size(),
+		Nic::Connection::default_rx_size(),
+		"iPXE"
+	};
 
 	Io_signal_handler<Main> _nic_packets_handler
 		{ _env.ep(), *this, &Main::_handle_nic_packets };

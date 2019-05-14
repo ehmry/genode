@@ -27,7 +27,9 @@ Seoul::Network::Network(Genode::Env &env, Genode::Heap &heap,
                         Synced_motherboard &mb)
 :
 	_motherboard(mb), _tx_block_alloc(&heap),
-	_nic(env, &_tx_block_alloc, BUF_SIZE, BUF_SIZE),
+	_nic(env, _tx_block_alloc,
+	     Nic::Connection::default_tx_size(),
+	     Nic::Connection::default_rx_size()),
 	_packet_avail(env.ep(), *this, &Network::_handle_packets)
 {
 	_nic.rx_channel()->sigh_packet_avail(_packet_avail);

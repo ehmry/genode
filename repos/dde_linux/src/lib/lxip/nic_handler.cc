@@ -29,11 +29,6 @@ class Nic_client
 {
 	private:
 
-		enum {
-			PACKET_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE,
-			BUF_SIZE    = Nic::Session::QUEUE_SIZE * PACKET_SIZE,
-		};
-
 		Nic::Packet_allocator _tx_block_alloc;
 		Nic::Connection       _nic;
 
@@ -115,7 +110,9 @@ class Nic_client
 		           void (*ticker)())
 		:
 			_tx_block_alloc(&alloc),
-			_nic(env, &_tx_block_alloc, BUF_SIZE, BUF_SIZE),
+			_nic(env, _tx_block_alloc,
+			     Nic::Connection::default_tx_size(),
+			     Nic::Connection::default_rx_size()),
 			_sink_ack(env.ep(), *this, &Nic_client::_packet_avail),
 			_sink_submit(env.ep(), *this, &Nic_client::_ready_to_ack),
 			_source_ack(env.ep(), *this, &Nic_client::_ack_avail),

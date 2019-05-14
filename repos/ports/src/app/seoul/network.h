@@ -40,11 +40,6 @@ class Seoul::Network
 {
 	private:
 
-		enum {
-			PACKET_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE,
-			BUF_SIZE    = Nic::Session::QUEUE_SIZE * PACKET_SIZE,
-		};
-
 		Synced_motherboard   &_motherboard;
 		Nic::Packet_allocator _tx_block_alloc;
 		Nic::Connection       _nic;

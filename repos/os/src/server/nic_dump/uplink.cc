@@ -29,7 +29,9 @@ Net::Uplink::Uplink(Env               &env,
                     Allocator         &alloc)
 :
 	Nic::Packet_allocator { &alloc },
-	Nic::Connection       { env, this, BUF_SIZE, BUF_SIZE },
+	Nic::Connection       { env, this,
+	                        Nic::Connection::default_tx_size(),
+	                        Nic::Connection::default_rx_size() },
 	Net::Interface        { env.ep(), config.attribute_value("uplink", Interface_label()),
 	                        timer, curr_time, config.attribute_value("time", false),
 	                        alloc, config }

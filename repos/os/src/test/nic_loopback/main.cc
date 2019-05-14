@@ -59,9 +59,10 @@ struct Test::Base : Interface
 
 		Allocator_avl _tx_block_alloc { &_heap };
 
-		enum { BUF_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE * 128 };
-
-		Nic::Connection _nic { _env, &_tx_block_alloc, BUF_SIZE, BUF_SIZE };
+		Nic::Connection _nic {
+			_env, &_tx_block_alloc,
+			Nic::Connection::default_tx_size(),
+			Nic::Connection::default_rx_size(), };
 
 		void _handle_nic() { if (!_done) handle_nic(); }
 

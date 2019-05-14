@@ -54,6 +54,9 @@ struct Nic::Session : Genode::Session
 {
 	enum { QUEUE_SIZE = 1024 };
 
+	struct Tx_size { Genode::size_t value; };
+	struct Rx_size { Genode::size_t value; };
+
 	/*
 	 * Types used by the client stub code and server implementation
 	 *

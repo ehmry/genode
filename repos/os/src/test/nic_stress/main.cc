@@ -63,7 +63,9 @@ struct Local::Construct_destruct_test
 	{
 		for (unsigned idx = 0; idx < _nr_of_sessions; idx++) {
 			try {
-				nic[idx].construct(_env, &_pkt_alloc, BUF_SIZE, BUF_SIZE);
+				nic[idx].construct(_env, &_pkt_alloc,
+				                   Nic::Session::Tx_size{BUF_SIZE},
+				                   Nic::Session::Rx_size{BUF_SIZE});
 				log("round ", round + 1, "/", _nr_of_rounds, " nic ", idx + 1,
 				    "/", _nr_of_sessions, " mac ", nic[idx]->mac_address());
 			}

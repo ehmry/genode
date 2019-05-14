@@ -75,11 +75,6 @@ class Lwip::Nic_netif
 {
 	private:
 
-		enum {
-			PACKET_SIZE = Nic::Packet_allocator::DEFAULT_PACKET_SIZE,
-			BUF_SIZE    = 128 * PACKET_SIZE,
-		};
-
 		Genode::Tslab<struct Nic_netif_pbuf, 128> _pbuf_alloc;
 
 		Nic::Packet_allocator _nic_tx_alloc;
@@ -212,7 +207,8 @@ class Lwip::Nic_netif
 		:
 			_pbuf_alloc(alloc), _nic_tx_alloc(&alloc),
 			_nic(env, _nic_tx_alloc,
-			     BUF_SIZE, BUF_SIZE,
+			     Nic::Connection::default_tx_size(),
+			     Nic::Connection::default_rx_size(),
 			     config.attribute_value("label", Genode::String<160>("lwip")).string()),
 			_link_state_handler(env.ep(), *this, &Nic_netif::handle_link_state),
 			_rx_packet_handler( env.ep(), *this, &Nic_netif::handle_rx_packets)
