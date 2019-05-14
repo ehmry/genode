@@ -76,12 +76,10 @@ append config {
 
 	<start name="nic_drv" priority="-1">
 		<resource name="RAM" quantum="4M"/>
-		<provides><service name="Nic"/></provides>
 	</start>
 
 	<start name="wifi_drv" caps="300" priority="-1">
 		<resource name="RAM" quantum="24M"/>
-		<provides> <service name="Nic"/> </provides>
 		<config ld_verbose="no">
 			<vfs>
 				<dir name="dev"> <log/> <rtc/> <null/>
@@ -142,7 +140,8 @@ append config {
 					        verbose_packets="}      [router_verbose_packets] {">
 
 						<default-policy     domain="downlink"/>
-						<uplink label="nic" domain="uplink"  />
+						<policy label_prefix="nic_drv" domain="uplink"/>
+						<policy label_prefix="wifi_drv" domain="uplink"/>
 						<domain name="uplink">
 							<nat domain="downlink" icmp-ids="999"/>
 						</domain>
@@ -318,12 +317,6 @@ append config {
 		<resource name="RAM" quantum="10M"/>
 		<provides><service name="Nic"/></provides>
 		<route>
-			<service name="Nic" label="nic">
-				<child name="nic_drv"/>
-			</service>
-			<service name="Nic" label="wifi">
-				<child name="wifi_drv"/>
-			</service>
 			<service name="ROM" label="config">
 				<child name="dynamic_rom" label="router.config"/>
 			</service>
@@ -337,7 +330,6 @@ append config {
 		        period_sec="1"
 		        count="999"/>
 		<route>
-			<service name="Nic"> <child name="router"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 	</start>

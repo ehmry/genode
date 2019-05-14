@@ -6,20 +6,20 @@
  */
 
 /*
- * Copyright (C) 2012-2017 Genode Labs GmbH
+ * Copyright (C) 2012-2019 Genode Labs GmbH
  *
  * This file is distributed under the terms of the GNU General Public License
  * version 2.
  */
 
 /* Genode includes */
-#include <base/log.h>
-#include <base/rpc_server.h>
-#include <base/snprintf.h>
-#include <base/tslab.h>
+#include <nic_session/connection.h>
+#include <nic/packet_allocator.h>
 #include <nic/xml_node.h>
-#include <nic/component.h>
-#include <root/component.h>
+#include <base/log.h>
+#include <base/snprintf.h>
+#include <base/registry.h>
+#include <base/tslab.h>
 #include <util/xml_node.h>
 
 /* local includes */
@@ -103,18 +103,51 @@ bool tx_task_send(struct sk_buff *skb)
 /**
  * Nic::Session implementation
  */
-class Wifi_session_component : public Nic::Session_component
+class Wifi_nic_proxy
 {
+	public:
+
+		static Wifi_nic_proxy *instance;
+		net_device            &device;
+
 	private:
 
-		net_device *_ndev;
-		bool        _has_link = !(_ndev->state & 1UL << __LINK_STATE_NOCARRIER);
+		Nic::Session::Link_state _device_link_state() const
+		{
+			return device.state & __LINK_STATE_NOCARRIER
+				? Nic::Session::LINK_DOWN : Nic::Session::LINK_UP;
+		}
 
-	protected:
+		Nic::Mac_address _mac() const
+		{
+			Nic::Mac_address m;
+			Genode::memcpy(&m, device.perm_addr, ETH_ALEN);
+			return m;
+		}
+
+		Nic::Packet_allocator _nic_tx_alloc;
+		Nic::Connection       _nic;
+
+		Genode::Signal_handler<Wifi_nic_proxy>    _nic_link_handler;
+		Genode::Io_signal_handler<Wifi_nic_proxy> _nic_packets_handler;
+
+		Nic::Session::Link_state _link_state { Nic::Session::LINK_DOWN };
+
+		void _handle_nic_link()
+		{
+			if ((_nic.session_link_state() == Nic::Session::LINK_UP)
+			 && (_device_link_state() == Nic::Session::LINK_UP))
+			{
+				_link_state = Nic::Session::LINK_UP;
+			} else {
+				_link_state = Nic::Session::LINK_DOWN;
+			}
+		}
 
 		bool _send()
 		{
 			using namespace Genode;
+			auto &sink = *_nic.rx();
 
 			/*
 			 * We must not be called from another task, just from the
@@ -125,205 +158,128 @@ class Wifi_session_component : public Nic::Session_component
 				return false;
 			}
 
-			/* XXX enable as soon as the other stack plays along
-			if (!_has_link) {
-				Packet_descriptor packet = _tx.sink()->get_packet();
-				_tx.sink()->acknowledge_packet(packet);
+			if (_link_state == Nic::Session::LINK_DOWN) {
+				Packet_descriptor packet = sink.get_packet();
+				sink.acknowledge_packet(packet);
 				Genode::warning("no link, drop packet");
 				return true;
 			}
-			*/
 
-			if (!_tx.sink()->ready_to_ack()) { return false; }
-			if (!_tx.sink()->packet_avail()) { return false; }
+			if (!sink.ready_to_ack() || !sink.packet_avail()) { return false; }
 
-			Packet_descriptor packet = _tx.sink()->get_packet();
-			if (!packet.size() || !_tx.sink()->packet_valid(packet)) {
-				warning("invalid tx packet");
+			Packet_descriptor const packet = sink.get_packet();
+			if (!packet.size() || !sink.packet_valid(packet)) {
+				warning("invalid packet from Nic session");
 				return true;
 			}
 
 			struct sk_buff *skb = lxc_alloc_skb(packet.size() + HEAD_ROOM, HEAD_ROOM);
 
-			skb->dev = _ndev;
+			skb->dev = &device;
 
 			unsigned char *data = lxc_skb_put(skb, packet.size());
-			Genode::memcpy(data, _tx.sink()->packet_content(packet), packet.size());
+			Genode::memcpy(data, sink.packet_content(packet), packet.size());
 
-			_tx_data.ndev = _ndev;
+			_tx_data.ndev = &device;
 			_tx_data.skb  = skb;
 
 			_tx_task->unblock();
 			Lx::scheduler().schedule();
 
-			_tx.sink()->acknowledge_packet(packet);
+			sink.acknowledge_packet(packet);
 
 			return true;
 		}
 
-		void _handle_rx()
-		{
-			while (_rx.source()->ack_avail()) {
-				_rx.source()->release_packet(_rx.source()->get_acked_packet());
-			}
-		}
-
-		void _handle_packet_stream() override
-		{
-			_handle_rx();
-
-			while (_send()) { continue; }
-		}
+		void _handle_nic_packets() { while (_send()) { continue; } }
 
 	public:
 
-		Wifi_session_component(Genode::size_t const tx_buf_size,
-		                       Genode::size_t const rx_buf_size,
-		                       Genode::Allocator   &rx_block_md_alloc,
-		                       Genode::Env  &env, net_device *ndev)
-		: Session_component(tx_buf_size, rx_buf_size, Genode::CACHED,
-		                    rx_block_md_alloc, env),
-		  _ndev(ndev)
+		Wifi_nic_proxy(Genode::Env  &env,
+		               Genode::Allocator &alloc,
+		               net_device &ndev)
+		: device(ndev),
+		  _nic_tx_alloc(&alloc),
+		  _nic(env, _mac(), _nic_tx_alloc,
+		       Nic::Connection::default_tx_size(),
+		       Nic::Connection::default_rx_size(),
+		       "wifi"),
+		  _nic_link_handler(env.ep(), *this,
+		                    &Wifi_nic_proxy::_handle_nic_link),
+		  _nic_packets_handler(env.ep(), *this,
+		                       &Wifi_nic_proxy::_handle_nic_packets)
 		{
-			_ndev->lx_nic_device = this;
+			device.lx_nic_device = this;
+
+			/* set Nic session signal handlers */
+			_nic.link_state_sigh(_nic_link_handler);
+			_nic.rx_channel()->sigh_packet_avail(_nic_packets_handler);
+			_nic.rx_channel()->sigh_ready_to_ack(_nic_packets_handler);
 		}
 
-		~Wifi_session_component()
+		~Wifi_nic_proxy()
 		{
-			_ndev->lx_nic_device = nullptr;
+			device.lx_nic_device = nullptr;
 		}
 
 		/**
-		 * Report link state
+		 * Report link state to Nic server
 		 */
-		void link_state(bool link)
+		void update_link_state()
 		{
-			/* only report changes of the link state */
-			if (link == _has_link)
-				return;
-
-			_has_link = link;
-			_link_state_changed();
+			if (_link_state != _device_link_state())
+				_nic.link_state(_device_link_state());
 		}
 
 		void receive(struct sk_buff *skb)
 		{
-			_handle_rx();
+			auto &source = *_nic.tx();
 
-			if (!_rx.source()->ready_to_submit()) {
+			/* flush acknowledgements */
+			while (source.ack_avail())
+				source.release_packet(source.get_acked_packet());
+
+			if ((_link_state == Nic::Session::LINK_DOWN)
+			 || (!source.ready_to_submit()))
+			{
 				Genode::warning("not ready to receive packet");
 				return;
 			}
 
 			Skb s = skb_helper(skb);
-
 			try {
-				Nic::Packet_descriptor p = _rx.source()->alloc_packet(s.packet_size + s.frag_size);
-				void *buffer = _rx.source()->packet_content(p);
+				Nic::Packet_descriptor p = source.alloc_packet(s.packet_size + s.frag_size);
+				void *buffer = source.packet_content(p);
 				memcpy(buffer, s.packet, s.packet_size);
 
 				if (s.frag_size)
 					memcpy((char *)buffer + s.packet_size, s.frag, s.frag_size);
 
-				_rx.source()->submit_packet(p);
+				source.submit_packet(p);
 			} catch (...) {
 				Genode::warning("failed to process received packet");
 			}
 		}
-
-		/*****************************
-		 ** NIC-component interface **
-		 *****************************/
-
-		Nic::Mac_address mac_address() override
-		{
-			Nic::Mac_address m;
-			Genode::memcpy(&m, _ndev->perm_addr, ETH_ALEN);
-			return m;
-		}
-
-		bool link_state() override { return _has_link; }
 };
 
 
-/**
- * NIC root implementation
- */
-class Root : public Genode::Root_component<Wifi_session_component,
-                                           Genode::Single_client>
-{
-	private:
-
-		Genode::Env &_env;
-
-	protected:
-
-		Wifi_session_component *_create_session(const char *args)
-		{
-			using namespace Genode;
-			using Genode::size_t;
-
-			size_t ram_quota   = Arg_string::find_arg(args, "ram_quota"  ).ulong_value(0);
-			size_t tx_buf_size = Arg_string::find_arg(args, "tx_buf_size").ulong_value(0);
-			size_t rx_buf_size = Arg_string::find_arg(args, "rx_buf_size").ulong_value(0);
-
-			/* deplete ram quota by the memory needed for the session structure */
-			size_t session_size = max(4096UL, (unsigned long)sizeof(Wifi_session_component));
-			if (ram_quota < session_size)
-				throw Genode::Insufficient_ram_quota();
-
-			/*
-			 * Check if donated ram quota suffices for both communication
-			 * buffers and check for overflow
-			 */
-			if (tx_buf_size + rx_buf_size < tx_buf_size ||
-			    tx_buf_size + rx_buf_size > ram_quota - session_size) {
-				Genode::error("insufficient 'ram_quota', got ", ram_quota, " need ",
-				              tx_buf_size + rx_buf_size + session_size);
-				throw Genode::Insufficient_ram_quota();
-			}
-
-			session = new (md_alloc())
-			          Wifi_session_component(tx_buf_size, rx_buf_size,
-			                                *md_alloc(), _env, device);
-			return session;
-		}
-
-		void _destroy_session(Wifi_session_component *session)
-		{
-			/* stop rx */
-			Root::instance->session = nullptr;
-			Genode::Root_component<Wifi_session_component, Genode::Single_client>::_destroy_session(session);
-		}
-
-	public:
-
-		net_device             *device  = nullptr;
-		Wifi_session_component *session = nullptr;
-		static Root            *instance;
-
-		Root(Genode::Env &env, Genode::Allocator &md_alloc)
-		: Genode::Root_component<Wifi_session_component, Genode::Single_client>(&env.ep().rpc_ep(), &md_alloc),
-			_env(env)
-		{ }
-
-		void announce() { _env.parent().announce(_env.ep().manage(*this)); }
-};
+static Genode::Env       *_proxy_env   { nullptr };
+static Genode::Allocator *_proxy_alloc { nullptr };
 
 
-Root *Root::instance;
+Wifi_nic_proxy *Wifi_nic_proxy::instance;
 
 
 void Lx::nic_init(Genode::Env &env, Genode::Allocator &alloc)
 {
-	static Root root(env, alloc);
-	Root::instance = &root;
+	_proxy_env = &env;
+	_proxy_alloc = &alloc;
 }
 
 
 void Lx::get_mac_address(unsigned char *addr)
 {
-	memcpy(addr, Root::instance->device->perm_addr, ETH_ALEN);
+	memcpy(addr, Wifi_nic_proxy::instance->device.perm_addr, ETH_ALEN);
 }
 
 
@@ -536,12 +492,12 @@ extern "C" void __dev_remove_pack(struct packet_type *pt)
 
 extern "C" struct net_device *__dev_get_by_index(struct net *net, int ifindex)
 {
-	if (!Root::instance->device) {
+	if (!Wifi_nic_proxy::instance) {
 		Genode::error("no net device registered!");
 		return 0;
 	}
 
-	return Root::instance->device;
+	return &Wifi_nic_proxy::instance->device;
 }
 
 
@@ -581,13 +537,8 @@ extern "C" int dev_parse_header(const struct sk_buff *skb, unsigned char *haddr)
 
 extern "C" int dev_queue_xmit(struct sk_buff *skb)
 {
-	struct net_device *dev           = skb->dev;
-	struct net_device_ops const *ops = dev->netdev_ops;
-
-	if (skb->next) {
+	if (skb->next)
 		Genode::warning("more skb's queued");
-	}
-
 	return tx_task_send(skb) ? NETDEV_TX_OK : -1;
 }
 
@@ -620,12 +571,12 @@ extern "C" void dev_close(struct net_device *ndev)
 
 bool Lx::open_device()
 {
-	if (!Root::instance->device) {
+	if (!Wifi_nic_proxy::instance) {
 		Genode::error("no net_device available");
 		return false;
 	}
 
-	struct net_device * const ndev = Root::instance->device;
+	struct net_device * const ndev = &Wifi_nic_proxy::instance->device;
 
 	int err = ndev->netdev_ops->ndo_open(ndev);
 	if (err) {
@@ -652,16 +603,12 @@ bool Lx::open_device()
 
 extern "C" int register_netdevice(struct net_device *ndev)
 {
-	static bool already_registered = false;
-
-	if (already_registered) {
+	if (Wifi_nic_proxy::instance) {
 		Genode::error("We don't support multiple network devices in one driver instance");
 		return -ENODEV;
 	}
 
-	already_registered = true;
-
-	Root::instance->device = ndev;
+	static Wifi_nic_proxy proxy(*_proxy_env, *_proxy_alloc, *ndev);
 
 	ndev->state |= 1UL << __LINK_STATE_START;
 	netif_carrier_off(ndev);
@@ -699,7 +646,7 @@ extern "C" int register_netdevice(struct net_device *ndev)
 	if (ndev->netdev_ops->ndo_set_rx_mode)
 		ndev->netdev_ops->ndo_set_rx_mode(ndev);
 
-	Root::instance->announce();
+	Wifi_nic_proxy::instance->update_link_state();
 
 	list_add_tail_rcu(&ndev->dev_list, &init_net.dev_base_head);
 
@@ -726,10 +673,10 @@ extern "C" void netif_carrier_on(struct net_device *dev)
 {
 	dev->state &= ~(1UL << __LINK_STATE_NOCARRIER);
 
-	Wifi_session_component *session = (Wifi_session_component *)dev->lx_nic_device;
+	Wifi_nic_proxy *proxy = (Wifi_nic_proxy *)dev->lx_nic_device;
 
-	if (session)
-		session->link_state(true);
+	if (proxy)
+		proxy->update_link_state();
 }
 
 
@@ -737,10 +684,10 @@ extern "C" void netif_carrier_off(struct net_device *dev)
 {
 	dev->state |= 1UL << __LINK_STATE_NOCARRIER;
 
-	Wifi_session_component *session = (Wifi_session_component *)dev->lx_nic_device;
+	Wifi_nic_proxy *proxy = (Wifi_nic_proxy *)dev->lx_nic_device;
 
-	if (session)
-		session->link_state(false);
+	if (proxy)
+		proxy->update_link_state();
 }
 
 
@@ -755,13 +702,14 @@ extern "C" int netif_receive_skb(struct sk_buff *skb)
 	if (is_eapol(skb)) {
 		/* XXX call only AF_PACKET hook */
 		for (Proto_hook* ph = proto_hook_list().first(); ph; ph = ph->next()) {
-			ph->pt.func(skb, Root::instance->device, &ph->pt, Root::instance->device);
+			ph->pt.func(skb, &Wifi_nic_proxy::instance->device,
+			            &ph->pt, &Wifi_nic_proxy::instance->device);
 		}
 		return NET_RX_SUCCESS;
 	}
 
-	if (Root::instance->session)
-		Root::instance->session->receive(skb);
+	if (Wifi_nic_proxy::instance)
+		Wifi_nic_proxy::instance->receive(skb);
 
 	dev_kfree_skb(skb);
 	return NET_RX_SUCCESS;
