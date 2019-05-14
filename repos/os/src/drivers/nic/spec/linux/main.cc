@@ -3,40 +3,33 @@
  * \author Stefan Kalkowski
  * \author Christian Helmuth
  * \author Sebastian Sumpf
+ * \author Emery Hemingway
  * \date   2011-08-08
  *
- * Configuration options are:
+ * Configuration option is:
  *
  * - TAP device to connect to (default is tap0)
- * - MAC address (default is 02-00-00-00-00-01)
  *
- * These can be set in the config section as follows:
+ * This can be set in the config section as follows:
  *  <config>
- *  	<nic mac="12:23:34:45:56:67" tap="tap1"/>
+ *  	<nic tap="tap1"/>
  *  </config>
  */
 
 /*
- * Copyright (C) 2011-2017 Genode Labs GmbH
+ * Copyright (C) 2011-2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-/* Genode */
-/*
- * Needs to be included first because otherwise
- * util/xml_node.h will not pick up the ascii_to
- * overload.
- */
-#include <nic/xml_node.h>
-
+#include <nic/packet_allocator.h>
+#include <nic_session/connection.h>
 #include <base/attached_rom_dataspace.h>
 #include <base/component.h>
 #include <base/heap.h>
 #include <base/thread.h>
 #include <base/log.h>
-#include <nic/root.h>
 
 /* Linux */
 #include <errno.h>
@@ -46,17 +39,14 @@
 #include <net/if.h>
 #include <linux/if_tun.h>
 
-namespace Server {
+namespace Driver {
 	using namespace Genode;
-
 	struct Main;
 }
 
 
-class Linux_session_component : public Nic::Session_component
+struct Driver::Main
 {
-	private:
-
 		struct Rx_signal_thread : Genode::Thread
 		{
 			int                               fd;
@@ -82,14 +72,13 @@ class Linux_session_component : public Nic::Session_component
 			}
 		};
 
-		Genode::Attached_rom_dataspace _config_rom;
-
-		Nic::Mac_address _mac_addr { };
-		int              _tap_fd;
-		Rx_signal_thread _rx_thread;
+		Env  &_env;
+		Heap  _heap { _env.ram(), _env.rm() };
 
 		int _setup_tap_fd()
 		{
+			Genode::Attached_rom_dataspace config_rom(_env, "config");
+
 			/* open TAP device */
 			int ret;
 			struct ifreq ifr;
@@ -112,7 +101,7 @@ class Linux_session_component : public Nic::Session_component
 
 			/* get tap device from config */
 			try {
-				Genode::Xml_node nic_node = _config_rom.xml().sub_node("nic");
+				Genode::Xml_node nic_node = config_rom.xml().sub_node("nic");
 				nic_node.attribute("tap").value(ifr.ifr_name, sizeof(ifr.ifr_name));
 				Genode::log("using tap device \"", Genode::Cstring(ifr.ifr_name), "\"");
 			} catch (...) {
@@ -132,19 +121,38 @@ class Linux_session_component : public Nic::Session_component
 			return fd;
 		}
 
+		int             const _tap_fd { _setup_tap_fd() };
+		Nic::Packet_allocator _nic_tx_alloc { &_heap };
+
+		Nic::Connection _nic {
+			_env, _nic_tx_alloc,
+			Nic::Connection::default_tx_size(),
+			Nic::Connection::default_rx_size(),
+			"linux" };
+
+		Io_signal_handler<Main> _link_handler {
+			_env.ep(), *this, &Main::_handle_link };
+
+		Io_signal_handler<Main> _packet_handler {
+			_env.ep(), *this, &Main::_process_packets };
+
+		Rx_signal_thread _rx_thread {
+			_env, _tap_fd, _packet_handler };
+
+		Nic::Session::Link_state _link_state { Nic::Session::LINK_UP };
+
 		bool _send()
 		{
-			using namespace Genode;
+			auto &sink = *_nic.rx();
 
-			if (!_tx.sink()->ready_to_ack())
+			if (_link_state == Nic::Session::LINK_DOWN
+			 || !sink.ready_to_ack()
+			 || !sink.packet_avail())
 				return false;
 
-			if (!_tx.sink()->packet_avail())
-				return false;
-
-			Packet_descriptor packet = _tx.sink()->get_packet();
-			if (!packet.size() || !_tx.sink()->packet_valid(packet)) {
-				warning("invalid tx packet");
+			Packet_descriptor packet = sink.get_packet();
+			if (!packet.size() || !sink.packet_valid(packet)) {
+				warning("invalid rx packet");
 				return true;
 			}
 
@@ -152,7 +160,7 @@ class Linux_session_component : public Nic::Session_component
 
 			/* non-blocking-write packet to TAP */
 			do {
-				ret = write(_tap_fd, _tx.sink()->packet_content(packet), packet.size());
+				ret = write(_tap_fd, sink.packet_content(packet), packet.size());
 				/* drop packet if write would block */
 				if (ret < 0 && errno == EAGAIN)
 					continue;
@@ -160,94 +168,63 @@ class Linux_session_component : public Nic::Session_component
 				if (ret < 0) Genode::error("write: errno=", errno);
 			} while (ret < 0);
 
-			_tx.sink()->acknowledge_packet(packet);
+			sink.acknowledge_packet(packet);
 
 			return true;
 		}
 
 		bool _receive()
 		{
+			auto &source = *_nic.tx();
+
 			unsigned const max_size = Nic::Packet_allocator::DEFAULT_PACKET_SIZE;
 
-			if (!_rx.source()->ready_to_submit())
+			if (_link_state == Nic::Session::LINK_DOWN
+			 || !source.ready_to_submit())
 				return false;
 
 			Nic::Packet_descriptor p;
 			try {
-				p = _rx.source()->alloc_packet(max_size);
-			} catch (Session::Rx::Source::Packet_alloc_failed) { return false; }
+				p = source.alloc_packet(max_size);
+			} catch (...) { return false; }
 
-			int size = read(_tap_fd, _rx.source()->packet_content(p), max_size);
+			int size = read(_tap_fd, source.packet_content(p), max_size);
 			if (size <= 0) {
-				_rx.source()->release_packet(p);
+				source.release_packet(p);
 				return false;
 			}
 
 			/* adjust packet size */
 			Nic::Packet_descriptor p_adjust(p.offset(), size);
-			_rx.source()->submit_packet(p_adjust);
+			source.submit_packet(p_adjust);
 
 			return true;
 		}
 
-	protected:
+		void _handle_link() {
+			_link_state = _nic.session_link_state(); }
 
-		void _handle_packet_stream() override
+		void _process_packets()
 		{
-			while (_rx.source()->ack_avail())
-				_rx.source()->release_packet(_rx.source()->get_acked_packet());
+			auto &source = *_nic.tx();
+			while (source.ack_avail())
+				source.release_packet(source.get_acked_packet());
 
 			while (_send()) ;
 			while (_receive()) ;
 		}
 
-	public:
-
-		Linux_session_component(Genode::size_t const tx_buf_size,
-		                        Genode::size_t const rx_buf_size,
-		                        Genode::Allocator   &rx_block_md_alloc,
-		                        Server::Env         &env)
-		:
-			Session_component(tx_buf_size, rx_buf_size, Genode::CACHED, rx_block_md_alloc, env),
-			_config_rom(env, "config"),
-			_tap_fd(_setup_tap_fd()), _rx_thread(env, _tap_fd, _packet_stream_dispatcher)
+		Main(Genode::Env &env) : _env(env)
 		{
-			/* try using configured MAC address */
-			try {
-				Genode::Xml_node nic_config = _config_rom.xml().sub_node("nic");
-				nic_config.attribute("mac").value(&_mac_addr);
-				Genode::log("Using configured MAC address ", _mac_addr);
-			} catch (...) {
-				/* fall back to fake MAC address (unicast, locally managed) */
-				_mac_addr.addr[0] = 0x02;
-				_mac_addr.addr[1] = 0x00;
-				_mac_addr.addr[2] = 0x00;
-				_mac_addr.addr[3] = 0x00;
-				_mac_addr.addr[4] = 0x00;
-				_mac_addr.addr[5] = 0x01;
-			}
-
 			_rx_thread.start();
+
+			/* set Nic session signal handlers */
+			_nic.rx_channel()->sigh_packet_avail(_packet_handler);
+			_nic.rx_channel()->sigh_ready_to_ack(_packet_handler);
+			_nic.link_state_sigh(_link_handler);
+
+			_nic.link_state( Nic::Session::LINK_UP);
 		}
-
-	Link_state session_link_state() override { return LINK_UP;   }
-	Nic::Mac_address mac_address()  override { return _mac_addr; }
-
-	void link_state(Link_state) override { }
 };
 
-
-struct Server::Main
-{
-	Env  &_env;
-	Heap  _heap { _env.ram(), _env.rm() };
-
-	Nic::Root<Linux_session_component> nic_root { _env, _heap };
-
-	Main(Env &env) : _env(env)
-	{
-		_env.parent().announce(_env.ep().manage(nic_root));
-	}
-};
-
-void Component::construct(Genode::Env &env) { static Server::Main main(env); }
+void Component::construct(Genode::Env &env) { static Driver::Main main(env); }
