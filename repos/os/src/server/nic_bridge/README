@@ -33,11 +33,11 @@ is available. However, there are situations where the use of static IPs for
 virtual NICs is useful. For example, when using the NIC bridge to create a
 virtual network between the lighttpd web server and the Arora web browser, both
 running as Genode processes without real network connectivity. However, the
-link-state of the entire bridge is determined by the current upstream client.
+link-state of the entire bridge is determined by the current uplink client.
 
-At least one client must be acting as an upstream, and only one client may
-act as an upstream at once. When an upstream session requests is made while an
-upstream is active the session request will be defered until the active upstream
+At least one client must be acting as an uplink, and only one client may
+act as an uplink at once. When an uplink session requests is made while an
+uplink is active the session request will be defered until the active uplink
 disconnects. This enables uplink fallback behavior.
 
 The static IP can be configured per client of the NIC bridge using a '<policy>'
