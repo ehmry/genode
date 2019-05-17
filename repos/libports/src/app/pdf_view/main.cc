@@ -23,6 +23,7 @@
 #include <input/event.h>
 #include <input/keycodes.h>
 #include <nitpicker_session/connection.h>
+#include <os/reporter.h>
 
 /* MuPDF includes */
 extern "C" {
@@ -142,6 +143,8 @@ class Pdf_view
 		Nitpicker::Connection  _nitpicker { _env };
 		Framebuffer::Session  &_framebuffer = *_nitpicker.framebuffer();
 		Input::Session_client &_input       = *_nitpicker.input();
+
+		Genode::Reporter _clipboard { _env, "clipboard" };
 
 		Framebuffer::Mode _nit_mode = _nitpicker.mode();
 		Framebuffer::Mode  _fb_mode {};
@@ -287,6 +290,9 @@ class Pdf_view
 			_nitpicker.mode_sigh(_nit_mode_handler);
 			_input.sigh(_input_handler);
 
+			try { _clipboard.enabled(true); }
+			catch (...) { Genode::log("URI clipboard unavailable"); }
+
 			pdfapp_init(&_pdfapp);
 			_pdfapp.userdata = this;
 			_pdfapp.pageno   = 0;
@@ -328,6 +334,15 @@ class Pdf_view
 		}
 
 		void show();
+
+		void openuri(char const *s)
+		{
+			if (_clipboard.enabled()) {
+				Genode::Reporter::Xml_generator xml(_clipboard, [&] () {
+					xml.append_content(Genode::Cstring(s));
+				});
+			}
+		}
 
 		void exit(int code = 0) { _env.parent().exit(code); }
 };
@@ -431,9 +446,10 @@ char *winpassword(pdfapp_t *, char *)
 }
 
 
-void winopenuri(pdfapp_t*, char *s)
+void winopenuri(pdfapp_t *pdfapp, char *s)
 {
-	Genode::log(Genode::Cstring(s));
+	Pdf_view *pdf_view = (Pdf_view *)pdfapp->userdata;
+	pdf_view->openuri(s);
 }
 
 
