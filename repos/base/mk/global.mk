@@ -41,8 +41,8 @@ ECHO      ?= echo -e
 #
 # Build tools
 #
-CC       = $(CUSTOM_CC)
-CXX      = $(CUSTOM_CXX)
+CC       = ccache $(CUSTOM_CC)
+CXX      = ccache $(CUSTOM_CXX)
 CPP      = $(CUSTOM_CPP)
 LD       = $(CUSTOM_LD)
 AS       = $(CUSTOM_AS)
