@@ -33,7 +33,10 @@ versioned_archive = $(if $(call archive_has_type,$1,bin),$(call _versioned_src_o
 
 VERSIONED_ARCHIVES = $(strip $(foreach A,$(MAKECMDGOALS),$(call versioned_archive,$A)))
 
-publish:
+create:
+	$(VERBOSE)$(MAKE) -f $(GENODE_DIR)/tool/depot/create $(MAKECMDGOALS)
+
+publish: create
 	$(if $(VERSIONED_ARCHIVES),\
 	   $(VERBOSE)$(MAKE) -f $(GENODE_DIR)/tool/depot/publish $(VERSIONED_ARCHIVES))
 
