@@ -100,6 +100,13 @@ struct Region : Genode::List<Region>::Element
 
 static Genode::List<Region> regions;
 
+static Genode::Allocator & heap()
+{
+	static Genode::Heap heap(genode_env().ram(), genode_env().rm());
+	return heap;
+}
+
+
 static Sub_rm_connection &vm_memory(Genode::uint64_t vm_size = 0)
 {
 	/* memory used by the VM in any order as the VMM asks for allocations */
@@ -133,7 +140,7 @@ static Sub_rm_connection &vm_memory(Genode::uint64_t vm_size = 0)
 			Assert(to == vm_memory.local_addr(memory.addr + allocated - vmm_local));
 			allocated += alloc_size;
 
-			regions.insert(new Region(to, alloc_size, ds));
+			regions.insert(new (heap()) Region(to, alloc_size, ds));
 
 			if (memory_size - allocated < alloc_size)
 				alloc_size = memory_size - allocated;
@@ -150,13 +157,6 @@ static Sub_rm_connection &vm_memory(Genode::uint64_t vm_size = 0)
 	chunk_ids.reserve(unused_id, unused_count);
 
 	return vm_memory;
-}
-
-
-static Genode::Allocator & heap()
-{
-	static Genode::Heap heap(genode_env().ram(), genode_env().rm());
-	return heap;
 }
 
 
@@ -263,13 +263,13 @@ int SUPR3PageAllocEx(::size_t cPages, uint32_t fFlags, void **ppvPages,
 	Assert(!fFlags);
 
 	using Genode::Attached_ram_dataspace;
-	Attached_ram_dataspace * ds = new Attached_ram_dataspace(genode_env().ram(),
-	                                                         genode_env().rm(),
-	                                                         cPages * ONE_PAGE_SIZE);
+	Attached_ram_dataspace * ds = new (heap()) Attached_ram_dataspace(genode_env().ram(),
+	                                                                  genode_env().rm(),
+	                                                                  cPages * ONE_PAGE_SIZE);
 
 	Genode::addr_t const vmm_local = reinterpret_cast<Genode::addr_t>(ds->local_addr<void>());
 
-	regions.insert(new Region(vmm_local, cPages * ONE_PAGE_SIZE, ds->cap()));
+	regions.insert(new (heap()) Region(vmm_local, cPages * ONE_PAGE_SIZE, ds->cap()));
 
 	*ppvPages = ds->local_addr<void>();
 	if (pR0Ptr)
@@ -752,13 +752,8 @@ extern "C" int sched_yield(void)
 
 	if (++counter % 50000 == 0)
 		Genode::warning(__func__, " called ", counter, " times");
-}
 
-
-void *operator new (__SIZE_TYPE__ size, int log2_align)
-{
-	static Libc::Mem_alloc_impl heap(genode_env().rm(), genode_env().ram());
-	return heap.alloc(size, log2_align);
+	return -1;
 }
 
 
@@ -778,7 +773,7 @@ bool create_emt_vcpu(pthread_t * thread, ::size_t stack_size,
 	Vcpu_handler *vcpu_handler = 0;
 
 	if (vmx)
-		vcpu_handler = new (0x10) Vcpu_handler_vmx(genode_env(),
+		vcpu_handler = new (heap()) Vcpu_handler_vmx(genode_env(),
 		                                           stack_size,
 		                                           location,
 		                                           cpu_id,
@@ -786,7 +781,7 @@ bool create_emt_vcpu(pthread_t * thread, ::size_t stack_size,
 		                                           heap());
 
 	if (svm)
-		vcpu_handler = new (0x10) Vcpu_handler_svm(genode_env(),
+		vcpu_handler = new (heap()) Vcpu_handler_svm(genode_env(),
 		                                           stack_size,
 		                                           location,
 		                                           cpu_id,
