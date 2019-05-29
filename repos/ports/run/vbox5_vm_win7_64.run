@@ -5,7 +5,7 @@
 assert_spec 64bit
 
 set flavor   "win7_64"
-set vm_ram   "2480M"
+set vm_ram   "9480M"
 
 set use_vbox5 1
 
