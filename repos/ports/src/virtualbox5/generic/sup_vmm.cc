@@ -831,6 +831,8 @@ static int _map_memory(Genode::Vm_connection &vm_session,
 					              " region=", Genode::Hex(region->vmm_local),
 					              "+", Genode::Hex(region->size));
 
+					vm_session.detach(GCPhys - offset, region->size);
+
 					return VERR_PGM_DYNMAP_FAILED;
 				}
 
@@ -863,8 +865,6 @@ class Pgm_guard
 int Vcpu_handler::map_memory(Genode::Vm_connection &vm_session,
                              RTGCPHYS const GCPhys, RTGCUINT vbox_fault_reason)
 {
-	Pgm_guard guard(*_vm);
-
 	_ept_fault_addr_type = PGMPAGETYPE_INVALID;
 
 	PPGMRAMRANGE const pRam = pgmPhysGetRangeAtOrAbove(_vm, GCPhys);
@@ -891,6 +891,7 @@ int Vcpu_handler::map_memory(Genode::Vm_connection &vm_session,
 	    && !PGM_PAGE_IS_SPECIAL_ALIAS_MMIO(pPage)
 	    && PGM_A20_IS_ENABLED(_vcpu))
 	{
+		Pgm_guard guard(*_vm);
 		pgmPhysPageMakeWritable(_vm, pPage, GCPhys);
 	}
 
