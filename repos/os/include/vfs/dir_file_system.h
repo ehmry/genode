@@ -409,6 +409,17 @@ class Vfs::Dir_file_system : public File_system
 			}
 		}
 
+		~Dir_file_system()
+		{
+			File_system *fs = _first_file_system;
+			_first_file_system = nullptr;
+			while (fs) {
+				File_system *next = fs->next;
+				destroy(_env.alloc(), fs);
+				fs = next;
+			}
+		}
+
 		/*********************************
 		 ** Directory-service interface **
 		 *********************************/

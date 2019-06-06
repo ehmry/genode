@@ -58,12 +58,6 @@ class Vfs_import::File_system : public Vfs::File_system
 {
 	private:
 
-		/**
-		 * XXX: A would-be temporary heap, but
-		 * deconstructing a VFS is not supported.
-		 */
-		Genode::Heap _heap;
-
 		enum { CREATE_IT = true };
 
 		static void copy_symlink(Vfs::Env &env,
@@ -209,12 +203,12 @@ class Vfs_import::File_system : public Vfs::File_system
 	public:
 
 		File_system(Vfs::Env &env, Genode::Xml_node config)
-		: _heap(env.env().pd(), env.env().rm())
 		{
-			bool overwrite = config.attribute_value("overwrite", false);
+			Genode::Heap heap(env.env().pd(), env.env().rm());
+			Root_directory content(env.env(), heap, config);
 
-			Root_directory content(env.env(), _heap, config);
-			copy_dir(env, content, Directory::Path(""), _heap, overwrite);
+			bool overwrite = config.attribute_value("overwrite", false);
+			copy_dir(env, content, Directory::Path(""), heap, overwrite);
 		}
 
 		const char* type() override { return "import"; }
