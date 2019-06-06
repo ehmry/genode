@@ -1210,19 +1210,20 @@ struct Vcpu : Genode::Thread
 		{
 			Lock::Guard guard(_remote_lock);
 
-			if (_state_request == RUN || _state_request == PAUSE ||
-			    _state_current == RUN)
+			if (_state_request == RUN || _state_request == PAUSE)
 				return;
 
 			_state_request = RUN;
-			_wake_up.up();
+
+			if (_state_current == NONE)
+				_wake_up.up();
 		}
 
 		void pause()
 		{
 			Lock::Guard guard(_remote_lock);
 
-			if (_state_request == PAUSE || _state_current == PAUSE)
+			if (_state_request == PAUSE)
 				return;
 
 			_state_request = PAUSE;
@@ -1232,7 +1233,8 @@ struct Vcpu : Genode::Thread
 			Fiasco::l4_cap_idx_t irq = tid + Fiasco::TASK_VCPU_IRQ_CAP;
 			Fiasco::l4_irq_trigger(irq);
 
-			_wake_up.up();
+			if (_state_current == NONE)
+				_wake_up.up();
 		}
 
 		void terminate()
