@@ -30,6 +30,7 @@ install_config {
 		<service name="CPU"/>
 		<service name="LOG"/>
 		<service name="TRACE"/>
+		<service name="VM"/>
 	</parent-provides>
 
 	<default-route>
@@ -490,6 +491,8 @@ exec gzip -dc [genode_dir]/repos/gems/run/sculpt/machine.vdi.gz > [run_dir]/geno
 
 #
 # Define 'VERSION' ROM module
+#
+# Note: the string must be exactly 5 bytes long.
 #
 proc sculpt_version { } {
 	return "19.05" }
