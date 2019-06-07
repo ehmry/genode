@@ -166,8 +166,8 @@ class Fs_rom::Rom_session_component : public  Rpc_object<Rom_session>
 				}
 
 				/*
-				 * Watching the original path and its immediate parent failed,
-				 * so pass on the received higher-level parent watch handle.
+				 * Watching the immediate parent directory or the original path
+				 * again failed, so pass on the received parent watch handle.
 				 */
 				path_watched = false;
 				return some_parent_watch_handle;
