@@ -890,9 +890,9 @@ while {1} {
 			init_previous_results
 		}
 		# determine timeout for the next timeout
-		set min_timeout 20
+		set min_timeout 30
 		regexp {depot_autopilot\] --- Run "(.*?)" \(max ([0-9]*?) } $output] ignore last_test_pkg min_timeout
-		set timeout [expr $min_timeout + 20]
+		set timeout [expr $min_timeout + 30]
 
 		# re-boot if the next test timeout would exceed the maximum uptime
 		if { [expr $max_up_time_sec && \
