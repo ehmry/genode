@@ -5,7 +5,7 @@
 assert_spec x86_64
 assert_spec nova
 
-set flavor   "win7_64"
+set flavor   "win7_64_1vcpu"
 set vm_ram   "9480M"
 
 set use_vbox5 1
