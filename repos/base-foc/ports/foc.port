@@ -19,7 +19,7 @@ REV(drivers-frst) := ce2d7d33294cb7034a4226912463b24f6ffe1bc7
 DIR(drivers-frst) := src/kernel/foc/l4/pkg/drivers-frst
 
 URL(bootstrap)    := https://github.com/kernkonzept/bootstrap.git
-REV(bootstrap)    := 9c4f1a17ffbd1315ea9036ac1f816fc41bb56114
+REV(bootstrap)    := 36500c1253f46f527098febd4da7cbc9d0e2c218
 DIR(bootstrap)    := src/kernel/foc/l4/pkg/bootstrap
 
 PATCHES           := $(addprefix patches/,$(notdir $(wildcard $(REP_DIR)/patches/*.patch)))
@@ -38,4 +38,3 @@ PATCH_OPT(patches/0014-Always-enable-user-mode-access-for-performance-monit.patc
 PATCH_OPT(patches/0015-VMX-disable-event-injection-if-requested-by-VMM.patch)     := -p3 -d${DIR(foc)}
 PATCH_OPT(patches/0016-svm-provide-cr0-to-guest-if-np-enabled.patch)              := -p3 -d${DIR(foc)}
 PATCH_OPT(patches/0017-svm-avoid-forceful-exit-on-task-switch.patch)              := -p3 -d${DIR(foc)}
-PATCH_OPT(patches/0018-Revert-bootstrap-Fix-build-failure.patch)                  := -p1 -d${DIR(bootstrap)}
