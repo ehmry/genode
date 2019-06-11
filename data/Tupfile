@@ -1,0 +1,69 @@
+!extract = |> \
+	rrdtool create %o \
+		--start 1483480799 \
+		--step 1d \
+		DS:duration:GAUGE:1w:1000:600000 \
+		RRA:AVERAGE:0.5:1d:10y; \
+	rrdtool update %o `sqlite3 file:%f?mode=ro -separator : \
+		"SELECT epoch, avg(1000*duration) FROM ( \
+			SELECT strftime('%%s',date) AS epoch, duration AS duration \
+			FROM \
+				test_results \
+				join dates on test_results.dates_id=dates.id \
+				join tests on test_results.tests_id=tests.id \
+				join boards on test_results.boards_id=boards.id \
+			WHERE tests.test is '%o' and board is 'x86' and test_results.result is 'ok' \
+			ORDER BY strftime('%%s',date) \
+		) GROUP BY EPOCH"` |>
+
+DB_FILE = autopilot.2019-05-29.db
+
+: $(DB_FILE) |> !extract |> netperf_lwip {netperf_rrd}
+: $(DB_FILE) |> !extract |> netperf_lwip_bridge {netperf_rrd}
+: $(DB_FILE) |> !extract |> netperf_lwip_router {netperf_rrd}
+: $(DB_FILE) |> !extract |> netperf_lwip_usb30 {netperf_rrd}
+: $(DB_FILE) |> !extract |> netperf_lwip_wifi {netperf_rrd}
+: $(DB_FILE) |> !extract |> netperf_lxip {netperf_rrd}
+: $(DB_FILE) |> !extract |> netperf_lxip_bridge {netperf_rrd}
+: $(DB_FILE) |> !extract |> netperf_lxip_router {netperf_rrd}
+: $(DB_FILE) |> !extract |> netperf_lxip_usb30 {netperf_rrd}
+: $(DB_FILE) |> !extract |> netperf_lxip_wifi {netperf_rrd}
+
+
+AWK_ARGS = tr ' ' '\n' | awk '{printf " DEF:%s=%s:duration:AVERAGE LINE:%s:%s", $0, $0, $0, $0}'
+
+: {netperf_rrd} |> rrdtool graph %o \
+	--start 1489442400 \
+	--width 800 --height 400 \
+	--left-axis-formatter duration \
+	DEF:netperf_lwip_bridge=netperf_lwip_bridge:duration:AVERAGE LINE:netperf_lwip_bridge#002080:"netperf_lwip_bridge" \
+	DEF:netperf_lwip_router=netperf_lwip_router:duration:AVERAGE LINE:netperf_lwip_router#004080:"netperf_lwip_router" \
+	DEF:netperf_lwip_usb30=netperf_lwip_usb30:duration:AVERAGE LINE:netperf_lwip_usb30#006080:"netperf_lwip_usb30" \
+	DEF:netperf_lwip_wifi=netperf_lwip_wifi:duration:AVERAGE LINE:netperf_lwip_wifi#008080:"netperf_lwip_wifi" \
+	DEF:netperf_lxip_bridge=netperf_lxip_bridge:duration:AVERAGE LINE:netperf_lxip_bridge#802000:"netperf_lxip_bridge" \
+	DEF:netperf_lxip_router=netperf_lxip_router:duration:AVERAGE LINE:netperf_lxip_router#804000:"netperf_lxip_router" \
+	DEF:netperf_lxip_usb30=netperf_lxip_usb30:duration:AVERAGE LINE:netperf_lxip_usb30#806000:"netperf_lxip_usb30" \
+	DEF:netperf_lxip_wifi=netperf_lxip_wifi:duration:AVERAGE LINE:netperf_lxip_wifi#808000:"netperf_lxip_wifi" \
+	DEF:netperf_lwip=netperf_lwip:duration:AVERAGE LINE2:netperf_lwip#0000ff:"netperf_lwip" \
+	DEF:netperf_lxip=netperf_lxip:duration:AVERAGE LINE2:netperf_lxip#ff0000:"netperf_lxip" \
+	|> netperf.png
+
+: $(DB_FILE) |> !extract |> libc_vfs {rrd}
+: $(DB_FILE) |> !extract |> libc_vfs_ext2 {rrd}
+: $(DB_FILE) |> !extract |> libc_vfs_fs {rrd}
+: $(DB_FILE) |> !extract |> libc_vfs_ram {rrd}
+: $(DB_FILE) |> !extract |> libc_vfs_fs_chained {rrd}
+
+: $(DB_FILE) |> !extract |> noux_tool_chain_auto {rrd}
+: $(DB_FILE) |> !extract |> seoul-auto {rrd}
+: $(DB_FILE) |> !extract |> bomb {rrd}
+: $(DB_FILE) |> !extract |> nic_router {rrd}
+
+!graph = |> rrdtool graph %o \
+	--start 1489442400 \
+	--width 800 --height 400 \
+	--left-axis-formatter duration \
+	DEF:%f=%f:duration:AVERAGE LINE:%f#000000:"%f" \
+	|> %b.png
+
+: foreach {rrd} |> !graph |> 
