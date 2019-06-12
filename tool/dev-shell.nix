@@ -4,12 +4,14 @@ stdenv.mkDerivation {
   name = "genode-dev-env";
   buildInputs =
     [ (import ./toolchain.nix { inherit pkgs; })
+      git
+      ccache
       gnumake which findutils
 
-      expect libxml2 cdrkit syslinux qemu
+      expect libxml2 syslinux qemu xorriso
 
       # libc
-      subversionClient flex bison
+      flex bison
 
       # virtualbox
       yasm libxslt iasl

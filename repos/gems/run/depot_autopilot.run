@@ -708,7 +708,6 @@ set default_test_pkgs {
 	test-rm_nested
 	test-rom_block
 	test-rom_filter
-	test-rust
 	test-sanitizer
 	test-sequence
 	test-signal

@@ -1,23 +1,19 @@
 { pkgs ? import <nixpkgs> {} }: with pkgs;
 
 let
-  genodeVersion = "16.05";
+  genodeVersion = "19.05";
   glibcVersion = (builtins.parseDrvName stdenv.glibc.name).version;
 
 in
 stdenv.mkDerivation rec {
   name = "genode-toolchain-${genodeVersion}";
-  version = "4.9.2";
+  version = genodeVersion;
 
-  src = if stdenv.isi686 then
-    fetchurl {
-      url = "mirror://sourceforge/genode/genode-toolchain/${genodeVersion}/${name}-x86_32.tar.bz2";
-      sha256 = "12ykyw7x8vyz7f8kb8qh7zyc4x3w2m10pqnqy1rwh4mjpx60b0cp";
-    } else
+  src =
     if stdenv.isx86_64 then
     fetchurl {
-      url = "mirror://sourceforge/genode/genode-toolchain/${genodeVersion}/${name}-x86_64.tar.bz2";
-      sha256 = "07k41p2ssr6vq793g766y5ng14ljx9x5d5qy2zvjkq7csqr9hr1j";
+      url = "https://downloads.sourceforge.net/project/genode/genode-toolchain/${genodeVersion}/genode-toolchain-${genodeVersion}-x86_64.tar.xz";
+      sha256 = "036czy21zk7fvz1y1p67q3d5hgg8rb8grwabgrvzgdsqcv2ls6l9";
     }
     else abort "no toolchain for ${stdenv.system}";
 
@@ -32,7 +28,7 @@ stdenv.mkDerivation rec {
     mkdir -p $out
 
     echo "unpacking $src..."
-    tar xf $src --strip-components=3 -C $out
+    tar xf $src --strip-components=5 -C $out
   '';
 
   installPhase = ''

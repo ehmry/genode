@@ -291,7 +291,7 @@ gen_deps_and_build_targets: $(INSTALL_DIR) $(DEBUG_DIR) $(LIB_DEP_FILE)
 	  echo "	@echo \"  \$$(sort \$$(MISSING_PORTS))\""; \
 	  echo "	@echo \"\""; \
 	  echo "	@echo \"You can prepare respectively update them as follows:\""; \
-	  echo "	@echo \"  make -f $(GENODE_DIR)/tool/ports/prepare_port \$$(sort \$$(MISSING_PORTS))\""; \
+	  echo "	@echo \"make -f $(GENODE_DIR)/tool/ports/prepare_port \$$(sort \$$(MISSING_PORTS))\""; \
 	  echo "	@echo \"\""; \
 	  echo "	@false"; \
 	  echo "else"; \

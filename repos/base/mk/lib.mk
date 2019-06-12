@@ -260,7 +260,7 @@ $(ABI_SO): $(LIB).symbols.o
 	                --end-group --no-whole-archive
 
 $(LIB_CHECKED): $(LIB_SO)
-	$(VERBOSE)$(BASE_DIR)/../../tool/check_abi $(LIB_SO) $(SYMBOLS)
+	$(VERBOSE)tclsh $(BASE_DIR)/../../tool/check_abi $(LIB_SO) $(SYMBOLS)
 
 $(LIB_SO).stripped: $(LIB_SO)
 	$(VERBOSE)$(STRIP) -o $@ $<
