@@ -23,6 +23,14 @@ HOST_INC_DIR += $(shell echo "int main() {return 0;}" |\
                         grep "include-fixed")
 
 #
+# Nix include paths
+#
+ifneq ($(nativeBuildInputs),)
+HOST_INC_DIR += $(shell find  $(nativeBuildInputs) -name include)
+endif
+
+
+#
 # Add search paths for normal libraries
 #
 CXX_LINK_OPT += $(addprefix -L,$(HOST_LIB_SEARCH_DIRS))
@@ -48,6 +56,14 @@ endif
 HOST_SO_SEARCH_DIRS := $(sort $(dir $(shell $(LDCONFIG) -p | sed "s/^.* \//\//" | grep "^\/")))
 LINK_ARG_PREFIX := -Wl,
 CXX_LINK_OPT += $(addprefix $(LINK_ARG_PREFIX)-rpath-link $(LINK_ARG_PREFIX),$(HOST_SO_SEARCH_DIRS))
+
+#
+# Nix library paths
+#
+ifneq ($(nativeBuildInputs),)
+HOST_SO_SEARCH_DIRS += $(shell find $(nativeBuildInputs) -name lib)
+endif
+
 
 #
 # Make exceptions work
