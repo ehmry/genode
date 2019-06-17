@@ -1,4 +1,4 @@
-#!/usr/bin/tclsh
+#!/usr/bin/env tclsh
 
 #
 # \brief  Detect inconsistencies between a shared library and its ABI

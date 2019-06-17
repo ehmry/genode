@@ -1,4 +1,4 @@
-#!/usr/bin/make --file
+#!/usr/bin/env -S make -f
 
 #
 # \brief  Create Genode software development kit
