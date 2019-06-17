@@ -159,7 +159,7 @@ handle_missing_ports = $(if $1,$(VERBOSE)( \
 	echo -e "  $(1)"; \
 	echo -e ""; \
 	echo -e "You can prepare respectively update them as follows:"; \
-	echo -e "make -f $(GENODE_DIR)/tool/ports/prepare_port $(1)"; \
+	echo -e "  $(GENODE_DIR)/tool/ports/prepare_port $(1)"; \
 	echo -e ""; \
 	false),)
 

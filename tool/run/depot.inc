@@ -205,7 +205,7 @@ proc _depot_auto_update { archives } {
 	# remove duplicates
 	set archives_to_create [lsort -unique $archives_to_create]
 
-	set    cmd "make -f [genode_dir]/tool/depot/create $archives_to_create "
+	set    cmd "[genode_dir]/tool/depot/create $archives_to_create "
 	append cmd "CROSS_DEV_PREFIX=[cross_dev_prefix] "
 	append cmd "DEPOT_DIR=[depot_dir] "
 	append cmd "UPDATE_VERSIONS=1 FORCE=1 REBUILD= "
@@ -445,12 +445,12 @@ proc check_for_missing_depot_archives { } {
 	if {[llength $local_user_archives]} {
 		append create_args " CROSS_DEV_PREFIX=[cross_dev_prefix]"
 		puts stderr "You may create the following archives locally:\n"
-		puts stderr "make -f [genode_dir]/tool/depot/create $local_user_archives$create_args\n"
+		puts stderr "  [genode_dir]/tool/depot/create $local_user_archives$create_args\n"
 	}
 
 	if {[llength $foreign_archives]} {
 		puts stderr "You may try to download the following archives:\n"
-		puts stderr "make -f [genode_dir]/tool/depot/download $foreign_archives\n"
+		puts stderr "  [genode_dir]/tool/depot/download $foreign_archives\n"
 	}
 
 	exit 1

@@ -291,7 +291,7 @@ gen_deps_and_build_targets: $(INSTALL_DIR) $(DEBUG_DIR) $(LIB_DEP_FILE)
 	  echo "	@echo \"  \$$(sort \$$(MISSING_PORTS))\""; \
 	  echo "	@echo \"\""; \
 	  echo "	@echo \"You can prepare respectively update them as follows:\""; \
-	  echo "	@echo \"make -f $(GENODE_DIR)/tool/ports/prepare_port \$$(sort \$$(MISSING_PORTS))\""; \
+	  echo "	@echo \"  $(GENODE_DIR)/tool/ports/prepare_port \$$(sort \$$(MISSING_PORTS))\""; \
 	  echo "	@echo \"\""; \
 	  echo "	@false"; \
 	  echo "else"; \
@@ -321,7 +321,7 @@ RUN_SCRIPT = $(call select_from_repositories,run/$*.run)
 
 run/%: $(call select_from_repositories,run/%.run) $(RUN_ENV)
 	$(VERBOSE)test -f "$(RUN_SCRIPT)" || (echo "Error: No run script for $*"; exit -1)
-	$(VERBOSE)expect $(GENODE_DIR)/tool/run/run --genode-dir $(GENODE_DIR) \
+	$(VERBOSE)$(GENODE_DIR)/tool/run/run --genode-dir $(GENODE_DIR) \
 	                                     --name $* \
 	                                     --specs "$(SPECS)" \
 	                                     --board "$(BOARD)" \
