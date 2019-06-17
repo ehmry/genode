@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # \brief  Signature verification tool
 # \author Stephan Müller
