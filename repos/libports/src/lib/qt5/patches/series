@@ -19,3 +19,4 @@ qtdeclarative_genode.patch
 qtwebkit_genode.patch
 host_tools.patch
 header_generation.patch
+pwd.patch

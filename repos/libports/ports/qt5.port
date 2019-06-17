@@ -34,7 +34,7 @@ PATCH_OPT                                                  := -p1 -d ${DIR(${QT5
 PATCH_OPT(src/lib/qt5/patches/qtscriptclassic_qt5.patch)   := -p1 -d ${DIR(${QTSCRIPTCLASSIC})}
 PATCH_OPT(src/lib/qt5/patches/qtscriptclassic_qt5_7.patch) := -p1 -d ${DIR(${QTSCRIPTCLASSIC})}
 
-MOC := /usr/local/genode-qt5/bin/moc
+MOC := moc
 
 $(call check_tool,bison)
 $(call check_tool,flex)

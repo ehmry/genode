@@ -23,6 +23,7 @@ stdenv.mkDerivation {
 
       # qt5
       gperf
+      qt5.full
 
       # ncurses
       mawk

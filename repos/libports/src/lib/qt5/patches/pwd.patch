@@ -1,0 +1,26 @@
+--- qtbase/configure	2019-06-17 22:06:22.773379245 +0200
++++ qtbase/configure.old	2019-06-17 21:55:46.249673595 +0200
+@@ -33,7 +33,7 @@
+ #############################################################################
+ 
+ srcpath=`dirname $0`
+-srcpath=`(cd "$srcpath"; /bin/pwd)`
++srcpath=`(cd "$srcpath"; pwd)`
+ configure=$srcpath/qtbase/configure
+ if [ ! -e "$configure" ]; then
+     echo "$configure not found. Did you forget to run \"init-repository\"?" >&2
+
+--- qtbase/qtbase/configure.old	2019-06-17 22:29:59.518310019 +0200
++++ qtbase/qtbase/configure	2019-06-17 22:30:22.701779103 +0200
+@@ -36,9 +36,9 @@
+ relconf=`basename $0`
+ # the directory of this script is the "source tree"
+ relpath=`dirname $0`
+-relpath=`(cd "$relpath"; /bin/pwd)`
++relpath=`(cd "$relpath"; pwd)`
+ # the current directory is the "build tree" or "object tree"
+-outpath=`/bin/pwd`
++outpath=`pwd`
+ 
+ # where to find which..
+ unixtests="$relpath/config.tests/unix"
