@@ -412,7 +412,7 @@ proc prepare_to_run_genode { } {
 		</start>
 
 		<start name="dynamic" caps="8000" priority="-1">
-			<resource name="RAM" quantum="420M"/>
+			<resource name="RAM" quantum="286M"/>
 			<binary name="init"/>
 			<route>
 
@@ -457,7 +457,7 @@ proc prepare_to_run_genode { } {
 	set serial_id -1
 	set timeout 40
 
-	append qemu_args "-m 768 -nographic -serial mon:stdio "
+	append qemu_args "-m 768 -nographic "
 }
 
 
@@ -630,7 +630,8 @@ proc exit {{status 0}} {
 #
 if {[expr ![have_spec x86] && \
           ![have_spec arm_v6] && \
-          ![have_spec arm_v7a]] || \
+          ![have_spec arm_v7a] && \
+          ![have_spec arm_v8a]] || \
     [expr [have_spec foc] && [have_spec panda]]} \
 {
 	puts "\n Run script is not supported on this platform. \n";
@@ -755,18 +756,22 @@ proc non_executable_supported { } {
 #
 # Whether to skip a test - if undefined for a test, the test is not skipped
 #
-set skip_test(test-python)          [expr ![have_spec x86]]
-set skip_test(test-slab)            [expr [get_cmd_switch --autopilot] && [have_include "power_on/qemu"]]
-set skip_test(test-rm_nested)       [expr [have_spec linux]]
 set skip_test(test-fault_detection) [expr [have_spec pistachio] || [have_spec fiasco]]
-set skip_test(test-fs_packet)       [expr [get_cmd_switch --autopilot] && [have_include "power_on/qemu"]]
+set skip_test(test-fs_packet)       [expr ![interactive] && [expr [have_include "power_on/qemu"] || [have_spec rpi]]]
+set skip_test(test-libc)            [expr [have_spec sel4] || [have_spec rpi] || [expr [have_spec pbxa9] && [have_spec foc]] || [expr [have_spec imx53] && [have_spec trustzone]]]
+set skip_test(test-lx_block)        [expr ![have_spec linux]]
+set skip_test(test-python)          [expr ![have_spec x86]]
 set skip_test(test-rm_fault)        [expr [have_spec linux] || ![non_executable_supported]]
 set skip_test(test-rm_fault_no_nox) [expr [have_spec linux] || ![skip_test test-rm_fault]]
-set skip_test(test-lx_block)        [expr ![have_spec linux]]
+set skip_test(test-rm_nested)       [expr [have_spec linux]]
+set skip_test(test-slab)            [expr ![interactive] && [have_include "power_on/qemu"]]
+set skip_test(test-solo5)           [expr ![have_spec x86_64]]
+set skip_test(test-spark_exception) [expr [have_spec arm]]
 set skip_test(test-tcp_bulk_lwip)   [expr ![have_spec x86]]
 set skip_test(test-tcp_bulk_lxip)   [expr ![have_spec x86]]
-set skip_test(test-solo5)           [expr ![have_spec x86_64]]
-set skip_test(test-libc)            [expr [have_spec sel4] || [have_spec rpi] || [expr [have_spec pbxa9] && [have_spec foc]] || [expr [have_spec imx53] && [have_spec trustzone]]]
+set skip_test(test-xml_generator)   [expr [have_spec arm_v8a]]
+set skip_test(gcov)                 [expr [have_spec arm_v8a]]
+set skip_test(test-rust)            [expr [have_spec arm_v8a]]
 
 #
 # FIXME
@@ -775,7 +780,7 @@ set skip_test(test-libc)            [expr [have_spec sel4] || [have_spec rpi] ||
 # subsequent tests crashes the system so it gets rebooted by the run script,
 # the system doesn't come up again. It gets stuck after core initialization.
 #
-set skip_test(test-libc_getenv) [expr [get_cmd_switch --autopilot] && [have_spec foc] && [have_spec x86]]
+set skip_test(test-libc_getenv) [expr ![interactive] && [have_spec foc] && [have_spec x86]]
 
 # remember initial qemu args in case we have to re-boot later
 set initial_qemu_args ""
@@ -787,21 +792,35 @@ if {[info exists qemu_args]} {
 init_test_setting
 init_previous_results
 
+#
+# Some platforms have a problem with executing all tests in a single boot.
+# Thus, we have to re-boot them periodically.
+#
+set max_nr_of_tests_per_boot 0
+if {[have_spec sel4]} {
+	set max_nr_of_tests_per_boot 20
+}
+
 # generic preparation for each system boot
 prepare_to_run_genode
 
 while {1} {
 
-	# wait for the next autopilot event
+	# check whether the system is already running
 	if {$serial_id == -1} {
+
+		# boot the system and wait for the depot autopilot to come up
 		autopilot_run_genode_until {depot_autopilot\] --- .*?\n} $timeout
 		set serial_id [output_spawn_id]
+		set nr_of_tests_this_boot 0
 
 		# if the system didn't even boot, exit (prints previous results)
 		if {$run_genode_failed} {
 			exit -1
 		}
 	} else {
+
+		# wait for the next step of the depot autopilot
 		set init_time_ms [clock clicks -millisec]
 		autopilot_run_genode_until {depot_autopilot\] --- .*?\n} $timeout $serial_id
 		set previous_time_ms [expr $previous_time_ms + [expr ([clock clicks -millisec] - $init_time_ms)] ]
@@ -839,6 +858,7 @@ while {1} {
 	# if the autopilot started a new test, set a new timeout
 	if {[regexp {depot_autopilot\] --- Run} $output]} {
 
+		# if we ran and finished another test beforehand, parse its result
 		if {$last_test_pkg != ""} {
 
 			# remember result of last test in case the system must be restartet
@@ -865,6 +885,7 @@ while {1} {
 				append previous_results \012
 			}
 			append previous_results $last_test_result
+			incr nr_of_tests_this_boot
 		}
 		# if the Autopilot is currently repeating, reset repeat-influenced variables
 		if {[llength $test_pkgs] == 0} {
@@ -872,10 +893,23 @@ while {1} {
 			init_previous_results
 		}
 		# determine timeout for the next timeout
-		set min_timeout 20
+		set min_timeout 30
 		regexp {depot_autopilot\] --- Run "(.*?)" \(max ([0-9]*?) } $output] ignore last_test_pkg min_timeout
-		set timeout [expr $min_timeout + 20]
+		set timeout [expr $min_timeout + 30]
 
+		# re-boot if the maximum number of tests per boot is set and reached
+		if { [expr $max_nr_of_tests_per_boot && \
+		           $nr_of_tests_this_boot >= $max_nr_of_tests_per_boot] } \
+		{
+			# shut-down running system
+			puts "Re-booting to meet maximum number of tests per boot for this platform"
+			exec kill -9 [exp_pid -i $serial_id]
+			run_power_off
+
+			# prepare system re-boot
+			prepare_to_run_genode
+			continue
+		}
 		set output ""
 	}
 }
