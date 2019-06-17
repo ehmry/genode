@@ -124,6 +124,13 @@ namespace Libc {
 			char const *string() const { return _value.string(); }
 	};
 
+	char const *config_pipe() __attribute__((weak));
+	char const *config_pipe()
+	{
+		static Config_attr attr("pipe", "");
+		return attr.string();
+	}
+
 	char const *config_rtc() __attribute__((weak));
 	char const *config_rtc()
 	{
@@ -513,7 +520,7 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 
 			Vfs::Vfs_handle *handle;
 			void const      *buf;
-			::size_t         count;
+			::size_t const   count;
 			Vfs::file_size  &out_count;
 			Result          &out_result;
 
@@ -526,14 +533,16 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 
 			bool suspend() override
 			{
+				Vfs::file_size out = 0;
 				try {
-					out_result = VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf,
-						                                              count, out_count));
-					retry = false;
+					out_result = VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf+out_count,
+					                                                count - out_count, out));
 				} catch (Vfs::File_io_service::Insufficient_buffer) {
-					retry = true;
+					out_result = Result::WRITE_OK;
 				}
 
+				out_count += out;
+				retry = (out_result == Result::WRITE_OK) && (out_count < count);
 				return retry;
 			}
 		} check(handle, buf, count, out_count, out_result);
@@ -1307,6 +1316,59 @@ void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags
 int Libc::Vfs_plugin::munmap(void *addr, ::size_t)
 {
 	Libc::mem_alloc()->free(addr);
+	return 0;
+}
+
+
+int Libc::Vfs_plugin::pipe(Libc::File_descriptor *pipefdo[2])
+{
+	Absolute_path base_path(Libc::config_pipe());
+	if (base_path == "") {
+		Genode::error(__func__, ": pipe fs not mounted");
+		return Errno(EACCES);
+	}
+
+	Libc::File_descriptor *meta_fd { nullptr };
+
+	{
+		Absolute_path new_path = base_path;
+		new_path.append("/new");
+
+		meta_fd = open(new_path.base(), O_RDONLY, Libc::ANY_FD);
+		if (!meta_fd) {
+			Genode::error("failed to create pipe at ", new_path);
+			return Errno(EACCES);
+		}
+
+		char buf[32];
+		int const n = read(meta_fd, buf, sizeof(buf)-1);
+		if (n < 1) {
+			Genode::error("failed to read pipe at ", new_path);
+			close(meta_fd);
+			return Errno(EACCES);
+		}
+		buf[n] = '\0';
+		base_path.append("/");
+		base_path.append(buf);
+	} {
+		Absolute_path out_path = base_path;
+		out_path.append("/out");
+		pipefdo[0] = open(out_path.base(), O_RDONLY, Libc::ANY_FD);
+		if (!pipefdo[0])
+			Genode::error("failed to open pipe end at ", out_path);
+	} {
+		Absolute_path in_path = base_path;
+		in_path.append("/in");
+		pipefdo[1] = open(in_path.base(), O_WRONLY, Libc::ANY_FD);
+		if (!pipefdo[1])
+			Genode::error("failed to open pipe end at ", in_path);
+	}
+
+	close(meta_fd);
+
+	if (!pipefdo[0] || !pipefdo[1])
+		return Errno(EACCES);
+
 	return 0;
 }
 

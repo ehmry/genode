@@ -54,6 +54,7 @@ void *read_pipe(void *arg)
 
 	reader_finished = true;
 
+	close(pipefd[0]);
 	return 0;
 }
 
@@ -81,9 +82,13 @@ int main(int argc, char *argv[])
 	}
 
 	/* pthread_join() is not implemented at this time */
-	while (!reader_finished) { }
+	while (!reader_finished) {
+		/* XXX: sleep to suspend main thread and dispatch libc events */
+		usleep(500000);
+	}
 
 	printf("--- test finished ---\n");
 
+	close(pipefd[1]);
 	return 0;
 }
