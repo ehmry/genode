@@ -81,11 +81,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	/* pthread_join() is not implemented at this time */
-	while (!reader_finished) {
-		/* XXX: sleep to suspend main thread and dispatch libc events */
-		usleep(500000);
-	}
+	pthread_join(tid, NULL);
 
 	printf("--- test finished ---\n");
 
