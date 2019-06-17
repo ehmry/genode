@@ -6,7 +6,12 @@ stdenv.mkDerivation {
     [ (import ./toolchain.nix { inherit pkgs; })
       git
       ccache
-      gnumake which findutils
+      tcl
+      gnumake
+      which
+      findutils
+      autoconf264
+      autogen
 
       expect libxml2 syslinux qemu xorriso
 
@@ -26,6 +31,10 @@ stdenv.mkDerivation {
       pkgconfig
       SDL.dev
       alsaLib.dev
+
+
+      # ncurses port needs infocmp
+      ncurses
     ];
 
   shellHook =
