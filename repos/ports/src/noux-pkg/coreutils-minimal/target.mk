@@ -1,4 +1,4 @@
-BINARIES := cat cp ls mkdir mv rm rmdir sort tail md5sum
+BINARIES := cat cp env ls mkdir mv rm rmdir sort tail md5sum
 
 INSTALL_TAR_CONTENT := $(addprefix bin/,$(BINARIES))
 
