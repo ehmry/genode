@@ -18,6 +18,7 @@
 #include <base/cache.h>
 #include <base/env.h>
 #include <irq_session/capability.h>
+#include <timer_session/connection.h>
 
 /* local includes */
 #include <scheduler.h>
@@ -28,7 +29,7 @@ namespace Bsd {
 
 	void mem_init(Genode::Env&, Genode::Allocator &);
 	void irq_init(Genode::Entrypoint&, Genode::Allocator&);
-	void timer_init(Genode::Env&);
+	void timer_init(Genode::Entrypoint&, Genode::Timeout_scheduler&);
 	void update_time();
 
 

@@ -19,6 +19,7 @@
 #define _AUDIO__AUDIO_H_
 
 /* Genode includes */
+#include <timer/timeout.h>
 #include <base/env.h>
 #include <util/xml_node.h>
 
@@ -43,7 +44,7 @@ namespace Audio {
 
 	void update_config(Genode::Env &, Genode::Xml_node);
 
-	void init_driver(Genode::Env &, Genode::Allocator &, Genode::Xml_node);
+	void init_driver(Genode::Env &, Genode::Allocator &, Genode::Timeout_scheduler &, Genode::Xml_node);
 
 	bool driver_active();
 

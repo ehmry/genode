@@ -39,13 +39,18 @@ class Bsd::Timer
 {
 	private:
 
-		::Timer::Connection                _timer_conn;
-		Genode::Signal_handler<Bsd::Timer> _dispatcher;
+		Genode::Entrypoint        &_ep;
+		Genode::Timeout_scheduler &_scheduler;
+
+		::Timer::One_shot_timeout<Bsd::Timer> _timeout {
+			_scheduler, *this,
+			&Bsd::Timer::_handle_timeout
+		};
 
 		/**
 		 * Handle trigger_once signal
 		 */
-		void _handle()
+		void _handle_timeout(Genode::Duration)
 		{
 			Bsd::scheduler().schedule();
 		}
@@ -55,25 +60,25 @@ class Bsd::Timer
 		/**
 		 * Constructor
 		 */
-		Timer(Genode::Env &env)
+		Timer(Genode::Entrypoint &ep,
+		      Genode::Timeout_scheduler &sched)
 		:
-			_timer_conn(env),
-			_dispatcher(env.ep(), *this, &Bsd::Timer::_handle)
-		{
-			_timer_conn.sigh(_dispatcher);
-		}
+			_ep(ep), _scheduler(sched)
+		{ }
 
 		/**
 		 * Update time counter
 		 */
 		void update_millisecs()
 		{
-			millisecs = _timer_conn.elapsed_ms();
+			millisecs = _scheduler.curr_time().trunc_to_plain_ms().value;
 		}
 
 		void delay(Genode::uint64_t ms)
 		{
-			_timer_conn.msleep(ms);
+			_timeout.schedule(Genode::Microseconds(ms*1000));
+			while (_timeout.scheduled())
+				_ep.wait_and_dispatch_one_io_signal();
 		}
 };
 
@@ -81,10 +86,10 @@ class Bsd::Timer
 static Bsd::Timer *_bsd_timer;
 
 
-void Bsd::timer_init(Genode::Env &env)
+void Bsd::timer_init(Genode::Entrypoint &ep, Genode::Timeout_scheduler &sched)
 {
 	/* XXX safer way preventing possible nullptr access? */
-	static Bsd::Timer bsd_timer(env);
+	static Bsd::Timer bsd_timer(ep, sched);
 	_bsd_timer = &bsd_timer;
 
 	/* initialize value explicitly */

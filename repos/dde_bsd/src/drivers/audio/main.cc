@@ -15,6 +15,7 @@
 /* Genode includes */
 #include <audio_in_session/rpc_object.h>
 #include <audio_out_session/rpc_object.h>
+#include <timer_session/connection.h>
 #include <base/attached_rom_dataspace.h>
 #include <base/session_label.h>
 #include <base/component.h>
@@ -486,6 +487,8 @@ struct Main
 	Genode::Env        &env;
 	Genode::Heap       heap { &env.ram(), &env.rm() };
 
+	Timer::Connection  timer { env };
+
 	Genode::Attached_rom_dataspace config { env, "config" };
 
 	Genode::Signal_handler<Main> config_update_dispatcher {
@@ -500,7 +503,7 @@ struct Main
 
 	Main(Genode::Env &env) : env(env)
 	{
-		Audio::init_driver(env, heap, config.xml());
+		Audio::init_driver(env, heap, timer, config.xml());
 
 		if (!Audio::driver_active()) {
 			return;

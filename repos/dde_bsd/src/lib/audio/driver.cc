@@ -503,11 +503,12 @@ void Audio::update_config(Genode::Env &env, Genode::Xml_node config)
 
 
 void Audio::init_driver(Genode::Env &env, Genode::Allocator &alloc,
+                        Genode::Timeout_scheduler &sched,
                         Genode::Xml_node config)
 {
 	Bsd::mem_init(env, alloc);
 	Bsd::irq_init(env.ep(), alloc);
-	Bsd::timer_init(env);
+	Bsd::timer_init(env.ep(), sched);
 
 	static Task_args args(env, alloc, config);
 
