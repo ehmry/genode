@@ -26,7 +26,7 @@ HOST_INC_DIR += $(shell echo "int main() {return 0;}" |\
 # Nix include paths
 #
 ifneq ($(nativeBuildInputs),)
-HOST_INC_DIR += $(shell find  $(nativeBuildInputs) -name include)
+HOST_INC_DIR += $(shell find  $(nativeBuildInputs) -maxdepth 1 -name include)
 endif
 
 

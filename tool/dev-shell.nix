@@ -1,9 +1,10 @@
 { pkgs ? import <nixpkgs> {} }: with pkgs;
 
-stdenv.mkDerivation {
+pkgs.mkShell {
   name = "genode-dev-env";
-  buildInputs =
+  nativeBuildInputs =
     [ (import ./toolchain.nix { inherit pkgs; })
+      stdenv.glibc.dev
       git
       ccache
       tcl
@@ -33,7 +34,6 @@ stdenv.mkDerivation {
       SDL.dev
       alsaLib.dev
 
-
       # ncurses port needs infocmp
       ncurses
     ];
@@ -44,4 +44,5 @@ stdenv.mkDerivation {
       export PS1="\[\033[1;30m\]Genode-dev [\[\033[1;37m\]\w\[\033[1;30m\]] $\[\033[0m\] "
       export PS2="\[\033[1;30m\]>\[\033[0m\] "
     '';
+      # Setup a prompt with a distinct appearance
 }
