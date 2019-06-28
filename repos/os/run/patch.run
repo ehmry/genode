@@ -1,0 +1,117 @@
+#
+# Build
+#
+
+# generic components
+set build_components {
+	core init timer
+	app/mp3_audio_sink
+	app/pipe
+	drivers/audio/dummy
+	server/stereo_patch
+	test/audio_out
+}
+
+source ${genode_dir}/repos/base/run/platform_drv.inc
+append_platform_drv_build_components
+
+build $build_components
+create_boot_directory
+
+
+#
+# Config
+#
+
+set config  {
+	<config>
+		<parent-provides>
+			<service name="ROM"/>
+			<service name="IRQ"/>
+			<service name="IO_MEM"/>
+			<service name="IO_PORT"/>
+			<service name="PD"/>
+			<service name="RM"/>
+			<service name="CPU"/>
+			<service name="LOG"/>
+		</parent-provides>
+		<default-route>
+			<any-service> <parent/> <any-child/> </any-service>
+		</default-route>
+		<default caps="128"/>}
+
+append_platform_drv_config
+
+append config {
+		<start name="timer">
+			<resource name="RAM" quantum="1M"/>
+			<provides><service name="Timer"/></provides>
+		</start>
+
+		<start name="audio_drv">
+			<binary name="dummy-audio_drv"/>
+			<resource name="RAM" quantum="8M"/>
+		</start>
+
+		<start name="stereo_patch">
+			<resource name="RAM" quantum="2M"/>
+			<provides>
+				<service name="Audio_in"/>
+				<service name="Audio_out"/>
+			</provides>
+			<route>
+				<any-service> <parent/> </any-service>
+			</route>
+		</start>
+
+		<start name="client">
+			<binary name="mp3_audio_sink"/>
+			<resource name="RAM" quantum="8M"/>
+			<provides> <service name="Terminal"/> </provides>
+			<config/>
+		</start>
+
+		<start name="pipe">
+			<resource name="RAM" quantum="4M"/>
+			<config>
+				<libc stdin="/test.mp3" stdout="/terminal"/>
+				<vfs> <rom name="test.mp3"/> <terminal/> </vfs>
+			</config>
+		</start>
+
+	</config>}
+
+install_config $config
+
+if {[expr ![file exists bin/client1.f32] || ![file exists bin/client2.f32]]} {
+	puts ""
+	puts "The sample files are missing. Please take a look at repos/dde_bsd/README"
+	puts "and create 'client1.f32' and 'client2.f32'. Afterwards put them into './bin'."
+	puts ""
+	exit 1
+}
+
+
+#
+# Boot modules
+#
+
+# generic modules
+append boot_modules {
+	core ld.lib.so init timer
+	dummy-audio_drv test-audio_out
+	stereo_patch client1.f32 client2.f32
+	pipe mp3_audio_sink
+	libmpg123.lib.so
+	libm.lib.so libc.lib.so
+	test.mp3
+	vfs.lib.so
+	posix.lib.so
+}
+
+# platform-specific components
+append_platform_drv_boot_modules
+
+build_boot_image $boot_modules
+append qemu_args "-soundhw es1370 -nographic"
+run_genode_until forever

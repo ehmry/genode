@@ -42,40 +42,35 @@ class Audio::Stereo_out
 	public:
 
 		Stereo_out(Genode::Env &env, Audio::Source &source)
-		: _source(source)
-		, _left (env,  "left", false, false)
-		, _right(env, "right", false, false)
-		, _progress_handler(env.ep(), *this, &Stereo_out::progress)
+		: _source(source), _left (env,  "left"), _right(env, "right"),
+		  _progress_handler(env.ep(), *this, &Stereo_out::progress)
 		{
+			reset();
+		}
+
+		void reset()
+		{
+			_left.stream().reset();
+			_right.stream().reset();
 			_left.progress_sigh(_progress_handler);
-		}
-
-		void start()
-		{
-			 _left.start();
-			_right.start();
-		}
-
-		void stop()
-		{
-			 _left.stop();
-			_right.stop();
 		}
 
 		void progress()
 		{
 			using namespace Audio_out;
 
-			while (!_left.stream()->full()) {
-				Packet  *left =  _left.stream()->alloc();
-				unsigned  pos =  _left.stream()->packet_position(left);
-				Packet *right = _right.stream()->get(pos);
+			while (!_left.stream().full()) {
+				unsigned  pos =  _left.stream().record_pos();
+				Packet  *left =  _left.stream().get(pos);
+				Packet *right = _right.stream().get(pos);
 
 				if (!_source.fill(left->content(), right->content(), PERIOD))
 					break;
 
-				 _left.submit(left);
-				_right.submit(right);
+				left->recorded();
+				right->recorded();
+				_left.stream().increment_position();
+				_right.stream().increment_position();
 			}
 		}
 };

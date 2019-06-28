@@ -462,34 +462,6 @@ static void run_bsd(void *p)
 }
 
 
-/***************************
- ** Notification handling **
- ***************************/
-
-static Genode::Signal_context_capability _play_sigh;
-static Genode::Signal_context_capability _record_sigh;
-
-
-/*
- * These functions are directly called by the audio
- * backend in case an play/record interrupt occures
- * and are used to notify our driver frontend.
- */
-
-extern "C" void notify_play()
-{
-	if (_play_sigh.valid())
-		Genode::Signal_transmitter(_play_sigh).submit();
-}
-
-
-extern "C" void notify_record()
-{
-	if (_record_sigh.valid())
-		Genode::Signal_transmitter(_record_sigh).submit();
-}
-
-
 /*****************************
  ** private Audio namespace **
  *****************************/
@@ -520,14 +492,6 @@ void Audio::init_driver(Genode::Env &env, Genode::Allocator &alloc,
 
 
 bool Audio::driver_active() { return drv_loaded() && adev_usuable; }
-
-
-void Audio::play_sigh(Genode::Signal_context_capability sigh) {
-	_play_sigh = sigh; }
-
-
-void Audio::record_sigh(Genode::Signal_context_capability sigh) {
-	_record_sigh = sigh; }
 
 
 int Audio::play(short *data, Genode::size_t size)

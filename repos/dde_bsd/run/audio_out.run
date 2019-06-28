@@ -10,7 +10,8 @@ set wget [installed_command wget]
 # Configure
 #
 
-set use_mixer 0
+set use_mixer 1
+set use_patch 0
 
 #
 # Build
@@ -23,6 +24,7 @@ set build_components {
 }
 
 lappend_if $use_mixer build_components server/mixer
+lappend_if $use_patch build_components server/stereo_patch
 
 source ${genode_dir}/repos/base/run/platform_drv.inc
 append_platform_drv_build_components
@@ -36,7 +38,7 @@ create_boot_directory
 #
 
 append config {
-<config>
+<config verbose="yes">
 	<parent-provides>
 		<service name="ROM"/>
 		<service name="IRQ"/>
@@ -61,34 +63,50 @@ append_platform_drv_config
 append_if $use_mixer config {
 	<start name="mixer">
 		<resource name="RAM" quantum="2M"/>
-		<provides><service name="Audio_out"/></provides>
+		<provides>
+			<service name="Audio_in"/>
+			<service name="Audio_out"/>
+		</provides>
 		<config>
-			<default out_volume="75" volume="25" muted="0"/>
+			<policy label_suffix="left"  channel="0"/>
+			<policy label_suffix="right" channel="1"/>
 		</config>
 		<route>
-			<service name="Audio_out"> <child name="audio_drv"/> </service>
-			<any-service> <parent/> <any-child/> </any-service>
+			<any-service> <parent/> </any-service>
 		</route>
-	</start>}
-
+	</start>
+}
+append_if $use_patch config {
+	<start name="stereo_patch">
+		<resource name="RAM" quantum="8M"/>
+		<provides>
+			<service name="Audio_in"/>
+			<service name="Audio_out"/>
+		</provides>
+		<route>
+			<any-service> <parent/> </any-service>
+		</route>
+	</start>
+}
 append config {
 	<start name="audio_drv">
 		<binary name="} [audio_drv_binary] {"/>
-		<resource name="RAM" quantum="8M"/>
-		<provides> <service name="Audio_out"/> </provides>
-		<config />
+		<resource name="RAM" quantum="16M"/>
+		<config playback="yes"/>
 	</start>
-	<start name="test-audio_out">
-		<resource name="RAM" quantum="4M"/>
+	<start name="sample_a">
+		<binary name="test-audio_out"/>
+		<resource name="RAM" quantum="8M"/>
 		<config>
-			<filename>sample.raw</filename>
+			<filename>sample_a.raw</filename>
 		</config>
-		<route>}
-append_if $use_mixer config {
-			<service name="Audio_out"><child name="mixer"/></service>}
-append config {
-			<any-service><parent/><any-child/></any-service>
-		</route>
+	</start>
+	<start name="sample_b">
+		<binary name="test-audio_out"/>
+		<resource name="RAM" quantum="8M"/>
+		<config>
+			<filename>sample_b.raw</filename>
+		</config>
 	</start>
 </config>}
 
@@ -100,15 +118,15 @@ install_config $config
 #
 
 if {[info exists env(GENODE_SAMPLE_RAW)]} {
-	catch { exec $wget $::env(GENODE_SAMPLE_RAW) -O bin/sample.raw }
+	catch { exec $wget $::env(GENODE_SAMPLE_RAW) -O bin/sample_a.raw }
+	catch { exec $wget $::env(GENODE_SAMPLE_RAW) -O bin/sample_b.raw }
 }
 
-if {![file exists bin/sample.raw]} {
+if {![file exists bin/sample_a.raw] || ![file exists bin/sample_b.raw]} {
 	puts ""
-	puts "The sample file is missing. Please take a look at"
-	puts "repos/dde_bsd/README, create 'sample.raw' and put"
-	puts "the file into './bin'. afterwards"
-	puts ""
+	puts "The sample files are missing. Please take a look at"
+	puts "repos/dde_bsd/README, create 'sample.f32' and put"
+	puts "the file at './bin/sample_a.raw' and './bin/sample_b.raw'."
 	exit 1
 }
 
@@ -118,10 +136,11 @@ if {![file exists bin/sample.raw]} {
 
 append boot_modules {
 	core ld.lib.so init timer } [audio_drv_binary] {
-	test-audio_out sample.raw
+	test-audio_out sample_a.raw sample_b.raw
 }
 
 lappend_if $use_mixer boot_modules mixer
+lappend_if $use_patch boot_modules stereo_patch
 
 append_platform_drv_boot_modules
 

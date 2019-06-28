@@ -60,7 +60,6 @@ struct Track final : Audio::Source
 	bool fill(float *left, float *right, Genode::size_t /*samples*/) override
 	{
 		if (_size <= _offset) {
-			_stereo_out.stop();
 			log("played '", _name, "' 1 time(s)");
 			return false;
 		}
@@ -97,8 +96,6 @@ struct Track final : Audio::Source
 		if (verbose)
 			log(_name, " size is ", _size, " bytes "
 			    "(attached to ", (void *)_base, ")");
-
-		_stereo_out.start();
 	}
 
 	~Track() { }

@@ -6,13 +6,14 @@
  */
 
 /*
- * Copyright (C) 2009-2017 Genode Labs GmbH
+ * Copyright (C) 2009-2019 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
  */
 
 #include <alsa/asoundlib.h>
+#include <audio/parameters.h>
 
 #include "alsa.h"
 
@@ -20,7 +21,7 @@ static snd_pcm_t *playback_handle;
 
 int audio_drv_init(char const * const device)
 {
-	unsigned int rate = 44100;
+	unsigned int rate = GENODE_AUDIO_SAMPLE_RATE;
 	int err;
 	snd_pcm_hw_params_t *hw_params;
 

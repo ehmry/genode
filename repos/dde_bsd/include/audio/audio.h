@@ -28,19 +28,9 @@
  ** private Audio namespace **
  *****************************/
 
-namespace Audio_out {
+namespace Audio {
 
 	enum Channel_number { LEFT, RIGHT, MAX_CHANNELS, INVALID = MAX_CHANNELS };
-}
-
-
-namespace Audio_in {
-
-	enum Channel_number { LEFT, MAX_CHANNELS, INVALID = MAX_CHANNELS };
-}
-
-
-namespace Audio {
 
 	void update_config(Genode::Env &, Genode::Xml_node);
 

@@ -1,4 +1,4 @@
-<runtime ram="16M" caps="256" binary="audio_drv">
+<runtime ram="24M" caps="256" binary="init">
 
 	<requires> <platform/> <rm/> <timer/> </requires>
 
@@ -10,8 +10,38 @@
 	<config/>
 
 	<content>
-		<rom label="ld.lib.so"/>
 		<rom label="audio_drv"/>
+		<rom label="stereo_patch"/>
 	</content>
+
+	<config>
+		<parent-provides>
+			<service name="CPU"/>
+			<service name="LOG"/>
+			<service name="PD"/>
+			<service name="RM"/>
+			<service name="Platform"/>
+			<service name="Report"/>
+			<service name="Timer"/>
+		</parent-provides>
+		<start name="stereo_patch" caps="96">
+			<resource name="RAM" quantum="8M"/>
+			<provides>
+				<service name="Audio_in"/>
+				<service name="Audio_out"/>
+			</provides>
+			<route>
+				<any-service> <parent/> </any-service>
+			</route>
+		</start>
+		<start name="audio_drv" caps="128">
+			<binary name="audio_drv"/>
+			<resource name="RAM" quantum="16M"/>
+			<config playback="yes"/>
+		</start>
+		<default-route>
+			<any-service> <parent/> <child name="stereo_patch"/> </any-service>
+		</default-route>
+	</config>
 
 </runtime>
