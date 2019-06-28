@@ -15,7 +15,7 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#include <audio_out_session/connection.h>
+#include <audio/source.h>
 #include <base/attached_rom_dataspace.h>
 #include <base/component.h>
 #include <base/heap.h>
@@ -27,111 +27,81 @@ using Filename = Genode::String<64>;
 using namespace Genode;
 using namespace Audio_out;
 
-static constexpr bool const verbose = false;
-static constexpr char const * channel_names[2] = { "front left", "front right" };
+static constexpr bool const verbose = true;
 
 
-class Track : public Thread
+struct Track final : Audio::Source
 {
-	private:
+	/*
+	 * Noncopyable
+	 */
+	Track(Track const &);
+	Track &operator = (Track const &);
+
+	enum {
+		CHN_CNT      = 2,                      /* number of channels */
+		FRAME_SIZE   = sizeof(float),
+		PERIOD_CSIZE = FRAME_SIZE * PERIOD,    /* size of channel packet (bytes) */
+		PERIOD_FSIZE = CHN_CNT * PERIOD_CSIZE, /* size of period in file (bytes) */
+	};
+
+	Env & _env;
+
+	Filename const & _name;
+
+	Attached_rom_dataspace _sample_ds { _env, _name.string() };
+
+	char     const * const _base   { _sample_ds.local_addr<char const>() };
+	size_t           const _size   { _sample_ds.size() };
+	size_t                 _offset { 0 };
+
+	Audio::Stereo_out _stereo_out { _env, *this };
+
+	bool fill(float *left, float *right, Genode::size_t /*samples*/) override
+	{
+		if (_size <= _offset) {
+			_stereo_out.stop();
+			log("played '", _name, "' 1 time(s)");
+			return false;
+		}
 
 		/*
-		 * Noncopyable
+		 * The current chunk (in number of frames of one channel)
+		 * is the size of the period except at the end of the
+		 * file.
 		 */
-		Track(Track const &);
-		Track &operator = (Track const &);
+		size_t chunk = (_offset + PERIOD_FSIZE > _size)
+		               ? (_size - _offset) / CHN_CNT / FRAME_SIZE
+		               : PERIOD;
 
-		enum {
-			CHN_CNT      = 2,                      /* number of channels */
-			FRAME_SIZE   = sizeof(float),
-			PERIOD_CSIZE = FRAME_SIZE * PERIOD,    /* size of channel packet (bytes) */
-			PERIOD_FSIZE = CHN_CNT * PERIOD_CSIZE, /* size of period in file (bytes) */
-		};
-
-		Env & _env;
-		Constructible<Audio_out::Connection> _audio_out[CHN_CNT];
-
-		Filename const & _name;
-
-		Attached_rom_dataspace _sample_ds { _env, _name.string() };
-		char     const * const _base = _sample_ds.local_addr<char const>();
-		size_t           const _size = _sample_ds.size();
-
-	public:
-
-		Track(Env & env, Filename const & name)
-		: Thread(env, "track", sizeof(size_t)*2048), _env(env), _name(name)
-		{
-			/* allocation signal for first channel only */
-			for (int i = 0; i < CHN_CNT; ++i)
-				_audio_out[i].construct(env, channel_names[i], i == 0);
-
-			start();
+		/* copy channel contents into sessions */
+		float *content = (float *)(_base + _offset);
+		for (unsigned c = 0; c < CHN_CNT * chunk; c += CHN_CNT) {
+			 left[c / 2] = content[c + 0];
+			right[c / 2] = content[c + 1];
 		}
 
-		void entry() override
-		{
-			if (verbose)
-				log(_name, " size is ", _size, " bytes "
-				    "(attached to ", (void *)_base, ")");
-
-			for (int i = 0; i < CHN_CNT; ++i)
-				_audio_out[i]->start();
-
-			unsigned cnt = 0;
-			while (1) {
-
-				for (size_t offset = 0, cnt = 1;
-				     offset < _size;
-				     offset += PERIOD_FSIZE, ++cnt) {
-
-					/*
-					 * The current chunk (in number of frames of one channel)
-					 * is the size of the period except at the end of the
-					 * file.
-					 */
-					size_t chunk = (offset + PERIOD_FSIZE > _size)
-					               ? (_size - offset) / CHN_CNT / FRAME_SIZE
-					               : PERIOD;
-
-					Packet *p[CHN_CNT];
-					while (1)
-						try {
-							p[0] = _audio_out[0]->stream()->alloc();
-							break;
-						} catch (Audio_out::Stream::Alloc_failed) {
-							_audio_out[0]->wait_for_alloc();
-						}
-
-					unsigned pos = _audio_out[0]->stream()->packet_position(p[0]);
-					/* sync other channels with first one */
-					for (int chn = 1; chn < CHN_CNT; ++chn)
-						p[chn] = _audio_out[chn]->stream()->get(pos);
-
-					/* copy channel contents into sessions */
-					float *content = (float *)(_base + offset);
-					for (unsigned c = 0; c < CHN_CNT * chunk; c += CHN_CNT)
-						for (int i = 0; i < CHN_CNT; ++i)
-							p[i]->content()[c / 2] = content[c + i];
-
-					/* handle last packet gracefully */
-					if (chunk < PERIOD) {
-						for (int i = 0; i < CHN_CNT; ++i)
-							memset(p[i]->content() + chunk,
-							       0, PERIOD_CSIZE - FRAME_SIZE * chunk);
-					}
-
-					if (verbose)
-						log(_name, " submit packet ",
-						    _audio_out[0]->stream()->packet_position((p[0])));
-
-					for (int i = 0; i < CHN_CNT; i++)
-						_audio_out[i]->submit(p[i]);
-				}
-
-				log("played '", _name, "' ", ++cnt, " time(s)");
-			}
+		/* handle last packet gracefully */
+		if (chunk < PERIOD) {
+			memset( left + chunk, 0, PERIOD_CSIZE - FRAME_SIZE * chunk);
+			memset(right + chunk, 0, PERIOD_CSIZE - FRAME_SIZE * chunk);
 		}
+
+		_offset += PERIOD_FSIZE;
+		return true;
+	}
+
+	Track(Env & env, Filename const & name)
+	: _env(env), _name(name)
+	{
+		if (verbose)
+			log(_name, " size is ", _size, " bytes "
+			    "(attached to ", (void *)_base, ")");
+
+		_stereo_out.start();
+	}
+
+	~Track() { }
 };
 
 

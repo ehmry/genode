@@ -62,6 +62,9 @@ append_if $use_mixer config {
 	<start name="mixer">
 		<resource name="RAM" quantum="2M"/>
 		<provides><service name="Audio_out"/></provides>
+		<config>
+			<default out_volume="75" volume="25" muted="0"/>
+		</config>
 		<route>
 			<service name="Audio_out"> <child name="audio_drv"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
@@ -130,4 +133,4 @@ append qemu_args "  -nographic -soundhw es1370 "
 # For obvious reasons the timeout depends on the total
 # length of the used sample file.
 #
-run_genode_until {.*played.*1 time\(s\)} 60
+run_genode_until {.*played.*1 time\(s\)} 300
