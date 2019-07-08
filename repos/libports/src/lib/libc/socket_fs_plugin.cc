@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <ifaddrs.h>
+#include <net/if.h>
 
 /* libc-internal includes */
 #include "socket_fs_plugin.h"
@@ -1005,6 +1006,8 @@ extern "C" int getifaddrs(struct ifaddrs **ifap)
 	static sockaddr_in broadcast { 0 };
 
 	static ifaddrs ifaddr {
+		.ifa_name      = "",
+		.ifa_flags     = IFF_UP,
 		.ifa_addr      = (sockaddr*)&address,
 		.ifa_netmask   = (sockaddr*)&netmask,
 		.ifa_broadaddr = (sockaddr*)&broadcast,
