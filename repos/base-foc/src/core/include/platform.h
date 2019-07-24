@@ -183,7 +183,7 @@ namespace Genode {
 
 			Cap_id_allocator &cap_id_alloc() { return _cap_id_alloc; }
 
-			void wait_for_exit() override;
+			void wait_for_exit(int const &) override;
 	};
 }
 

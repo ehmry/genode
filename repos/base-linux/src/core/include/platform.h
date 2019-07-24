@@ -129,7 +129,9 @@ namespace Genode {
 			 */
 			size_t max_caps() const override { return 10000; }
 
-			void wait_for_exit() override;
+			void wait_for_exit(int const &) override;
+
+			void child_exit() override;
 	};
 }
 
