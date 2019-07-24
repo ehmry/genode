@@ -77,7 +77,12 @@ namespace Genode {
 			/**
 			 * Wait for exit condition
 			 */
-			virtual void wait_for_exit() = 0;
+			virtual void wait_for_exit(int const &exit_value) = 0;
+
+			/**
+			 * Handle exit of child
+			 */
+			virtual void child_exit() { };
 
 			/**
 			 * Return true if platform supports direct unmap (no mapping db)
