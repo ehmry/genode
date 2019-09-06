@@ -33,8 +33,8 @@ struct Genode::Trace::Connection : Genode::Connection<Genode::Trace::Session>,
 	Connection(Env &env, size_t ram_quota, size_t arg_buffer_size, unsigned parent_levels)
 	:
 		Genode::Connection<Session>(env,
-			session(env.parent(), "ram_quota=%lu, arg_buffer_size=%lu, parent_levels=%u",
-			        ram_quota + 2048, arg_buffer_size, parent_levels)),
+			args("ram_quota=%lu, arg_buffer_size=%lu, parent_levels=%u",
+			     ram_quota + 2048, arg_buffer_size, parent_levels)),
 		Session_client(env.rm(), cap())
 	{ }
 };

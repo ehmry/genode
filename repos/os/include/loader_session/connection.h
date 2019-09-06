@@ -28,10 +28,9 @@ struct Loader::Connection : Genode::Connection<Session>, Session_client
 	 */
 	Connection(Genode::Env &env, Ram_quota ram_quota, Cap_quota cap_quota)
 	:
-		Genode::Connection<Session>(env, session(env.parent(),
-		                                         "ram_quota=%ld, cap_quota=%ld",
-		                                         ram_quota.value,
-		                                         CAP_QUOTA + cap_quota.value)),
+		Genode::Connection<Session>(env, args("ram_quota=%ld, cap_quota=%ld",
+		                                      ram_quota.value,
+		                                      CAP_QUOTA + cap_quota.value)),
 		Session_client(cap())
 	{ }
 };

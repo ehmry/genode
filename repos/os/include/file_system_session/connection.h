@@ -72,17 +72,16 @@ struct File_system::Connection : Genode::Connection<Session>, Session_client
 	           size_t                   tx_buf_size = DEFAULT_TX_BUF_SIZE)
 	:
 		Genode::Connection<Session>(env,
-			session(env.parent(),
-			        "ram_quota=%ld, "
-			        "cap_quota=%ld, "
-			        "tx_buf_size=%ld, "
-			        "label=\"%s\", "
-			        "root=\"%s\", "
-			        "writeable=%d",
-			        8*1024*sizeof(long) + tx_buf_size,
-			        CAP_QUOTA,
-			        tx_buf_size,
-			        label, root, writeable)),
+			args("ram_quota=%ld, "
+			     "cap_quota=%ld, "
+			     "tx_buf_size=%ld, "
+			     "label=\"%s\", "
+			     "root=\"%s\", "
+			     "writeable=%d",
+			     8*1024*sizeof(long) + tx_buf_size,
+			     CAP_QUOTA,
+			     tx_buf_size,
+			     label, root, writeable)),
 		Session_client(cap(), tx_block_alloc, env.rm())
 	{ }
 

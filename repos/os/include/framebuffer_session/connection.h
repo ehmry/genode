@@ -31,11 +31,9 @@ class Framebuffer::Connection : public Genode::Connection<Session>,
 	private:
 
 		/**
-		 * Create session and return typed session capability
+		 * Create session arguments
 		 */
-		Session_capability _connect(Genode::Parent &parent,
-		                            unsigned width, unsigned height,
-		                            Mode::Format format)
+		Args _args(unsigned width, unsigned height, Mode::Format format)
 		{
 			using namespace Genode;
 
@@ -55,7 +53,7 @@ class Framebuffer::Connection : public Genode::Connection<Session>,
 			if (format != Mode::INVALID)
 				Arg_string::set_arg(argbuf, sizeof(argbuf), "fb_format", format);
 
-			return session(parent, argbuf);
+			return args(argbuf);
 		}
 
 	public:
@@ -71,9 +69,9 @@ class Framebuffer::Connection : public Genode::Connection<Session>,
 		 */
 		Connection(Genode::Env &env, Framebuffer::Mode mode)
 		:
-			Genode::Connection<Session>(env, _connect(env.parent(),
-			                                          mode.width(), mode.height(),
-			                                          mode.format())),
+			Genode::Connection<Session>(env, _args(mode.width(),
+			                                       mode.height(),
+			                                       mode.format())),
 			Session_client(cap())
 		{ }
 };

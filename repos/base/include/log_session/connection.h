@@ -30,9 +30,8 @@ struct Genode::Log_connection : Connection<Log_session>, Log_session_client
 	 */
 	Log_connection(Env &env, Session_label label = Session_label())
 	:
-		Connection<Log_session>(env, session(env.parent(),
-		                                     "ram_quota=%ld, cap_quota=%ld, label=\"%s\"",
-		                                     RAM_QUOTA, CAP_QUOTA, label.string())),
+		Connection<Log_session>(env, args("ram_quota=%ld, cap_quota=%ld, label=\"%s\"",
+		                                  RAM_QUOTA, CAP_QUOTA, label.string())),
 		Log_session_client(cap())
 	{ }
 };

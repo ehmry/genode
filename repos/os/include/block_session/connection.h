@@ -222,9 +222,8 @@ struct Block::Connection : Genode::Connection<Session>, Session_client
 		           const char              *label = "")
 		:
 			Genode::Connection<Session>(env,
-				session(env.parent(),
-				        "ram_quota=%ld, cap_quota=%ld, tx_buf_size=%ld, label=\"%s\"",
-				        14*1024 + tx_buf_size, CAP_QUOTA, tx_buf_size, label)),
+				args("ram_quota=%ld, cap_quota=%ld, tx_buf_size=%ld, label=\"%s\"",
+				     14*1024 + tx_buf_size, CAP_QUOTA, tx_buf_size, label)),
 			Session_client(cap(), *tx_block_alloc, env.rm()),
 			_max_block_count(_init_max_block_count(_tx.source()->bulk_buffer_size()))
 		{ }

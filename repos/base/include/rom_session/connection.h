@@ -37,10 +37,8 @@ struct Genode::Rom_connection : Connection<Rom_session>,
 	 */
 	Rom_connection(Env &env, const char *label)
 	try :
-		Connection<Rom_session>(env,
-		                        session(env.parent(),
-		                                "ram_quota=%ld, cap_quota=%ld, label=\"%s\"",
-		                                 RAM_QUOTA, CAP_QUOTA, label)),
+		Connection<Rom_session>(env, args("ram_quota=%ld, cap_quota=%ld, label=\"%s\"",
+		                                  RAM_QUOTA, CAP_QUOTA, label)),
 		Rom_session_client(cap())
 	{ }
 	catch (...) {

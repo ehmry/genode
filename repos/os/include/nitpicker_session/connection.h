@@ -39,7 +39,7 @@ class Nitpicker::Connection : public Genode::Connection<Session>,
 		/**
 		 * Create session and return typed session capability
 		 */
-		Session_capability _connect(Genode::Parent &parent, char const *label)
+		Args _args(char const *label)
 		{
 			enum { ARGBUF_SIZE = 128 };
 			char argbuf[ARGBUF_SIZE];
@@ -55,7 +55,7 @@ class Nitpicker::Connection : public Genode::Connection<Session>,
 			Arg_string::set_arg(argbuf, sizeof(argbuf), "ram_quota", RAM_QUOTA);
 			Arg_string::set_arg(argbuf, sizeof(argbuf), "cap_quota", CAP_QUOTA);
 
-			return session(parent, argbuf);
+			return args(argbuf);
 		}
 
 	public:
@@ -66,7 +66,7 @@ class Nitpicker::Connection : public Genode::Connection<Session>,
 		Connection(Genode::Env &env, char const *label = "")
 		:
 			/* establish nitpicker session */
-			Genode::Connection<Session>(env, _connect(env.parent(), label)),
+			Genode::Connection<Session>(env, _args(label)),
 			Session_client(env.rm(), cap()),
 
 			/* request frame-buffer and input sub sessions */

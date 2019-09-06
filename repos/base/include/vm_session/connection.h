@@ -25,19 +25,6 @@ namespace Genode { struct Vm_connection; }
 struct Genode::Vm_connection : Connection<Vm_session>, Vm_session_client
 {
 	/**
-	 * Issue session request
-	 *
-	 * \noapi
-	 */
-	Capability<Vm_session> _session(Parent &parent, char const *label, long priority,
-	                                unsigned long affinity)
-	{
-		return session(parent,
-		               "priority=0x%lx, affinity=0x%lx, ram_quota=16K, cap_quota=10, label=\"%s\"",
-		               priority, affinity, label);
-	}
-
-	/**
 	 * Constructor
 	 *
 	 * \param label     initial session label
@@ -48,7 +35,9 @@ struct Genode::Vm_connection : Connection<Vm_session>, Vm_session_client
 	              long priority = Cpu_session::DEFAULT_PRIORITY,
 	              unsigned long affinity = 0)
 	:
-		Connection<Vm_session>(env, _session(env.parent(), label, priority, affinity)),
+		Connection<Vm_session>(env,
+			args("priority=0x%lx, affinity=0x%lx, ram_quota=16K, cap_quota=10, label=\"%s\"",
+                 priority, affinity, label)),
 		Vm_session_client(cap())
 	{ }
 

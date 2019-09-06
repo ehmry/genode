@@ -32,9 +32,8 @@ struct Genode::Pd_connection : Connection<Pd_session>, Pd_session_client
 	 */
 	Pd_connection(Env &env, char const *label = "", Virt_space space = CONSTRAIN)
 	:
-		Connection<Pd_session>(env, session(env.parent(),
-		                                    "ram_quota=%u, cap_quota=%u, label=\"%s\", virt_space=%u",
-		                                    RAM_QUOTA, CAP_QUOTA, label, space)),
+		Connection<Pd_session>(env, args("ram_quota=%u, cap_quota=%u, label=\"%s\", virt_space=%u",
+		                                 RAM_QUOTA, CAP_QUOTA, label, space)),
 		Pd_session_client(cap())
 	{ }
 };

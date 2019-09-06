@@ -24,17 +24,6 @@ struct Genode::Io_port_connection : Connection<Io_port_session>,
                                     Io_port_session_client
 {
 	/**
-	 * Issue session request
-	 *
-	 * \noapi
-	 */
-	Capability<Io_port_session> _session(Parent &parent, unsigned base, unsigned size)
-	{
-		return session(parent, "ram_quota=6K, cap_quota=%u, io_port_base=%u, io_port_size=%u",
-		               CAP_QUOTA, base, size);
-	}
-
-	/**
 	 * Constructor
 	 *
 	 * \param base  base address of port range
@@ -43,10 +32,9 @@ struct Genode::Io_port_connection : Connection<Io_port_session>,
 	Io_port_connection(Env &env, unsigned base, unsigned size)
 	:
 		Connection<Io_port_session>(env,
-		                            session(env.parent(),
-		                                    "ram_quota=6K, cap_quota=%u, "
-		                                    "io_port_base=%u, io_port_size=%u",
-		                                    CAP_QUOTA, base, size)),
+		                            args("ram_quota=6K, cap_quota=%u, "
+		                                 "io_port_base=%u, io_port_size=%u",
+		                                 CAP_QUOTA, base, size)),
 		Io_port_session_client(cap())
 	{ }
 };

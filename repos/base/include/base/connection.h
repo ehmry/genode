@@ -45,14 +45,6 @@ class Genode::Connection_base : Noncopyable, Interface
 			_id_space_element(_parent_client, _env.id_space())
 		{ }
 
-		/**
-		 * Legacy constructor
-		 *
-		 * \noapi
-		 */
-		Connection_base();
-
-
 		void upgrade(Session::Resources resources)
 		{
 			String<80> const args("ram_quota=", resources.ram_quota, ", "
@@ -78,41 +70,41 @@ class Genode::Connection_base : Noncopyable, Interface
 template <typename SESSION_TYPE>
 class Genode::Connection : public Connection_base
 {
+	public:
+
+		struct Args {
+			Parent::Session_args session_args;
+			Affinity affinity;
+		};
+
 	private:
 
-		/*
-		 * Buffer for storing the session arguments passed to the
-		 * 'session' method that is called before the 'Connection' is
-		 * constructed.
-		 */
+		Args const _args;
 
-		enum { FORMAT_STRING_SIZE = Parent::Session_args::MAX_SIZE };
-
-		char _session_args[FORMAT_STRING_SIZE];
-		char _affinity_arg[sizeof(Affinity)];
-
-		void _session(Parent &,
-		              Affinity const &affinity,
+		static
+		Args _session(Affinity const &affinity,
 		              const char *format_args, va_list list)
 		{
-			String_console sc(_session_args, FORMAT_STRING_SIZE);
+			enum { FORMAT_STRING_SIZE = Parent::Session_args::MAX_SIZE };
+			char session_args[FORMAT_STRING_SIZE];
+
+			String_console sc(session_args, FORMAT_STRING_SIZE);
 			sc.vprintf(format_args, list);
 			va_end(list);
 
-			memcpy(_affinity_arg, &affinity, sizeof(Affinity));
+			return Args { session_args, affinity };
 		}
 
 		Capability<SESSION_TYPE> _request_cap()
 		{
-			Affinity affinity;
-			memcpy(&affinity, _affinity_arg, sizeof(Affinity));
-
 			try {
 				return _env.session<SESSION_TYPE>(_id_space_element.id(),
-				                                  _session_args, affinity); }
+				                                  _args.session_args,
+				                                  _args.affinity);
+			}
 			catch (...) {
 				error(SESSION_TYPE::service_name(), "-session creation failed "
-				      "(", Cstring(_session_args), ")");
+				      "(", _args.session_args.string(), ")");
 				throw;
 			}
 		}
@@ -126,9 +118,9 @@ class Genode::Connection : public Connection_base
 		/**
 		 * Constructor
 		 */
-		Connection(Env &env, Capability<SESSION_TYPE>)
+		Connection(Env &env, Args const &args)
 		:
-			Connection_base(env), _cap(_request_cap())
+			Connection_base(env), _args(args), _cap(_request_cap())
 		{ }
 
 		/**
@@ -142,29 +134,26 @@ class Genode::Connection : public Connection_base
 		Capability<SESSION_TYPE> cap() const { return _cap; }
 
 		/**
-		 * Issue session request to the parent
+		 * Construct session argument buffer
 		 */
-		Capability<SESSION_TYPE> session(Parent &parent, const char *format_args, ...)
+		static Args args(const char *format_args, ...)
 		{
 			va_list list;
 			va_start(list, format_args);
 
-			_session(parent, Affinity(), format_args, list);
-			return Capability<SESSION_TYPE>();
+			return _session(Affinity(), format_args, list);
 		}
 
 		/**
-		 * Issue session request to the parent
+		 * Construct session argument buffer
 		 */
-		Capability<SESSION_TYPE> session(Parent         &parent,
-		                                 Affinity const &affinity,
-		                                 char     const *format_args, ...)
+		static Args args(Affinity const &affinity,
+		                 char     const *format_args, ...)
 		{
 			va_list list;
 			va_start(list, format_args);
 
-			_session(parent, affinity, format_args, list);
-			return Capability<SESSION_TYPE>();
+			return _session(affinity, format_args, list);
 		}
 };
 

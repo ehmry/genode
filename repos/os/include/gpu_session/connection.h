@@ -23,17 +23,6 @@ namespace Gpu { struct Connection; }
 struct Gpu::Connection : Genode::Connection<Session>, Session_client
 {
 	/**
-	 * Issue session request
-	 *
-	 * \noapi
-	 */
-	Genode::Capability<Gpu::Session> _session(Genode::Parent &parent,
-	                                          char const *label, Genode::size_t quota)
-	{
-		return session(parent, "ram_quota=%ld, label=\"%s\"", quota, label);
-	}
-
-	/**
 	 * Constructor
 	 *
 	 * \param quota  initial amount of quota used for allocating Gpu
@@ -43,7 +32,7 @@ struct Gpu::Connection : Genode::Connection<Session>, Session_client
 	           Genode::size_t  quota = Session::REQUIRED_QUOTA,
 	           const char     *label = "")
 	:
-		Genode::Connection<Session>(env, _session(env.parent(), label, quota)),
+		Genode::Connection<Session>(env, args("ram_quota=%ld, label=\"%s\"", quota, label)),
 		Session_client(cap())
 	{ }
 };

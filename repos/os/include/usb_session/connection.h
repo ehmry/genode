@@ -33,9 +33,8 @@ struct Usb::Connection : Genode::Connection<Session>, Session_client
 	                                     Genode::Signal_context_capability())
 	:
 		Genode::Connection<Session>(env,
-			session(env.parent(),
-			        "ram_quota=%ld, cap_quota=%ld, tx_buf_size=%ld, label=\"%s\"",
-			        3 * 4096 + tx_buf_size, CAP_QUOTA, tx_buf_size, label)),
+			args("ram_quota=%ld, cap_quota=%ld, tx_buf_size=%ld, label=\"%s\"",
+			     3 * 4096 + tx_buf_size, CAP_QUOTA, tx_buf_size, label)),
 		Session_client(cap(), *tx_block_alloc, env.rm(), sigh_state_changed)
 	{ }
 };

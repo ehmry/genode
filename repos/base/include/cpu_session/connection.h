@@ -35,10 +35,10 @@ struct Genode::Cpu_connection : Connection<Cpu_session>, Cpu_session_client
 	               Affinity const &affinity = Affinity())
 	:
 		Connection<Cpu_session>(env,
-		                        session(env.parent(), affinity,
-		                                "priority=0x%lx, ram_quota=%u, "
-		                                "cap_quota=%u, label=\"%s\"",
-		                                priority, RAM_QUOTA, CAP_QUOTA, label)),
+		                        args(affinity,
+		                             "priority=0x%lx, ram_quota=%u, "
+		                             "cap_quota=%u, label=\"%s\"",
+		                             priority, RAM_QUOTA, CAP_QUOTA, label)),
 		Cpu_session_client(cap())
 	{ }
 };

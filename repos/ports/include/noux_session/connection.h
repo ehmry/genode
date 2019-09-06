@@ -27,7 +27,7 @@ struct Noux::Connection : Genode::Connection<Session>, Session_client
 	 */
 	Connection(Genode::Env &env)
 	:
-		Genode::Connection<Session>(env, session(env.parent(), "")),
+		Genode::Connection<Session>(env, args("")),
 		Session_client(cap())
 	{ }
 

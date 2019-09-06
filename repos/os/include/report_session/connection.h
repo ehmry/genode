@@ -27,11 +27,10 @@ struct Report::Connection : Genode::Connection<Session>, Session_client
 	Connection(Genode::Env &env, char const *label, size_t buffer_size = 4096)
 	:
 		Genode::Connection<Session>(env,
-		                            session(env.parent(),
-		                                    "label=\"%s\", ram_quota=%ld, "
-		                                    "cap_quota=%ld, buffer_size=%zd",
-		                                    label, RAM_QUOTA + buffer_size,
-		                                    CAP_QUOTA, buffer_size)),
+		                            args("label=\"%s\", ram_quota=%ld, "
+		                                 "cap_quota=%ld, buffer_size=%zd",
+		                                 label, RAM_QUOTA + buffer_size,
+		                                 CAP_QUOTA, buffer_size)),
 		Session_client(cap())
 	{ }
 };

@@ -29,7 +29,7 @@ struct Rtc::Connection : Genode::Connection<Session>, Session_client
 	Connection(Genode::Env &env, char const *label = "")
 	:
 		Genode::Connection<Rtc::Session>(
-			env, session(env.parent(), "ram_quota=8K, label=\"%s\"", label)),
+			env, args("ram_quota=8K, label=\"%s\"", label)),
 		Session_client(cap())
 	{ }
 };

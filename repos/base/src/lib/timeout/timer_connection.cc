@@ -129,7 +129,7 @@ void Timer::Connection::_enable_modern_mode()
 
 Timer::Connection::Connection(Genode::Env &env, char const *label)
 :
-	Genode::Connection<Session>(env, session(env.parent(),
+	Genode::Connection<Session>(env, args(
 	                            "ram_quota=10K, cap_quota=%u, label=\"%s\"",
 	                            CAP_QUOTA, label)),
 	Session_client(cap()),

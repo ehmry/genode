@@ -32,9 +32,9 @@ struct Regulator::Connection : Genode::Connection<Session>, Session_client
 	Connection(Genode::Env &env, Regulator_id regulator, const char * label = "")
 	:
 		Genode::Connection<Session>(env,
-			session(env.parent(),
-			        "ram_quota=8K, cap_quota=%ld, regulator=\"%s\", label=\"%s\"",
-			        CAP_QUOTA, regulator_name_by_id(regulator), label)),
+			args(env.parent(),
+			     "ram_quota=8K, cap_quota=%ld, regulator=\"%s\", label=\"%s\"",
+			     CAP_QUOTA, regulator_name_by_id(regulator), label)),
 		Session_client(cap())
 	{ }
 };

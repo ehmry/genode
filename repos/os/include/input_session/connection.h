@@ -27,9 +27,8 @@ struct Input::Connection : Genode::Connection<Session>, Session_client
 	Connection(Genode::Env &env, char const *label = "")
 	:
 		Genode::Connection<Input::Session>(env,
-		                                   session(env.parent(),
-		                                   "ram_quota=18K, cap_quota=%u, label=\"%s\"",
-		                                   CAP_QUOTA, label)),
+		                                   args("ram_quota=18K, cap_quota=%u, label=\"%s\"",
+		                                        CAP_QUOTA, label)),
 		Session_client(env.rm(), cap())
 	{ }
 };
