@@ -21,9 +21,9 @@
 
 namespace Genode {
 
-	class Microseconds;
-	class Milliseconds;
-	class Duration;
+	struct Microseconds;
+	struct Milliseconds;
+	struct Duration;
 }
 
 

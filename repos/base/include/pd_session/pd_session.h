@@ -23,8 +23,8 @@
 namespace Genode {
 	struct Pd_session;
 	struct Pd_session_client;
-	struct Parent;
-	struct Signal_context;
+	class Parent;
+	class Signal_context;
 }
 
 

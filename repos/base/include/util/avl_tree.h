@@ -20,7 +20,7 @@
 namespace Genode {
 	
 	class Avl_node_base;
-	template <typename> class Avl_node;
+	template <typename> struct Avl_node;
 	template <typename> class Avl_tree;
 }
 

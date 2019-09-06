@@ -24,7 +24,7 @@ class Genode::Slab : public Allocator
 {
 	private:
 
-		struct Block;
+		class Block;
 		struct Entry;
 
 		size_t const _slab_size;          /* size of one slab entry           */

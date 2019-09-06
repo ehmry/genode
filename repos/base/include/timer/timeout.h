@@ -27,7 +27,7 @@
 
 namespace Genode {
 
-	class Time_source;
+	struct Time_source;
 	class Timeout_scheduler;
 	class Timeout;
 	class Alarm_timeout_scheduler;

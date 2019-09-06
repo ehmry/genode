@@ -24,7 +24,7 @@ namespace Genode {
 
 class Genode::Vm_handler_base : public Signal_dispatcher_base
 {
-	friend class Vm_session_client;
+	friend struct Vm_session_client;
 
 	protected:
 

@@ -17,7 +17,7 @@
 /* base-internal includes */
 #include <base/internal/rpc_obj_key.h>
 
-namespace Genode { class Cap_sel; class Pd_session; }
+namespace Genode { class Cap_sel; struct Pd_session; }
 
 
 namespace Genode { namespace Capability_space {

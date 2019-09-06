@@ -18,9 +18,9 @@
 
 namespace Genode {
 
-	class Region_map;
-	class Ram_allocator;
-	class Env;
+	struct Region_map;
+	struct Ram_allocator;
+	struct Env;
 	class Local_session_id_space;
 
 	extern Region_map    *env_stack_area_region_map;

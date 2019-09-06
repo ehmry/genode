@@ -20,8 +20,8 @@
 namespace Genode { namespace Trace {
 
 	class Control;
-	class Policy_module;
-	class Logger;
+	struct Policy_module;
+	struct Logger;
 } }
 
 

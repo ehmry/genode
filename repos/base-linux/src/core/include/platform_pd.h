@@ -21,7 +21,7 @@
 
 namespace Genode {
 	struct Platform_pd;
-	struct Platform_thread;
+	class Platform_thread;
 }
 
 struct Genode::Platform_pd

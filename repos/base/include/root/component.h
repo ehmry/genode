@@ -28,7 +28,7 @@
 namespace Genode {
 
 	class Single_client;
-	class Multiple_clients;
+	struct Multiple_clients;
 	template <typename, typename POLICY = Multiple_clients> class Root_component;
 }
 

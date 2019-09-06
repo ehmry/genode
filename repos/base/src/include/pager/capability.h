@@ -23,7 +23,7 @@ namespace Genode {
 	 * passed as argument to 'Cpu_session::set_pager'. It is never invoked or
 	 * otherwise used.
 	 */
-	class Pager_object;
+	struct Pager_object;
 	typedef Capability<Pager_object> Pager_capability;
 }
 

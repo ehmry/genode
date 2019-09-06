@@ -43,7 +43,7 @@ class Genode::Object_pool : Interface, Noncopyable
 
 				friend class Object_pool;
 				friend class Avl_tree<Entry>;
-				friend class Avl_node<Entry>;
+				friend struct Avl_node<Entry>;
 
 				struct Entry_lock : Weak_object<Entry_lock>, Noncopyable
 				{

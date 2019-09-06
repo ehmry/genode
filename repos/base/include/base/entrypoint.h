@@ -21,9 +21,9 @@
 #include <base/thread.h>
 
 namespace Genode {
-	class Startup;
+	struct Startup;
 	class Entrypoint;
-	class Env;
+	struct Env;
 }
 
 
@@ -138,7 +138,7 @@ class Genode::Entrypoint : Noncopyable
 		void _handle_stop_signal_proxy() { _stop_signal_proxy = true; }
 		Constructible<Genode::Signal_handler<Entrypoint> > _stop_signal_proxy_handler { };
 
-		friend class Startup;
+		friend struct Startup;
 
 		/**
 		 * Called by the startup code only

@@ -25,7 +25,7 @@
 
 namespace Genode {
 
-	class Local_session;
+	struct Local_session;
 	class Local_parent;
 }
 

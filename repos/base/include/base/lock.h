@@ -16,7 +16,7 @@
 
 #include <base/cancelable_lock.h>
 
-namespace Genode { class Lock; }
+namespace Genode { struct Lock; }
 
 
 struct Genode::Lock : Cancelable_lock

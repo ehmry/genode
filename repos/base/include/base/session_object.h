@@ -18,7 +18,7 @@
 #include <base/entrypoint.h>
 #include <session/session.h>
 
-namespace Genode { template <typename, typename> struct Session_object; }
+namespace Genode { template <typename, typename> class Session_object; }
 
 template <typename RPC_INTERFACE, typename SERVER = RPC_INTERFACE>
 class Genode::Session_object : private Ram_quota_guard,

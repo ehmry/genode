@@ -22,7 +22,7 @@ namespace Genode {
 	class Signal_context;
 	class Rpc_object_base;
 
-	namespace Trace { class Policy_module; }
+	namespace Trace { struct Policy_module; }
 }
 
 

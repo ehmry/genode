@@ -20,7 +20,7 @@
 
 namespace Linker {
 	struct Hash_table;
-	struct Dynamic;
+	class Dynamic;
 }
 
 /**
