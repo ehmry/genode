@@ -40,7 +40,9 @@
 /*
  * Resolve ambiguity between 'Genode::size_t' and the host's header's 'size_t'.
  */
+#ifndef __SIZE_TYPE__
 #define size_t __SIZE_TYPE__
+#endif
 
 /* Linux includes */
 #include <sys/cdefs.h>   /* include first to avoid double definition of '__always_inline' */
