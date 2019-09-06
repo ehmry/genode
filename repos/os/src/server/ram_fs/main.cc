@@ -659,6 +659,7 @@ static void preload_content(Genode::Env            &env,
                             Genode::Xml_node        node,
                             Ram_fs::Directory &dir)
 {
+	using namespace Genode;
 	using namespace File_system;
 
 	for (unsigned i = 0; i < node.num_sub_nodes(); i++) {

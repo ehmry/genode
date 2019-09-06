@@ -25,8 +25,6 @@
 
 namespace Ram_fs
 {
-	using File_system::Chunk;
-	using File_system::Chunk_index;
 	using File_system::file_size_t;
 	using File_system::SEEK_TAIL;
 	class File;

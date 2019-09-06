@@ -20,9 +20,10 @@
 #include <util/string.h>
 #include <file_system_session/file_system_session.h>
 
-namespace File_system {
+namespace Ram_fs {
 
 	using namespace Genode;
+	using namespace File_system;
 
 	using Genode::Noncopyable;
 
@@ -36,7 +37,7 @@ namespace File_system {
 /**
  * Common base class of both 'Chunk' and 'Chunk_index'
  */
-class File_system::Chunk_base : Noncopyable
+class Ram_fs::Chunk_base : Noncopyable
 {
 	public:
 
@@ -98,7 +99,7 @@ class File_system::Chunk_base : Noncopyable
  * Chunk of bytes used as leaf in hierarchy of chunk indices
  */
 template <Genode::size_t CHUNK_SIZE>
-class File_system::Chunk : public Chunk_base
+class Ram_fs::Chunk : public Chunk_base
 {
 	private:
 
@@ -178,7 +179,7 @@ class File_system::Chunk : public Chunk_base
 
 
 template <Genode::size_t NUM_ENTRIES, typename ENTRY_TYPE>
-class File_system::Chunk_index : public Chunk_base
+class Ram_fs::Chunk_index : public Chunk_base
 {
 	public:
 

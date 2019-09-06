@@ -17,7 +17,7 @@
 #include <base/component.h>
 #include <ram_fs/chunk.h>
 
-using namespace File_system;
+using namespace Ram_fs;
 using namespace Genode;
 
 using Chunk_level_3 = Chunk<2>;
