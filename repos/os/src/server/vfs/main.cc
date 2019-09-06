@@ -190,7 +190,7 @@ class Vfs_server::Session_component : private Session_resources,
 					result = node.process_packet(packet);
 				});
 			}
-			catch (File_system::Invalid_handle) { }
+			catch (::File_system::Invalid_handle) { }
 
 			/* send the packet back if the handle is missing */
 			if (handle_invalid)
