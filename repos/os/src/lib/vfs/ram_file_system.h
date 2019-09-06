@@ -26,9 +26,9 @@ namespace Vfs_ram {
 
 	using namespace Genode;
 	using namespace Vfs;
-	using namespace Ram_fs;
-	using File_system::Chunk;
-	using File_system::Chunk_index;
+
+	using Ram_fs::Chunk;
+	using Ram_fs::Chunk_index;
 
 	struct Io_handle;
 	struct Watch_handle;
@@ -236,10 +236,10 @@ class Vfs_ram::File : public Vfs_ram::Node
 {
 	private:
 
-		typedef Chunk      <num_level_3_entries()>                Chunk_level_3;
-		typedef Chunk_index<num_level_2_entries(), Chunk_level_3> Chunk_level_2;
-		typedef Chunk_index<num_level_1_entries(), Chunk_level_2> Chunk_level_1;
-		typedef Chunk_index<num_level_0_entries(), Chunk_level_1> Chunk_level_0;
+		typedef Chunk      <Ram_fs::num_level_3_entries()>                Chunk_level_3;
+		typedef Chunk_index<Ram_fs::num_level_2_entries(), Chunk_level_3> Chunk_level_2;
+		typedef Chunk_index<Ram_fs::num_level_1_entries(), Chunk_level_2> Chunk_level_1;
+		typedef Chunk_index<Ram_fs::num_level_0_entries(), Chunk_level_1> Chunk_level_0;
 
 		Chunk_level_0 _chunk;
 		file_size     _length = 0;
