@@ -254,9 +254,16 @@ class Genode::Child : protected Rpc_object<Parent>,
 
 		struct Initial_thread : Initial_thread_base
 		{
+			protected:
+
+				/*
+				 * not used on all platfroms, marked as
+				 * protected to suppress warnings
+				 */
+				Cpu_session      &_cpu;
+
 			private:
 
-				Cpu_session      &_cpu;
 				Thread_capability _cap;
 
 			public:

@@ -133,7 +133,7 @@ namespace Genode {
 		_marshal_args(call_buf, args);
 
 		{
-			Trace::Rpc_call trace_event(IF::name(), call_buf);
+			Trace::Rpc_call(IF::name(), call_buf);
 		}
 
 		/* perform RPC, unmarshal return value */
@@ -146,7 +146,7 @@ namespace Genode {
 		Ipc_unmarshaller unmarshaller(reply_buf);
 
 		{
-			Trace::Rpc_returned trace_event(IF::name(), reply_buf);
+			Trace::Rpc_returned(IF::name(), reply_buf);
 		}
 
 		/* unmarshal RPC output arguments */

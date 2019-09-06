@@ -148,7 +148,7 @@ void Session_component::free(Subject_id subject_id)
 
 Session_component::Session_component(Ram_allocator &ram, Region_map &local_rm,
                                      Allocator &md_alloc, size_t ram_quota,
-                                     size_t arg_buffer_size, unsigned parent_levels,
+                                     size_t arg_buffer_size, unsigned /*parent_levels*/,
                                      char const *label, Source_registry &sources,
                                      Policy_registry &policies)
 :
@@ -156,7 +156,6 @@ Session_component::Session_component(Ram_allocator &ram, Region_map &local_rm,
 	_md_alloc(&md_alloc, ram_quota),
 	_subjects_slab(&_md_alloc),
 	_policies_slab(&_md_alloc),
-	_parent_levels(parent_levels),
 	_label(label),
 	_sources(sources),
 	_policies(policies),
