@@ -158,6 +158,8 @@ class Vfs::Fs_file_system : public File_system
 				_fs(fs_connection)
 			{ }
 
+			virtual ~Fs_vfs_handle() { _fs.close(file_handle()); }
+
 			::File_system::File_handle file_handle() const
 			{ return ::File_system::File_handle { id().value }; }
 
@@ -333,11 +335,12 @@ class Vfs::Fs_file_system : public File_system
 
 			Fs_handle_guard(File_system &fs,
 			                ::File_system::Session &fs_session,
+			                Allocator &alloc,
 			                ::File_system::Node_handle fs_handle,
 			                Handle_space &space,
 			                ::File_system::Connection &fs_connection)
 			:
-				Fs_vfs_handle(fs, *(Allocator*)nullptr, 0, space, fs_handle,
+				Fs_vfs_handle(fs, alloc, 0, space, fs_handle,
 				              fs_connection),
 				_fs_session(fs_session)
 			{ }
@@ -593,7 +596,8 @@ class Vfs::Fs_file_system : public File_system
 
 			try {
 				::File_system::Node_handle node = _fs.node(path);
-				Fs_handle_guard node_guard(*this, _fs, node, _handle_space, _fs);
+				Fs_handle_guard node_guard(*this, _fs, _env.alloc(),
+				                           node, _handle_space, _fs);
 				status = _fs.status(node);
 			}
 			catch (Genode::Out_of_ram)  {
@@ -634,7 +638,8 @@ class Vfs::Fs_file_system : public File_system
 
 			try {
 				::File_system::Dir_handle dir = _fs.dir(dir_path.base(), false);
-				Fs_handle_guard dir_guard(*this, _fs, dir, _handle_space, _fs);
+				Fs_handle_guard dir_guard(*this, _fs, _env.alloc(),
+				                          dir, _handle_space, _fs);
 
 				_fs.unlink(dir, file_name.base() + 1);
 			}
@@ -669,13 +674,13 @@ class Vfs::Fs_file_system : public File_system
 				::File_system::Dir_handle from_dir =
 					_fs.dir(from_dir_path.base(), false);
 
-				Fs_handle_guard from_dir_guard(*this, _fs, from_dir,
-				                               _handle_space, _fs);
+				Fs_handle_guard from_dir_guard(
+					*this, _fs, _env.alloc(), from_dir, _handle_space, _fs);
 
 				::File_system::Dir_handle to_dir = _fs.dir(to_dir_path.base(),
 				                                           false);
 				Fs_handle_guard to_dir_guard(
-					*this, _fs, to_dir, _handle_space, _fs);
+					*this, _fs, _env.alloc(), to_dir, _handle_space, _fs);
 
 				_fs.move(from_dir, from_file_name.base() + 1,
 				         to_dir,   to_file_name.base() + 1);
@@ -693,8 +698,8 @@ class Vfs::Fs_file_system : public File_system
 
 			try {
 				::File_system::Node_handle node = _fs.node(path);
-				Fs_handle_guard node_guard(*this, _fs, node,
-				                           _handle_space, _fs);
+				Fs_handle_guard node_guard(
+					*this, _fs, _env.alloc(), node, _handle_space, _fs);
 
 				::File_system::Status status = _fs.status(node);
 
@@ -708,7 +713,8 @@ class Vfs::Fs_file_system : public File_system
 		{
 			try {
 				::File_system::Node_handle node = _fs.node(path);
-				Fs_handle_guard node_guard(*this, _fs, node, _handle_space, _fs);
+				Fs_handle_guard node_guard(
+					*this, _fs, _env.alloc(), node, _handle_space, _fs);
 
 				::File_system::Status status = _fs.status(node);
 
@@ -754,7 +760,8 @@ class Vfs::Fs_file_system : public File_system
 
 			try {
 				::File_system::Dir_handle dir = _fs.dir(dir_path.base(), false);
-				Fs_handle_guard dir_guard(*this, _fs, dir, _handle_space, _fs);
+				Fs_handle_guard dir_guard(
+					*this, _fs, _env.alloc(), dir, _handle_space, _fs);
 
 				::File_system::File_handle file = _fs.file(dir,
 				                                           file_name.base() + 1,
@@ -820,8 +827,8 @@ class Vfs::Fs_file_system : public File_system
 				::File_system::Dir_handle dir_handle = _fs.dir(abs_path.base(),
 				                                               false);
 
-				Fs_handle_guard from_dir_guard(*this, _fs, dir_handle,
-				                               _handle_space, _fs);
+				Fs_handle_guard from_dir_guard(
+					*this, _fs, _env.alloc(), dir_handle, _handle_space, _fs);
 
 				::File_system::Symlink_handle symlink_handle =
 				    _fs.symlink(dir_handle, symlink_name.base() + 1, create);
@@ -852,7 +859,6 @@ class Vfs::Fs_file_system : public File_system
 			if (fs_handle->enqueued())
 				_congested_handles.remove(*fs_handle);
 
-			_fs.close(fs_handle->file_handle());
 			destroy(fs_handle->alloc(), fs_handle);
 		}
 

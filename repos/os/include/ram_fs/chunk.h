@@ -196,7 +196,7 @@ class Ram_fs::Chunk_index : public Chunk_base
 		Chunk_index(Chunk_index const &);
 		Chunk_index &operator = (Chunk_index const &);
 
-		Allocator &_alloc;
+		Allocator *_alloc;
 
 		Entry * _entries[NUM_ENTRIES];
 
@@ -226,7 +226,7 @@ class Ram_fs::Chunk_index : public Chunk_base
 
 			seek_off_t entry_offset = base_offset() + index*ENTRY_SIZE;
 
-			_entries[index] = new (&_alloc) Entry(_alloc, entry_offset);
+			_entries[index] = new (_alloc) Entry(*_alloc, entry_offset);
 
 			_num_entries = max(_num_entries, index + 1);
 
@@ -349,7 +349,7 @@ class Ram_fs::Chunk_index : public Chunk_base
 		void _destroy_entry(unsigned i)
 		{
 			if (_entries[i] && (i < _num_entries)) {
-				destroy(&_alloc, _entries[i]);
+				destroy(_alloc, _entries[i]);
 				_entries[i] = 0;
 			}
 		}
@@ -364,12 +364,12 @@ class Ram_fs::Chunk_index : public Chunk_base
 		 * \param base_offset  absolute offset of the chunk in bytes
 		 */
 		Chunk_index(Allocator &alloc, seek_off_t base_offset)
-		: Chunk_base(base_offset), _alloc(alloc) { _init_entries(); }
+		: Chunk_base(base_offset), _alloc(&alloc) { _init_entries(); }
 
 		/**
 		 * Construct zero chunk
 		 */
-		Chunk_index() : _alloc(*(Allocator *)0) { }
+		Chunk_index() : _alloc(nullptr) { }
 
 		/**
 		 * Destructor
