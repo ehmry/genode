@@ -27,21 +27,29 @@
 
 namespace Genode {
 
-	struct Pager_object
+	class Platform_thread;
+
+	class Pager_object
 	{
-		Thread_capability         _thread_cap { };
-		Signal_context_capability _sigh       { };
+		friend class Platform_thread;
 
-		virtual ~Pager_object() { }
+		protected:
 
-		void exception_handler(Signal_context_capability sigh) { _sigh = sigh; }
+			Thread_capability         _thread_cap { };
+			Signal_context_capability _sigh       { };
 
-		/**
-		 * Remember thread cap so that rm_session can tell thread that
-		 * rm_client is gone.
-		 */
-		Thread_capability thread_cap() const { return _thread_cap; }
-		void thread_cap(Thread_capability cap) { _thread_cap = cap; }
+		public:
+
+			virtual ~Pager_object() { }
+
+			void exception_handler(Signal_context_capability sigh) { _sigh = sigh; }
+
+			/**
+			 * Remember thread cap so that rm_session can tell thread that
+			 * rm_client is gone.
+			 */
+			Thread_capability thread_cap() const { return _thread_cap; }
+			void thread_cap(Thread_capability cap) { _thread_cap = cap; }
 	};
 
 	struct Pager_entrypoint

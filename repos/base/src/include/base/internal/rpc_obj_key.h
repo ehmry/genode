@@ -18,7 +18,7 @@
 #include <base/stdint.h>
 #include <base/output.h>
 
-namespace Genode { struct Rpc_obj_key; }
+namespace Genode { class Rpc_obj_key; }
 
 
 class Genode::Rpc_obj_key

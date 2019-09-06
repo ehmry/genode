@@ -18,7 +18,7 @@
 
 namespace Genode
 {
-	class Cpu_session;
+	struct Cpu_session;
 	typedef Capability<Cpu_session> Cpu_session_capability;
 }
 

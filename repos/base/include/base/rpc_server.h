@@ -25,7 +25,7 @@
 
 namespace Genode {
 
-	class Ipc_server;
+	struct Ipc_server;
 
 	template <typename, typename> class Rpc_dispatcher;
 	class Rpc_object_base;

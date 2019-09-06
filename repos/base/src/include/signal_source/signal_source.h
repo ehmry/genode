@@ -18,7 +18,7 @@
 #ifndef _INCLUDE__SIGNAL_SOURCE__SIGNAL_SOURCE_H_
 #define _INCLUDE__SIGNAL_SOURCE__SIGNAL_SOURCE_H_
 
-namespace Genode { class Signal_source; }
+namespace Genode { struct Signal_source; }
 
 /**
  * Blocking part of the PD-session interface

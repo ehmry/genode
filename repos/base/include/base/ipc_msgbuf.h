@@ -22,7 +22,7 @@
 namespace Genode {
 
 	class Msgbuf_base;
-	template <unsigned> class Msgbuf;
+	template <unsigned> struct Msgbuf;
 }
 
 

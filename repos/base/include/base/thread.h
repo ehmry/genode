@@ -23,11 +23,11 @@
 #include <cpu_session/cpu_session.h>  /* for 'Thread_capability' type */
 
 namespace Genode {
-	struct Native_utcb;
+	class Native_utcb;
 	struct Native_thread;
 	class Thread;
 	class Stack;
-	class Env;
+	struct Env;
 	template <unsigned> class Thread_deprecated;
 }
 
@@ -161,7 +161,7 @@ class Genode::Thread
 		 */
 		Tls _tls { };
 
-		friend class Tls::Base;
+		friend struct Tls::Base;
 
 		/**
 		 * Hook for platform-specific constructor supplements

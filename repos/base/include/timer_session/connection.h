@@ -25,7 +25,7 @@
 namespace Timer
 {
 	class Connection;
-	template <typename> class Periodic_timeout;
+	template <typename> struct Periodic_timeout;
 	template <typename> class One_shot_timeout;
 }
 

@@ -22,7 +22,7 @@
 
 namespace Genode {
 
-	class Local_connection_base;
+	struct Local_connection_base;
 	template <typename> class Local_connection;
 }
 

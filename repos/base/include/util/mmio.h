@@ -20,7 +20,7 @@
 namespace Genode {
 
 	class Mmio_plain_access;
-	class Mmio;
+	struct Mmio;
 }
 
 /**

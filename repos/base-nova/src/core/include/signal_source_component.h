@@ -20,7 +20,7 @@
 
 namespace Genode {
 
-	class Signal_context_component;
+	struct Signal_context_component;
 	class Signal_source_component;
 }
 

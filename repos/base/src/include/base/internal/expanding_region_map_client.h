@@ -22,7 +22,7 @@
 /* base-internal includes */
 #include <base/internal/upgradeable_client.h>
 
-namespace Genode { class Expanding_region_map_client; }
+namespace Genode { struct Expanding_region_map_client; }
 
 
 struct Genode::Expanding_region_map_client : Region_map_client

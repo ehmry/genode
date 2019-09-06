@@ -19,7 +19,7 @@
 
 namespace Genode {
 
-	template <typename> struct Rpc_client;
+	template <typename> class Rpc_client;
 
 	/**
 	 * Count capabilities of a RPC_FUNCTION which are out parameters.

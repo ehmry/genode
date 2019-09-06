@@ -108,7 +108,7 @@ class Wm::Nitpicker::View : private Genode::Weak_object<View>,
 	private:
 
 		friend class Genode::Weak_ptr<View>;
-		friend class Genode::Locked_ptr<View>;
+		friend struct Genode::Locked_ptr<View>;
 
 	protected:
 

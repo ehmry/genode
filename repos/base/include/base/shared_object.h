@@ -24,7 +24,7 @@ namespace Genode {
 
 	class  Shared_object;
 	struct Address_info;
-	struct Dynamic_linker;
+	class Dynamic_linker;
 };
 
 

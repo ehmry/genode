@@ -33,10 +33,10 @@
  */
 namespace Linker {
 	class  Object;
-	struct Root_object;
-	struct Dependency;
-	struct Elf_object;
-	struct Dynamic;
+	class Root_object;
+	class Dependency;
+	class Elf_object;
+	class Dynamic;
 
 	typedef void (*Func)(void);
 

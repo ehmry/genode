@@ -383,7 +383,7 @@ class Genode::Region_map_component : private Weak_object<Region_map_component>,
 		~Region_map_component();
 
 		using Weak_object<Region_map_component>::weak_ptr;
-		friend class Locked_ptr<Region_map_component>;
+		friend struct Locked_ptr<Region_map_component>;
 
 		bool equals(Weak_ptr<Region_map_component> const &other)
 		{
@@ -393,7 +393,7 @@ class Genode::Region_map_component : private Weak_object<Region_map_component>,
 		void address_space(Address_space *space) { _address_space = space; }
 		Address_space *address_space() { return _address_space; }
 
-		class Fault_area;
+		struct Fault_area;
 
 		/**
 		 * Register fault

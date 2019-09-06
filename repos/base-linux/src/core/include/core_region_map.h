@@ -17,7 +17,7 @@
 /* base-internal includes */
 #include <base/internal/region_map_mmap.h>
 
-namespace Genode { class Core_region_map; }
+namespace Genode { struct Core_region_map; }
 
 
 struct Genode::Core_region_map : Region_map_mmap

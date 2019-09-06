@@ -31,7 +31,7 @@ namespace Linker {
 	struct Debug;
 	struct Link_map;
 
-	struct Object;
+	class Object;
 	void dump_link_map(Object const &);
 }
 

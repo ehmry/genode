@@ -29,17 +29,17 @@ namespace Genode {
 
 	class Entrypoint;
 	class Rpc_entrypoint;
-	class Signal_source;
+	struct Signal_source;
 
 	class Signal_receiver;
 	class Signal_context;
 	class Signal_context_registry;
 	class Signal_transmitter;
 	class Signal;
-	class Signal_dispatcher_base;
+	struct Signal_dispatcher_base;
 
 	template <typename, typename> class Signal_handler;
-	template <typename, typename> class Io_signal_handler;
+	template <typename, typename> struct Io_signal_handler;
 
 	typedef Capability<Signal_context> Signal_context_capability;
 }
@@ -97,7 +97,7 @@ class Genode::Signal
 		 */
 		Signal(Data data);
 
-		friend class Kernel::Signal_receiver;
+		friend struct Kernel::Signal_receiver;
 		friend class Signal_receiver;
 		friend class Signal_context;
 

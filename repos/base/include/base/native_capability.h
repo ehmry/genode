@@ -37,7 +37,7 @@ class Genode::Native_capability
 		 * Forward declaration of the platform-specific internal capability
 		 * representation
 		 */
-		class Data;
+		struct Data;
 
 	private:
 

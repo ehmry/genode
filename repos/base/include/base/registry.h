@@ -106,7 +106,7 @@ struct Genode::Registry : private Registry_base
 {
 	struct Element : Registry_base::Element
 	{
-		friend class Registry;  /* allow 'for_each' to access '_obj' */
+		friend struct Registry;  /* allow 'for_each' to access '_obj' */
 
 		Element(Registry &registry, T &obj)
 		: Registry_base::Element(registry, &obj) { }

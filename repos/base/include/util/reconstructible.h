@@ -20,7 +20,7 @@
 
 namespace Genode {
 	template<typename> class Reconstructible;
-	template<typename> class Constructible;
+	template<typename> struct Constructible;
 }
 
 

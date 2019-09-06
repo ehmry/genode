@@ -33,13 +33,13 @@
 using namespace Linker;
 
 namespace Linker {
-	struct Dynamic;
+	class Dynamic;
 	struct Ld;
 	struct Ld_vtable;
 	struct Binary;
 	struct Link_map;
 	struct Debug;
-	struct Config;
+	class Config;
 };
 
 static    Binary *binary_ptr = nullptr;

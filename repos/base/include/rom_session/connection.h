@@ -18,7 +18,7 @@
 #include <base/connection.h>
 #include <base/log.h>
 
-namespace Genode { class Rom_connection; }
+namespace Genode { struct Rom_connection; }
 
 
 struct Genode::Rom_connection : Connection<Rom_session>,

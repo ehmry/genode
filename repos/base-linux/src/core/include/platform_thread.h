@@ -30,8 +30,6 @@
 
 namespace Genode {
 
-	class Platform_thread;
-
 	/*
 	 * We hold all Platform_thread objects in a list in order to be able to
 	 * reflect SIGCHLD as exception signals. When a SIGCHILD occurs, we

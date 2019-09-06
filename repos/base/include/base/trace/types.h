@@ -40,7 +40,7 @@ namespace Genode { namespace Trace {
 	struct Policy_id;
 	struct Subject_id;
 	struct Execution_time;
-	struct Subject_info;
+	class Subject_info;
 } }
 
 

@@ -19,7 +19,7 @@
 #include <vm_session/handler.h>
 #include <base/rpc_client.h>
 
-namespace Genode { struct Vm_session_client; class Allocator; class Vm_state; }
+namespace Genode { struct Vm_session_client; struct Allocator; struct Vm_state; }
 
 /**
  * Client-side VM session interface

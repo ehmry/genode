@@ -18,7 +18,7 @@
 #include <pd_session/pd_session.h>
 #include <signal_source/signal_source.h>
 
-namespace Genode { class Signal_source_client; }
+namespace Genode { struct Signal_source_client; }
 
 struct Genode::Signal_source_client : Rpc_client<Signal_source>
 {

@@ -16,7 +16,7 @@
 
 #include <base/stdint.h>
 
-namespace Genode { struct Native_utcb; }
+namespace Genode { class Native_utcb; }
 
 class Genode::Native_utcb
 {

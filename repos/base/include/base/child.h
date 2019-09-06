@@ -30,7 +30,7 @@
 
 namespace Genode {
 	struct Child_policy;
-	struct Child;
+	class Child;
 }
 
 

@@ -14,6 +14,6 @@
 #ifndef _INCLUDE__BASE__INTERNAL__NATIVE_UTCB_H_
 #define _INCLUDE__BASE__INTERNAL__NATIVE_UTCB_H_
 
-namespace Genode { struct Native_utcb { }; }
+namespace Genode { class Native_utcb { }; }
 
 #endif /* _INCLUDE__BASE__INTERNAL__NATIVE_UTCB_H_ */

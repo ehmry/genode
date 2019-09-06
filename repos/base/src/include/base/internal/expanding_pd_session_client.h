@@ -18,7 +18,7 @@
 #include <util/retry.h>
 #include <pd_session/client.h>
 
-namespace Genode { class Expanding_pd_session_client; }
+namespace Genode { struct Expanding_pd_session_client; }
 
 
 struct Genode::Expanding_pd_session_client : Pd_session_client

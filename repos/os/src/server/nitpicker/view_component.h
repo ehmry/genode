@@ -83,7 +83,7 @@ class Nitpicker::View_component : private Same_buffer_list_elem,
 
 		friend class View_stack;
 		friend class Session_component;
-		friend class Locked_ptr<View_component>;
+		friend struct Locked_ptr<View_component>;
 
 		/*
 		 * Noncopyable

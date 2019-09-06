@@ -22,7 +22,7 @@ namespace Genode { struct Address_space; }
 struct Genode::Address_space : private Weak_object<Address_space>,
                                public  Interface
 {
-	friend class Locked_ptr<Address_space>;
+	friend struct Locked_ptr<Address_space>;
 
 	struct Core_local_addr { addr_t value; };
 

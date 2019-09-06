@@ -25,7 +25,7 @@
 
 namespace Genode { namespace Trace {
 	class Source;
-	class Source_owner;
+	struct Source_owner;
 	class Source_registry;
 
 	/**

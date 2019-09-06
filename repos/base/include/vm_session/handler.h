@@ -17,14 +17,14 @@
 #include <base/signal.h>
 
 namespace Genode {
-	class Vm_state;
+	struct Vm_state;
 	class Vm_handler_base;
 	template <typename, typename> class Vm_handler;
 }
 
 class Genode::Vm_handler_base : public Signal_dispatcher_base
 {
-	friend class Vm_session_client;
+	friend struct Vm_session_client;
 
 	protected:
 
