@@ -163,7 +163,9 @@ class Genode::Rpc_dispatcher : public RPC_INTERFACE
 				Server_args args = _read_args(in, arg_selector);
 
 				{
-					Trace::Rpc_dispatch trace_event(This_rpc_function::name());
+#if !defined(__clang__)
+					Trace::Rpc_dispatch(This_rpc_function::name());
+#endif
 				}
 
 				/*
@@ -191,7 +193,9 @@ class Genode::Rpc_dispatcher : public RPC_INTERFACE
 				}
 
 				{
-					Trace::Rpc_reply trace_event(This_rpc_function::name());
+#if !defined(__clang__)
+					Trace::Rpc_reply(This_rpc_function::name());
+#endif
 				}
 
 				return exc;
