@@ -36,7 +36,6 @@ Child::Initial_thread::Initial_thread(Cpu_session          &cpu,
                                       Pd_session_capability pd,
                                       Name           const &name)
 :
-	_cpu(cpu),
 	_cap(cpu.create_thread(pd, name, Affinity::Location(), Cpu_session::Weight()))
 { }
 

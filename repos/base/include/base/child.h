@@ -256,7 +256,6 @@ class Genode::Child : protected Rpc_object<Parent>,
 		{
 			private:
 
-				Cpu_session      &_cpu;
 				Thread_capability _cap;
 
 			public:

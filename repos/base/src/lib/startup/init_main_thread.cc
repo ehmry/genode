@@ -98,7 +98,7 @@ extern "C" void init_main_thread()
 	 * Explicitly setup program environment at this point to ensure that its
 	 * destructor won't be registered for the atexit routine.
 	 */
-	(void*)env_deprecated();
+	(void)env_deprecated();
 	init_log(*env_deprecated()->parent());
 	init_exit(*env_deprecated()->parent());
 

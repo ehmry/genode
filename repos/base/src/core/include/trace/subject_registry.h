@@ -309,7 +309,6 @@ class Genode::Trace::Subject_registry
 		typedef List<Subject> Subjects;
 
 		Allocator       &_md_alloc;
-		Ram_allocator   &_ram;
 		Source_registry &_sources;
 		unsigned         _id_cnt  { 0 };
 		Lock             _lock    { };
@@ -399,7 +398,7 @@ class Genode::Trace::Subject_registry
 		Subject_registry(Allocator &md_alloc, Ram_allocator &ram,
 		                 Source_registry &sources)
 		:
-			_md_alloc(md_alloc), _ram(ram), _sources(sources)
+			_md_alloc(md_alloc), _sources(sources)
 		{ }
 
 		/**
