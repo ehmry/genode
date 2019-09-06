@@ -427,7 +427,7 @@ class Genode::Trace::Subject_registry
 		 */
 		size_t subjects(Subject_id *dst, size_t dst_len)
 		{
-			Lock guard(_lock);
+			[[maybe_unused]] Lock guard(_lock);
 
 			unsigned i = 0;
 			for (Subject *s = _entries.first(); s && i < dst_len; s = s->next())
@@ -453,7 +453,7 @@ class Genode::Trace::Subject_registry
 
 		Subject &lookup_by_id(Subject_id id)
 		{
-			Lock guard(_lock);
+			[[maybe_unused]] Lock guard(_lock);
 
 			return _unsynchronized_lookup_by_id(id);
 		}
