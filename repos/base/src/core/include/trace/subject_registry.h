@@ -406,7 +406,7 @@ class Genode::Trace::Subject_registry
 		 */
 		~Subject_registry()
 		{
-			Lock guard(_lock);
+			[[maybe_unused]] Lock guard(_lock);
 
 			while (Subject *s = _entries.first())
 				_unsynchronized_destroy(*s);
@@ -417,7 +417,7 @@ class Genode::Trace::Subject_registry
 		 */
 		void import_new_sources(Source_registry &)
 		{
-			Lock guard(_lock);
+			[[maybe_unused]] Lock guard(_lock);
 
 			_sources.export_sources(_tester, _inserter);
 		}
@@ -445,7 +445,7 @@ class Genode::Trace::Subject_registry
 		 */
 		size_t release(Subject_id subject_id)
 		{
-			Lock guard(_lock);
+			[[maybe_unused]] Lock guard(_lock);
 
 			Subject &subject = _unsynchronized_lookup_by_id(subject_id);
 			return _unsynchronized_destroy(subject);

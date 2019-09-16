@@ -35,7 +35,7 @@ class Genode::Native_utcb
 		 * and the user process. It is not backed by a
 		 * dataspace but provided by the kernel.
 		 */
-		addr_t _utcb[UTCB_SIZE/sizeof(addr_t)];
+		[[maybe_unused]] addr_t _utcb[UTCB_SIZE/sizeof(addr_t)];
 
 	public:
 
