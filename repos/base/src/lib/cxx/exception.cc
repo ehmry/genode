@@ -15,6 +15,7 @@
 /* libsupc++ includes */
 #include <cxxabi.h>
 #include <exception>
+#include <typeinfo>
 
 /* Genode includes */
 #include <base/log.h>
