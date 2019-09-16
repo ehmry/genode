@@ -72,7 +72,7 @@ class Genode::Core_env : public Env_deprecated, Noncopyable
 			            Ram_dataspace_factory::Virt_range { platform().vm_start(),
 			                                                platform().vm_size() },
 			            _region_map,
-			            *((Pager_entrypoint *)nullptr),
+			            nullptr,
 			            "" /* args to native PD */,
 			            platform_specific().core_mem_alloc())
 		{

@@ -70,7 +70,7 @@ class Genode::Pd_root : public Genode::Root_component<Genode::Pd_session_compone
 				                     _phys_alloc,
 				                     _phys_range_from_args(args),
 				                     _virt_range_from_args(args),
-				                     _local_rm, _pager_ep, args,
+				                     _local_rm, &_pager_ep, args,
 				                     _core_mem);
 		}
 

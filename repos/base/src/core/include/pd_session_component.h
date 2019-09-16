@@ -124,7 +124,7 @@ class Genode::Pd_session_component : public Session_object<Pd_session>
 		                     Phys_range        phys_range,
 		                     Virt_range        virt_range,
 		                     Region_map       &local_rm,
-		                     Pager_entrypoint &pager_ep,
+		                     Pager_entrypoint *pager_ep,
 		                     char const       *args,
 		                     Range_allocator  &core_mem)
 		:

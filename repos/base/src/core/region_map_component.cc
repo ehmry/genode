@@ -644,7 +644,7 @@ _type_deduction_helper(Dataspace_capability cap) { return cap; }
 
 Region_map_component::Region_map_component(Rpc_entrypoint   &ep,
                                            Allocator        &md_alloc,
-                                           Pager_entrypoint &pager_ep,
+                                           Pager_entrypoint *pager_ep,
                                            addr_t            vm_start,
                                            size_t            vm_size,
                                            Session::Diag     diag)
