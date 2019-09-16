@@ -66,8 +66,14 @@ typedef unsigned long Block_header;
 
 extern "C" void *malloc(size_t size)
 {
-	/* enforce size to be a multiple of 4 bytes */
-	size = (size + 3) & ~3;
+	/*
+	 * Use a double-word aligned allocations as required by the Itanium C++ ABI.
+	 *
+	 * See https://itanium-cxx-abi.github.io/cxx-abi/abi-eh.html#base-data
+	 */
+
+	constexpr size_t align_mask = sizeof(long)*2 - 1;
+	size = (size + align_mask) & ~align_mask;
 
 	/*
 	 * We store the size of the allocation at the very
@@ -75,13 +81,21 @@ extern "C" void *malloc(size_t size)
 	 * the subsequent address. This way, we can retrieve
 	 * the size information when freeing the block.
 	 */
-	unsigned long real_size = size + sizeof(Block_header);
+	unsigned long real_size = size + sizeof(Block_header)*2;
 	void *addr = 0;
 	if (!cxx_heap().alloc(real_size, &addr))
 		return 0;
 
 	*(Block_header *)addr = real_size;
-	return (Block_header *)addr + 1;
+
+	return (Block_header *)addr + 2;
+}
+
+
+extern "C" int posix_memalign(void **dest, size_t /*align*/, size_t size)
+{
+	*dest = malloc(size);
+	return *dest ? 0 : 1;
 }
 
 
@@ -97,7 +111,7 @@ extern "C" void free(void *ptr)
 {
 	if (!ptr) return;
 
-	unsigned long *addr = ((unsigned long *)ptr) - 1;
+	unsigned long *addr = ((unsigned long *)ptr) - 2;
 	cxx_heap().free(addr, *addr);
 }
 
@@ -113,7 +127,7 @@ extern "C" void *realloc(void *ptr, Genode::size_t size)
 	}
 
 	/* determine size of old block content (without header) */
-	unsigned long old_size = *((Block_header *)ptr - 1)
+	unsigned long old_size = *((Block_header *)ptr - 2)
 	                         - sizeof(Block_header);
 
 	/* do not reallocate if new size is less than the current size */

@@ -62,9 +62,9 @@ extern "C" int __cxa_atexit(void(*func)(void*), void *arg,
 extern int genode___cxa_finalize(void *dso);
 
 
-extern "C" void __cxa_finalize(void *dso)
+extern "C" int __cxa_finalize(void *dso)
 {
-	genode___cxa_finalize(dso);
+	return genode___cxa_finalize(dso);
 }
 
 
@@ -124,6 +124,17 @@ extern "C" void abort(void)
 		genode_exit(1);
 
 	Genode::sleep_forever();
+}
+
+
+extern "C" int fflush(void*) {
+	return 0;
+}
+
+
+extern "C" int fprintf(void*, const char *msg, ...) {
+	Genode::warning("C++ runtime: ", msg);
+	return 0;
 }
 
 
@@ -215,6 +226,12 @@ extern "C" int strcmp(const char *s1, const char *s2)
 }
 
 
+extern "C" char *getenv(const char *)
+{
+	return NULL;
+}
+
+
 /*
  * Needed by ARM EABI (gcc-4.4 Codesourcery release1039)
  */
@@ -222,6 +239,42 @@ extern "C" int sprintf(char *, const char *, ...)
 {
 	Genode::warning("sprintf - not implemented");
 	return 0;
+}
+
+
+/*
+ * Needed by Clang/Libunwind/Libc++abi
+ */
+
+extern "C" {
+
+
+void __assert(const char *, const char *, int, const char *) {
+	std::terminate();
+}
+
+int tolower(int c) { return c; }
+int isdigit(int) { return 0; }
+int isxdigit(int) { return 0; }
+int islower(int) { return 0; }
+
+
+int snprintf(char *, size_t, const char *, ...) { return 0; }
+
+int vfprintf(FILE *, const char *msg, va_list)
+{
+	Genode::warning("C++ runtime: ", msg);
+	return 0;
+}
+
+struct Dl_info;
+int dladdr(const void *, Dl_info *) { return 0; }
+
+struct pthread_rwlock_t;
+int pthread_rwlock_rdlock(pthread_rwlock_t *) { return 0; }
+int pthread_rwlock_unlock(pthread_rwlock_t *) { return 0; }
+int pthread_rwlock_wrlock(pthread_rwlock_t *) { return 0; }
+
 }
 
 

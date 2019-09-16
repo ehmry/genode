@@ -3,6 +3,16 @@ include_rules
 DEFINES = -ffunction-sections -fno-strict-aliasing -g -fPIC
 	# drop the standard defines to avoid -nostdinc
 
+export LIBCXX
+export LIBCXXABI
+export LIBUNWIND
+
+INCLUDES += -I$LIBCXX/include/c++/v1
+INCLUDES += -I$LIBCXXABI/include
+
+LLVM_LIBS += $LIBCXXABI/lib/libc++abi.a
+LLVM_LIBS += $LIBUNWIND/lib/libunwind.a
+
 : foreach *.cc |> !cxx |> {supc++}
 
 #
@@ -18,11 +28,7 @@ KEEP_SYMBOLS = \
 	-u _ZTVN10__cxxabiv119__pointer_type_infoE \
 	-u _ZTSN10__cxxabiv120__function_type_infoE \
 
-LIBCXX_GCC = \
-	`$(CXX) $(CC_MARCH) -print-file-name=libsupc++.a` \
-	`$(CXX) $(CC_MARCH) -print-file-name=libgcc_eh.a` \
-
-: {supc++} |> $(LD) $(LD_MARCH) $(KEEP_SYMBOLS) -r %f $(LIBCXX_GCC) -o %o |> supc++.tmp
+: {supc++} |> $(LD) $(LD_MARCH) $(KEEP_SYMBOLS) -r %f $(LLVM_LIBS) -o %o |> supc++.tmp
 
 #
 # Here we define all symbols we want to hide in libsupc++ and libgcc_eh
@@ -63,7 +69,8 @@ EH_SYMBOLS += \
 
 REDEF_SYMBOLS = `echo $(EH_SYMBOLS) | awk -v RS=' ' '{ print "--redefine-sym "$1"=_cxx_"$1 }'`
 
-: supc++.tmp |> $(OBJCOPY) $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++.o {obj}
+export OBJCOPY
+: supc++.tmp |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++.o {obj}
 
 : foreach *.c |> !cc |> {obj}
 
