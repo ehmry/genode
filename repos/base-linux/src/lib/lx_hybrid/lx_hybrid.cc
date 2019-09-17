@@ -154,6 +154,7 @@ int main()
 
 /* host libc includes */
 #define size_t __SIZE_TYPE__ /* see comment in 'linux_syscalls.h' */
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Weffc++"
 #include <pthread.h>
 #pragma GCC diagnostic pop
