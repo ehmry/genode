@@ -196,6 +196,7 @@ size_t Thread::stack_area_virtual_size()
 	return Genode::stack_area_virtual_size();
 }
 
+#pragma clang diagnostic ignored "-Wuninitialized"
 
 Thread::Thread(size_t weight, const char *name, size_t stack_size,
                Type type, Cpu_session *cpu_session, Affinity::Location affinity)
