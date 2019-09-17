@@ -36,6 +36,8 @@
 
 #include <nova/stdint.h>
 
+#pragma clang diagnostic ignored "-Waddress-of-packed-member"
+
 namespace Nova {
 
 	enum {
