@@ -506,9 +506,6 @@ Platform::Platform()
 	 */
 	for (unsigned i = 0; i < num_mem_desc; i++, mem_desc++) {
 		/* 32/64bit EFI image handle pointer - see multiboot spec 2 */
-		if (mem_desc->type == 20 || mem_desc->type == 19)
-			efi_boot = true;
-
 		if (mem_desc->type == Hip::Mem_desc::FRAMEBUFFER)
 			boot_fb = mem_desc;
 		if (mem_desc->type == Hip::Mem_desc::MICROHYPERVISOR)
