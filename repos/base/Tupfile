@@ -10,7 +10,7 @@ endif
 
 
 SED_FLAGS += -e "s|@toolchainincludedir@|`$(CC) $(CC_MARCH) -print-file-name=include`|"
-SED_FLAGS += -e "s|@libgcc@|`$(CC) $(CC_MARCH) -print-file-name=libgcc.a`|"
+SED_FLAGS += -e "s|@libgcc@||"
 
 SED_FLAGS += -e "s|@cc@|$(CC)|"
 SED_FLAGS += -e "s|@cxx@|$(CXX)|"
