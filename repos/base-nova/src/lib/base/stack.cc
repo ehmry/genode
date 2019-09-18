@@ -113,6 +113,8 @@ void prepare_reinit_main_thread()
  ** Thread **
  ************/
 
+#pragma clang diagnostic ignored "-Wtautological-undefined-compare"
+
 /* prevent the compiler from optimizing out the 'this' pointer check */
 __attribute__((optimize("-fno-delete-null-pointer-checks")))
 Native_utcb *Thread::utcb()
