@@ -146,6 +146,11 @@ CC_CXX_WARN_STRICT ?= -Wextra -Weffc++ -Werror -Wsuggest-override
 CC_CXX_WARN        ?= $(CC_WARN) $(CC_CXX_WARN_STRICT)
 
 #
+# Ignore Clang pragmas
+#
+CC_WARN += -Wno-error=unknown-pragmas
+
+#
 # Aggregate compiler options that are common for C and C++
 #
 CC_OPT += $(CC_OPT_NOSTDINC) -g $(CC_MARCH) $(CC_OLEVEL) $(CC_OPT_DEP) $(CC_WARN)
