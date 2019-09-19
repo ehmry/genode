@@ -71,7 +71,7 @@ CXX = $CXX
 LD= $LD
 OBJCOPY = $OBJCOPY
 
-CXXFLAGS += -Wno-undefined-bool-conversion -Wno-unknown-attributes -Wsystem-headers -Werror
+CXXFLAGS += -Wno-undefined-bool-conversion -Wno-unknown-attributes -Wsystem-headers -Werror -Wno-uninitialized
 #CXXFLAGS +=  -Wno-unused-command-line-argument
 
 export NIX_PATH
