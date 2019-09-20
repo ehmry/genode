@@ -5,13 +5,13 @@ DEFINES = -ffunction-sections -fno-strict-aliasing -g -fPIC
 
 export LIBCXX
 export LIBCXXABI
-export LIBUNWIND
+export LIBUNWIND_BAREMETAL
 
 INCLUDES += -I$LIBCXX/include/c++/v1
 INCLUDES += -I$LIBCXXABI/include
 
 LLVM_LIBS += $LIBCXXABI/lib/libc++abi.a
-LLVM_LIBS += $LIBUNWIND/lib/libunwind.a
+LLVM_LIBS += $LIBUNWIND_BAREMETAL/lib/libunwind.a
 
 : foreach *.cc |> !cxx |> {supc++}
 
@@ -70,7 +70,7 @@ EH_SYMBOLS += \
 REDEF_SYMBOLS = `echo $(EH_SYMBOLS) | awk -v RS=' ' '{ print "--redefine-sym "$1"=_cxx_"$1 }'`
 
 export OBJCOPY
-: supc++.tmp |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++.o {obj}
+: supc++.tmp |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) -weaken %f %o |> supc++.o {obj}
 
 : foreach *.c |> !cc |> {obj}
 
