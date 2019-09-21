@@ -98,9 +98,9 @@ OLEVEL = -O0
 
 !asm = |> ^ CC %b^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(DEFINES) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) -D__ASSEMBLY__ $(INCLUDES) -c %f -o %o |> %B.o
 
-!cc = | $(GENODE_DIR)/<pkg-config> |> ^o CC %f^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(DEFINES) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS) $(LIBS_CFLAGS)` $(INCLUDES) -c -fPIC %f -o %o |> %B.o
+!cc = | $(GENODE_DIR)/<pkg-config> |> ^o CC %f^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(DEFINES) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) $(INCLUDES) `$(PKG_CONFIG) --cflags $(LIBS) $(LIBS_CFLAGS)` -c -fPIC %f -o %o |> %B.o
 
-!cxx = | $(GENODE_DIR)/<pkg-config> |> ^o CXX %b^ @(CC_WRAPPER) $(CXX) $(OLEVEL) $(DEFINES) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(INCLUDES) -c -fPIC %f -o %o |> %B.o
+!cxx = | $(GENODE_DIR)/<pkg-config> |> ^o CXX %b^ @(CC_WRAPPER) $(CXX) $(OLEVEL) $(DEFINES) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) $(INCLUDES) `$(PKG_CONFIG) --cflags $(LIBS)` -c -fPIC %f -o %o |> %B.o
 
 !ld = | $(GENODE_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LDFLAGS) `$(PKG_CONFIG) --libs $(LIBS)` --whole-archive --start-group %f --no-whole-archive --end-group -o %o |>
 
