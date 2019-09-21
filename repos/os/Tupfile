@@ -1,21 +1,5 @@
-include_rules
-
 ifdef NIX_OUTPUTS_DEV
+include_rules
 SED_FLAGS += -e "s|@includedir@|@(NIX_OUTPUTS_DEV)/include/os|"
-else
-SED_FLAGS += -e "s|@includedir@|`nix-store --add $(REP_DIR)/include`|"
-endif
-
-ifeq (@(TUP_ARCH),i386)
-SED_FLAGS += -e 's|@spec_includes@|-I${includedir}/spec/x86_32 -I${includedir}/spec/x86|'
-endif
-
-ifeq (@(TUP_ARCH),x86_64)
-SED_FLAGS += -e 's|@spec_includes@|-I${includedir}/spec/x86_64 -I${includedir}/spec/x86|'
-endif
-
-ifeq (@(TUP_ARCH),arm)
-	SED_FLAGS += -e 's|@spec_includes@| -I${includedir}/spec/arm|'
-endif
-
 : *.pc.in |> !sed_pkgconfig_file |>
+endif
