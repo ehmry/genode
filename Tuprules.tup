@@ -80,8 +80,10 @@ NIX_BUILD = nix-build --option substitute no
 LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
 
 LIB_DIR = $(OUTPUTS_DEV)/lib
+
+export PKG_CONFIG_PATH
 PKG_CONFIG_DIR = $(OUTPUTS_DEV)/lib/pkgconfig
-PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR) pkg-config
+PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR):$PKG_CONFIG_PATH pkg-config
 
 DEFINES += -g
 OLEVEL = -O0
