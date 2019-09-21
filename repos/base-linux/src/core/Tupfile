@@ -53,11 +53,13 @@ LDFLAGS += \
 	-T$(REP_DIR)/src/ld/stack_area.ld \
 
 CORE_LIBS += \
-	$(BASE_DIR)/src/lib/cxx/cxx.lib.a \
-	$(BASE_DIR)/src/lib/startup/startup.lib.a \
 	$(REP_DIR)/src/lib/base/base-linux-common.lib.a \
 	$(REP_DIR)/src/lib/syscall/syscall-linux.lib.a \
 
-: {obj} $(CORE_LIBS) |> !ld |> core-linux $(REP_DIR)/<core> {bin}
+CORE_PKGS += cxx startup
+
+STATIC_LIBS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx startup`
+
+: {obj} $(CORE_LIBS) | $(DEV_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> !ld $(STATIC_LIBS) |> core-linux $(REP_DIR)/<core> {bin}
 : {bin} |> !collect_bin |>
 include &(BIN_RULES)

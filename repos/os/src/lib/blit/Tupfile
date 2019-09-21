@@ -1,7 +1,4 @@
-
 include_rules
-
-BLIT_DIR = $(GENODE_DIR)/repos/os/src/lib/blit
 
 ifeq (@(TUP_ARCH),i386)
 BLIT_INCLUDES += -Ispec/x86_32
@@ -24,4 +21,6 @@ endif
 INCLUDES += $(BLIT_INCLUDES)
 
 : foreach *.cc |> !cxx |> {obj}
-: {obj} |> !ar |> %d.lib.a
+: {obj} |> !ar |> {bin}
+: {bin} |> !collect_static |>
+: |> !emit_lib_pkg_config |>

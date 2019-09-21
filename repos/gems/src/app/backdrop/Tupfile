@@ -3,9 +3,9 @@ LIBS += libpng libc
 
 include_rules
 
-BLIT = $(GENODE_DIR)/repos/os/src/lib/blit/blit.lib.a
+LIBS += blit
 
 : foreach *.cc $(REP_DIR)/src/lib/file/*.cc |> !cxx |> %B.o {obj}
-: {obj} $(BLIT) |> !prg |> {bin}
+: {obj} |> !prg |> {bin}
 : {bin} |> !collect_bin |>
 include &(BIN_RULES)

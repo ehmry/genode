@@ -38,14 +38,13 @@ LDFLAGS += -T$(BASE_DIR)/src/ld/genode_rel.ld
 LDFLAGS += --entry=_start_initial_stack
 
 BASE_LIBS += \
-	$(BASE_DIR)/src/lib/alarm/alarm.lib.a \
 	$(REP_DIR)/src/lib/base/base-linux-common.lib.a \
 	$(REP_DIR)/src/lib/base/base-linux.lib.a \
-	$(BASE_DIR)/src/lib/cxx/cxx.lib.a \
-	$(BASE_DIR)/src/lib/ldso/startup/ldso-startup.lib.a \
-	$(BASE_DIR)/src/lib/startup/startup.lib.a \
 	$(REP_DIR)/src/lib/syscall/syscall-linux.lib.a \
-	$(BASE_DIR)/src/lib/timeout/timeout.lib.a \
+
+BASE_PKGS += alarm cxx ldso-startup startup timeout
+
+LDFLAGS += `pkg-config --static --libs $(BASE_PKGS)`
 
 : $(BASE_LIBS) {obj} | symbol.map \
 |> \

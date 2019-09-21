@@ -74,4 +74,6 @@ export OBJCOPY
 
 : foreach *.c |> !cc |> {obj}
 
-: {obj} |> !ar |> cxx.lib.a $(BASE_DIR)/<base-libs>
+: {obj} |> !ar |> {bin}
+: foreach {bin} |> !collect_static |>
+: |> !emit_lib_pkg_config |>

@@ -14,4 +14,6 @@ else
 endif
 
 : foreach $(SRC_CC) |> !cxx |> {obj}
-: {obj} |> !ar |> %d.lib.a
+: {obj} |> !ar |> {bin}
+: foreach {bin} |> !collect_static |>
+: |> !emit_lib_pkg_config |>

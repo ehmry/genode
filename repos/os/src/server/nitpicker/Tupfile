@@ -1,11 +1,10 @@
 TARGET_NAME = nitpicker
-
 include_rules
 
-BLIT_LIB = $(REP_DIR)/src/lib/blit/blit.lib.a
+LIBS += blit
 
 : foreach *.cc |> !cxx |> %B.o {obj}
 : default.tff |> !incbin |> {obj}
-: {obj} $(BLIT_LIB) |> !prg |> {bin}
+: {obj} |> !prg |> {bin}
 : {bin} |> !collect_bin |>
 include &(BIN_RULES)

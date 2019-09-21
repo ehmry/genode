@@ -1,6 +1,0 @@
-LIBS += base
-include_rules
-
-: foreach startup.cc |> !cxx |> %B.o {obj}
-: {obj} |  |> !ar |> ldso-startup.lib.a
-: {obj} |  |> !ar |> $(LIB_DIR)/ldso-startup.lib.a $(GENODE_DIR)/<lib>

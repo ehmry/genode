@@ -12,4 +12,6 @@ ifeq (@(TUP_ARCH),arm64)
 	: foreach spec/arm_64/*.s |> !asm |> {obj}
 endif
 
-: {obj} |> !ar |> startup.lib.a $(BASE_DIR)/<base-libs>
+: {obj} |> !ar |> {bin}
+: foreach {bin} |> !collect_static |>
+: |> !emit_lib_pkg_config |>

@@ -1,5 +1,6 @@
 include_rules
+
 : foreach *.cc |> !cxx |> {obj}
-: {obj} |> !ar |> {bin}
-: foreach {bin} |> !collect_static |>
+: {obj} |> !ar |> %d.lib.a {bin}
+: {bin} |> !collect_static |>
 : |> !emit_lib_pkg_config |>

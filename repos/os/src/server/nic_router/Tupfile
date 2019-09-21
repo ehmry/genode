@@ -1,10 +1,9 @@
 TARGET_NAME = nic_router
 INCLUDES += -I.
 include_rules
+LIBS += net
 
 : foreach *.cc |> !cxx |> %B.o {obj}
-: foreach ../../lib/net/*.cc |> !cxx |> %B.o {obj}
-
 : {obj} |> !prg |> {bin}
 : {bin} |> !collect_bin |>
 include &(BIN_RULES)

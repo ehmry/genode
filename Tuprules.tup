@@ -2,6 +2,7 @@
 
 OUTPUTS_OUT=$(TUP_CWD)/out
 OUTPUTS_DEV=$(TUP_CWD)/dev
+DEV_DIR = $(TUP_CWD)/dev
 
 ifeq (@(TUP_ARCH),i386)
 CC_MARCH = -march=i686 -m32
@@ -25,7 +26,7 @@ GENODE_DIR = $(TUP_CWD)
 
 LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
 
-!prg = | $(GENODE_DIR)/<lib> $(GENODE_DIR)/<pkg-config> \
+!prg = | $(GENODE_DIR)/<lib> $(DEV_DIR)/<lib> $(GENODE_DIR)/<pkg-config> \
 |> ^o LD %o^ \
 	$(LD) $(LD_MARCH) $(LDFLAGS) \
 	-L$(LIB_DIR) \
@@ -35,7 +36,7 @@ LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
 	-o %o \
 |> %d
 
-!lib = | $(GENODE_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LD_MARCH) %f $(LDFLAGS) `$(PKG_CONFIG) --libs genode-lib $(LIBS)` -L$(LIB_DIR) -o %o |>
+!lib = | $(GENODE_DIR)/<lib> $(DEV_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LD_MARCH) %f $(LDFLAGS) `$(PKG_CONFIG) --libs genode-lib $(LIBS)` -L$(LIB_DIR) -o %o |>
 
 ifeq ($(BIN_NAME),)
 BIN_NAME = $(TARGET_NAME)
@@ -61,6 +62,11 @@ BIN_DIR = $(OUT_BIN_DIR)/$(BIN_NAME)/$(DEPOT_VERSION)
 !collect_bin = |> ^ COLLECT %b^ \
 	$STRIP -o %o %f \
 |> $(OUT_BIN_DIR)/$(BIN_NAME)/%b $(OUTPUTS_OUT)/<bin>
+
+!collect_static = |> ^ COLLECT %b^ \
+	cp %f %o \
+|> $(DEV_DIR)/lib/%b \
+	$(DEV_DIR)/<lib> \
 
 export CC
 export CXX
@@ -145,10 +151,14 @@ BASE_DIR = $(GENODE_DIR)/repos/base
 |> binary_%b.o
 
 export AR
-!ar = |> ^ MERGE %o^ $AR -rcs %o %f |>
+!ar = |> ^ MERGE %o^ $AR -rcs %o %f |> %d.lib.a
+
+export version
+GIT_VERSION = `git describe || echo $version`
 
 export TOOLCHAIN_DIR
-SED_FLAGS += -e "s|@DEPOT_VERSION@|$(DEPOT_VERSION)|"
+SED_PKGCONFIG_FLAGS += -e "s|@DEPOT_VERSION@|$(GIT_VERSION)|"
+SED_PKGCONFIG_FLAGS += -e "s|@VERSION@|$(GIT_VERSION)|"
 
 !sed_pkgconfig_file = |> ^o SED %B^ \
 	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) < %f > %o; \
@@ -157,5 +167,13 @@ SED_FLAGS += -e "s|@DEPOT_VERSION@|$(DEPOT_VERSION)|"
 
 !sed_pkgconfig_flags = |> ^o SED %d.pc^ \
 	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) > %o; \
+	pkg-config --validate %o; \
+|> $(PKG_CONFIG_DIR)/%d.pc $(GENODE_DIR)/<pkg-config>
+
+!emit_lib_pkg_config = |> \
+	echo Name: %d >> %o; \
+	echo Description: Genode %d library >> %o; \
+	echo Version: $(GIT_VERSION) >> %o; \
+	echo Libs: -l:%d.lib.a >> %o; \
 	pkg-config --validate %o; \
 |> $(PKG_CONFIG_DIR)/%d.pc $(GENODE_DIR)/<pkg-config>
