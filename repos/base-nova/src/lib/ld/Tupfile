@@ -1,5 +1,3 @@
-ifeq (@(BUILD_NOVA),y)
-
 TARGET_NAME = base-nova
 include_rules
 INCLUDES += -I$(BASE_DIR)/src/include
@@ -59,5 +57,3 @@ LDFLAGS += `pkg-config --static --libs $(BASE_PKGS)`
 
 : {bin} |> !collect_bin |>
 include &(BIN_RULES)
-
-endif

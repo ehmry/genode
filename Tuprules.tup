@@ -5,12 +5,14 @@ OUTPUTS_DEV=$(TUP_CWD)/dev
 DEV_DIR = $(TUP_CWD)/dev
 
 ifeq (@(TUP_ARCH),i386)
+X86 = y
 CC_MARCH = -march=i686 -m32
 LD_MARCH = -melf_i386
 AS_MARCH = -march=i686 --32
 endif
 
 ifeq (@(TUP_ARCH),x86_64)
+X86 = y
 TOOL_CHAIN_PREFIX=genode-x86-
 CC_MARCH = -m64 -mcmodel=large
 LD_MARCH = -melf_x86_64
@@ -92,7 +94,12 @@ PKG_CONFIG_DIR = $(OUTPUTS_DEV)/lib/pkgconfig
 PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR):$PKG_CONFIG_PATH pkg-config
 
 DEFINES += -g
+
+ifdef OLEVEL
+OLEVEL = @(OLEVEL)
+else
 OLEVEL = -O0
+endif
 
 !ir = | $(GENODE_DIR)/<pkg-config> |> clang $(OLEVEL) $(DEFINES) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(INCLUDES) -S -emit-llvm %f |> %B.ll
 

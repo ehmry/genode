@@ -1,5 +1,3 @@
-ifeq (@(BUILD_NOVA),y)
-
 include_rules
 GEN_CORE_DIR = $(BASE_DIR)/src/core
 
@@ -55,5 +53,3 @@ CXXFLAGS_$(GEN_CORE_DIR)/version.cc += -DGENODE_VERSION=\"`git describe`\"
 	|> $(LD) $(LD_MARCH) -u _start --whole-archive -r \
 		%<base-common> %<base-libs> %f -o %o \
 	|> core-nova.o $(REP_DIR)/<core>
-
-endif

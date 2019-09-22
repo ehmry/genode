@@ -1,7 +1,7 @@
-ifdef x86
-
 TARGET_NAME = ps2_drv
 include_rules
+ifneq ($(X86),)
+
 : foreach $(SRC_CC) *.cc |> !cxx |> %B.o {obj}
 : {obj} |  |> !prg |> $(TARGET_NAME) {bin}
 : {bin} |> !collect_bin |>

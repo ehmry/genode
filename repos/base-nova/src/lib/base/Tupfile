@@ -1,5 +1,3 @@
-ifeq (@(BUILD_NOVA),y)
-
 include_rules
 INCLUDES += -I$(BASE_DIR)/src/include
 
@@ -42,5 +40,3 @@ SRC_CC += \
 : foreach $(SRC_CC) |> !cxx |> {base-obj}
 
 : {base-obj} |> !ar |> base-nova.lib.a
-
-endif
