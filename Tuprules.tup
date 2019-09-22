@@ -1,7 +1,6 @@
 .gitignore
 
-OUTPUTS_OUT=$(TUP_CWD)/out
-OUTPUTS_DEV=$(TUP_CWD)/dev
+OUT_DIR=$(TUP_CWD)/out
 DEV_DIR = $(TUP_CWD)/dev
 
 ifeq (@(TUP_ARCH),i386)
@@ -22,7 +21,7 @@ ifeq (@(TUP_ARCH),arm_v8)
 CC_MARCH = -march=armv8-a
 endif
 
-OUT_BIN_DIR = $(OUTPUTS_OUT)/bin
+OUT_BIN_DIR = $(OUT_DIR)/bin
 
 GENODE_DIR = $(TUP_CWD)
 
@@ -52,9 +51,6 @@ endif
 
 BIN_VERSION=$(DEPOT_VERSION)
 
-BIN_DIR = $(OUT_BIN_DIR)/$(BIN_NAME)/$(DEPOT_VERSION)
-	# Destination for locally defined binary package
-
 !bin = |> |>
 	# Macro invoked in BIN_RULES
 
@@ -63,7 +59,7 @@ BIN_DIR = $(OUT_BIN_DIR)/$(BIN_NAME)/$(DEPOT_VERSION)
 
 !collect_bin = |> ^ COLLECT %b^ \
 	$STRIP -o %o %f \
-|> $(OUT_BIN_DIR)/$(BIN_NAME)/%b $(OUTPUTS_OUT)/<bin>
+|> $(OUT_BIN_DIR)/$(BIN_NAME)/%b $(OUT_DIR)/<bin>
 
 !collect_static = |> ^ COLLECT %b^ \
 	cp %f %o \
@@ -87,10 +83,10 @@ NIX_BUILD = nix-build --option substitute no
 
 LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
 
-LIB_DIR = $(OUTPUTS_DEV)/lib
+LIB_DIR = $(DEV_DIR)/lib
 
 export PKG_CONFIG_PATH
-PKG_CONFIG_DIR = $(OUTPUTS_DEV)/lib/pkgconfig
+PKG_CONFIG_DIR = $(DEV_DIR)/lib/pkgconfig
 PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR):$PKG_CONFIG_PATH pkg-config
 
 DEFINES += -g
@@ -140,7 +136,7 @@ endif
 		-T &(LD_SCRIPT_SO) \
 		tmp.o; \
 	rm tmp.o; \
-|> $(OUTPUTS_DEV)/lib/%B.lib.so $(GENODE_DIR)/<lib>
+|> $(DEV_DIR)/lib/%B.lib.so $(GENODE_DIR)/<lib>
 
 !dhall = |> ^b dhall > %o^ dhall |>
 
