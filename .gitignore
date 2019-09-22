@@ -13,6 +13,5 @@
 ##### Do not edit.
 .tup
 /.gitignore
-/bin.dhall
 /dev
 /out
