@@ -1,8 +1,0 @@
-TARGET_NAME = sculpt_manager
-INCLUDES += -I.
-INCLUDES += -I../depot_deploy
-include_rules
-: foreach *.cc view/*.cc |> !cxx |> %B.o {obj}
-: {obj} |> !prg |> {bin}
-: {bin} |> !collect_bin |>
-include &(BIN_RULES)

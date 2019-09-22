@@ -1,7 +1,0 @@
-TARGET_NAME = pipe
-LIBS += posix
-include_rules
-: foreach *.cc |> !cxx |> %B.o {obj}
-: {obj} |> !prg |> {bin}
-: {bin} |> !collect_bin |>
-include &(BIN_RULES)

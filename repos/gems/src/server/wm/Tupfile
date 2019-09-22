@@ -1,8 +1,0 @@
-TARGET_NAME = wm
-INCLUDES += -I.
-include_rules
-
-: foreach *.cc |> !cxx |> %B.o {obj}
-: {obj} |> !prg |> {bin}
-: {bin} |> !collect_bin |>
-include &(BIN_RULES)

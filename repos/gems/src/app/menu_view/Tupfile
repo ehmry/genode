@@ -1,9 +1,0 @@
-TARGET_NAME = menu_view
-LIBS += libpng libc
-include_rules
-INCLUDES += -I.
-INCLUDES += -I$(REP_DIR)/../demo/include
-: foreach *.cc $(REP_DIR)/src/lib/file/*.cc |> !cxx |> %B.o {obj}
-: {obj} |> !prg |> {bin}
-: {bin} |> !collect_bin |>
-include &(BIN_RULES)

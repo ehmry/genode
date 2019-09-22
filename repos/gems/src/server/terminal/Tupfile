@@ -1,7 +1,0 @@
-TARGET_NAME = terminal
-LIBS += vfs
-include_rules
-: foreach *.cc |> !cxx |> %B.o {obj}
-: {obj} |> !prg |> {bin}
-: {bin} |> !collect_bin |>
-include &(BIN_RULES)
