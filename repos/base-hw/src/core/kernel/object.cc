@@ -13,7 +13,7 @@ using namespace Kernel;
 
 Object::~Object()
 {
-	for (Object_identity * oi = first(); oi; oi = first())
+	for (Object_identity * oi = list.first(); oi; oi = list.first())
 		oi->invalidate();
 }
 
@@ -24,18 +24,18 @@ Object::~Object()
 
 void Object_identity::invalidate()
 {
-	for (Object_identity_reference * oir = first(); oir; oir = first())
+	for (Object_identity_reference * oir = list.first(); oir; oir = list.first())
 		oir->invalidate();
 
 	if (_object) {
-		_object->remove(this);
+		_object->list.remove(this);
 		_object = nullptr;
 	}
 }
 
 
 Object_identity::Object_identity(Object & object)
-: _object(&object) { _object->insert(this); }
+: _object(&object) { _object->list.insert(this); }
 
 
 Object_identity::~Object_identity() { invalidate(); }
@@ -50,7 +50,7 @@ Object_identity_reference::find(Pd &pd)
 {
 	if (!_identity) return nullptr;
 
-	for (Object_identity_reference * oir = _identity->first();
+	for (Object_identity_reference * oir = _identity->list.first();
 	     oir; oir = oir->next())
 		if (&pd == &(oir->_pd)) return oir;
 	return nullptr;
@@ -79,7 +79,7 @@ Object_identity_reference * Object_identity_reference::factory(void * dst,
 
 
 void Object_identity_reference::invalidate() {
-	if (_identity) _identity->remove(this);
+	if (_identity) _identity->list.remove(this);
 	_identity = nullptr;
 }
 
@@ -88,7 +88,7 @@ Object_identity_reference::Object_identity_reference(Object_identity *oi,
                                                      Pd              &pd)
 : _capid(pd.capid_alloc().alloc()), _identity(oi), _pd(pd), _in_utcbs(0)
 {
-	if (_identity) _identity->insert(this);
+	if (_identity) _identity->list.insert(this);
 	_pd.cap_tree().insert(this);
 }
 

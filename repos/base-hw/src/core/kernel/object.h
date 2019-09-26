@@ -71,18 +71,16 @@ namespace Kernel
 }
 
 
-struct Kernel::Object : private Object_identity_list
+class Kernel::Object
 {
-	using Object_identity_list::remove;
-	using Object_identity_list::insert;
+	Object_identity_list list { };
 
 	virtual ~Object();
 };
 
 
 class Kernel::Object_identity
-: public Object_identity_list::Element,
-  public Kernel::Object_identity_reference_list
+: public Object_identity_list::Element
 {
 	private:
 
@@ -95,6 +93,8 @@ class Kernel::Object_identity
 		Object * _object = nullptr;
 
 	public:
+
+		Kernel::Object_identity_reference_list list { };
 
 		Object_identity(Object & object);
 		~Object_identity();
