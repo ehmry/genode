@@ -69,6 +69,7 @@ namespace Kernel
  *   publicly provide via a 'typedef Genode::Cpu::Arch_regs Arch_regs'.
  *   Then, the 'Genode::Cpu' could be inherited privately.
  */
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 
 class Kernel::Cpu : public Genode::Cpu, private Irq::Pool, private Timeout
