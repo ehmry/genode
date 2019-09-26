@@ -16,7 +16,7 @@
 
 /* core includes */
 #include <cpu_session_component.h>
-#include <kernel/configuration.h>
+#include "kernel/configuration.h"
 
 using namespace Genode;
 

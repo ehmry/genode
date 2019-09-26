@@ -20,10 +20,10 @@
 
 /* core includes */
 #include <platform_pd.h>
-#include <kernel/ipc_node.h>
-#include <kernel/pd.h>
-#include <kernel/kernel.h>
-#include <kernel/thread.h>
+#include "ipc_node.h"
+#include "pd.h"
+#include "kernel.h"
+#include "thread.h"
 
 using namespace Kernel;
 

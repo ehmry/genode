@@ -17,8 +17,8 @@
 /* core includes */
 #include <util.h>
 #include <util/misc_math.h>
-#include <kernel/configuration.h>
-#include <kernel/double_list.h>
+#include "configuration.h"
+#include "double_list.h"
 
 namespace Kernel
 {

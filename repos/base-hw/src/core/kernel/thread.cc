@@ -24,11 +24,11 @@
 
 /* core includes */
 #include <hw/assert.h>
-#include <kernel/cpu.h>
-#include <kernel/kernel.h>
-#include <kernel/thread.h>
-#include <kernel/irq.h>
-#include <kernel/log.h>
+#include "cpu.h"
+#include "kernel.h"
+#include "thread.h"
+#include "irq.h"
+#include "log.h"
 #include <map_local.h>
 #include <platform_pd.h>
 

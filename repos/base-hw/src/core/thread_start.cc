@@ -22,8 +22,8 @@
 #include <base/internal/native_utcb.h>
 
 /* core includes */
-#include <map_local.h>
-#include <kernel/kernel.h>
+#include "map_local.h"
+#include "kernel/kernel.h"
 #include <platform.h>
 #include <platform_thread.h>
 

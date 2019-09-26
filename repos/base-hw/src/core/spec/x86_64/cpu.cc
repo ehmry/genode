@@ -13,8 +13,8 @@
 
 /* core includes */
 #include <cpu.h>
-#include <kernel/thread.h>
-#include <kernel/pd.h>
+#include "../../kernel/thread.h"
+#include "../../kernel/pd.h"
 
 extern int __idt;
 extern int __idt_end;

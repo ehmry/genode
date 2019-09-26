@@ -1,0 +1,38 @@
+include_rules
+
+GENERIC_DIR = $(BASE_DIR)/src/lib/base
+
+GENERIC_SRC_CC += \
+	$(GENERIC_DIR)/allocator_avl.cc \
+	$(GENERIC_DIR)/avl_tree.cc \
+	$(GENERIC_DIR)/child.cc \
+	$(GENERIC_DIR)/child_process.cc \
+	$(GENERIC_DIR)/component.cc \
+	$(GENERIC_DIR)/console.cc \
+	$(GENERIC_DIR)/elf_binary.cc \
+	$(GENERIC_DIR)/entrypoint.cc \
+	$(GENERIC_DIR)/env_session_id_space.cc \
+	$(GENERIC_DIR)/heap.cc \
+	$(GENERIC_DIR)/lock.cc \
+	$(GENERIC_DIR)/log.cc \
+	$(GENERIC_DIR)/output.cc \
+	$(GENERIC_DIR)/raw_output.cc \
+	$(GENERIC_DIR)/region_map_client.cc \
+	$(GENERIC_DIR)/registry.cc \
+	$(GENERIC_DIR)/rm_session_client.cc \
+	$(GENERIC_DIR)/root_proxy.cc \
+	$(GENERIC_DIR)/session_state.cc \
+	$(GENERIC_DIR)/signal_common.cc \
+	$(GENERIC_DIR)/slab.cc \
+	$(GENERIC_DIR)/sleep.cc \
+	$(GENERIC_DIR)/sliced_heap.cc \
+	$(GENERIC_DIR)/stack_allocator.cc \
+	$(GENERIC_DIR)/stack_protector.cc \
+	$(GENERIC_DIR)/thread.cc \
+	$(GENERIC_DIR)/thread_myself.cc \
+	$(GENERIC_DIR)/trace.cc \
+	$(GENERIC_DIR)/vm_session.cc \
+
+: foreach $(GENERIC_SRC_CC) |> !cxx |> %B.base.o {obj}
+: foreach *.cc |> !cxx |> %B.nova.o {obj}
+: {obj} |> !ar |> | $(REP_DIR)/<base-common>

@@ -25,11 +25,11 @@
 
 /* core includes */
 #include <address_space.h>
-#include <object.h>
+#include "../core/object.h"
 
 /* kernel includes */
-#include <kernel/core_interface.h>
-#include <kernel/thread.h>
+#include "../core/kernel/core_interface.h"
+#include "../core/kernel/thread.h"
 
 namespace Genode {
 

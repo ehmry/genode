@@ -13,10 +13,10 @@
  */
 
 /* base-hw includes */
-#include <kernel/core_interface.h>
+#include "kernel/core_interface.h"
 
 /* core includes */
-#include <kernel/irq.h>
+#include "kernel/irq.h"
 #include <irq_root.h>
 #include <irq_args.h>
 #include <core_env.h>

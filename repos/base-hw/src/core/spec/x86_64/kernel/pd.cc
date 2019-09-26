@@ -11,8 +11,8 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#include <kernel/cpu.h>
-#include <kernel/pd.h>
+#include "../../kernel/cpu.h"
+#include "../../kernel/pd.h"
 
 
 bool Kernel::Pd::invalidate_tlb(Cpu & cpu, addr_t, size_t)

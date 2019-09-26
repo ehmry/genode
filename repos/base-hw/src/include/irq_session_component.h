@@ -16,10 +16,11 @@
 
 /* Genode includes */
 #include <base/rpc_server.h>
+#include <base/allocator.h>
 #include <util/list.h>
 #include <irq_session/capability.h>
 
-#include <kernel/irq.h>
+#include "../core/kernel/irq.h"
 
 namespace Genode { class Irq_session_component; }
 

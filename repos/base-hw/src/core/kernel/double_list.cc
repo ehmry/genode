@@ -12,7 +12,7 @@
  */
 
 /* core includes */
-#include <kernel/double_list.h>
+#include "double_list.h"
 
 using namespace Kernel;
 

@@ -1,1 +1,1 @@
-INCLUDES += -I$(REP_DIR)/src/include
+INCLUDES = -I$(TUP_CWD)/include -I$(BASE_DIR)/src/include $(INCLUDES)

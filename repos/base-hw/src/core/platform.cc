@@ -19,14 +19,14 @@
 #include <boot_modules.h>
 #include <core_log.h>
 #include <hw/memory_region.h>
-#include <map_local.h>
+#include "map_local.h"
 #include <platform.h>
 #include <platform_pd.h>
 #include <hw/page_flags.h>
 #include <hw/util.h>
-#include <kernel/kernel.h>
+#include "kernel/kernel.h"
 #include <translation_table.h>
-#include <kernel/cpu.h>
+#include "kernel/cpu.h"
 
 /* base-internal includes */
 #include <base/internal/crt0.h>

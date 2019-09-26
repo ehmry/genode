@@ -17,7 +17,7 @@
 /* core includes */
 #include <platform.h>
 #include <core_region_map.h>
-#include <map_local.h>
+#include "map_local.h"
 #include <util.h>
 #include <base/heap.h>
 

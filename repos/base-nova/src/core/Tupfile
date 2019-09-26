@@ -2,11 +2,10 @@ include_rules
 GEN_CORE_DIR = $(BASE_DIR)/src/core
 
 INCLUDES += \
-	-I$(REP_DIR)/src/core/include \
-	-I$(REP_DIR)/src/include \
-	-I$(BASE_DIR)/src/include \
+	-I$(TUP_CWD)/include \
 	-I$(GEN_CORE_DIR)/include \
-	-I$(BASE_DIR)/include \
+
+SRC_CC += *.cc
 
 ifeq (@(TUP_ARCH),i386)
 SRC_CC += spec/x86_32/*.cc
@@ -17,7 +16,6 @@ SRC_CC += spec/x86_64/*.cc
 endif
 
 SRC_CC += \
-	*.cc \
 	$(GEN_CORE_DIR)/core_log.cc \
 	$(GEN_CORE_DIR)/core_mem_alloc.cc \
 	$(GEN_CORE_DIR)/cpu_session_component.cc \
@@ -47,9 +45,31 @@ CXXFLAGS_$(GEN_CORE_DIR)/version.cc += -DGENODE_VERSION=\"`git describe`\"
 
 : foreach $(SRC_CC) |> !cxx |> {link-items}
 
-: {link-items} |> !ar |> core-nova.lib.a
+: {link-items} |> !ar |> {archive}
 
-: core-nova.lib.a | $(REP_DIR)/<base-common> $(BASE_DIR)/<base-libs> \
-	|> $(LD) $(LD_MARCH) -u _start --whole-archive -r \
-		%<base-common> %<base-libs> %f -o %o \
-	|> core-nova.o $(REP_DIR)/<core>
+STATIC_LIBS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx startup`
+
+ifndef LIBUNWIND_BAREMETAL
+error CONFIG_LIBUNWIND_BAREMETAL not defined
+@(LIBUNWIND_BAREMETAL)
+endif
+
+EH_SYMBOLS = \
+	_Unwind_Resume \
+	_Unwind_Complete \
+	_Unwind_DeleteException \
+
+REDEF_SYMBOLS = `echo $(EH_SYMBOLS) | awk -v RS=' ' '{ print "--redefine-sym "$1"=_cxx_"$1 }'`
+
+export OBJCOPY
+: |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) @(LIBUNWIND_BAREMETAL) %o |> libunwind.a {archive}
+
+: {archive} | \
+	$(DEV_DIR)/<lib> \
+	$(GENODE_DIR)/<pkg-config> \
+	$(BASE_DIR)/<libunwind-baremetal> \
+	$(BASE_DIR)/<base-libs> \
+	$(REP_DIR)/<base-common> \
+|> $(LD) -u _start --whole-archive -r \
+	%<libunwind-baremetal> %<base-libs> %<base-common> %f $(STATIC_LIBS) -o %o \
+|> core.o $(REP_DIR)/<core>

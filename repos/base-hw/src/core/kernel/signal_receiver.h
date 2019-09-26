@@ -17,8 +17,8 @@
 /* Genode includes */
 #include <base/signal.h>
 
-#include <kernel/core_interface.h>
-#include <kernel/object.h>
+#include "core_interface.h"
+#include "object.h"
 
 namespace Kernel
 {

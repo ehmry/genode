@@ -22,7 +22,7 @@
 
 /* base-hw includes */
 #include <kernel/interface.h>
-#include <kernel/object.h>
+#include "kernel/object.h"
 
 namespace Genode {
 	/**

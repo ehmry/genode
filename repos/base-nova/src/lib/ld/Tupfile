@@ -38,19 +38,18 @@ LDFLAGS += -gc-sections -z max-page-size=0x1000
 LDFLAGS += -T$(BASE_DIR)/src/ld/genode_rel.ld \
 
 BASE_LIBS += \
-	$(REP_DIR)/src/lib/base/base-nova-common.lib.a \
 	$(REP_DIR)/src/lib/base/base-nova.lib.a \
 
 BASE_PKGS += alarm cxx ldso-startup startup timeout
 
 LDFLAGS += `pkg-config --static --libs $(BASE_PKGS)`
 
-: $(BASE_LIBS) {obj} | symbol.map \
+: $(BASE_LIBS) {obj} | symbol.map $(REP_DIR)/<base-common> \
 |> \
 	$(LD) -o %o \
 	$(LD_MARCH) $(LDFLAGS) \
 	--whole-archive --start-group \
-	%f \
+	%<base-common> %f \
 	--end-group --no-whole-archive \
 	$(LIBGCC) \
 |> ld.lib.so $(REP_DIR)/<ld> {bin}

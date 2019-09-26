@@ -12,7 +12,7 @@
  */
 
 /* core includes */
-#include <kernel/thread.h>
+#include "thread.h"
 
 void Kernel::Thread::_call_new_vm()    { user_arg_0(-1); }
 void Kernel::Thread::_call_delete_vm() { user_arg_0(-1); }

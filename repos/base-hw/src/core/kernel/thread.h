@@ -19,11 +19,11 @@
 
 /* core includes */
 #include <cpu.h>
-#include <kernel/cpu_context.h>
-#include <kernel/inter_processor_work.h>
-#include <kernel/signal_receiver.h>
-#include <kernel/ipc_node.h>
-#include <kernel/object.h>
+#include "cpu_context.h"
+#include "inter_processor_work.h"
+#include "signal_receiver.h"
+#include "ipc_node.h"
+#include "object.h"
 
 namespace Kernel
 {

@@ -18,7 +18,7 @@
 /* core includes */
 #include <ram_dataspace_factory.h>
 #include <platform.h>
-#include <map_local.h>
+#include "map_local.h"
 
 using namespace Genode;
 

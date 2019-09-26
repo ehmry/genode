@@ -17,7 +17,7 @@
 #include <base/internal/raw_write_string.h>
 
 #include <core_log.h>
-#include <kernel/log.h>
+#include "kernel/log.h"
 
 
 void Genode::Core_log::out(char const c) { Kernel::log(c); }

@@ -13,11 +13,11 @@
  */
 
 /* core includes */
-#include <kernel/cpu.h>
-#include <kernel/kernel.h>
-#include <kernel/thread.h>
-#include <kernel/irq.h>
-#include <kernel/pd.h>
+#include "cpu.h"
+#include "kernel.h"
+#include "thread.h"
+#include "irq.h"
+#include "pd.h"
 #include <board.h>
 #include <hw/assert.h>
 #include <hw/boot_info.h>

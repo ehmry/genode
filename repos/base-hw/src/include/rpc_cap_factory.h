@@ -23,8 +23,8 @@
 #include <base/log.h>
 
 /* core-local includes */
-#include <object.h>
-#include <kernel/thread.h>
+#include "../core/object.h"
+#include "../core/kernel/thread.h"
 
 /* base-internal includes */
 #include <base/internal/capability_space.h>

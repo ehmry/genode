@@ -13,7 +13,7 @@
 
 #include <base/log.h>
 #include <hw/assert.h>
-#include <kernel/cpu_scheduler.h>
+#include "cpu_scheduler.h"
 
 using namespace Kernel;
 

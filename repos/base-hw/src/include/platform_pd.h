@@ -17,13 +17,13 @@
 
 /* Core includes */
 #include <translation_table.h>
-#include <platform.h>
 #include <address_space.h>
 #include <hw/page_table_allocator.h>
-#include <object.h>
-#include <kernel/configuration.h>
-#include <kernel/object.h>
-#include <kernel/pd.h>
+#include "platform.h"
+#include "../core/object.h"
+#include "../core/kernel/configuration.h"
+#include "../core/kernel/object.h"
+#include "../core/kernel/pd.h"
 
 namespace Hw
 {

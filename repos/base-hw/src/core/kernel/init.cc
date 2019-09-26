@@ -13,10 +13,10 @@
  */
 
 /* core includes */
-#include <kernel/pd.h>
-#include <kernel/cpu.h>
-#include <kernel/kernel.h>
-#include <kernel/lock.h>
+#include "pd.h"
+#include "cpu.h"
+#include "kernel.h"
+#include "lock.h"
 #include <platform_pd.h>
 #include <board.h>
 #include <platform_thread.h>

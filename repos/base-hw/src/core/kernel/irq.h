@@ -23,7 +23,7 @@
 #include <base/internal/unmanaged_singleton.h>
 
 /* core includes */
-#include <kernel/signal_receiver.h>
+#include "signal_receiver.h"
 
 namespace Kernel
 {

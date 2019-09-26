@@ -21,7 +21,7 @@
 
 /* core includes */
 #include <kernel/interface.h>
-#include <kernel/kernel.h>
+#include "kernel.h"
 
 namespace Kernel
 {
@@ -71,7 +71,7 @@ namespace Kernel
 }
 
 
-class Kernel::Object
+struct Kernel::Object
 {
 	Object_identity_list list { };
 

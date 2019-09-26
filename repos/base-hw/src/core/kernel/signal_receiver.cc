@@ -12,7 +12,7 @@
  */
 
 /* core includes */
-#include <kernel/signal_receiver.h>
+#include "signal_receiver.h"
 
 using namespace Kernel;
 

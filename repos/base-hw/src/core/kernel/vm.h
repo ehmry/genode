@@ -17,10 +17,10 @@
 namespace Genode { class Vm_state; }
 
 /* core includes */
-#include <kernel/cpu_context.h>
-#include <kernel/kernel.h>
-#include <kernel/pd.h>
-#include <kernel/signal_receiver.h>
+#include "cpu_context.h"
+#include "kernel.h"
+#include "pd.h"
+#include "signal_receiver.h"
 
 namespace Kernel
 {

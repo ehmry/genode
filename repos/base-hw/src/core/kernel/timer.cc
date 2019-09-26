@@ -12,9 +12,9 @@
  */
 
 /* Core includes */
-#include <kernel/cpu.h>
-#include <kernel/timer.h>
-#include <kernel/configuration.h>
+#include "cpu.h"
+#include "timer.h"
+#include "configuration.h"
 #include <hw/assert.h>
 
 using namespace Kernel;

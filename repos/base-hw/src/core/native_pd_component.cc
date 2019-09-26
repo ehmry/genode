@@ -12,7 +12,7 @@
  */
 
 #include <pd_session_component.h>
-#include <native_pd_component.h>
+#include "native_pd_component.h"
 
 using namespace Genode;
 

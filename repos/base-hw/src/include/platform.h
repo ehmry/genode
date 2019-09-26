@@ -24,9 +24,9 @@
 /* base-hw includes */
 #include <hw/boot_info.h>
 #include <hw/memory_region.h>
-#include <kernel/configuration.h>
-#include <kernel/core_interface.h>
-#include <kernel/pd.h>
+#include "../core/kernel/configuration.h"
+#include "../core/kernel/core_interface.h"
+#include "../core/kernel/pd.h"
 
 /* core includes */
 #include <platform_generic.h>

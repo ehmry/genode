@@ -16,8 +16,8 @@
 #define _CORE__KERNEL__CPU_CONTEXT_H_
 
 /* core includes */
-#include <kernel/cpu_scheduler.h>
-#include <kernel/timer.h>
+#include "cpu_scheduler.h"
+#include "timer.h"
 
 namespace Kernel
 {

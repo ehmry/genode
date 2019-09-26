@@ -1,0 +1,7 @@
+ifndef LINUX_HEADERS
+error CONFIG_LINUX_HEADERS not defined
+endif
+
+INCLUDES += -I$(TUP_CWD)/include
+INCLUDES += -I$(BASE_DIR)/src/include
+INCLUDES += -I@(LINUX_HEADERS)

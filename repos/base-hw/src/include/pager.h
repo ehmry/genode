@@ -25,10 +25,11 @@
 #include <base/internal/unmanaged_singleton.h>
 
 /* core-local includes */
-#include <kernel/signal_receiver.h>
 #include <hw/mapping.h>
-#include <object.h>
-#include <rpc_cap_factory.h>
+#include "rpc_cap_factory.h"
+#include "../core/kernel/signal_receiver.h"
+#include "../core/kernel/object.h"
+#include "../core/kernel/thread.h"
 
 namespace Genode
 {

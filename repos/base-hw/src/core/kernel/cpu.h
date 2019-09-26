@@ -19,10 +19,10 @@
 
 /* core includes */
 #include <board.h>
-#include <kernel/cpu_context.h>
-#include <kernel/irq.h>
-#include <kernel/inter_processor_work.h>
-#include <kernel/thread.h>
+#include "cpu_context.h"
+#include "irq.h"
+#include "inter_processor_work.h"
+#include "thread.h"
 
 namespace Kernel
 {

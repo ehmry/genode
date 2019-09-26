@@ -16,7 +16,7 @@
 
 /* base-hw includes */
 #include <kernel/types.h>
-#include <kernel/irq.h>
+#include "irq.h"
 
 /* Genode includes */
 #include <util/list.h>

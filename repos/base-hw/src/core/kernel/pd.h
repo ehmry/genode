@@ -18,8 +18,8 @@
 /* core includes */
 #include <hw/assert.h>
 #include <cpu.h>
-#include <kernel/core_interface.h>
-#include <kernel/object.h>
+#include "core_interface.h"
+#include "object.h"
 #include <translation_table.h>
 
 namespace Genode {
