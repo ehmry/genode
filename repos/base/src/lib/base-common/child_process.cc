@@ -68,9 +68,14 @@ Child::Process::Loaded_executable::Loaded_executable(Type type,
 		bool const write = seg.flags().w;
 		bool const exec = seg.flags().x;
 
-		if (write) {
+		Dataspace_capability ds_cap = ldso_ds;
+		off_t offset = 0;
 
-			/* read-write segment */
+		if (write || seg.file_size() < seg.mem_size()) {
+
+			/* segment must be copied */
+			if (!write)
+				warning("copying sparse read-only segment");
 
 			/*
 			 * Note that a failure to allocate a RAM dataspace after other
@@ -86,7 +91,7 @@ Child::Process::Loaded_executable::Loaded_executable(Type type,
 			Dataspace_capability ds_cap;
 			try { ds_cap = ram.alloc(size); }
 			catch (Out_of_ram) {
-				error("allocation of read-write segment failed"); throw; };
+				error("allocation of ELF segment failed"); throw; };
 
 			/* attach dataspace */
 			void *base;
@@ -117,36 +122,42 @@ Child::Process::Loaded_executable::Loaded_executable(Type type,
 			/* detach dataspace */
 			local_rm.detach(base);
 
-			off_t const offset = 0;
-			try { remote_rm.attach_at(ds_cap, addr, size, offset); }
+			try {
+				if (exec)
+					remote_rm.attach_executable(ds_cap, addr, size, offset);
+				else
+					remote_rm.attach_at(ds_cap, addr, size, offset);
+			}
 			catch (Region_map::Region_conflict) {
 				error("region conflict while remotely attaching ELF segment");
 				error("addr=", (void *)addr, " size=", (void *)size, " offset=", (void *)offset);
 				throw; }
 
 		} else {
-
 			/* read-only segment */
+			offset = seg.file_offset();
+		}
 
-			if (seg.file_size() != seg.mem_size())
-				warning("filesz and memsz for read-only segment differ");
+		if (!ds_cap.valid())
+			Genode::error("segment dataspace is not valid");
 
-			off_t const offset = seg.file_offset();
-			try {
-				if (exec)
-					remote_rm.attach_executable(ldso_ds, addr, size, offset);
-				else
-					remote_rm.attach_at(ldso_ds, addr, size, offset);
-			}
-			catch (Region_map::Region_conflict) {
-				error("region conflict while remotely attaching read-only ELF segment");
-				error("addr=", (void *)addr, " size=", (void *)size, " offset=", (void *)offset);
-				throw;
-			}
-			catch (Region_map::Invalid_dataspace) {
-				error("attempt to attach invalid read-only segment dataspace");
-				throw;
-			}
+		if (!Dataspace_client(ds_cap).size())
+			Genode::error("segment dataspace is zero sized");
+
+		try {
+			if (exec)
+				remote_rm.attach_executable(ds_cap, addr, size, offset);
+			else
+				remote_rm.attach_at(ds_cap, addr, size, offset);
+		}
+		catch (Region_map::Region_conflict) {
+			error("region conflict while remotely attaching read-only ELF segment");
+			error("addr=", (void *)addr, " size=", (void *)size, " offset=", (void *)offset);
+			throw;
+		}
+		catch (Region_map::Invalid_dataspace) {
+			error("attempt to attach invalid read-only segment dataspace");
+			throw;
 		}
 	}
 
