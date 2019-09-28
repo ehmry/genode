@@ -166,7 +166,8 @@ void *memmove(void *dst, const void *src, size_t n)
 extern "C" __attribute__((weak))
 void *memset(void *s, int c, size_t n)
 {
-	return Genode::memset(s, c, n);
+	while (n--) ((char *)s)[n] = c;
+	return s;
 }
 
 
