@@ -43,33 +43,15 @@ SRC_CC += \
 
 CXXFLAGS_$(GEN_CORE_DIR)/version.cc += -DGENODE_VERSION=\"`git describe`\"
 
-: foreach $(SRC_CC) |> !cxx |> {link-items}
+: foreach $(SRC_CC) |> !cxx |> {obj}
 
-: {link-items} |> !ar |> {archive}
+LDFLAGS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx-baremetal startup`
 
-STATIC_LIBS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx startup`
-
-ifndef LIBUNWIND_BAREMETAL
-error CONFIG_LIBUNWIND_BAREMETAL not defined
-@(LIBUNWIND_BAREMETAL)
-endif
-
-EH_SYMBOLS = \
-	_Unwind_Resume \
-	_Unwind_Complete \
-	_Unwind_DeleteException \
-
-REDEF_SYMBOLS = `echo $(EH_SYMBOLS) | awk -v RS=' ' '{ print "--redefine-sym "$1"=_cxx_"$1 }'`
-
-export OBJCOPY
-: |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) @(LIBUNWIND_BAREMETAL) %o |> libunwind.a {archive}
-
-: {archive} | \
+: {obj} | \
 	$(DEV_DIR)/<lib> \
 	$(GENODE_DIR)/<pkg-config> \
-	$(BASE_DIR)/<libunwind-baremetal> \
 	$(BASE_DIR)/<base-libs> \
 	$(REP_DIR)/<base-common> \
-|> $(LD) -u _start --whole-archive -r \
-	%<libunwind-baremetal> %<base-libs> %<base-common> %f $(STATIC_LIBS) -o %o \
+|> $(LD) $(LDFLAGS) -u _start -r \
+	%<base-libs> %<base-common> %f -o %o \
 |> core.o $(REP_DIR)/<core>

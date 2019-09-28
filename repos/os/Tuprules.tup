@@ -15,3 +15,5 @@ INCLUDES += -I$(REP_DIR)/include/spec/arm
 endif
 
 INCLUDES += -I$(REP_DIR)/include
+
+CXXFLAGS += -std=gnu++17

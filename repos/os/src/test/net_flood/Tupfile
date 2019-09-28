@@ -1,4 +1,5 @@
 include_rules
+LIBS += net
 : foreach *.cc |> !cxx |> %B.o {obj}
 : {obj} |  |> !prg |> test-%d {bin}
 : {bin} |> !collect_bin |>

@@ -1,7 +1,4 @@
-TARGET_NAME = fs_rom
-
 include_rules
 : foreach *.cc |> !cxx |> %B.o {obj}
 : {obj} |> !prg |> %d {bin}
 : {bin} |> !collect_bin |>
-include &(BIN_RULES)

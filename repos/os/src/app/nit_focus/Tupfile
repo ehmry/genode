@@ -1,7 +1,4 @@
-TARGET_NAME = nit_focus
-
 include_rules
 : foreach *.cc |> !cxx |> %B.o {obj}
 : {obj} |> !prg |> {bin}
 : {bin} |> !collect_bin |>
-include &(BIN_RULES)

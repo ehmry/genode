@@ -1,5 +1,0 @@
-INCLUDES += -I$(REP_DIR)/src/lib/syscall
-
-export HOST_LIBC
-	# an environmental variable set by nix-shell
-INCLUDES += -I$HOST_LIBC/include

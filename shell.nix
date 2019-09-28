@@ -1,1 +1,1 @@
-{ pkgs ? import <genodepkgs> { } }: pkgs.upstream.base
+{ pkgs ? import <genodepkgs> { } }: pkgs.genode.base

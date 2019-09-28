@@ -1,4 +1,3 @@
-TARGET_NAME = linux_timer_drv
 LIBS += genode-base
 include_rules
 
@@ -6,17 +5,16 @@ BASE_TIMER_DIR = $(BASE_DIR)/src/timer
 
 PERIODIC_DIR = $(BASE_TIMER_DIR)/periodic
 
-INCLUDES += -I.
 INCLUDES += -I$(BASE_TIMER_DIR)/include
 INCLUDES += -I$(PERIODIC_DIR)
+INCLUDES += -I$(REP_DIR)/src/lib/syscall
 
-include $(REP_DIR)/src/lib/syscall/headers.tup
+INCLUDES = -I. $(INCLUDES)
+	#TODO: ^ FAIL
 
 : foreach $(BASE_TIMER_DIR)/*.cc |> !cxx |> %B.linux.o {obj}
 : foreach $(PERIODIC_DIR)/*.cc |> !cxx |> %B.linux.o {obj}
 : foreach *.cc |> !cxx |> %B.o {obj}
 
-: {obj} $(REP_DIR)/src/lib/syscall/syscall-linux.lib.a |> !prg |> timer {bin}
+: {obj} | $(REP_DIR)/<syscall> |> !prg %<syscall> |> linux_timer_drv {bin}
 : {bin} |> !collect_bin |>
-
-include &(BIN_RULES)

@@ -1,4 +1,3 @@
-TARGET_NAME = core-linux
 
 include_rules
 GEN_CORE_DIR = $(BASE_DIR)/src/core
@@ -8,17 +7,9 @@ DEFINES += -D_GNU_SOURCE
 INCLUDES += \
 	-I$(REP_DIR)/src/core/include \
 	-I$(GEN_CORE_DIR)/include \
-	-I$(REP_DIR)/src/platform \
-	-I$(REP_DIR)/src/include \
-	-I$(BASE_DIR)/src/include \
 
-include $(REP_DIR)/src/lib/syscall/headers.tup
-
+SRC_CC += *.cc
 SRC_CC += \
-	*.cc \
-	$(REP_DIR)/src/lib/base/env_reinit.cc \
-	$(BASE_DIR)/src/lib/base/thread.cc \
-	$(BASE_DIR)/src/lib/base/thread_myself.cc \
 	$(GEN_CORE_DIR)/capability_space.cc \
 	$(GEN_CORE_DIR)/core_log.cc \
 	$(GEN_CORE_DIR)/core_rpc_cap_alloc.cc \
@@ -44,7 +35,6 @@ CXXFLAGS_$(GEN_CORE_DIR)/version.cc += -DGENODE_VERSION=\"`git describe`\"
 : foreach $(SRC_CC) |> !cxx |> {obj}
 
 LDFLAGS += \
-	$(LD_MARCH) \
 	-gc-sections \
 	-z max-page-size=0x1000 \
 	-nostdlib \
@@ -52,14 +42,14 @@ LDFLAGS += \
 	-T$(BASE_DIR)/src/ld/genode.ld \
 	-T$(REP_DIR)/src/ld/stack_area.ld \
 
-CORE_LIBS += \
-	$(REP_DIR)/src/lib/base/base-linux-common.lib.a \
-	$(REP_DIR)/src/lib/syscall/syscall-linux.lib.a \
+LDFLAGS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx-baremetal startup`
 
-CORE_PKGS += cxx startup
+: {obj} | \
+	$(DEV_DIR)/<lib> \
+	$(GENODE_DIR)/<pkg-config> \
+	$(REP_DIR)/<base-common> \
+	$(REP_DIR)/<syscall> \
+|> !ld %<base-common> %<syscall> \
+|> core-linux $(REP_DIR)/<core> {bin}
 
-STATIC_LIBS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx startup`
-
-: {obj} $(CORE_LIBS) | $(DEV_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> !ld $(STATIC_LIBS) |> core-linux $(REP_DIR)/<core> {bin}
 : {bin} |> !collect_bin |>
-include &(BIN_RULES)

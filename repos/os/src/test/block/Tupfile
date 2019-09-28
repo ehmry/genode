@@ -1,7 +1,4 @@
-TARGET_NAME = test-block
-
 include_rules
 : foreach *.cc |> !cxx |> %B.o {obj}
-: {obj} |> !prg |> test-%d {bin}
+: {obj} |  |> !prg |> test-%d {bin}
 : {bin} |> !collect_bin |>
-include &(BIN_RULES)

@@ -1,11 +1,8 @@
-TARGET_NAME = base-linux
 include_rules
 
 ifeq (@(TUP_ARCH),x86_64)
 	INCLUDES += -I$(BASE_DIR)/src/lib/ldso/spec/x86_64
 endif
-
-INCLUDES += -I$(BASE_DIR)/src/include
 
 LDSO_DIR = $(BASE_DIR)/src/lib/ldso
 
@@ -14,7 +11,7 @@ LDSO_SPEC_DIR = $(LDSO_DIR)/spec/x86_64
 endif
 
 INCLUDES += -I$(LDSO_SPEC_DIR)
-INCLUDES += -I$(LDSO_DIR)/include
+INCLUDES = -I$(LDSO_DIR)/include $(INCLUDES)
 
 DEFINES += -fPIC
 
@@ -38,24 +35,21 @@ LDFLAGS += -T$(BASE_DIR)/src/ld/genode_rel.ld
 LDFLAGS += --entry=_start_initial_stack
 
 BASE_LIBS += \
-	$(REP_DIR)/src/lib/base/base-linux-common.lib.a \
 	$(REP_DIR)/src/lib/base/base-linux.lib.a \
-	$(REP_DIR)/src/lib/syscall/syscall-linux.lib.a \
 
 BASE_PKGS += alarm cxx ldso-startup startup timeout
 
-LDFLAGS += `pkg-config --static --libs $(BASE_PKGS)`
+LDFLAGS += -L$(LIB_DIR) `$(PKG_CONFIG) --static --libs $(BASE_PKGS)`
 
-: $(BASE_LIBS) {obj} | symbol.map \
+: $(BASE_LIBS) {obj} | \
+	symbol.map \
+	$(DEV_DIR)/<lib> \
+	$(GENODE_DIR)/<pkg-config> \
+	$(REP_DIR)/<base-common> \
+	$(REP_DIR)/<syscall> \
 |> \
-	$(LD) -o %o \
-	$(LD_MARCH) $(LDFLAGS) \
-	--whole-archive --start-group \
-	%f \
-	--end-group --no-whole-archive \
-	$(LIBGCC) ;\
-	printf "\x02" | dd of=%o bs=1 seek=16 count=1 conv=notrunc ; \
+	$(LD) $(LDFLAGS) %<base-common> %<syscall> %f -o %o; \
+	printf "\x02" | dd of=%o bs=1 seek=16 count=1 conv=notrunc; \
 |> ld-linux.lib.so $(REP_DIR)/<ld> {bin}
 
 : {bin} |> !collect_bin |>
-include &(BIN_RULES)
