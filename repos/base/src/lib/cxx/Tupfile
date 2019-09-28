@@ -1,19 +1,30 @@
+ifndef LIBCXX
+error LIBCXX not configured
+endif
+
+ifndef LIBCXXABI
+error LIBCXXABI not configured
+endif
+
+ifndef LIBUNWIND_BAREMETAL
+error LIBUNWIND_BAREMETAL not configured
+endif
+
+ifndef LIBUNWIND
+error LIBUNWIND not configured
+endif
+
 include_rules
 
 DEFINES = -ffunction-sections -fno-strict-aliasing -g -fPIC
 	# drop the standard defines to avoid -nostdinc
 
-export LIBCXX
-export LIBCXXABI
-export LIBUNWIND_BAREMETAL
+INCLUDES += -I@(LIBCXX)/include/c++/v1
+INCLUDES += -I@(LIBCXXABI)/include
 
-INCLUDES += -I$LIBCXX/include/c++/v1
-INCLUDES += -I$LIBCXXABI/include
+LLVM_LIBS += @(LIBCXXABI)/lib/libc++abi.a
 
-LLVM_LIBS += $LIBCXXABI/lib/libc++abi.a
-LLVM_LIBS += $LIBUNWIND_BAREMETAL/lib/libunwind.a
-
-: foreach *.cc |> !cxx |> {supc++}
+: foreach *.cc |> !cxx |> {obj}
 
 #
 # Prevent symbols of the gcc support libs from being discarded during 'ld -r'
@@ -28,35 +39,41 @@ KEEP_SYMBOLS = \
 	-u _ZTVN10__cxxabiv119__pointer_type_infoE \
 	-u _ZTSN10__cxxabiv120__function_type_infoE \
 
-: {supc++} |> $(LD) $(LD_MARCH) $(KEEP_SYMBOLS) -r %f $(LLVM_LIBS) -o %o |> supc++.tmp
-
-#
 # Here we define all symbols we want to hide in libsupc++ and libgcc_eh
 #
 LOCAL_SYMBOLS = \
+	--localize-symbol=__stderrp
 	--localize-symbol=abort \
 	--localize-symbol=calloc \
+	--localize-symbol=fflush \
+	--localize-symbol=fprintf \
 	--localize-symbol=fputc \
 	--localize-symbol=fputs \
 	--localize-symbol=free \
 	--localize-symbol=fwrite \
+	--localize-symbol=islower \
+	--localize-symbol=isxdigit \
 	--localize-symbol=malloc \
 	--localize-symbol=memcmp \
+	--localize-symbol=memcpy \
+	--localize-symbol=memmove \
+	--localize-symbol=memset \
+	--localize-symbol=posix_memalign \
 	--localize-symbol=realloc \
+	--localize-symbol=snprintf \
 	--localize-symbol=sprintf \
 	--localize-symbol=stderr \
-	--localize-symbol=__stderrp \
 	--localize-symbol=strcat \
 	--localize-symbol=strcmp \
 	--localize-symbol=strcpy \
 	--localize-symbol=strlen \
 	--localize-symbol=strncmp \
+	--localize-symbol=vfprintf \
 
 #
-# Symbols we wrap (see unwind.cc)
+# Symbols we wrap (see unwind.c)
 #
 EH_SYMBOLS = \
-	_Unwind_Resume \
 	_Unwind_Complete \
 	_Unwind_DeleteException \
 
@@ -69,11 +86,20 @@ EH_SYMBOLS += \
 
 REDEF_SYMBOLS = `echo $(EH_SYMBOLS) | awk -v RS=' ' '{ print "--redefine-sym "$1"=_cxx_"$1 }'`
 
-export OBJCOPY
-: supc++.tmp |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) -weaken %f %o |> supc++.o {obj}
+: {obj} |> \
+	$(LD) $(LD_MARCH) $(KEEP_SYMBOLS) -r %f $(LLVM_LIBS) @(LIBUNWIND)/lib/libunwind.a -o %o |> supc++.tmp
+
+: {obj} |> \
+	$(LD) $(LD_MARCH) $(KEEP_SYMBOLS) -r %f $(LLVM_LIBS) @(LIBUNWIND_BAREMETAL)/lib/libunwind.a -o %o |> supc++-baremetal.tmp
 
 : foreach *.c |> !cc |> {obj}
 
-: {obj} |> !ar |> {bin}
+export OBJCOPY
+: supc++.tmp |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++.o
+: supc++-baremetal.tmp |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++-baremetal.o
+
+#
+: supc++.o |> !ar |> cxx.a {bin}
+: supc++-baremetal.o |> !ar |> cxx-baremetal.a {bin}
 : foreach {bin} |> !collect_static |>
 : |> !emit_lib_pkg_config |>

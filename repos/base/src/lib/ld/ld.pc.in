@@ -2,4 +2,4 @@ Name: ld
 Description: Genode dynamic loader
 URL: https://genode.org/
 Version: @VERSION@
-Libs: -l:ld.lib.so -l:ldso-startup.lib.a
+Libs: -l:ld.lib.so -l:ldso-startup.a

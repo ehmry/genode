@@ -1,0 +1,2 @@
+include_rules
+: |> !emit_lib_pkg_config |>

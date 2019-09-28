@@ -21,11 +21,7 @@ ifeq (@(TUP_ARCH),arm_v8)
 CC_MARCH = -march=armv8-a
 endif
 
-OUT_BIN_DIR = $(OUT_DIR)/bin
-
 GENODE_DIR = $(TUP_CWD)
-
-LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
 
 !prg = | $(GENODE_DIR)/<lib> $(DEV_DIR)/<lib> $(GENODE_DIR)/<pkg-config> \
 |> ^o LD %o^ \
@@ -37,29 +33,15 @@ LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
 	-o %o \
 |> %d
 
-!lib = | $(GENODE_DIR)/<lib> $(DEV_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LD_MARCH) %f $(LDFLAGS) `$(PKG_CONFIG) --libs genode-lib $(LIBS)` -L$(LIB_DIR) -o %o |>
-
-ifeq ($(BIN_NAME),)
-BIN_NAME = $(TARGET_NAME)
-endif
-
-ifdef DEPOT_VERSION
-DEPOT_VERSION = @(DEPOT_VERSION)
-else
-DEPOT_VERSION = current
-endif
-
-BIN_VERSION=$(DEPOT_VERSION)
-
-!bin = |> |>
-	# Macro invoked in BIN_RULES
-
-&BIN_RULES = errata/bin.tup
-	# Rules for finalizing a locally defined binary package
+!lib = | $(GENODE_DIR)/<lib> $(DEV_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LD_MARCH) %f $(LDFLAGS) `$(PKG_CONFIG) --libs genode-lib $(LIBS)` -L$(LIB_DIR) -o %o |> %d.lib.so
 
 !collect_bin = |> ^ COLLECT %b^ \
 	$STRIP -o %o %f \
-|> $(OUT_BIN_DIR)/$(BIN_NAME)/%b $(OUT_DIR)/<bin>
+|> $(OUT_DIR)/bin/%b $(OUT_DIR)/<bin>
+
+!collect_shared = |> ^ COLLECT %b^ \
+	$STRIP -o %o %f \
+|> $(OUT_DIR)/lib/%b $(OUT_DIR)/<lib>
 
 !collect_static = |> ^ COLLECT %b^ \
 	cp %f %o \
@@ -75,11 +57,11 @@ CXX = $CXX
 LD= $LD
 OBJCOPY = $OBJCOPY
 
-CXXFLAGS += -Wno-undefined-bool-conversion -Wno-unknown-attributes -Wsystem-headers -Werror -Wno-uninitialized -Wno-mismatched-tags
-#CXXFLAGS +=  -Wno-unused-command-line-argument
+ifdef CXXFLAGS
+CXXFLAGS = @(CXXFLAGS)
+endif
 
-export NIX_PATH
-NIX_BUILD = nix-build --option substitute no
+CXXFLAGS += -Wno-undefined-bool-conversion -Wno-unknown-attributes -Wsystem-headers -Werror -Wno-uninitialized -Wno-mismatched-tags
 
 LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
 
@@ -138,12 +120,6 @@ endif
 	rm tmp.o; \
 |> $(DEV_DIR)/lib/%B.lib.so $(GENODE_DIR)/<lib>
 
-!dhall = |> ^b dhall > %o^ dhall |>
-
-ifeq (@(TUP_ARCH),i386)
-AS_MARCH = -march=i686 --32
-endif
-
 BASE_DIR = $(GENODE_DIR)/repos/base
 &BASE_DIR = repos/base
 
@@ -154,12 +130,10 @@ BASE_DIR = $(GENODE_DIR)/repos/base
 |> binary_%b.o
 
 export AR
-!ar = |> ^ MERGE %o^ $AR -rcs %o %f |> %d.lib.a
+!ar = |> $AR -rcs %o %f |> %d.a
 
-export version
-GIT_VERSION = `git describe || echo $version`
+GIT_VERSION = `git describe || echo @(VERSION)`
 
-export TOOLCHAIN_DIR
 SED_PKGCONFIG_FLAGS += -e "s|@DEPOT_VERSION@|$(GIT_VERSION)|"
 SED_PKGCONFIG_FLAGS += -e "s|@VERSION@|$(GIT_VERSION)|"
 
@@ -173,10 +147,10 @@ SED_PKGCONFIG_FLAGS += -e "s|@VERSION@|$(GIT_VERSION)|"
 	pkg-config --validate %o; \
 |> $(PKG_CONFIG_DIR)/%d.pc $(GENODE_DIR)/<pkg-config>
 
-!emit_lib_pkg_config = |> \
+!emit_lib_pkg_config = |> ^ emit %d.a pkg-config^ \
 	echo Name: %d >> %o; \
 	echo Description: Genode %d library >> %o; \
 	echo Version: $(GIT_VERSION) >> %o; \
-	echo Libs: -l:%d.lib.a >> %o; \
+	echo Libs: -l:%d.a >> %o; \
 	pkg-config --validate %o; \
 |> $(PKG_CONFIG_DIR)/%d.pc $(GENODE_DIR)/<pkg-config>

@@ -1,17 +1,9 @@
-TARGET_NAME = vfs
-INCLUDES += -I./
 include_rules
 
 : $(REP_DIR)/lib/symbols/vfs |> !abi_stub |>
 
 : vfs.pc.in |> !sed_pkgconfig_file |>
 
-: foreach *.cc |> !cxx |> %B.o {lib-obj}
-: {lib-obj} |> !lib |> %d.lib.so {lib}
-
-: foreach ../../server/vfs/*.cc |> !cxx |> %B.o {server-obj}
-: {server-obj} {lib} |> !prg |> server/vfs {server}
-	# Link the server to the immediate vfs.lib.so
-
-: foreach {lib} {server} |> !collect_bin |>
-include &(BIN_RULES)
+: foreach *.cc |> !cxx |> %B.o {obj}
+: {obj} |> !lib |> {lib}
+: foreach {lib} |> !collect_shared |>

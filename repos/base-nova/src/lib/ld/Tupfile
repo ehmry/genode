@@ -1,4 +1,3 @@
-TARGET_NAME = base-nova
 include_rules
 INCLUDES += -I$(BASE_DIR)/src/include
 
@@ -55,4 +54,3 @@ LDFLAGS += `pkg-config --static --libs $(BASE_PKGS)`
 |> ld.lib.so $(REP_DIR)/<ld> {bin}
 
 : {bin} |> !collect_bin |>
-include &(BIN_RULES)

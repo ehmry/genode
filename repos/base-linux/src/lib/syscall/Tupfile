@@ -19,4 +19,4 @@ ifeq ($(SPEC_DIR),)
 endif
 
 : foreach $(SPEC_DIR)/*.S |> !asm |> {obj}
-: {obj} |> !ar |> syscall-linux.lib.a
+: {obj} |> !ar |> | $(REP_DIR)/<syscall>

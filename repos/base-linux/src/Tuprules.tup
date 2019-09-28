@@ -4,4 +4,4 @@ endif
 
 INCLUDES += -I$(TUP_CWD)/include
 INCLUDES += -I$(BASE_DIR)/src/include
-INCLUDES += -I@(LINUX_HEADERS)
+INCLUDES += -I@(LINUX_HEADERS)/include
