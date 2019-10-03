@@ -22,12 +22,12 @@
 #include <os/buffered_xml.h>
 
 /* local includes */
-#include <types.h>
-#include <verbose.h>
-#include <report.h>
-#include <name_registry.h>
-#include <service.h>
-#include <utils.h>
+#include "types.h"
+#include "verbose.h"
+#include "report.h"
+#include "name_registry.h"
+#include "service.h"
+#include "utils.h"
 
 namespace Init { class Child; }
 

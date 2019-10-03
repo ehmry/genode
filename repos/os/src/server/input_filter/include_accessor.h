@@ -18,7 +18,7 @@
 #include <util/xml_node.h>
 
 /* local includes */
-#include <types.h>
+#include "types.h"
 
 namespace Input_filter { struct Include_accessor; }
 

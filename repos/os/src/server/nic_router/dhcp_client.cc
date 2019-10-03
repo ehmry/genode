@@ -12,10 +12,10 @@
  */
 
 /* local includes */
-#include <dhcp_client.h>
-#include <interface.h>
-#include <domain.h>
-#include <configuration.h>
+#include "dhcp_client.h"
+#include "interface.h"
+#include "domain.h"
+#include "configuration.h"
 
 enum { PKT_SIZE = 1024 };
 

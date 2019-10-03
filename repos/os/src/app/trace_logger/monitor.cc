@@ -12,7 +12,7 @@
  */
 
 /* local includes */
-#include <monitor.h>
+#include "monitor.h"
 
 /* Genode includes */
 #include <trace_session/connection.h>

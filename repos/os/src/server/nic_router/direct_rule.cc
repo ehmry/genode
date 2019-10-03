@@ -12,7 +12,7 @@
  */
 
 /* local includes */
-#include <direct_rule.h>
+#include "direct_rule.h"
 
 using namespace Net;
 using namespace Genode;

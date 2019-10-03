@@ -26,12 +26,12 @@
 #include <util/arg_string.h>
 
 /* NIC router includes */
-#include <mac_allocator.h>
+#include "mac_allocator.h"
 
 /* local includes */
-#include <address_node.h>
-#include <nic.h>
-#include <packet_handler.h>
+#include "address_node.h"
+#include "nic.h"
+#include "packet_handler.h"
 
 namespace Net {
 	class Stream_allocator;

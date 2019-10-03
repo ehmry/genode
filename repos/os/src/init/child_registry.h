@@ -15,10 +15,10 @@
 #define _SRC__INIT__CHILD_REGISTRY_H_
 
 /* local includes */
-#include <child.h>
-#include <name_registry.h>
-#include <alias.h>
-#include <report.h>
+#include "child.h"
+#include "name_registry.h"
+#include "alias.h"
+#include "report.h"
 
 namespace Init { struct Child_registry; }
 

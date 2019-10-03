@@ -12,7 +12,7 @@
  */
 
 /* local includes */
-#include <nic.h>
+#include "nic.h"
 
 using namespace Net;
 using namespace Genode;

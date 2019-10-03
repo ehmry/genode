@@ -12,9 +12,9 @@
  */
 
 /* local includes */
-#include <configuration.h>
-#include <l3_protocol.h>
-#include <interface.h>
+#include "configuration.h"
+#include "l3_protocol.h"
+#include "interface.h"
 
 /* Genode includes */
 #include <util/xml_generator.h>

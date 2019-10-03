@@ -21,7 +21,7 @@
 #include <net/ethernet.h>
 #include <net/ipv4.h>
 
-#include <vlan.h>
+#include "vlan.h"
 
 namespace Net {
 

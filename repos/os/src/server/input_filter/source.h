@@ -19,7 +19,7 @@
 #include <input/event.h>
 
 /* local includes */
-#include <types.h>
+#include "types.h"
 
 namespace Input_filter { struct Source; }
 

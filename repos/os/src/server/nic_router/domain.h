@@ -15,17 +15,17 @@
 #define _DOMAIN_H_
 
 /* local includes */
-#include <forward_rule.h>
-#include <transport_rule.h>
-#include <nat_rule.h>
-#include <ip_rule.h>
-#include <arp_cache.h>
-#include <port_allocator.h>
-#include <pointer.h>
-#include <ipv4_config.h>
-#include <dhcp_server.h>
-#include <interface.h>
-#include <avl_string_tree.h>
+#include "forward_rule.h"
+#include "transport_rule.h"
+#include "nat_rule.h"
+#include "ip_rule.h"
+#include "arp_cache.h"
+#include "port_allocator.h"
+#include "pointer.h"
+#include "ipv4_config.h"
+#include "dhcp_server.h"
+#include "interface.h"
+#include "avl_string_tree.h"
 
 /* Genode includes */
 #include <util/reconstructible.h>

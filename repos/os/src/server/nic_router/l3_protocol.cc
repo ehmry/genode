@@ -12,8 +12,8 @@
  */
 
 /* local includes */
-#include <l3_protocol.h>
-#include <interface.h>
+#include "l3_protocol.h"
+#include "interface.h"
 
 /* Genode includes */
 #include <util/string.h>

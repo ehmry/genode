@@ -18,8 +18,8 @@
 #include <input/keycodes.h>
 
 /* local includes */
-#include <source.h>
-#include <key_code_by_name.h>
+#include "source.h"
+#include "key_code_by_name.h"
 
 namespace Input_filter { class Button_scroll_source; }
 

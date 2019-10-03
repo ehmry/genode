@@ -19,7 +19,7 @@
 #include <root/component.h>
 
 /* local includes */
-#include <time_source.h>
+#include "time_source.h"
 #include <session_component.h>
 
 namespace Timer { class Root_component; }

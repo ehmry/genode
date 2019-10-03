@@ -15,7 +15,7 @@
 #include <base/log.h>
 
 /* local includes */
-#include <ipv4_config.h>
+#include "ipv4_config.h"
 
 using namespace Genode;
 using namespace Net;

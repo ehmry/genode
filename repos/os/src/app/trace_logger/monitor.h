@@ -15,8 +15,8 @@
 #define _MONITOR_H_
 
 /* local includes */
-#include <avl_tree.h>
-#include <trace_buffer.h>
+#include "avl_tree.h"
+#include "trace_buffer.h"
 
 /* Genode includes */
 #include <base/trace/types.h>

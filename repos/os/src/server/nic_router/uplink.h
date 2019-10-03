@@ -19,9 +19,9 @@
 #include <nic/packet_allocator.h>
 
 /* local includes */
-#include <avl_string_tree.h>
-#include <interface.h>
-#include <ipv4_address_prefix.h>
+#include "avl_string_tree.h"
+#include "interface.h"
+#include "ipv4_address_prefix.h"
 
 namespace Net {
 

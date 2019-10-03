@@ -21,8 +21,8 @@
 #include <nic_session/rpc_object.h>
 
 /* local includes */
-#include <interface.h>
-#include <uplink.h>
+#include "interface.h"
+#include "uplink.h"
 
 namespace Net {
 

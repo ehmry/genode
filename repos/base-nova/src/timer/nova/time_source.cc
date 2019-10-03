@@ -16,7 +16,7 @@
 #include <nova/native_thread.h>
 
 /* local includes */
-#include <time_source.h>
+#include "time_source.h"
 
 using namespace Genode;
 using namespace Nova;

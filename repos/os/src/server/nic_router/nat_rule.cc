@@ -18,9 +18,9 @@
 #include <net/udp.h>
 
 /* local includes */
-#include <nat_rule.h>
-#include <domain.h>
-#include <interface.h>
+#include "nat_rule.h"
+#include "domain.h"
+#include "interface.h"
 
 using namespace Net;
 using namespace Genode;

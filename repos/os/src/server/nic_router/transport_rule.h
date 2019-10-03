@@ -15,9 +15,9 @@
 #define _TRANSPORT_RULE_H_
 
 /* local includes */
-#include <direct_rule.h>
-#include <permit_rule.h>
-#include <pointer.h>
+#include "direct_rule.h"
+#include "permit_rule.h"
+#include "pointer.h"
 
 namespace Genode { class Allocator; }
 

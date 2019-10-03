@@ -18,7 +18,7 @@
 #include <timer_session/connection.h>
 
 /* local includes */
-#include <component.h>
+#include "component.h"
 
 using namespace Net;
 using namespace Genode;

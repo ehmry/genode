@@ -12,7 +12,7 @@
  */
 
 /* local includes */
-#include <port_allocator.h>
+#include "port_allocator.h"
 
 using namespace Net;
 using namespace Genode;

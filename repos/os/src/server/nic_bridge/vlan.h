@@ -18,7 +18,7 @@
 
 #include <util/avl_tree.h>
 #include <util/list.h>
-#include <address_node.h>
+#include "address_node.h"
 
 namespace Net {
 

@@ -18,7 +18,7 @@
 #include <base/child.h>
 
 /* local includes */
-#include <types.h>
+#include "types.h"
 
 namespace Init { struct Name_registry; }
 

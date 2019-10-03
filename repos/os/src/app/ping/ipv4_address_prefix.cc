@@ -12,7 +12,7 @@
  */
 
 /* local includes */
-#include <ipv4_address_prefix.h>
+#include "ipv4_address_prefix.h"
 
 using namespace Genode;
 using namespace Net;

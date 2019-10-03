@@ -15,8 +15,8 @@
 #define _ARP_WAITER_H_
 
 /* local includes */
-#include <list.h>
-#include <reference.h>
+#include "list.h"
+#include "reference.h"
 
 /* Genode includes */
 #include <net/ipv4.h>

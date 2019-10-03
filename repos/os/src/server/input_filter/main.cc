@@ -20,12 +20,12 @@
 #include <timer_session/connection.h>
 
 /* local includes */
-#include <input_source.h>
-#include <remap_source.h>
-#include <merge_source.h>
-#include <chargen_source.h>
-#include <button_scroll_source.h>
-#include <accelerate_source.h>
+#include "input_source.h"
+#include "remap_source.h"
+#include "merge_source.h"
+#include "chargen_source.h"
+#include "button_scroll_source.h"
+#include "accelerate_source.h"
 
 namespace Input_filter { struct Main; }
 

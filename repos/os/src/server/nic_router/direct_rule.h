@@ -15,8 +15,8 @@
 #define _DIRECT_RULE_H_
 
 /* local includes */
-#include <ipv4_address_prefix.h>
-#include <list.h>
+#include "ipv4_address_prefix.h"
+#include "list.h"
 
 /* Genode includes */
 #include <util/list.h>

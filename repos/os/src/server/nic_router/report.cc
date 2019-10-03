@@ -12,9 +12,9 @@
  */
 
 /* local includes */
-#include <report.h>
-#include <xml_node.h>
-#include <domain.h>
+#include "report.h"
+#include "xml_node.h"
+#include "domain.h"
 
 using namespace Net;
 using namespace Genode;

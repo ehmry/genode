@@ -22,10 +22,10 @@
 #include <nic_session/rpc_object.h>
 
 /* local includes */
-#include <mac_allocator.h>
-#include <interface.h>
-#include <reference.h>
-#include <report.h>
+#include "mac_allocator.h"
+#include "interface.h"
+#include "reference.h"
+#include "report.h"
 
 namespace Genode { class Session_env; }
 

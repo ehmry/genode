@@ -19,9 +19,9 @@
 #include <base/quota_guard.h>
 
 /* local includes */
-#include <interface.h>
-#include <configuration.h>
-#include <l3_protocol.h>
+#include "interface.h"
+#include "configuration.h"
+#include "l3_protocol.h"
 
 using namespace Net;
 using Genode::Deallocator;

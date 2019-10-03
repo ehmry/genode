@@ -16,7 +16,7 @@
 #include <net/ethernet.h>
 
 /* local includes */
-#include <uplink.h>
+#include "uplink.h"
 
 using namespace Net;
 using namespace Genode;

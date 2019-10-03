@@ -17,8 +17,8 @@
 #include <base/log.h>
 
 /* local includes */
-#include <transport_rule.h>
-#include <configuration.h>
+#include "transport_rule.h"
+#include "configuration.h"
 
 using namespace Net;
 using namespace Genode;

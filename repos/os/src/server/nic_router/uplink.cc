@@ -15,8 +15,8 @@
 #include <base/env.h>
 
 /* local includes */
-#include <uplink.h>
-#include <configuration.h>
+#include "uplink.h"
+#include "configuration.h"
 
 using namespace Net;
 using namespace Genode;

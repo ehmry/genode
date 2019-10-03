@@ -15,8 +15,8 @@
 #include <os/session_policy.h>
 
 /* local includes */
-#include <component.h>
-#include <uplink.h>
+#include "component.h"
+#include "uplink.h"
 
 using namespace Net;
 using namespace Genode;

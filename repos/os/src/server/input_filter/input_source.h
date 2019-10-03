@@ -15,8 +15,8 @@
 #define _INPUT_FILTER__INPUT_SOURCE_H_
 
 /* local includes */
-#include <source.h>
-#include <connection.h>
+#include "source.h"
+#include "connection.h"
 
 namespace Input_filter { class Input_source; }
 

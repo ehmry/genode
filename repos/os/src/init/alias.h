@@ -15,7 +15,7 @@
 #define _SRC__INIT__ALIAS_H_
 
 /* local includes */
-#include <types.h>
+#include "types.h"
 
 namespace Init { struct Alias; }
 

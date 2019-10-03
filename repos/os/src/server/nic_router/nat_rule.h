@@ -15,9 +15,9 @@
 #define _NAT_RULE_H_
 
 /* local includes */
-#include <port_allocator.h>
-#include <l3_protocol.h>
-#include <avl_tree.h>
+#include "port_allocator.h"
+#include "l3_protocol.h"
+#include "avl_tree.h"
 
 /* Genode includes */
 #include <util/avl_string.h>

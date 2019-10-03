@@ -12,9 +12,9 @@
 */
 
 /* local includes */
-#include <arp_cache.h>
-#include <domain.h>
-#include <configuration.h>
+#include "arp_cache.h"
+#include "domain.h"
+#include "configuration.h"
 
 using namespace Net;
 using namespace Genode;

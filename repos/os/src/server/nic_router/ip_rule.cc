@@ -12,8 +12,8 @@
  */
 
 /* local includes */
-#include <ip_rule.h>
-#include <domain.h>
+#include "ip_rule.h"
+#include "domain.h"
 
 using namespace Net;
 using namespace Genode;

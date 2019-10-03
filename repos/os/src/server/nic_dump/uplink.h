@@ -20,7 +20,7 @@
 #include <util/xml_node.h>
 
 /* local includes */
-#include <interface.h>
+#include "interface.h"
 
 namespace Net { class Uplink; }
 

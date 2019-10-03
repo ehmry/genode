@@ -15,8 +15,8 @@
 #include <net/tcp.h>
 
 /* local includes */
-#include <link.h>
-#include <configuration.h>
+#include "link.h"
+#include "configuration.h"
 
 using namespace Net;
 using namespace Genode;

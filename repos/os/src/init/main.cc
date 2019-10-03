@@ -16,10 +16,10 @@
 #include <base/attached_rom_dataspace.h>
 
 /* local includes */
-#include <child.h>
-#include <alias.h>
-#include <server.h>
-#include <heartbeat.h>
+#include "child.h"
+#include "alias.h"
+#include "server.h"
+#include "heartbeat.h"
 
 namespace Init { struct Main; }
 

@@ -15,7 +15,7 @@
 #define _AVL_STRING_TREE_H_
 
 /* local includes */
-#include <reference.h>
+#include "reference.h"
 
 /* Genode includes */
 #include <util/avl_string.h>

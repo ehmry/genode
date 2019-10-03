@@ -12,10 +12,10 @@
  */
 
 /* local includes */
-#include <dhcp_server.h>
-#include <interface.h>
-#include <domain.h>
-#include <configuration.h>
+#include "dhcp_server.h"
+#include "interface.h"
+#include "domain.h"
+#include "configuration.h"
 
 using namespace Net;
 using namespace Genode;

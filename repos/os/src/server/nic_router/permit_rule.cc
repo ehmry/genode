@@ -15,8 +15,8 @@
 #include <base/log.h>
 
 /* local includes */
-#include <permit_rule.h>
-#include <domain.h>
+#include "permit_rule.h"
+#include "domain.h"
 
 using namespace Net;
 using namespace Genode;

@@ -16,7 +16,7 @@
 #include <base/log.h>
 #include <timer_session/connection.h>
 
-#include <bogomips.h>
+#include "bogomips.h"
 
 void Component::construct(Genode::Env &env)
 {

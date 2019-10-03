@@ -12,8 +12,8 @@
  */
 
 /* local includes */
-#include <configuration.h>
-#include <xml_node.h>
+#include "configuration.h"
+#include "xml_node.h"
 
 /* Genode includes */
 #include <base/allocator.h>

@@ -12,11 +12,11 @@
  */
 
 /* local includes */
-#include <interface.h>
+#include "interface.h"
+#include "packet_log.h"
 
 /* Genode includes */
 #include <net/ethernet.h>
-#include <packet_log.h>
 #include <util/xml_node.h>
 
 using namespace Net;

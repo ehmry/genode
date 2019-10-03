@@ -14,7 +14,7 @@
 #include <vm_session/vm_session.h>
 
 /* local includes */
-#include <child.h>
+#include "child.h"
 
 
 void Init::Child::destroy_services()

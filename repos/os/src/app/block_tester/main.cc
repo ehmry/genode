@@ -307,10 +307,10 @@ struct Test::Test_base : private Genode::Fifo<Test_base>::Element
 
 
 /* tests */
-#include <test_ping_pong.h>
-#include <test_random.h>
-#include <test_replay.h>
-#include <test_sequential.h>
+#include "test_ping_pong.h"
+#include "test_random.h"
+#include "test_replay.h"
+#include "test_sequential.h"
 
 
 /*

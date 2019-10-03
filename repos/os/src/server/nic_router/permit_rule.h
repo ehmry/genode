@@ -15,7 +15,7 @@
 #define _PERMIT_RULE_H_
 
 /* local includes */
-#include <avl_tree.h>
+#include "avl_tree.h"
 
 /* Genode includes */
 #include <util/avl_tree.h>

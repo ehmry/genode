@@ -15,8 +15,8 @@
 #define _SRC__INIT__HEARTBEAT_H_
 
 /* local includes */
-#include <state_reporter.h>
-#include <child_registry.h>
+#include "state_reporter.h"
+#include "child_registry.h"
 #include <util/noncopyable.h>
 
 namespace Init { class Heartbeat; }

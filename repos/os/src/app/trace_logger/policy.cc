@@ -12,7 +12,7 @@
  */
 
 /* local includes */
-#include <policy.h>
+#include "policy.h"
 
 using namespace Genode;
 

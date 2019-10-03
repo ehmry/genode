@@ -22,7 +22,7 @@
 #include <nic/packet_allocator.h>
 
 /* local includes */
-#include <component.h>
+#include "component.h"
 
 
 struct Main

@@ -17,7 +17,7 @@
 #include <nic_session/connection.h>
 #include <nic/packet_allocator.h>
 
-#include <packet_handler.h>
+#include "packet_handler.h"
 
 namespace Net { class Nic; }
 

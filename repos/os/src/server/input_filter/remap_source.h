@@ -18,9 +18,9 @@
 #include <input/keycodes.h>
 
 /* local includes */
-#include <include_accessor.h>
-#include <source.h>
-#include <key_code_by_name.h>
+#include "include_accessor.h"
+#include "source.h"
+#include "key_code_by_name.h"
 
 namespace Input_filter { class Remap_source; }
 

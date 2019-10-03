@@ -38,10 +38,10 @@
 #include <net/port.h>
 
 /* local includes */
-#include <list.h>
-#include <reference.h>
-#include <pointer.h>
-#include <l3_protocol.h>
+#include "list.h"
+#include "reference.h"
+#include "pointer.h"
+#include "l3_protocol.h"
 
 namespace Net {
 

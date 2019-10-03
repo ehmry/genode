@@ -12,9 +12,9 @@
  */
 
 /* local includes */
-#include <arp_waiter.h>
-#include <interface.h>
-#include <domain.h>
+#include "arp_waiter.h"
+#include "interface.h"
+#include "domain.h"
 
 using namespace Net;
 using namespace Genode;

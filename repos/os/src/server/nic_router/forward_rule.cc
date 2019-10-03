@@ -12,8 +12,8 @@
  */
 
 /* local includes */
-#include <forward_rule.h>
-#include <domain.h>
+#include "forward_rule.h"
+#include "domain.h"
 
 /* Genode includes */
 #include <util/xml_node.h>

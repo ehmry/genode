@@ -18,9 +18,9 @@
 #include <input/keycodes.h>
 
 /* local includes */
-#include <source.h>
-#include <timer_accessor.h>
-#include <include_accessor.h>
+#include "source.h"
+#include "timer_accessor.h"
+#include "include_accessor.h"
 
 namespace Input_filter { class Chargen_source; }
 

@@ -15,9 +15,9 @@
 #define _CONFIGURATION_H_
 
 /* local includes */
-#include <domain.h>
-#include <report.h>
-#include <uplink.h>
+#include "domain.h"
+#include "report.h"
+#include "uplink.h"
 
 /* Genode includes */
 #include <base/duration.h>

@@ -12,7 +12,7 @@
  */
 
 /* local includes */
-#include <packet_log.h>
+#include "packet_log.h"
 
 using namespace Genode;
 using namespace Net;

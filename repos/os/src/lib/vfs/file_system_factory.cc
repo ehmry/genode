@@ -17,18 +17,18 @@
 #include <base/shared_object.h>
 
 /* supported builtin file systems */
-#include <block_file_system.h>
-#include <fs_file_system.h>
-#include <inline_file_system.h>
-#include <log_file_system.h>
-#include <null_file_system.h>
-#include <ram_file_system.h>
-#include <rom_file_system.h>
-#include <rtc_file_system.h>
-#include <symlink_file_system.h>
-#include <tar_file_system.h>
-#include <terminal_file_system.h>
-#include <zero_file_system.h>
+#include "block_file_system.h"
+#include "fs_file_system.h"
+#include "inline_file_system.h"
+#include "log_file_system.h"
+#include "null_file_system.h"
+#include "ram_file_system.h"
+#include "rom_file_system.h"
+#include "rtc_file_system.h"
+#include "symlink_file_system.h"
+#include "tar_file_system.h"
+#include "terminal_file_system.h"
+#include "zero_file_system.h"
 
 
 namespace Vfs {

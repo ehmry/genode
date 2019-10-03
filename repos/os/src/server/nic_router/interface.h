@@ -15,13 +15,13 @@
 #define _INTERFACE_H_
 
 /* local includes */
-#include <link.h>
-#include <arp_waiter.h>
-#include <l3_protocol.h>
-#include <dhcp_client.h>
-#include <dhcp_server.h>
-#include <list.h>
-#include <report.h>
+#include "link.h"
+#include "arp_waiter.h"
+#include "l3_protocol.h"
+#include "dhcp_client.h"
+#include "dhcp_server.h"
+#include "list.h"
+#include "report.h"
 
 /* Genode includes */
 #include <nic_session/nic_session.h>

@@ -12,9 +12,9 @@
  */
 
 /* local includes */
-#include <policy.h>
-#include <monitor.h>
-#include <xml_node.h>
+#include "policy.h"
+#include "monitor.h"
+#include "xml_node.h"
 
 /* Genode includes */
 #include <base/component.h>

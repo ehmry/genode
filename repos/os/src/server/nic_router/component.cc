@@ -15,8 +15,8 @@
 #include <os/session_policy.h>
 
 /* local includes */
-#include <component.h>
-#include <configuration.h>
+#include "component.h"
+#include "configuration.h"
 
 using namespace Net;
 using namespace Genode;

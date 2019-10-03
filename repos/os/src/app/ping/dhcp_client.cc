@@ -12,9 +12,9 @@
  */
 
 /* local includes */
-#include <nic.h>
-#include <dhcp_client.h>
-#include <ipv4_config.h>
+#include "nic.h"
+#include "dhcp_client.h"
+#include "ipv4_config.h"
 
 /* Genode includes */
 #include <util/xml_node.h>

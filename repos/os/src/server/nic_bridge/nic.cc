@@ -18,7 +18,7 @@
 #include <net/udp.h>
 #include <net/dhcp.h>
 
-#include <component.h>
+#include "component.h"
 
 using namespace Net;
 using namespace Genode;

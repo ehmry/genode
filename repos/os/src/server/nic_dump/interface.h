@@ -15,8 +15,8 @@
 #define _INTERFACE_H_
 
 /* local includes */
-#include <pointer.h>
-#include <packet_log.h>
+#include "pointer.h"
+#include "packet_log.h"
 
 /* Genode includes */
 #include <nic_session/nic_session.h>

@@ -15,7 +15,7 @@
 #define _IP_RULE_H_
 
 /* local includes */
-#include <direct_rule.h>
+#include "direct_rule.h"
 
 namespace Net {
 

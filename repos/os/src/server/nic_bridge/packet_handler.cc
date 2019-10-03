@@ -18,8 +18,8 @@
 #include <net/ipv4.h>
 #include <net/udp.h>
 
-#include <component.h>
-#include <packet_handler.h>
+#include "component.h"
+#include "packet_handler.h"
 
 using namespace Net;
 

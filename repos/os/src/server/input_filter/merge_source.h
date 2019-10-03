@@ -15,7 +15,7 @@
 #define _INPUT_FILTER__MERGE_SOURCE_H_
 
 /* local includes */
-#include <source.h>
+#include "source.h"
 
 namespace Input_filter { class Merge_source; }
 

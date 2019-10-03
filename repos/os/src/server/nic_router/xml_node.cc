@@ -12,7 +12,7 @@
  */
 
 /* local includes */
-#include <xml_node.h>
+#include "xml_node.h"
 
 using namespace Genode;
 

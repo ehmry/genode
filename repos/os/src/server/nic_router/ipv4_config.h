@@ -15,7 +15,7 @@
 #define _IPV4_CONFIG_H_
 
 /* local includes */
-#include <ipv4_address_prefix.h>
+#include "ipv4_address_prefix.h"
 
 namespace Net { class Ipv4_config; }
 

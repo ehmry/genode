@@ -15,10 +15,10 @@
 #define _DHCP_SERVER_H_
 
 /* local includes */
-#include <ipv4_address_prefix.h>
-#include <bit_allocator_dynamic.h>
-#include <list.h>
-#include <pointer.h>
+#include "ipv4_address_prefix.h"
+#include "bit_allocator_dynamic.h"
+#include "list.h"
+#include "pointer.h"
 
 /* Genode includes */
 #include <net/mac_address.h>
