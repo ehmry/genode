@@ -5,11 +5,11 @@ BASE_TIMER_DIR = $(BASE_DIR)/src/timer
 
 PERIODIC_DIR = $(BASE_TIMER_DIR)/periodic
 
-INCLUDES += -I$(BASE_TIMER_DIR)/include
-INCLUDES += -I$(PERIODIC_DIR)
-INCLUDES += -I$(REP_DIR)/src/lib/syscall
+CPPFLAGS += -I$(BASE_TIMER_DIR)/include
+CPPFLAGS += -I$(PERIODIC_DIR)
+CPPFLAGS += -I$(REP_DIR)/src/lib/syscall
 
-INCLUDES = -I. $(INCLUDES)
+CPPFLAGS = -I. $(CPPFLAGS)
 	#TODO: ^ FAIL
 
 : foreach $(BASE_TIMER_DIR)/*.cc |> !cxx |> %B.linux.o {obj}

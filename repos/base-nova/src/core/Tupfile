@@ -1,7 +1,7 @@
 include_rules
 GEN_CORE_DIR = $(BASE_DIR)/src/core
 
-INCLUDES += \
+CPPFLAGS += \
 	-I$(TUP_CWD)/include \
 	-I$(GEN_CORE_DIR)/include \
 

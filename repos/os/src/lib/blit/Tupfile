@@ -1,24 +1,24 @@
 include_rules
 
 ifeq (@(TUP_ARCH),i386)
-BLIT_INCLUDES += -Ispec/x86_32
-BLIT_INCLUDES += -Ispec/x86
+BLIT_CPPFLAGS += -Ispec/x86_32
+BLIT_CPPFLAGS += -Ispec/x86
 endif
 
 ifeq (@(TUP_ARCH),x86_64)
-BLIT_INCLUDES += -Ispec/x86_64
-BLIT_INCLUDES += -Ispec/x86
+BLIT_CPPFLAGS += -Ispec/x86_64
+BLIT_CPPFLAGS += -Ispec/x86
 endif
 
 ifeq (@(TUP_ARCH),arm)
-BLIT_INCLUDES += -Ispec/arm
+BLIT_CPPFLAGS += -Ispec/arm
 endif
 
-ifeq ($(BLIT_INCLUDES),)
+ifeq ($(BLIT_CPPFLAGS),)
 error blit library not yet ported to @(TUP_ARCH)
 endif
 
-INCLUDES += $(BLIT_INCLUDES)
+CPPFLAGS += $(BLIT_CPPFLAGS)
 
 : foreach *.cc |> !cxx |> {obj}
 : {obj} |> !ar |> {bin}

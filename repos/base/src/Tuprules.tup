@@ -1,1 +1,1 @@
-INCLUDES += -I$(REP_DIR)/src/include
+CPPFLAGS += -I$(REP_DIR)/src/include
