@@ -1,0 +1,7 @@
+include_rules
+ifneq ($(X86),)
+CPPFLAGS += -Ispec/x86
+: foreach *.cc |> !cxx |> %B.o {obj}
+: {obj} |  |> !prg |> pc_uart_drv {bin}
+: {bin} |> !collect_bin |>
+endif

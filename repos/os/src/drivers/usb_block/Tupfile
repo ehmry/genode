@@ -1,0 +1,4 @@
+include_rules
+: foreach *.cc |> !cxx |> %B.o {obj}
+: {obj} |  |> !prg |> usb_block_drv {bin}
+: {bin} |> !collect_bin |>

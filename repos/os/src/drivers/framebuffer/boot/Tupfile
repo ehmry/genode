@@ -1,0 +1,6 @@
+include_rules
+ifneq ($(X86),)
+: foreach *.cc |> !cxx |> %B.o {obj}
+: {obj} |  |> !prg |> fb_boot_drv {bin}
+: {bin} |> !collect_bin |>
+endif
