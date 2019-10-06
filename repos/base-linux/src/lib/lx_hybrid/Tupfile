@@ -1,6 +1,6 @@
 include_rules
 
-INCLUDES += -I$(REP_DIR)/src/lib/syscall
+CPPFLAGS += -I$(REP_DIR)/src/lib/syscall
 
 : foreach *.cc $(BASE_DIR)/src/lib/cxx/new_delete.cc |> !cxx |> {obj}
 : foreach *.c |> !cc |> {obj}

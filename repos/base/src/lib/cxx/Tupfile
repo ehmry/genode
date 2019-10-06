@@ -16,11 +16,13 @@ endif
 
 include_rules
 
-DEFINES = -ffunction-sections -fno-strict-aliasing -g -fPIC
-	# drop the standard defines to avoid -nostdinc
+COMMON_FLAGS = -ffunction-sections -fno-strict-aliasing
 
-INCLUDES += -I@(LIBCXX)/include/c++/v1
-INCLUDES += -I@(LIBCXXABI)/include
+CFLAGS += $(COMMON_FLAGS)
+CXXFLAGS += $(COMMON_FLAGS)
+
+CPPFLAGS += -I@(LIBCXX)/include/c++/v1
+CPPFLAGS += -I@(LIBCXXABI)/include
 
 LLVM_LIBS += @(LIBCXXABI)/lib/libc++abi.a
 

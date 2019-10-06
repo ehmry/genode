@@ -1,2 +1,2 @@
-INCLUDES += -I$(TUP_CWD)
+CPPFLAGS += -I$(TUP_CWD)
 SRC_CC = $(TUP_CWD)/*.cc

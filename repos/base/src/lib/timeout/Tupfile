@@ -1,5 +1,5 @@
 include_rules
-INCLUDES += $(REP_DIR)/src/include
+CPPFLAGS += $(REP_DIR)/src/include
 
 SRC_CC += \
 	duration.cc \

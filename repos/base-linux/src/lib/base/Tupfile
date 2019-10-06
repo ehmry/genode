@@ -1,6 +1,6 @@
 include_rules
 
-INCLUDES += -I$(REP_DIR)/src/lib/syscall
+CPPFLAGS += -I$(REP_DIR)/src/lib/syscall
 
 BASE_LIB_DIR = $(BASE_DIR)/src/lib/base
 

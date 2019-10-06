@@ -71,7 +71,8 @@ export PKG_CONFIG_PATH
 PKG_CONFIG_DIR = $(DEV_DIR)/lib/pkgconfig
 PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR):$PKG_CONFIG_PATH pkg-config
 
-DEFINES += -g
+CFLAGS += -g
+CXXFLAGS += -g
 
 ifdef OLEVEL
 OLEVEL = @(OLEVEL)
@@ -79,13 +80,13 @@ else
 OLEVEL = -O0
 endif
 
-!ir = | $(GENODE_DIR)/<pkg-config> |> clang $(OLEVEL) $(DEFINES) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(INCLUDES) -S -emit-llvm %f |> %B.ll
+!ir = | $(GENODE_DIR)/<pkg-config> |> clang $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(CPPFLAGS) -S -emit-llvm %f |> %B.ll
 
-!asm = |> ^ CC %b^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(DEFINES) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) -D__ASSEMBLY__ $(INCLUDES) -c %f -o %o |> %B.o
+!asm = |> ^ CC %b^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) -D__ASSEMBLY__ $(CPPFLAGS) -c %f -o %o |> %B.o
 
-!cc = | $(GENODE_DIR)/<pkg-config> |> ^o CC %f^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(DEFINES) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) $(INCLUDES) `$(PKG_CONFIG) --cflags $(LIBS) $(LIBS_CFLAGS)` -c -fPIC %f -o %o |> %B.o
+!cc = | $(GENODE_DIR)/<pkg-config> |> ^o CC %f^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS) $(LIBS_CFLAGS)` -c -fPIC %f -o %o |> %B.o
 
-!cxx = | $(GENODE_DIR)/<pkg-config> |> ^o CXX %b^ @(CC_WRAPPER) $(CXX) $(OLEVEL) $(DEFINES) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) $(INCLUDES) `$(PKG_CONFIG) --cflags $(LIBS)` -c -fPIC %f -o %o |> %B.o
+!cxx = | $(GENODE_DIR)/<pkg-config> |> ^o CXX %b^ @(CC_WRAPPER) $(CXX) $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS)` -c -fPIC %f -o %o |> %B.o
 
 !ld = | $(GENODE_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LDFLAGS) `$(PKG_CONFIG) --libs $(LIBS)` --whole-archive --start-group %f --no-whole-archive --end-group -o %o |>
 

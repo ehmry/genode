@@ -1,12 +1,12 @@
 ifeq (@(TUP_ARCH),x86_32)
-	INCLUDES += -I$(TUP_CWD)/include/spec/64bit
+	CPPFLAGS += -I$(TUP_CWD)/include/spec/64bit
 endif
 
 ifeq (@(TUP_ARCH),x86_64)
-	INCLUDES += -I$(TUP_CWD)/include/spec/64bit
+	CPPFLAGS += -I$(TUP_CWD)/include/spec/64bit
 endif
 
-INCLUDES += -I$(TUP_CWD)/include
+CPPFLAGS += -I$(TUP_CWD)/include
 
 include &(BASE_DIR)/Tuprules.tup
 REP_DIR = $(TUP_CWD)
