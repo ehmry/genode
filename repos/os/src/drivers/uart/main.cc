@@ -17,7 +17,7 @@
 #include <base/attached_io_mem_dataspace.h>
 
 /* local includes */
-#include <uart_component.h>
+#include "uart_component.h"
 
 
 struct Main

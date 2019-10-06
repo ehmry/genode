@@ -11,7 +11,7 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#include <framebuffer.h>
+#include "framebuffer.h"
 #include <base/component.h>
 
 using namespace Framebuffer;

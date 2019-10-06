@@ -20,7 +20,7 @@
 #include <irq_session/connection.h>
 
 /* platform local includes */
-#include <irq_proxy.h>
+#include "irq_proxy.h"
 
 
 namespace Platform {

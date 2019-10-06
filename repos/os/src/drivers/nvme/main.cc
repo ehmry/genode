@@ -29,8 +29,8 @@
 #include <util/misc_math.h>
 
 /* local includes */
-#include <util.h>
-#include <pci.h>
+#include "util.h"
+#include "pci.h"
 
 
 namespace {

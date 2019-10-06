@@ -16,7 +16,7 @@
 /* Genode */
 #include <io_port_session/connection.h>
 
-#include "rtc.h"
+#include "../../rtc.h"
 
 using namespace Genode;
 

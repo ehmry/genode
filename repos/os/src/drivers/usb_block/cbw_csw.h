@@ -14,7 +14,7 @@
 #ifndef _CBW_CSW_H_
 #define _CBW_CSW_H_
 
-#include <scsi.h>
+#include "scsi.h"
 
 namespace Usb {
 	struct Cbw;
