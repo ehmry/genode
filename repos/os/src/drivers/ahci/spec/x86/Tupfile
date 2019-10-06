@@ -1,8 +1,0 @@
-include_rules
-ifneq ($(X86),)
-
-: foreach $(SRC_CC) *.cc |> !cxx |> %B.o {obj}
-: {obj} |  |> !prg |> ahci_x86_drv {bin}
-: {bin} |> !collect_bin |>
-
-endif

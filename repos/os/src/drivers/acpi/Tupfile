@@ -1,0 +1,6 @@
+include_rules
+ifneq ($(X86),)
+: foreach ../*.cc *.cc |> !cxx |> %B.o {obj}
+: {obj} |  |> !prg |> acpi_drv {bin}
+: {bin} |> !collect_bin |>
+endif
