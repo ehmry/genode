@@ -24,6 +24,9 @@ namespace Genode {
 	template <typename> class Connection;
 }
 
+#pragma clang diagnostic ignored "-Wuninitialized"
+// TODO: this diagnostic is now broken for most code in the tree,
+// but thats not a regression from upstream
 
 class Genode::Connection_base : Noncopyable, Interface
 {
