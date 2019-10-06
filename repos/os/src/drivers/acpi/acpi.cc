@@ -34,6 +34,7 @@ using namespace Genode;
 /* enable debugging output */
 static const bool verbose = false;
 
+#pragma clang diagnostic ignored "-Waddress-of-packed-member"
 
 /**
  * Generic Apic structure
