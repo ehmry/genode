@@ -12,8 +12,8 @@
   */
 
 /* local includes */
-#include <smbios_table_reporter.h>
-#include <efi_system_table.h>
+#include "smbios_table_reporter.h"
+#include "efi_system_table.h"
 
 /* Genode includes */
 #include <base/attached_io_mem_dataspace.h>

@@ -16,7 +16,7 @@
 #include <dataspace/capability.h>
 #include <os/static_root.h>
 
-#include <framebuffer.h>
+#include "framebuffer.h"
 
 struct Main {
 

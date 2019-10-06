@@ -29,7 +29,7 @@
 static bool verbose_scsi = false;
 
 /* local includes */
-#include <cbw_csw.h>
+#include "cbw_csw.h"
 
 
 namespace Usb {

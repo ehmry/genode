@@ -22,7 +22,7 @@
 enum { UARTS_NUM = 4 }; /* needed by base class definitions */
 
 /* local includes */
-#include <uart_driver_base.h>
+#include "../../uart_driver_base.h"
 
 class Uart::Driver : public Uart::Driver_base
 {

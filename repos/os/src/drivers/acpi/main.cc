@@ -18,8 +18,8 @@
 #include <util/xml_generator.h>
 
 /* local includes */
-#include <acpi.h>
-#include <smbios_table_reporter.h>
+#include "acpi.h"
+#include "smbios_table_reporter.h"
 
 
 namespace Acpi {
