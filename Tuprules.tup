@@ -95,35 +95,6 @@ export STRIP
 
 !ln = |> ln -s %f %o |>
 
-&LD_SCRIPT_SO = repos/base/src/ld/genode_rel.ld
-
-ifeq (@(TUP_ARCH),x86_64)
-	ASM_SYM_DEPENDENCY = movq \1@GOTPCREL(%rip), %rax
-else
-	ASM_SYM_DEPENDENCY = .long \1
-endif
-
-!abi_stub = |> ^ STUB %o^\
-	sed \
-		-e "s/^\(\w\+\) D \(\w\+\)\$/.data; .global \1; .type \1,%%object; .size \1,\2; \1:/" \
-		-e "s/^\(\w\+\) V/.data; .weak \1; .type \1,%%object; \1:/" \
-		-e "s/^\(\w\+\) T/.text; .global \1; .type \1,%%function; \1:/" \
-		-e "s/^\(\w\+\) R \(\w\+\)\$/.section .rodata; .global \1; .type \1,%%object; .size \1,\2; \1:/" \
-		-e "s/^\(\w\+\) W/.text; .weak \1; .type \1,%%function; \1:/" \
-		-e "s/^\(\w\+\) B \(\w\+\)\$/.bss; .global \1; .type \1,%%object; .size \1,\2; \1:/" \
-		-e "s/^\(\w\+\) U/.text; .global \1; $(ASM_SYM_DEPENDENCY)/" \
-		%f \
-	| $(CC) -x assembler -c - -o tmp.o; \
-	$(LD) -o %o \
-		-shared \
-		-T &(LD_SCRIPT_SO) \
-		tmp.o; \
-	rm tmp.o; \
-|> $(DEV_DIR)/lib/%B.lib.so $(GENODE_DIR)/<lib>
-
-BASE_DIR = $(GENODE_DIR)/repos/base
-&BASE_DIR = repos/base
-
 !incbin = |> ^ incbin %f^ \
 	export SYM=_binary_`echo %f | sed 's/\./_/g'`; \
 	echo ".global ${SYM}_start, ${SYM}_end; .data; .align 4; ${SYM}_start:; .incbin \"%f\"; ${SYM}_end:" \
