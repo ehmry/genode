@@ -18,17 +18,5 @@ SED_FLAGS += -e "s|@ld@|$(LD)|"
 SED_FLAGS += -e "s|@ar@|$(AR)|"
 SED_FLAGS += -e "s|@ranlib@|$(RANLIB)|"
 
-ifeq (@(TUP_ARCH),i386)
-SED_FLAGS += -e 's|@spec_includes@|-I${includedir}/spec/x86_32 -I${includedir}/spec/x86 -I${includedir}/spec/32bit|'
-endif
-
-ifeq (@(TUP_ARCH),x86_64)
-SED_FLAGS += -e 's|@spec_includes@|-I${includedir}/spec/x86_64 -I${includedir}/spec/x86 -I${includedir}/spec/64bit|'
-endif
-
-ifeq (@(TUP_ARCH),arm64)
-SED_FLAGS += -e 's|@spec_includes@| -I${includedir}/spec/arm_64 -I${includedir}/spec/64bit|'
-endif
-
 : foreach *.pc.in |> !sed_pkgconfig_file |>
 : |> ln -s genode-base.pc %o |> $(PKG_CONFIG_DIR)/base.pc $(GENODE_DIR)/<pkg-config>
