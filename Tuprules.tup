@@ -77,7 +77,7 @@ CXXFLAGS += -g
 ifdef OLEVEL
 OLEVEL = @(OLEVEL)
 else
-OLEVEL = -O0
+OLEVEL = -O2
 endif
 
 !ir = | $(GENODE_DIR)/<pkg-config> |> clang $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(CPPFLAGS) -S -emit-llvm %f |> %B.ll
