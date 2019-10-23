@@ -158,8 +158,6 @@ class Vfs::Fs_file_system : public File_system
 				_fs(fs_connection)
 			{ }
 
-			virtual ~Fs_vfs_handle() { _fs.close(file_handle()); }
-
 			::File_system::File_handle file_handle() const
 			{ return ::File_system::File_handle { id().value }; }
 
@@ -859,6 +857,7 @@ class Vfs::Fs_file_system : public File_system
 			if (fs_handle->enqueued())
 				_congested_handles.remove(*fs_handle);
 
+			_fs.close(fs_handle->file_handle());
 			destroy(fs_handle->alloc(), fs_handle);
 		}
 
