@@ -51,9 +51,9 @@ LDFLAGS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx-baremetal`
 	$(DEV_DIR)/<lib> \
 	$(GENODE_DIR)/<pkg-config> \
 	$(BASE_DIR)/<base-libs> \
-	$(BASE_DIR)/<startup> \
+	$(REP_DIR)/<startup> \
 	$(REP_DIR)/<base-common> \
 |> $(LD) $(LDFLAGS) -u _start -r \
 	%<base-libs> %<base-common> %<startup> %f -o %o \
 |> core.o $(REP_DIR)/<core> {core}
-: {core} |> cp %f %o |> $(DEV_DIR)/lib/core-nova.o
+: {core} |> cp %f %o |> $(OUT_DIR)/lib/core-nova.o

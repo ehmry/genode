@@ -1,0 +1,2 @@
+include_rules
+include &(BASE_DIR)/src/lib/startup/Tupfile.inc

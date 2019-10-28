@@ -47,7 +47,7 @@ LDFLAGS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx-baremetal`
 : {obj} | \
 	$(DEV_DIR)/<lib> \
 	$(GENODE_DIR)/<pkg-config> \
-	$(BASE_DIR)/<startup> \
+	$(REP_DIR)/<startup> \
 	$(REP_DIR)/<base-common> \
 	$(REP_DIR)/<syscall> \
 |> !ld %<base-common> %<startup> %<syscall> \

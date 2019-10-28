@@ -39,7 +39,7 @@ BASE_PKGS += alarm cxx-baremetal ldso-startup timeout
 
 LDFLAGS += `$(PKG_CONFIG) --static --libs $(BASE_PKGS)` -L $(LIB_DIR)
 
-: $(BASE_LIBS) {obj} | symbol.map $(BASE_DIR)/<startup> $(REP_DIR)/<base-common> $(GENODE_DIR)/<pkg-config> $(DEV_DIR)/<lib> \
+: $(BASE_LIBS) {obj} | symbol.map $(REP_DIR)/<startup> $(REP_DIR)/<base-common> $(GENODE_DIR)/<pkg-config> $(DEV_DIR)/<lib> \
 |> \
 	$(LD) -o %o \
 	$(LD_MARCH) $(LDFLAGS) \
