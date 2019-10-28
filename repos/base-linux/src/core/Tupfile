@@ -42,14 +42,15 @@ LDFLAGS += \
 	-T$(BASE_DIR)/src/ld/genode.ld \
 	-T$(REP_DIR)/src/ld/stack_area.ld \
 
-LDFLAGS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx-baremetal startup`
+LDFLAGS += -L$(LIB_DIR) `$(PKG_CONFIG) --libs cxx-baremetal`
 
 : {obj} | \
 	$(DEV_DIR)/<lib> \
 	$(GENODE_DIR)/<pkg-config> \
+	$(BASE_DIR)/<startup> \
 	$(REP_DIR)/<base-common> \
 	$(REP_DIR)/<syscall> \
-|> !ld %<base-common> %<syscall> \
+|> !ld %<base-common> %<startup> %<syscall> \
 |> core-linux $(REP_DIR)/<core> {bin}
 
 : {bin} |> !collect_bin |>

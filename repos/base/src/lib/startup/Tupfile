@@ -1,17 +1,13 @@
 include_rules
 
-: foreach *.cc |> !cxx |> {obj}
+: foreach *.cc |> !cxx |> | $(BASE_DIR)/<startup> {obj}
 
 ifeq (@(TUP_ARCH),i386)
-	: foreach spec/x86_32/*.s |> !asm |> {obj}
+	: foreach spec/x86_32/*.s |> !asm |> | $(BASE_DIR)/<startup> {obj}
 endif
 ifeq (@(TUP_ARCH),x86_64)
-	: foreach spec/x86_64/*.s |> !asm |> {obj}
+	: foreach spec/x86_64/*.s |> !asm |> | $(BASE_DIR)/<startup> {obj}
 endif
 ifeq (@(TUP_ARCH),arm64)
-	: foreach spec/arm_64/*.s |> !asm |> {obj}
+	: foreach spec/arm_64/*.s |> !asm |> | $(BASE_DIR)/<startup> {obj}
 endif
-
-: {obj} |> !ar |> {bin}
-: foreach {bin} |> !collect_static |>
-: |> !emit_lib_pkg_config |>
