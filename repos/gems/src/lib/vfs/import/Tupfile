@@ -1,0 +1,5 @@
+include_rules
+
+: foreach *.cc |> !cxx |> %B.o {obj}
+: {obj} |> !lib |> vfs_import.lib.so {lib}
+: foreach {lib} |> !collect_shared |>

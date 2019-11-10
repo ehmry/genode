@@ -1,0 +1,5 @@
+ifdef NIX_OUTPUTS_DEV
+include_rules
+SED_FLAGS += -e "s|@includedir@|@(NIX_OUTPUTS_DEV)/include/os|"
+: *.pc.in |> !sed_pkgconfig_file |>
+endif
