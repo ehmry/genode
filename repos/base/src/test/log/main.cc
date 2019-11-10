@@ -48,7 +48,7 @@ void Component::construct(Genode::Env &env)
 	Log_connection log_connection { env, "log" };
 	log_connection.write(buf);
 
-	/* test splitting of message with length > MAX_STRING_LEN with 'Genode::log()' */ 
+	/* test splitting of message with length > MAX_STRING_LEN with 'Genode::log()' */
 	for (char &c : buf) c = '.';
 	buf[0] = '3';                                  /* begin of first line */
 	buf[Log_session::MAX_STRING_LEN - 2]   = '4';  /* last visible before flushed */
@@ -58,4 +58,6 @@ void Component::construct(Genode::Env &env)
 	log(Cstring(buf));
 
 	log("Test done.");
+
+	env.parent().exit(0);
 }
