@@ -1,0 +1,11 @@
+{
+    "inputs": {
+        "nixpkgs": {
+            "inputs": {},
+            "narHash": "sha256-HYX9rCn1dweN+L3ecNy4BiCGw4WEt1zgdIiAeYNY5GM=",
+            "originalUrl": "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode",
+            "url": "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode&rev=12e31ac07c6d337760b3f59dc64c03f26cdd2009"
+        }
+    },
+    "version": 3
+}

@@ -1,0 +1,15 @@
+*~
+*.orig
+*.swp
+*.rej
+result
+result-*
+
+/build
+/contrib
+/depot
+/public
+/repos/world
+/.tup
+/build-*
+/configs

@@ -1,1 +1,1 @@
-{ pkgs ? import <genodepkgs> { } }: pkgs.genode.base
+let pkgs = import ./default.nix { }; in pkgs.base
