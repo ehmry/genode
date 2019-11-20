@@ -2,6 +2,8 @@
 
 OUT_DIR=$(TUP_CWD)/out
 DEV_DIR = $(TUP_CWD)/dev
+DEV_LIB_DIR = $(DEV_DIR)/lib
+
 
 ifeq (@(TUP_ARCH),i386)
 X86 = y
@@ -23,29 +25,29 @@ endif
 
 GENODE_DIR = $(TUP_CWD)
 
-!prg = | $(GENODE_DIR)/<lib> $(DEV_DIR)/<lib> $(GENODE_DIR)/<pkg-config> \
+!prg = | $(DEV_DIR)/<lib> $(DEV_DIR)/<pkg-config> \
 |> ^o LD %o^ \
 	$(LD) $(LD_MARCH) $(LDFLAGS) \
-	-L$(LIB_DIR) \
+	-L$(DEV_LIB_DIR) \
 	`$(PKG_CONFIG) --libs $(LIBS) genode-prg` \
 	%f \
 	$(LIBGCC) \
 	-o %o \
 |> %d
 
-!lib = | $(GENODE_DIR)/<lib> $(DEV_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LD_MARCH) %f $(LDFLAGS) `$(PKG_CONFIG) --libs genode-lib $(LIBS)` -L$(LIB_DIR) -o %o |> %d.lib.so
+!lib = | $(DEV_DIR)/<lib> $(DEV_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LD_MARCH) %f $(LDFLAGS) `$(PKG_CONFIG) --libs genode-lib $(LIBS)` -L$(DEV_LIB_DIR) -o %o |> %d.lib.so
 
 !collect_bin = |> ^ COLLECT %b^ \
 	$STRIP -o %o %f \
 |> $(OUT_DIR)/bin/%b $(OUT_DIR)/<bin>
 
 !collect_shared = |> ^ COLLECT %b^ \
-	$STRIP -o %o %f \
+	cp %f %o \
 |> $(OUT_DIR)/lib/%b $(OUT_DIR)/<lib>
 
 !collect_static = |> ^ COLLECT %b^ \
 	cp %f %o \
-|> $(DEV_DIR)/lib/%b \
+|> $(DEV_LIB_DIR)/%b \
 	$(DEV_DIR)/<lib> \
 
 export CC
@@ -65,8 +67,6 @@ CXXFLAGS += -Wno-undefined-bool-conversion -Wno-unknown-attributes -Wsystem-head
 
 LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
 
-LIB_DIR = $(DEV_DIR)/lib
-
 export PKG_CONFIG_PATH
 PKG_CONFIG_DIR = $(DEV_DIR)/lib/pkgconfig
 PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR):$PKG_CONFIG_PATH pkg-config
@@ -80,15 +80,15 @@ else
 OLEVEL = -O2
 endif
 
-!ir = | $(GENODE_DIR)/<pkg-config> |> clang $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(CPPFLAGS) -S -emit-llvm %f |> %B.ll
+!ir = | $(DEV_DIR)/<pkg-config> |> clang $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(CPPFLAGS) -S -emit-llvm %f |> %B.ll
 
 !asm = |> ^ CC %b^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) -D__ASSEMBLY__ $(CPPFLAGS) -c %f -o %o |> %B.o
 
-!cc = | $(GENODE_DIR)/<pkg-config> |> ^o CC %f^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS) $(LIBS_CFLAGS)` -c -fPIC %f -o %o |> %B.o
+!cc = | $(DEV_DIR)/<pkg-config> |> ^o CC %f^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS) $(LIBS_CFLAGS)` -c -fPIC %f -o %o |> %B.o
 
-!cxx = | $(GENODE_DIR)/<pkg-config> |> ^o CXX %b^ @(CC_WRAPPER) $(CXX) $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS)` -c -fPIC %f -o %o |> %B.o
+!cxx = | $(DEV_DIR)/<pkg-config> |> ^o CXX %b^ @(CC_WRAPPER) $(CXX) $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS)` -c -fPIC %f -o %o |> %B.o
 
-!ld = | $(GENODE_DIR)/<lib> $(GENODE_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LDFLAGS) `$(PKG_CONFIG) --libs $(LIBS)` --whole-archive --start-group %f --no-whole-archive --end-group -o %o |>
+!ld = | $(DEV_DIR)/<lib> $(DEV_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LDFLAGS) `$(PKG_CONFIG) --libs $(LIBS)` --whole-archive --start-group %f --no-whole-archive --end-group -o %o |>
 
 export STRIP
 !strip = |> $STRIP -o %o %f |>
@@ -106,18 +106,17 @@ export AR
 
 GIT_VERSION = `git describe || echo @(VERSION)`
 
-SED_PKGCONFIG_FLAGS += -e "s|@DEPOT_VERSION@|$(GIT_VERSION)|"
 SED_PKGCONFIG_FLAGS += -e "s|@VERSION@|$(GIT_VERSION)|"
 
 !sed_pkgconfig_file = |> ^o SED %B^ \
 	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) < %f > %o; \
 	pkg-config --validate %o; \
-|> $(PKG_CONFIG_DIR)/%B $(GENODE_DIR)/<pkg-config>
+|> $(PKG_CONFIG_DIR)/%B $(DEV_DIR)/<pkg-config>
 
 !sed_pkgconfig_flags = |> ^o SED %d.pc^ \
 	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) > %o; \
 	pkg-config --validate %o; \
-|> $(PKG_CONFIG_DIR)/%d.pc $(GENODE_DIR)/<pkg-config>
+|> $(PKG_CONFIG_DIR)/%d.pc $(DEV_DIR)/<pkg-config>
 
 !emit_lib_pkg_config = |> ^ emit %d.a pkg-config^ \
 	echo Name: %d >> %o; \
@@ -125,4 +124,4 @@ SED_PKGCONFIG_FLAGS += -e "s|@VERSION@|$(GIT_VERSION)|"
 	echo Version: $(GIT_VERSION) >> %o; \
 	echo Libs: -l:%d.a >> %o; \
 	pkg-config --validate %o; \
-|> $(PKG_CONFIG_DIR)/%d.pc $(GENODE_DIR)/<pkg-config>
+|> $(PKG_CONFIG_DIR)/%d.pc $(DEV_DIR)/<pkg-config>

@@ -37,12 +37,12 @@ BASE_LIBS += \
 
 BASE_PKGS += alarm cxx ldso-startup startup timeout
 
-LDFLAGS += -L$(LIB_DIR) `$(PKG_CONFIG) --static --libs $(BASE_PKGS)`
+LDFLAGS += -L$(DEV_LIB_DIR) `$(PKG_CONFIG) --static --libs $(BASE_PKGS)`
 
 : $(BASE_LIBS) {obj} | \
 	symbol.map \
 	$(DEV_DIR)/<lib> \
-	$(GENODE_DIR)/<pkg-config> \
+	$(DEV_DIR)/<pkg-config> \
 	$(REP_DIR)/<base-common> \
 	$(REP_DIR)/<syscall> \
 |> \

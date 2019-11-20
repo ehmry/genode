@@ -8,7 +8,6 @@ SED_FLAGS += -e "s|@includedir@|`nix-store --add $(REP_DIR)/include`|"
 SED_FLAGS += -e "s|@lddir@|`nix-store --add $(REP_DIR)/src/ld`|"
 endif
 
-
 SED_FLAGS += -e "s|@toolchainincludedir@|`$(CC) $(CC_MARCH) -print-file-name=include`|"
 SED_FLAGS += -e "s|@libgcc@||"
 
@@ -19,4 +18,3 @@ SED_FLAGS += -e "s|@ar@|$(AR)|"
 SED_FLAGS += -e "s|@ranlib@|$(RANLIB)|"
 
 : foreach *.pc.in |> !sed_pkgconfig_file |>
-: |> ln -s genode-base.pc %o |> $(PKG_CONFIG_DIR)/base.pc $(GENODE_DIR)/<pkg-config>

@@ -35,11 +35,14 @@ LDFLAGS += -T$(BASE_DIR)/src/ld/genode_rel.ld
 
 BASE_LIBS += $(REP_DIR)/src/lib/base/base-nova.lib.a
 
-BASE_PKGS += alarm cxx-baremetal ldso-startup timeout
+LDFLAGS += -L$(DEV_LIB_DIR) `$(PKG_CONFIG) --static --libs $(BASE_PKGS)`
 
-LDFLAGS += `$(PKG_CONFIG) --static --libs $(BASE_PKGS)` -L $(LIB_DIR)
-
-: $(BASE_LIBS) {obj} | symbol.map $(REP_DIR)/<startup> $(REP_DIR)/<base-common> $(GENODE_DIR)/<pkg-config> $(DEV_DIR)/<lib> \
+: {obj} | \
+	$(DEV_DIR)/<lib> \
+	$(DEV_DIR)/<pkg-config> \
+	$(REP_DIR)/<base-common> \
+	$(REP_DIR)/<startup> \
+	symbol.map \
 |> \
 	$(LD) -o %o \
 	$(LD_MARCH) $(LDFLAGS) \

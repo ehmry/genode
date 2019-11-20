@@ -25,7 +25,7 @@ endif
 		-T &(LD_SCRIPT_SO) \
 		tmp.o; \
 	rm tmp.o; \
-|> $(DEV_DIR)/lib/%B.lib.so $(GENODE_DIR)/<lib>
+|> $(DEV_LIB_DIR)/%B.lib.so $(DEV_DIR)/<lib>
 
 BASE_DIR = $(GENODE_DIR)/repos/base
 &BASE_DIR = base
