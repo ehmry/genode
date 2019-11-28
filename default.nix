@@ -1,7 +1,14 @@
-{ system ? "x86_64-genode", self ? { }, nixpkgs ? import <nixpkgs> {
-  localSystem = "x86_64-linux";
-  crossSystem = "x86_64-genode";
-} }:
+let
+  nixpkgsGit = builtins.fetchGit {
+    url = "https://gitea.c3d2.de/ehmry/nixpkgs.git";
+    ref = "genode";
+  };
+  pinnedNixpkgs = import nixpkgsGit {
+    localSystem = "x86_64-linux";
+    crossSystem = "x86_64-genode";
+  };
+
+in { system ? "x86_64-genode", self ? { }, nixpkgs ? pinnedNixpkgs }:
 let
   inherit (nixpkgs) stdenv buildPackages fetchgit llvmPackages;
 
