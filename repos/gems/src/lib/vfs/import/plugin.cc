@@ -11,7 +11,7 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#include <gems/vfs.h>
+#include <os/vfs.h>
 #include <vfs/print.h>
 #include <base/heap.h>
 
@@ -189,19 +189,20 @@ class Vfs_import::File_system : public Vfs::File_system
 				dir.for_each_entry([&] (Directory::Entry const &e) {
 					auto entry_path = Directory::join(path, e.name());
 					switch (e.type()) {
-					case DIRENT_TYPE_FILE:
+					case Dirent_type::TRANSACTIONAL_FILE:
+					case Dirent_type::CONTINUOUS_FILE:
 						copy_file(env, src, entry_path, alloc, overwrite);
-						break;
-					case DIRENT_TYPE_DIRECTORY:
+						return;
+					case Dirent_type::DIRECTORY:
 						copy_dir(env, src, entry_path, alloc, overwrite);
-						break;
-					case DIRENT_TYPE_SYMLINK:
+						return;
+					case Dirent_type::SYMLINK:
 						copy_symlink(env, src, entry_path, alloc, overwrite);
-						break;
-					default:
-						Genode::warning("skipping copy of ", e);
-						break;
+						return;
+					case Dirent_type::END:
+						return;
 					}
+					Genode::warning("skipping copy of ", e);
 				});
 			}
 		}

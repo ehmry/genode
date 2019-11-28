@@ -69,6 +69,50 @@ class Vfs::Fs_file_system : public File_system
 		struct Fs_vfs_handle;
 		typedef Genode::Fifo<Fs_vfs_handle> Fs_vfs_handle_queue;
 
+		/**
+		 * Convert 'File_system::Node_type' to 'Dirent_type'
+		 */
+		static Dirent_type _dirent_type(::File_system::Node_type type)
+		{
+			using ::File_system::Node_type;
+
+			switch (type) {
+			case Node_type::DIRECTORY:          return Dirent_type::DIRECTORY;
+			case Node_type::CONTINUOUS_FILE:    return Dirent_type::CONTINUOUS_FILE;
+			case Node_type::TRANSACTIONAL_FILE: return Dirent_type::TRANSACTIONAL_FILE;
+			case Node_type::SYMLINK:            return Dirent_type::SYMLINK;
+			}
+			return Dirent_type::END;
+		}
+
+		/**
+		 * Convert 'File_system::Node_type' to 'Vfs::Node_type'
+		 */
+		static Node_type _node_type(::File_system::Node_type type)
+		{
+			using Type = ::File_system::Node_type;
+
+			switch (type) {
+			case Type::DIRECTORY:          return Node_type::DIRECTORY;
+			case Type::CONTINUOUS_FILE:    return Node_type::CONTINUOUS_FILE;
+			case Type::TRANSACTIONAL_FILE: return Node_type::TRANSACTIONAL_FILE;
+			case Type::SYMLINK:            return Node_type::SYMLINK;
+			}
+
+			Genode::error("invalid File_system::Node_type");
+			return Node_type::CONTINUOUS_FILE;
+		}
+
+		/**
+		 * Convert 'File_system::Node_rwx' to 'Vfs::Node_rwx'
+		 */
+		static Node_rwx _node_rwx(::File_system::Node_rwx rwx)
+		{
+			return { .readable   = rwx.readable,
+			         .writeable  = rwx.writeable,
+			         .executable = rwx.executable };
+		}
+
 		struct Fs_vfs_handle : Vfs_handle,
 		                       private ::File_system::Node,
 		                       private Handle_space::Element,
@@ -225,6 +269,35 @@ class Vfs::Fs_file_system : public File_system
 
 				return result;
 			}
+
+			bool update_modification_timestamp(Vfs::Timestamp time)
+			{
+				::File_system::Session::Tx::Source &source = *_fs.tx();
+				using ::File_system::Packet_descriptor;
+
+				if (!source.ready_to_submit()) {
+					Genode::error(__func__, ":", __LINE__, " Insufficient_buffer");
+					return false;
+				}
+
+				try {
+					Packet_descriptor p(source.alloc_packet(0),
+					                    file_handle(),
+					                    Packet_descriptor::WRITE_TIMESTAMP,
+					                    ::File_system::Timestamp { .value = time.value });
+
+					/* pass packet to server side */
+					source.submit_packet(p);
+				} catch (::File_system::Session::Tx::Source::Packet_alloc_failed) {
+					Genode::error(__func__, ":", __LINE__, " Insufficient_buffer");
+					return false;
+				} catch (...) {
+					Genode::error("unhandled exception");
+					return false;
+				}
+
+				return true;
+			}
 		};
 
 		struct Fs_vfs_file_handle : Fs_vfs_handle
@@ -266,41 +339,38 @@ class Vfs::Fs_file_system : public File_system
 
 				using ::File_system::Directory_entry;
 
-				Directory_entry entry;
-				file_size       entry_out_count;
+				Directory_entry entry { };
+				file_size       entry_out_count = 0;
 
-				Read_result read_result =
+				Read_result const read_result =
 					_complete_read(&entry, DIRENT_SIZE, entry_out_count);
 
 				if (read_result != READ_OK)
 					return read_result;
 
-				Dirent *dirent = (Dirent*)dst;
+				entry.sanitize();
+
+				Dirent &dirent = *(Dirent*)dst;
 
 				if (entry_out_count < DIRENT_SIZE) {
+
 					/* no entry found for the given index, or error */
-					*dirent = Dirent();
+					dirent = Dirent {
+						.fileno = 0,
+						.type   = Dirent_type::END,
+						.rwx    = { },
+						.name   = { }
+					};
 					out_count = sizeof(Dirent);
 					return READ_OK;
 				}
 
-				/*
-				 * The default value has no meaning because the switch below
-				 * assigns a value in each possible branch. But it is needed to
-				 * keep the compiler happy.
-				 */
-				Dirent_type type = DIRENT_TYPE_END;
-
-				/* copy-out payload into destination buffer */
-				switch (entry.type) {
-				case Directory_entry::TYPE_DIRECTORY: type = DIRENT_TYPE_DIRECTORY; break;
-				case Directory_entry::TYPE_FILE:      type = DIRENT_TYPE_FILE;      break;
-				case Directory_entry::TYPE_SYMLINK:   type = DIRENT_TYPE_SYMLINK;   break;
-				}
-
-				dirent->fileno = entry.inode;
-				dirent->type   = type;
-				strncpy(dirent->name, entry.name, sizeof(dirent->name));
+				dirent = Dirent {
+					.fileno = entry.inode,
+					.type   = _dirent_type(entry.type),
+					.rwx    = _node_rwx(entry.rwx),
+					.name   = { entry.name.buf }
+				};
 
 				out_count = sizeof(Dirent);
 
@@ -518,6 +588,10 @@ class Vfs::Fs_file_system : public File_system
 					case Packet_descriptor::CONTENT_CHANGED:
 						/* previously handled */
 						break;
+
+					case Packet_descriptor::WRITE_TIMESTAMP:
+						/* previously handled */
+						break;
 					}
 				};
 
@@ -533,6 +607,11 @@ class Vfs::Fs_file_system : public File_system
 					Genode::warning("ack for unknown File_system handle ", id); }
 
 				if (packet.operation() == Packet_descriptor::WRITE) {
+					Lock::Guard guard(_lock);
+					source.release_packet(packet);
+				}
+
+				if (packet.operation() == Packet_descriptor::WRITE_TIMESTAMP) {
 					Lock::Guard guard(_lock);
 					source.release_packet(packet);
 				}
@@ -610,19 +689,13 @@ class Vfs::Fs_file_system : public File_system
 
 			out = Stat();
 
-			out.size = status.size;
-			out.mode = STAT_MODE_FILE | 0777;
-
-			if (status.symlink())
-				out.mode = STAT_MODE_SYMLINK | 0777;
-
-			if (status.directory())
-				out.mode = STAT_MODE_DIRECTORY | 0777;
-
-			out.uid = 0;
-			out.gid = 0;
-			out.inode = status.inode;
+			out.size   = status.size;
+			out.type   = _node_type(status.type);
+			out.rwx    = _node_rwx(status.rwx);
+			out.inode  = status.inode;
 			out.device = (Genode::addr_t)this;
+			out.modification_time.value = status.modification_time.value;
+
 			return STAT_OK;
 		}
 
@@ -1015,6 +1088,15 @@ class Vfs::Fs_file_system : public File_system
 			Fs_vfs_handle *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
 
 			return handle->complete_sync();
+		}
+
+		bool update_modification_timestamp(Vfs_handle *vfs_handle, Vfs::Timestamp time) override
+		{
+			Lock::Guard guard(_lock);
+
+			Fs_vfs_handle *handle = static_cast<Fs_vfs_handle *>(vfs_handle);
+
+			return handle->update_modification_timestamp(time);
 		}
 };
 

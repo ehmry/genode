@@ -33,10 +33,10 @@
 #include "vcpu_vmx.h"
 
 /* libc memory allocator */
-#include <libc_mem_alloc.h>
+#include <internal/mem_alloc.h>
 
 /* Genode libc pthread binding */
-#include <thread_create.h>
+#include <internal/thread_create.h>
 
 /* libc */
 #include <pthread.h>
@@ -1154,8 +1154,10 @@ class Periodic_gip
 			ASMAtomicIncU32(&cpu->u32TransactionId);
 
 			/* call the timer function of the RTTimerCreate call */
-			if (rttimer_func)
-				rttimer_func(nullptr, rttimer_obj, 0);
+			if (rttimer_func) {
+				Libc::with_libc([&] () {
+					rttimer_func(nullptr, rttimer_obj, 0); });
+			}
 
 			for (Vcpu_handler *vcpu_handler = vcpu_handler_list().first();
 			     vcpu_handler;

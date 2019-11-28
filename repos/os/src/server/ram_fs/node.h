@@ -23,9 +23,12 @@ namespace Ram_fs {
 	using namespace Genode;
 	using File_system::seek_off_t;
 	using File_system::Status;
+	using File_system::Timestamp;
 	class Node;
 	class File;
 	class Symlink;
+
+	enum class Session_writeable { READ_ONLY, WRITEABLE };
 }
 
 
@@ -48,6 +51,7 @@ class Ram_fs::Node : public  File_system::Node_base,
 		int                 _ref_count;
 		Name                _name;
 		unsigned long const _inode;
+		Timestamp           _modification_time { };
 
 		/**
 		 * Generate unique inode number
@@ -62,7 +66,10 @@ class Ram_fs::Node : public  File_system::Node_base,
 
 		Node()
 		: _ref_count(0), _inode(_unique_inode())
-		{ _name[0] = 0; }
+		{
+			_name[0] = 0;
+			_modification_time.value = File_system::Timestamp::INVALID;
+		}
 
 		virtual ~Node() { lock_for_destruction(); }
 
@@ -74,10 +81,21 @@ class Ram_fs::Node : public  File_system::Node_base,
 		 */
 		void name(char const *name) { strncpy(_name, name, sizeof(_name)); }
 
-		virtual size_t read(char *dst, size_t len, seek_off_t) = 0;
+		void update_modification_time(Timestamp const time)
+		{
+			_modification_time = time;
+		}
+
+		Timestamp modification_time() const { return _modification_time; }
+
+		/*
+		 * 'Session_writeable' is supplied to the 'read' method to reflect the
+		 * writeability in directory entries read from 'Directory' nodes.
+		 */
+		virtual size_t read(char *dst, size_t len, seek_off_t, Session_writeable) = 0;
 		virtual size_t write(char const *src, size_t len, seek_off_t) = 0;
 
-		virtual Status status() = 0;
+		virtual Status status(Session_writeable) = 0;
 
 
 		/* File functionality */

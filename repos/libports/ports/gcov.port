@@ -9,7 +9,7 @@ SIG(gcov) := ${URL(gcov)}
 KEY(gcov) := GNU
 
 URL(generated) := https://github.com/cproc/genode-generated.git
-REV(generated) := 21d621a326ac3f074647c0555144d1638ee495a8
+REV(generated) := 745e78b2ea6abd4a9c601de2cc40702bcb6c636a
 DIR(generated) := include
 
 TAR_OPT(gcov) := gcc-$(VERSION)/gcc/color-macros.h \

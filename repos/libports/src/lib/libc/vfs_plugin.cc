@@ -34,12 +34,34 @@
 
 /* libc plugin interface */
 #include <libc-plugin/plugin.h>
-#include <vfs_plugin.h>
 
 /* libc-internal includes */
-#include "libc_mem_alloc.h"
-#include "libc_errno.h"
-#include "task.h"
+#include <internal/vfs_plugin.h>
+#include <internal/mem_alloc.h>
+#include <internal/errno.h>
+#include <internal/init.h>
+#include <internal/legacy.h>
+#include <internal/suspend.h>
+
+
+static Libc::Suspend *_suspend_ptr;
+
+
+void Libc::init_vfs_plugin(Suspend &suspend)
+{
+	_suspend_ptr = &suspend;
+}
+
+
+static void suspend(Libc::Suspend_functor &check)
+{
+	struct Missing_call_of_init_vfs_plugin : Genode::Exception { };
+	if (!_suspend_ptr)
+		throw Missing_call_of_init_vfs_plugin();
+
+	_suspend_ptr->suspend(check);
+};
+
 
 static Genode::Lock &vfs_lock()
 {
@@ -76,16 +98,36 @@ static void vfs_stat_to_libc_stat_struct(Vfs::Directory_service::Stat const &src
 {
 	enum { FS_BLOCK_SIZE = 4096 };
 
-	Genode::memset(dst, 0, sizeof(*dst));
+	unsigned const readable_bits   = S_IRUSR,
+	               writeable_bits  = S_IWUSR,
+	               executable_bits = S_IXUSR;
 
-	dst->st_uid     = src.uid;
-	dst->st_gid     = src.gid;
-	dst->st_mode    = src.mode;
+	auto type = [] (Vfs::Node_type type)
+	{
+		switch (type) {
+		case Vfs::Node_type::DIRECTORY:          return S_IFDIR;
+		case Vfs::Node_type::CONTINUOUS_FILE:    return S_IFREG;
+		case Vfs::Node_type::TRANSACTIONAL_FILE: return S_IFSOCK;
+		case Vfs::Node_type::SYMLINK:            return S_IFLNK;
+		}
+		return 0;
+	};
+
+	*dst = { };
+
+	dst->st_uid     = 0;
+	dst->st_gid     = 0;
+	dst->st_mode    = (src.rwx.readable   ? readable_bits   : 0)
+	                | (src.rwx.writeable  ? writeable_bits  : 0)
+	                | (src.rwx.executable ? executable_bits : 0)
+	                | type(src.type);
 	dst->st_size    = src.size;
 	dst->st_blksize = FS_BLOCK_SIZE;
 	dst->st_blocks  = (dst->st_size + FS_BLOCK_SIZE - 1) / FS_BLOCK_SIZE;
 	dst->st_ino     = src.inode;
 	dst->st_dev     = src.device;
+	long long mtime = src.modification_time.value;
+	dst->st_mtime   = mtime != Vfs::Timestamp::INVALID ? mtime : 0;
 }
 
 
@@ -96,8 +138,8 @@ char const *libc_resolv_path;
 
 namespace Libc {
 
-	Genode::Xml_node config() __attribute__((weak));
-	Genode::Xml_node config()
+	Xml_node config() __attribute__((weak));
+	Xml_node config()
 	{
 		if (!_config_node) {
 			error("libc config not initialized - aborting");
@@ -117,18 +159,18 @@ namespace Libc {
 
 			Config_attr(char const *attr_name, char const *default_value)
 			:
-				_value(Libc::config().attribute_value(attr_name,
-				                                      Value(default_value)))
+				_value(config().attribute_value(attr_name,
+				                                Value(default_value)))
 			{ }
 
 			char const *string() const { return _value.string(); }
 	};
 
-	char const *config_rtc() __attribute__((weak));
-	char const *config_rtc()
+	char const *config_pipe() __attribute__((weak));
+	char const *config_pipe()
 	{
-		static Config_attr rtc("rtc", "");
-		return rtc.string();
+		static Config_attr attr("pipe", "");
+		return attr.string();
 	}
 
 	char const *config_rng() __attribute__((weak));
@@ -153,9 +195,9 @@ namespace Libc {
 		return ns_file.string();
 	}
 
-	void libc_config_init(Genode::Xml_node node)
+	void libc_config_init(Xml_node node)
 	{
-		static Genode::Xml_node config = node;
+		static Xml_node config = node;
 		_config_node = &config;
 
 		libc_resolv_path = config_nameserver_file();
@@ -172,7 +214,7 @@ namespace Libc {
 		VFS_THREAD_SAFE(handle->fs().notify_read_ready(handle));
 	}
 
-	bool read_ready(Libc::File_descriptor *fd)
+	bool read_ready(File_descriptor *fd)
 	{
 		Vfs::Vfs_handle *handle = vfs_handle(fd);
 		if (!handle) return false;
@@ -181,12 +223,34 @@ namespace Libc {
 
 		return VFS_THREAD_SAFE(handle->fs().read_ready(handle));
 	}
-
 }
+
+
+template <typename FN>
+void Libc::Vfs_plugin::_with_info(File_descriptor &fd, FN const &fn)
+{
+	if (!_root_dir.constructed())
+		return;
+
+	Absolute_path path = ioctl_dir(fd);
+	path.append_element("info");
+
+	try {
+		Lock::Guard g(vfs_lock());
+
+		File_content const content(_alloc, *_root_dir, path.string(),
+		                           File_content::Limit{4096U});
+
+		content.xml([&] (Xml_node node) {
+			fn(node); });
+
+	} catch (...) { }
+}
+
 
 int Libc::Vfs_plugin::access(const char *path, int amode)
 {
-	if (VFS_THREAD_SAFE(_root_dir.leaf_path(path)))
+	if (VFS_THREAD_SAFE(_root_fs.leaf_path(path)))
 		return 0;
 
 	errno = ENOENT;
@@ -197,7 +261,7 @@ int Libc::Vfs_plugin::access(const char *path, int amode)
 Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
                                               int libc_fd)
 {
-	if (VFS_THREAD_SAFE(_root_dir.directory(path))) {
+	if (VFS_THREAD_SAFE(_root_fs.directory(path))) {
 
 		if (((flags & O_ACCMODE) != O_RDONLY)) {
 			errno = EISDIR;
@@ -210,7 +274,7 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 
 		typedef Vfs::Directory_service::Opendir_result Opendir_result;
 
-		switch (VFS_THREAD_SAFE(_root_dir.opendir(path, false, &handle, _alloc))) {
+		switch (VFS_THREAD_SAFE(_root_fs.opendir(path, false, &handle, _alloc))) {
 		case Opendir_result::OPENDIR_OK:                      break;
 		case Opendir_result::OPENDIR_ERR_LOOKUP_FAILED:       errno = ENOENT;       return nullptr;
 		case Opendir_result::OPENDIR_ERR_NAME_TOO_LONG:       errno = ENAMETOOLONG; return nullptr;
@@ -223,8 +287,8 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 
 		/* the directory was successfully opened */
 
-		Libc::File_descriptor *fd =
-			Libc::file_descriptor_allocator()->alloc(this, vfs_context(handle), libc_fd);
+		File_descriptor *fd =
+			file_descriptor_allocator()->alloc(this, vfs_context(handle), libc_fd);
 
 		/* FIXME error cleanup code leaks resources! */
 
@@ -251,7 +315,7 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 
 	while (handle == nullptr) {
 
-		switch (VFS_THREAD_SAFE(_root_dir.open(path, flags, &handle, _alloc))) {
+		switch (VFS_THREAD_SAFE(_root_fs.open(path, flags, &handle, _alloc))) {
 
 		case Result::OPEN_OK:
 			break;
@@ -268,7 +332,7 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 				}
 
 				/* O_CREAT is set, so try to create the file */
-				switch (VFS_THREAD_SAFE(_root_dir.open(path, flags | O_EXCL, &handle, _alloc))) {
+				switch (VFS_THREAD_SAFE(_root_fs.open(path, flags | O_EXCL, &handle, _alloc))) {
 
 				case Result::OPEN_OK:
 					break;
@@ -304,8 +368,8 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 
 	/* the file was successfully opened */
 
-	Libc::File_descriptor *fd =
-		Libc::file_descriptor_allocator()->alloc(this, vfs_context(handle), libc_fd);
+	File_descriptor *fd =
+		file_descriptor_allocator()->alloc(this, vfs_context(handle), libc_fd);
 
 	/* FIXME error cleanup code leaks resources! */
 
@@ -328,13 +392,52 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags,
 }
 
 
+void Libc::Vfs_plugin::_vfs_write_mtime(Vfs::Vfs_handle &handle)
+{
+	struct timespec ts;
+
+	if (_update_mtime == Update_mtime::NO)
+		return;
+
+	/* XXX using  clock_gettime directly is probably not the best idea */
+	if (clock_gettime(CLOCK_REALTIME, &ts) < 0) {
+		ts.tv_sec = 0;
+	}
+
+	Vfs::Timestamp time { .value = (long long)ts.tv_sec };
+
+	struct Check : Libc::Suspend_functor
+	{
+		bool retry { false };
+
+		Vfs::Vfs_handle &vfs_handle;
+		Vfs::Timestamp &time;
+
+		Check(Vfs::Vfs_handle &vfs_handle, Vfs::Timestamp &time)
+		: vfs_handle(vfs_handle), time(time) { }
+
+		bool suspend() override
+		{
+			retry = !vfs_handle.fs().update_modification_timestamp(&vfs_handle, time);
+			return retry;
+		}
+	} check(handle, time);
+
+	do {
+		_suspend_ptr->suspend(check);
+	} while (check.retry);
+}
+
+
 int Libc::Vfs_plugin::_vfs_sync(Vfs::Vfs_handle &vfs_handle)
 {
+	_vfs_write_mtime(vfs_handle);
+
 	typedef Vfs::File_io_service::Sync_result Result;
 	Result result = Result::SYNC_QUEUED;
 
 	{
-		struct Check : Libc::Suspend_functor
+		struct Check : Suspend_functor
 		{
 			bool retry { false };
 
@@ -351,18 +454,18 @@ int Libc::Vfs_plugin::_vfs_sync(Vfs::Vfs_handle &vfs_handle)
 		} check(vfs_handle);
 
 		/*
-		 * Cannot call Libc::suspend() immediately, because the Libc kernel
+		 * Cannot call suspend() immediately, because the Libc kernel
 		 * might not be running yet.
 		 */
 		if (!VFS_THREAD_SAFE(vfs_handle.fs().queue_sync(&vfs_handle))) {
 			do {
-				Libc::suspend(check);
+				suspend(check);
 			} while (check.retry);
 		}
 	}
 
 	{
-		struct Check : Libc::Suspend_functor
+		struct Check : Suspend_functor
 		{
 			bool retry { false };
 
@@ -381,52 +484,113 @@ int Libc::Vfs_plugin::_vfs_sync(Vfs::Vfs_handle &vfs_handle)
 		} check(vfs_handle, result);
 
 		/*
-		 * Cannot call Libc::suspend() immediately, because the Libc kernel
+		 * Cannot call suspend() immediately, because the Libc kernel
 		 * might not be running yet.
 		 */
 		result = VFS_THREAD_SAFE(vfs_handle.fs().complete_sync(&vfs_handle));
 		if (result == Result::SYNC_QUEUED) {
 			do {
-				Libc::suspend(check);
+				suspend(check);
 			} while (check.retry);
 		}
 	}
 
-	return result == Result::SYNC_OK ? 0 : Libc::Errno(EIO);
+	return result == Result::SYNC_OK ? 0 : Errno(EIO);
 }
 
 
-int Libc::Vfs_plugin::close(Libc::File_descriptor *fd)
+int Libc::Vfs_plugin::close(File_descriptor *fd)
 {
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
-	/* XXX: mark the handle as requiring sync or not */
-	_vfs_sync(*handle);
+
+	if ((fd->modified) || (fd->flags & O_CREAT)) {
+		_vfs_sync(*handle);
+	}
+
 	VFS_THREAD_SAFE(handle->close());
-	Libc::file_descriptor_allocator()->free(fd);
+	file_descriptor_allocator()->free(fd);
 	return 0;
 }
 
 
-int Libc::Vfs_plugin::dup2(Libc::File_descriptor *fd,
-                           Libc::File_descriptor *new_fd)
+int Libc::Vfs_plugin::dup2(File_descriptor *fd,
+                           File_descriptor *new_fd)
 {
-	new_fd->context = fd->context;
+	Vfs::Vfs_handle *handle = nullptr;
+
+	typedef Vfs::Directory_service::Open_result Result;
+
+	if (VFS_THREAD_SAFE(_root_fs.open(fd->fd_path, fd->flags, &handle, _alloc))
+	    != Result::OPEN_OK) {
+
+		warning("dup2 failed for path ", fd->fd_path);
+		return Errno(EBADF);
+	}
+
+	handle->seek(vfs_handle(fd)->seek());
+	handle->handler(&_response_handler);
+
+	new_fd->context = vfs_context(handle);
+	new_fd->flags = fd->flags;
+	new_fd->path(fd->fd_path);
+
 	return new_fd->libc_fd;
 }
 
 
-int Libc::Vfs_plugin::fstat(Libc::File_descriptor *fd, struct stat *buf)
+Libc::File_descriptor *Libc::Vfs_plugin::dup(File_descriptor *fd)
 {
-	Vfs::Vfs_handle *handle = vfs_handle(fd);
-	_vfs_sync(*handle);
-	return stat(fd->fd_path, buf);
+	Vfs::Vfs_handle *handle = nullptr;
+
+	typedef Vfs::Directory_service::Open_result Result;
+
+	if (VFS_THREAD_SAFE(_root_fs.open(fd->fd_path, fd->flags, &handle, _alloc))
+	    != Result::OPEN_OK) {
+
+		warning("dup failed for path ", fd->fd_path);
+		errno = EBADF;
+		return nullptr;
+	}
+
+	handle->seek(vfs_handle(fd)->seek());
+	handle->handler(&_response_handler);
+
+	File_descriptor * const new_fd =
+		file_descriptor_allocator()->alloc(this, vfs_context(handle));
+
+	new_fd->flags = fd->flags;
+	new_fd->path(fd->fd_path);
+
+	return new_fd;
 }
 
 
-int Libc::Vfs_plugin::fstatfs(Libc::File_descriptor *fd, struct statfs *buf)
+int Libc::Vfs_plugin::fstat(File_descriptor *fd, struct stat *buf)
+{
+	Vfs::Vfs_handle *handle = vfs_handle(fd);
+	if (fd->modified) {
+		_vfs_sync(*handle);
+		fd->modified = false;
+	}
+
+	int const result = stat(fd->fd_path, buf);
+
+	/*
+	 * The libc expects stdout to be a character device.
+	 * If 'st_mode' is set to 'S_IFREG', 'printf' does not work.
+	 */
+	if (fd->libc_fd == 1) {
+		buf->st_mode &= ~S_IFMT;
+		buf->st_mode |=  S_IFCHR;
+	}
+	return result;
+}
+
+
+int Libc::Vfs_plugin::fstatfs(File_descriptor *fd, struct statfs *buf)
 {
 	if (!fd || !buf)
-		return Libc::Errno(EFAULT);
+		return Errno(EFAULT);
 
 	Genode::memset(buf, 0, sizeof(*buf));
 
@@ -441,7 +605,7 @@ int Libc::Vfs_plugin::mkdir(const char *path, mode_t mode)
 
 	typedef Vfs::Directory_service::Opendir_result Opendir_result;
 
-	switch (VFS_THREAD_SAFE(_root_dir.opendir(path, true, &dir_handle, _alloc))) {
+	switch (VFS_THREAD_SAFE(_root_fs.opendir(path, true, &dir_handle, _alloc))) {
 	case Opendir_result::OPENDIR_OK:
 		VFS_THREAD_SAFE(dir_handle->close());
 		break;
@@ -474,7 +638,7 @@ int Libc::Vfs_plugin::stat(char const *path, struct stat *buf)
 
 	Vfs::Directory_service::Stat stat;
 
-	switch (VFS_THREAD_SAFE(_root_dir.stat(path, stat))) {
+	switch (VFS_THREAD_SAFE(_root_fs.stat(path, stat))) {
 	case Result::STAT_ERR_NO_ENTRY: errno = ENOENT; return -1;
 	case Result::STAT_ERR_NO_PERM:  errno = EACCES; return -1;
 	case Result::STAT_OK:                           break;
@@ -485,10 +649,14 @@ int Libc::Vfs_plugin::stat(char const *path, struct stat *buf)
 }
 
 
-ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
+ssize_t Libc::Vfs_plugin::write(File_descriptor *fd, const void *buf,
                                 ::size_t count)
 {
 	typedef Vfs::File_io_service::Write_result Result;
+
+	if ((fd->flags & O_ACCMODE) == O_RDONLY) {
+		return Errno(EBADF);
+	}
 
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
 
@@ -500,51 +668,127 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 		try {
 			out_result = VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf, count, out_count));
 
-			/* wake up threads blocking for 'queue_*()' or 'write()' */
-			Libc::resume_all();
+			Plugin::resume_all();
 
 		} catch (Vfs::File_io_service::Insufficient_buffer) { }
 
 	} else {
 
-		struct Check : Libc::Suspend_functor
+		Vfs::file_size const initial_seek { handle->seek() };
+
+		struct Check : Suspend_functor
 		{
-			bool             retry { false };
+			bool retry { false };
 
-			Vfs::Vfs_handle *handle;
-			void const      *buf;
-			::size_t         count;
-			Vfs::file_size  &out_count;
-			Result          &out_result;
+			Vfs::File_system  &_root_fs;
+			char const * const _fd_path;
+			Vfs::Vfs_handle   *_handle;
+			void const        *_buf;
+			::size_t           _count;
+			::off_t            _offset = 0;
+			Vfs::file_size    &_out_count;
+			Result            &_out_result;
+			unsigned           _iteration = 0;
 
-			Check(Vfs::Vfs_handle *handle, void const *buf,
+			bool _fd_refers_to_continuous_file()
+			{
+				if (!_fd_path) {
+					warning("Vfs_plugin: _fd_refers_to_continuous_file: missing fd_path");
+					return false;
+				}
+
+				typedef Vfs::Directory_service::Stat_result Result;
+
+				Vfs::Directory_service::Stat stat { };
+
+				if (VFS_THREAD_SAFE(_root_fs.stat(_fd_path, stat)) != Result::STAT_OK)
+					return false;
+
+				return stat.type == Vfs::Node_type::CONTINUOUS_FILE;
+			};
+
+			Check(Vfs::File_system &root_fs, char const *fd_path,
+			      Vfs::Vfs_handle *handle, void const *buf,
 			      ::size_t count, Vfs::file_size &out_count,
 			      Result &out_result)
-			: handle(handle), buf(buf), count(count), out_count(out_count),
-			  out_result(out_result)
+			:
+				_root_fs(root_fs), _fd_path(fd_path), _handle(handle), _buf(buf),
+				_count(count), _out_count(out_count), _out_result(out_result)
 			{ }
 
 			bool suspend() override
 			{
-				try {
-					out_result = VFS_THREAD_SAFE(handle->fs().write(handle, (char const *)buf,
-						                                              count, out_count));
-					retry = false;
-				} catch (Vfs::File_io_service::Insufficient_buffer) {
-					retry = true;
-				}
+				for (;;) {
 
-				return retry;
+					/* number of bytes written in one iteration */
+					Vfs::file_size partial_out_count = 0;
+
+					try {
+						char const * const src = (char const *)_buf + _offset;
+
+						_out_result = VFS_THREAD_SAFE(_handle->fs().write(_handle, src,
+						                                                  _count, partial_out_count));
+					} catch (Vfs::File_io_service::Insufficient_buffer) {
+						retry = true;
+						return retry;
+					}
+
+					if (_out_result != Result::WRITE_OK) {
+						retry = false;
+						return retry;
+					}
+
+					/* increment byte count reported to caller */
+					_out_count += partial_out_count;
+
+					bool const write_complete = (partial_out_count == _count);
+					if (write_complete) {
+						retry = false;
+						return retry;
+					}
+
+					/*
+					 * If the write has not consumed all bytes, set up
+					 * another partial write iteration with the remaining
+					 * bytes as 'count'.
+					 *
+					 * The costly 'fd_refers_to_continuous_file' is called
+					 * for the first iteration only.
+					 */
+					bool const continuous_file = (_iteration > 0 || _fd_refers_to_continuous_file());
+
+					if (!continuous_file) {
+						warning("partial write on transactional file");
+						_out_result = Result::WRITE_ERR_IO;
+						retry = false;
+						return retry;
+					}
+
+					_iteration++;
+
+					bool const stalled = (partial_out_count == 0);
+					if (stalled) {
+						retry = true;
+						return retry;
+					}
+
+					/* issue new write operation for remaining bytes */
+					_count  -= partial_out_count;
+					_offset += partial_out_count;
+					_handle->advance_seek(partial_out_count);
+				}
 			}
-		} check(handle, buf, count, out_count, out_result);
+		} check(_root_fs, fd->fd_path, handle, buf, count, out_count, out_result);
 
 		do {
-			Libc::suspend(check);
+			suspend(check);
 		} while (check.retry);
+
+		/* XXX reset seek pointer after loop (will be advanced below by out_count) */
+		handle->seek(initial_seek);
 	}
 
-	/* wake up threads blocking for 'queue_*()' or 'write()' */
-	Libc::resume_all();
+	Plugin::resume_all();
 
 	switch (out_result) {
 	case Result::WRITE_ERR_AGAIN:       return Errno(EAGAIN);
@@ -556,15 +800,20 @@ ssize_t Libc::Vfs_plugin::write(Libc::File_descriptor *fd, const void *buf,
 	}
 
 	VFS_THREAD_SAFE(handle->advance_seek(out_count));
+	fd->modified = true;
 
 	return out_count;
 }
 
 
-ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
+ssize_t Libc::Vfs_plugin::read(File_descriptor *fd, void *buf,
                                ::size_t count)
 {
-	Libc::dispatch_pending_io_signals();
+	dispatch_pending_io_signals();
+
+	if ((fd->flags & O_ACCMODE) == O_WRONLY) {
+		return Errno(EBADF);
+	}
 
 	typedef Vfs::File_io_service::Read_result Result;
 
@@ -573,11 +822,11 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 	if (fd->flags & O_DIRECTORY)
 		return Errno(EISDIR);
 
-	if (fd->flags & O_NONBLOCK && !Libc::read_ready(fd))
+	if (fd->flags & O_NONBLOCK && !read_ready(fd))
 		return Errno(EAGAIN);
 
 	{
-		struct Check : Libc::Suspend_functor
+		struct Check : Suspend_functor
 		{
 			bool             retry { false };
 
@@ -595,7 +844,7 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 		} check ( handle, count);
 
 		do {
-			Libc::suspend(check);
+			suspend(check);
 		} while (check.retry);
 	}
 
@@ -603,7 +852,7 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 	Result         out_result;
 
 	{
-		struct Check : Libc::Suspend_functor
+		struct Check : Suspend_functor
 		{
 			bool             retry { false };
 
@@ -632,12 +881,11 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 		} check ( handle, buf, count, out_count, out_result);
 
 		do {
-			Libc::suspend(check);
+			suspend(check);
 		} while (check.retry);
 	}
 
-	/* wake up threads blocking for 'queue_*()' or 'write()' */
-	Libc::resume_all();
+	Plugin::resume_all();
 
 	switch (out_result) {
 	case Result::READ_ERR_AGAIN:       return Errno(EAGAIN);
@@ -656,11 +904,11 @@ ssize_t Libc::Vfs_plugin::read(Libc::File_descriptor *fd, void *buf,
 }
 
 
-ssize_t Libc::Vfs_plugin::getdirentries(Libc::File_descriptor *fd, char *buf,
+ssize_t Libc::Vfs_plugin::getdirentries(File_descriptor *fd, char *buf,
                                         ::size_t nbytes, ::off_t *basep)
 {
 	if (nbytes < sizeof(struct dirent)) {
-		Genode::error("getdirentries: buffer too small");
+		error("getdirentries: buffer too small");
 		return -1;
 	}
 
@@ -673,7 +921,7 @@ ssize_t Libc::Vfs_plugin::getdirentries(Libc::File_descriptor *fd, char *buf,
 	Dirent dirent_out;
 
 	{
-		struct Check : Libc::Suspend_functor
+		struct Check : Suspend_functor
 		{
 			bool             retry { false };
 
@@ -690,7 +938,7 @@ ssize_t Libc::Vfs_plugin::getdirentries(Libc::File_descriptor *fd, char *buf,
 		} check(handle);
 
 		do {
-			Libc::suspend(check);
+			suspend(check);
 		} while (check.retry);
 	}
 
@@ -698,7 +946,7 @@ ssize_t Libc::Vfs_plugin::getdirentries(Libc::File_descriptor *fd, char *buf,
 	Vfs::file_size out_count;
 
 	{
-		struct Check : Libc::Suspend_functor
+		struct Check : Suspend_functor
 		{
 			bool             retry { false };
 
@@ -718,6 +966,7 @@ ssize_t Libc::Vfs_plugin::getdirentries(Libc::File_descriptor *fd, char *buf,
 				                             (char*)&dirent_out,
 				                             sizeof(Dirent),
 				                             out_count));
+				dirent_out.sanitize();
 
 				/* suspend me if read is still queued */
 
@@ -728,41 +977,48 @@ ssize_t Libc::Vfs_plugin::getdirentries(Libc::File_descriptor *fd, char *buf,
 		} check(handle, dirent_out, out_count, out_result);
 
 		do {
-			Libc::suspend(check);
+			suspend(check);
 		} while (check.retry);
 	}
 
-	/* wake up threads blocking for 'queue_*()' or 'write()' */
-	Libc::resume_all();
+	Plugin::resume_all();
 
 	if ((out_result != Result::READ_OK) ||
 	    (out_count < sizeof(Dirent))) {
 		return 0;
 	}
 
+	using Dirent_type = Vfs::Directory_service::Dirent_type;
+
+	if (dirent_out.type == Dirent_type::END)
+		return 0;
+
 	/*
 	 * Convert dirent structure from VFS to libc
 	 */
 
-	struct dirent *dirent = (struct dirent *)buf;
-	Genode::memset(dirent, 0, sizeof(struct dirent));
+	auto dirent_type = [] (Dirent_type type)
+	{
+		switch (type) {
+		case Dirent_type::DIRECTORY:          return DT_DIR;
+		case Dirent_type::CONTINUOUS_FILE:    return DT_REG;
+		case Dirent_type::TRANSACTIONAL_FILE: return DT_SOCK;
+		case Dirent_type::SYMLINK:            return DT_LNK;
+		case Dirent_type::END:                return DT_UNKNOWN;
+		}
+		return DT_UNKNOWN;
+	};
 
-	switch (dirent_out.type) {
-	case Vfs::Directory_service::DIRENT_TYPE_DIRECTORY: dirent->d_type = DT_DIR;  break;
-	case Vfs::Directory_service::DIRENT_TYPE_FILE:      dirent->d_type = DT_REG;  break;
-	case Vfs::Directory_service::DIRENT_TYPE_SYMLINK:   dirent->d_type = DT_LNK;  break;
-	case Vfs::Directory_service::DIRENT_TYPE_FIFO:      dirent->d_type = DT_FIFO; break;
-	case Vfs::Directory_service::DIRENT_TYPE_CHARDEV:   dirent->d_type = DT_CHR;  break;
-	case Vfs::Directory_service::DIRENT_TYPE_BLOCKDEV:  dirent->d_type = DT_BLK;  break;
-	case Vfs::Directory_service::DIRENT_TYPE_END:                                 return 0;
-	}
+	dirent &dirent = *(struct dirent *)buf;
+	dirent = { };
 
-	dirent->d_fileno = dirent_out.fileno;
-	dirent->d_reclen = sizeof(struct dirent);
+	dirent.d_type   = dirent_type(dirent_out.type);
+	dirent.d_fileno = dirent_out.fileno;
+	dirent.d_reclen = sizeof(struct dirent);
 
-	Genode::strncpy(dirent->d_name, dirent_out.name, sizeof(dirent->d_name));
+	Genode::strncpy(dirent.d_name, dirent_out.name.buf, sizeof(dirent.d_name));
 
-	dirent->d_namlen = Genode::strlen(dirent->d_name);
+	dirent.d_namlen = Genode::strlen(dirent.d_name);
 
 	/*
 	 * Keep track of VFS seek pointer and user-supplied basep.
@@ -775,7 +1031,56 @@ ssize_t Libc::Vfs_plugin::getdirentries(Libc::File_descriptor *fd, char *buf,
 }
 
 
-int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
+int Libc::Vfs_plugin::ioctl(File_descriptor *fd, int request, char *argp)
+{
+	bool handled = false;
+
+	if (request == TIOCGWINSZ) {
+
+		if (!argp)
+			return Errno(EINVAL);
+
+		_with_info(*fd, [&] (Xml_node info) {
+			if (info.type() == "terminal") {
+				::winsize *winsize = (::winsize *)argp;
+				winsize->ws_row = info.attribute_value("rows",    25U);
+				winsize->ws_col = info.attribute_value("columns", 80U);
+				handled = true;
+			}
+		});
+
+	} else if (request == TIOCGETA) {
+
+		::termios *termios = (::termios *)argp;
+
+		termios->c_iflag = 0;
+		termios->c_oflag = 0;
+		termios->c_cflag = 0;
+		/*
+		 * Set 'ECHO' flag, needed by libreadline. Otherwise, echoing
+		 * user input doesn't work in bash.
+		 */
+		termios->c_lflag = ECHO;
+		::memset(termios->c_cc, _POSIX_VDISABLE, sizeof(termios->c_cc));
+		termios->c_ispeed = 0;
+		termios->c_ospeed = 0;
+		handled = true;
+	}
+
+	if (handled)
+		return 0;
+
+	return _legacy_ioctl(fd, request, argp);
+}
+
+
+/**
+ * Fallback for ioctl operations targeting the deprecated VFS ioctl interface
+ *
+ * XXX Remove this method once all ioctl operations are supported via
+ *     regular VFS file accesses.
+ */
+int Libc::Vfs_plugin::_legacy_ioctl(File_descriptor *fd, int request, char *argp)
 {
 	using ::off_t;
 
@@ -801,27 +1106,6 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 			opcode = Opcode::IOCTL_OP_TIOCGWINSZ;
 			break;
 		}
-
-	case TIOCGETA:
-		{
-			::termios *termios = (::termios *)argp;
-
-			termios->c_iflag = 0;
-			termios->c_oflag = 0;
-			termios->c_cflag = 0;
-			/*
-			 * Set 'ECHO' flag, needed by libreadline. Otherwise, echoing
-			 * user input doesn't work in bash.
-			 */
-			termios->c_lflag = ECHO;
-			::memset(termios->c_cc, _POSIX_VDISABLE, sizeof(termios->c_cc));
-			termios->c_ispeed = 0;
-			termios->c_ospeed = 0;
-
-			return 0;
-		}
-
-		break;
 
 	case TIOCSETAF:
 		{
@@ -870,7 +1154,7 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 		}
 
 	default:
-		Genode::warning("unsupported ioctl (request=", Genode::Hex(request), ")");
+		warning("unsupported ioctl (request=", Hex(request), ")");
 		break;
 	}
 
@@ -929,7 +1213,7 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 }
 
 
-::off_t Libc::Vfs_plugin::lseek(Libc::File_descriptor *fd, ::off_t offset, int whence)
+::off_t Libc::Vfs_plugin::lseek(File_descriptor *fd, ::off_t offset, int whence)
 {
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
 
@@ -949,10 +1233,13 @@ int Libc::Vfs_plugin::ioctl(Libc::File_descriptor *fd, int request, char *argp)
 }
 
 
-int Libc::Vfs_plugin::ftruncate(Libc::File_descriptor *fd, ::off_t length)
+int Libc::Vfs_plugin::ftruncate(File_descriptor *fd, ::off_t length)
 {
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
-	_vfs_sync(*handle);
+	if (fd->modified) {
+		_vfs_sync(*handle);
+		fd->modified = false;
+	}
 
 	typedef Vfs::File_io_service::Ftruncate_result Result;
 
@@ -966,7 +1253,7 @@ int Libc::Vfs_plugin::ftruncate(Libc::File_descriptor *fd, ::off_t length)
 }
 
 
-int Libc::Vfs_plugin::fcntl(Libc::File_descriptor *fd, int cmd, long arg)
+int Libc::Vfs_plugin::fcntl(File_descriptor *fd, int cmd, long arg)
 {
 	switch (cmd) {
 	case F_DUPFD_CLOEXEC:
@@ -975,18 +1262,16 @@ int Libc::Vfs_plugin::fcntl(Libc::File_descriptor *fd, int cmd, long arg)
 			/*
 			 * Allocate free file descriptor locally.
 			 */
-			Libc::File_descriptor *new_fd =
-				Libc::file_descriptor_allocator()->alloc(this, 0);
+			File_descriptor *new_fd =
+				file_descriptor_allocator()->alloc(this, 0);
 			if (!new_fd) return Errno(EMFILE);
-
-			new_fd->path(fd->fd_path);
 
 			/*
 			 * Use new allocated number as name of file descriptor
 			 * duplicate.
 			 */
-			if (dup2(fd, new_fd) == -1) {
-				Genode::error("Plugin::fcntl: dup2 unexpectedly failed");
+			if (Vfs_plugin::dup2(fd, new_fd) == -1) {
+				error("Plugin::fcntl: dup2 unexpectedly failed");
 				return Errno(EINVAL);
 			}
 
@@ -996,21 +1281,33 @@ int Libc::Vfs_plugin::fcntl(Libc::File_descriptor *fd, int cmd, long arg)
 	case F_SETFD: fd->cloexec = arg == FD_CLOEXEC;  return 0;
 
 	case F_GETFL: return fd->flags;
-	case F_SETFL: fd->flags = arg; return 0;
+	case F_SETFL: {
+			/* only the specified flags may be changed */
+			long const mask = (O_NONBLOCK | O_APPEND | O_ASYNC | O_FSYNC);
+			fd->flags = (fd->flags & ~mask) | (arg & mask);
+		} return 0;
 
 	default:
 		break;
 	}
 
-	Genode::error("fcntl(): command ", cmd, " not supported - vfs");
+	error("fcntl(): command ", cmd, " not supported - vfs");
 	return Errno(EINVAL);
 }
 
 
-int Libc::Vfs_plugin::fsync(Libc::File_descriptor *fd)
+int Libc::Vfs_plugin::fsync(File_descriptor *fd)
 {
 	Vfs::Vfs_handle *handle = vfs_handle(fd);
-	return _vfs_sync(*handle);
+	if (!fd->modified) { return 0; }
+
+	/*
+	 * XXX checking the return value of _vfs_sync amd returning -1
+	 * in the EIO case will break the lighttpd or rather the socket_fs
+	 */
+	fd->modified = !!_vfs_sync(*handle);
+
+	return 0;
 }
 
 
@@ -1021,7 +1318,7 @@ int Libc::Vfs_plugin::symlink(const char *oldpath, const char *newpath)
 	Vfs::Vfs_handle *handle { 0 };
 
 	Openlink_result openlink_result =
-		VFS_THREAD_SAFE(_root_dir.openlink(newpath, true, &handle, _alloc));
+		VFS_THREAD_SAFE(_root_fs.openlink(newpath, true, &handle, _alloc));
 
 	switch (openlink_result) {
 	case Openlink_result::OPENLINK_OK:
@@ -1047,7 +1344,7 @@ int Libc::Vfs_plugin::symlink(const char *oldpath, const char *newpath)
 
 	handle->handler(&_response_handler);
 
-	struct Check : Libc::Suspend_functor
+	struct Check : Suspend_functor
 	{
 		bool             retry { false };
 
@@ -1076,11 +1373,10 @@ int Libc::Vfs_plugin::symlink(const char *oldpath, const char *newpath)
 	} check ( handle, oldpath, count, out_count);
 
 	do {
-		Libc::suspend(check);
+		suspend(check);
 	} while (check.retry);
 
-	/* wake up threads blocking for 'queue_*()' or 'write()' */
-	Libc::resume_all();
+	Plugin::resume_all();
 
 	_vfs_sync(*handle);
 	VFS_THREAD_SAFE(handle->close());
@@ -1097,7 +1393,7 @@ ssize_t Libc::Vfs_plugin::readlink(const char *path, char *buf, ::size_t buf_siz
 	Vfs::Vfs_handle *symlink_handle { 0 };
 
 	Vfs::Directory_service::Openlink_result openlink_result =
-		VFS_THREAD_SAFE(_root_dir.openlink(path, false, &symlink_handle, _alloc));
+		VFS_THREAD_SAFE(_root_fs.openlink(path, false, &symlink_handle, _alloc));
 
 	switch (openlink_result) {
 	case Vfs::Directory_service::OPENLINK_OK:
@@ -1118,7 +1414,7 @@ ssize_t Libc::Vfs_plugin::readlink(const char *path, char *buf, ::size_t buf_siz
 	symlink_handle->handler(&_response_handler);
 
 	{
-		struct Check : Libc::Suspend_functor
+		struct Check : Suspend_functor
 		{
 			bool             retry { false };
 
@@ -1138,7 +1434,7 @@ ssize_t Libc::Vfs_plugin::readlink(const char *path, char *buf, ::size_t buf_siz
 		} check(symlink_handle, buf_size);
 
 		do {
-			Libc::suspend(check);
+			suspend(check);
 		} while (check.retry);
 	}
 
@@ -1148,7 +1444,7 @@ ssize_t Libc::Vfs_plugin::readlink(const char *path, char *buf, ::size_t buf_siz
 	Vfs::file_size out_len = 0;
 
 	{
-		struct Check : Libc::Suspend_functor
+		struct Check : Suspend_functor
 		{
 			bool             retry { false };
 
@@ -1179,12 +1475,11 @@ ssize_t Libc::Vfs_plugin::readlink(const char *path, char *buf, ::size_t buf_siz
 		} check(symlink_handle, buf, buf_size, out_len, out_result);
 
 		do {
-			Libc::suspend(check);
+			suspend(check);
 		} while (check.retry);
 	}
 
-	/* wake up threads blocking for 'queue_*()' or 'write()' */
-	Libc::resume_all();
+	Plugin::resume_all();
 
 	switch (out_result) {
 	case Result::READ_ERR_AGAIN:       return Errno(EAGAIN);
@@ -1213,7 +1508,7 @@ int Libc::Vfs_plugin::unlink(char const *path)
 {
 	typedef Vfs::Directory_service::Unlink_result Result;
 
-	switch (VFS_THREAD_SAFE(_root_dir.unlink(path))) {
+	switch (VFS_THREAD_SAFE(_root_fs.unlink(path))) {
 	case Result::UNLINK_ERR_NO_ENTRY:  errno = ENOENT;    return -1;
 	case Result::UNLINK_ERR_NO_PERM:   errno = EPERM;     return -1;
 	case Result::UNLINK_ERR_NOT_EMPTY: errno = ENOTEMPTY; return -1;
@@ -1227,25 +1522,25 @@ int Libc::Vfs_plugin::rename(char const *from_path, char const *to_path)
 {
 	typedef Vfs::Directory_service::Rename_result Result;
 
-	if (VFS_THREAD_SAFE(_root_dir.leaf_path(to_path))) {
+	if (VFS_THREAD_SAFE(_root_fs.leaf_path(to_path))) {
 
-		if (VFS_THREAD_SAFE(_root_dir.directory(to_path))) {
-			if (!VFS_THREAD_SAFE(_root_dir.directory(from_path))) {
+		if (VFS_THREAD_SAFE(_root_fs.directory(to_path))) {
+			if (!VFS_THREAD_SAFE(_root_fs.directory(from_path))) {
 				errno = EISDIR; return -1;
 			}
 
-			if (VFS_THREAD_SAFE(_root_dir.num_dirent(to_path))) {
+			if (VFS_THREAD_SAFE(_root_fs.num_dirent(to_path))) {
 				errno = ENOTEMPTY; return -1;
 			}
 
 		} else {
-			if (VFS_THREAD_SAFE(_root_dir.directory(from_path))) {
+			if (VFS_THREAD_SAFE(_root_fs.directory(from_path))) {
 				errno = ENOTDIR; return -1;
 			}
 		}
 	}
 
-	switch (VFS_THREAD_SAFE(_root_dir.rename(from_path, to_path))) {
+	switch (VFS_THREAD_SAFE(_root_fs.rename(from_path, to_path))) {
 	case Result::RENAME_ERR_NO_ENTRY: errno = ENOENT; return -1;
 	case Result::RENAME_ERR_CROSS_FS: errno = EXDEV;  return -1;
 	case Result::RENAME_ERR_NO_PERM:  errno = EPERM;  return -1;
@@ -1256,16 +1551,16 @@ int Libc::Vfs_plugin::rename(char const *from_path, char const *to_path)
 
 
 void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags,
-                             Libc::File_descriptor *fd, ::off_t offset)
+                             File_descriptor *fd, ::off_t offset)
 {
 	if (prot != PROT_READ && !(prot == (PROT_READ | PROT_WRITE) && flags == MAP_PRIVATE)) {
-		Genode::error("mmap for prot=", Genode::Hex(prot), " not supported");
+		error("mmap for prot=", Hex(prot), " not supported");
 		errno = EACCES;
 		return (void *)-1;
 	}
 
 	if (addr_in != 0) {
-		Genode::error("mmap for predefined address not supported");
+		error("mmap for predefined address not supported");
 		errno = EINVAL;
 		return (void *)-1;
 	}
@@ -1275,7 +1570,7 @@ void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags
 	 *     'Vfs::Directory_service::dataspace'.
 	 */
 
-	void *addr = Libc::mem_alloc()->alloc(length, PAGE_SHIFT);
+	void *addr = mem_alloc()->alloc(length, PAGE_SHIFT);
 	if (addr == (void *)-1) {
 		errno = ENOMEM;
 		return (void *)-1;
@@ -1289,7 +1584,7 @@ void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags
 	while (read_remain > 0) {
 		ssize_t length_read = ::pread(fd->libc_fd, read_addr, read_remain, read_offset);
 		if (length_read < 0) { /* error */
-			Genode::error("mmap could not obtain file content");
+			error("mmap could not obtain file content");
 			::munmap(addr, length);
 			errno = EACCES;
 			return (void *)-1;
@@ -1306,7 +1601,66 @@ void *Libc::Vfs_plugin::mmap(void *addr_in, ::size_t length, int prot, int flags
 
 int Libc::Vfs_plugin::munmap(void *addr, ::size_t)
 {
-	Libc::mem_alloc()->free(addr);
+	mem_alloc()->free(addr);
+	return 0;
+}
+
+
+int Libc::Vfs_plugin::pipe(Libc::File_descriptor *pipefdo[2])
+{
+	Absolute_path base_path(Libc::config_pipe());
+	if (base_path == "") {
+		error(__func__, ": pipe fs not mounted");
+		return Errno(EACCES);
+	}
+
+	Libc::File_descriptor *meta_fd { nullptr };
+
+	{
+		Absolute_path new_path = base_path;
+		new_path.append("/new");
+
+		meta_fd = open(new_path.base(), O_RDONLY, Libc::ANY_FD);
+		if (!meta_fd) {
+			Genode::error("failed to create pipe at ", new_path);
+			return Errno(EACCES);
+		}
+		meta_fd->path(new_path.string());
+
+		char buf[32] { };
+		int const n = read(meta_fd, buf, sizeof(buf)-1);
+		if (n < 1) {
+			error("failed to read pipe at ", new_path);
+			close(meta_fd);
+			return Errno(EACCES);
+		}
+		buf[n] = '\0';
+		base_path.append("/");
+		base_path.append(buf);
+	}
+
+	auto open_pipe_fd = [&] (auto path_suffix, auto flags)
+	{
+		Absolute_path path = base_path;
+		path.append(path_suffix);
+
+		File_descriptor *fd = open(path.base(), flags, Libc::ANY_FD);
+		if (!fd)
+			error("failed to open pipe end at ", path);
+		else
+			fd->path(path.string());
+
+		return fd;
+	};
+
+	pipefdo[0] = open_pipe_fd("/out", O_RDONLY);
+	pipefdo[1] = open_pipe_fd("/in",  O_WRONLY);
+
+	close(meta_fd);
+
+	if (!pipefdo[0] || !pipefdo[1])
+		return Errno(EACCES);
+
 	return 0;
 }
 
@@ -1354,8 +1708,8 @@ bool Libc::Vfs_plugin::supports_select(int nfds,
 
 		if (FD_ISSET(fd, readfds) || FD_ISSET(fd, writefds) || FD_ISSET(fd, exceptfds)) {
 
-			Libc::File_descriptor *fdo =
-				Libc::file_descriptor_allocator()->find_by_libc_fd(fd);
+			File_descriptor *fdo =
+				file_descriptor_allocator()->find_by_libc_fd(fd);
 
 			if (fdo && (fdo->plugin == this))
 				return true;
@@ -1382,8 +1736,8 @@ int Libc::Vfs_plugin::select(int nfds,
 
 	for (int fd = 0; fd < nfds; ++fd) {
 
-		Libc::File_descriptor *fdo =
-			Libc::file_descriptor_allocator()->find_by_libc_fd(fd);
+		File_descriptor *fdo =
+			file_descriptor_allocator()->find_by_libc_fd(fd);
 
 		/* handle only fds that belong to this plugin */
 		if (!fdo || (fdo->plugin != this))
@@ -1397,7 +1751,7 @@ int Libc::Vfs_plugin::select(int nfds,
 				FD_SET(fd, readfds);
 				++nready;
 			} else {
-				Libc::notify_read_ready(handle);
+				notify_read_ready(handle);
 			}
 		}
 

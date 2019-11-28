@@ -32,34 +32,47 @@
 #include <libc-plugin/fd_alloc.h>
 
 /* libc-internal includes */
-#include <task.h>
-#include <libc_init.h>
-#include <clone_session.h>
+#include <internal/init.h>
+#include <internal/clone_session.h>
+#include <internal/legacy.h>
+#include <internal/kernel_routine.h>
+#include <internal/suspend.h>
+#include <internal/resume.h>
+#include <internal/signal.h>
 
-using namespace Genode;
+using namespace Libc;
 
 
 static pid_t fork_result;
 
-static Env       *_env_ptr;
-static Allocator *_alloc_ptr;
-static Heap      *_malloc_heap_ptr;
-static void      *_user_stack_base_ptr;
-static size_t     _user_stack_size;
-static int        _pid;
-static int        _pid_cnt;
-
-static Libc::Config_accessor const *_config_accessor_ptr;
+static Env                      *_env_ptr;
+static Allocator                *_alloc_ptr;
+static Suspend                  *_suspend_ptr;
+static Resume                   *_resume_ptr;
+static Libc::Signal             *_signal_ptr;
+static Kernel_routine_scheduler *_kernel_routine_scheduler_ptr;
+static Heap                     *_malloc_heap_ptr;
+static void                     *_user_stack_base_ptr;
+static size_t                    _user_stack_size;
+static int                       _pid;
+static int                       _pid_cnt;
+static Config_accessor const    *_config_accessor_ptr;
 
 
 void Libc::init_fork(Env &env, Config_accessor const &config_accessor,
-                     Allocator &alloc, Heap &malloc_heap, pid_t pid)
+                     Allocator &alloc, Heap &malloc_heap, pid_t pid,
+                     Suspend &suspend, Resume &resume, Signal &signal,
+                     Kernel_routine_scheduler &kernel_routine_scheduler)
 {
-	_env_ptr             = &env;
-	_alloc_ptr           = &alloc;
-	_malloc_heap_ptr     = &malloc_heap;
-	_config_accessor_ptr = &config_accessor;
-	_pid                 =  pid;
+	_env_ptr                      = &env;
+	_alloc_ptr                    = &alloc;
+	_suspend_ptr                  = &suspend;
+	_resume_ptr                   = &resume;
+	_signal_ptr                   = &signal;
+	_kernel_routine_scheduler_ptr = &kernel_routine_scheduler;
+	_malloc_heap_ptr              = &malloc_heap;
+	_config_accessor_ptr          = &config_accessor;
+	_pid                          =  pid;
 }
 
 
@@ -347,13 +360,15 @@ struct Libc::Local_clone_service : Noncopyable
 
 	Child_ready &_child_ready;
 
+	Resume &_resume;
+
 	Io_signal_handler<Local_clone_service> _child_ready_handler;
 
 	void _handle_child_ready()
 	{
 		_child_ready.child_ready();
 
-		Libc::resume_all();
+		_resume.resume_all();
 	}
 
 	struct Factory : Local_service<Session>::Factory
@@ -374,9 +389,10 @@ struct Libc::Local_clone_service : Noncopyable
 
 	Service service { _factory };
 
-	Local_clone_service(Env &env, Entrypoint &ep, Child_ready &child_ready)
+	Local_clone_service(Env &env, Entrypoint &ep, Child_ready &child_ready,
+	                    Resume &resume)
 	:
-		_session(env, ep), _child_ready(child_ready),
+		_session(env, ep), _child_ready(child_ready), _resume(resume),
 		_child_ready_handler(env.ep(), *this, &Local_clone_service::_handle_child_ready),
 		_factory(_session, _child_ready_handler)
 	{ }
@@ -386,6 +402,10 @@ struct Libc::Local_clone_service : Noncopyable
 struct Libc::Forked_child : Child_policy, Child_ready
 {
 	Env &_env;
+
+	Resume &_resume;
+
+	Signal &_signal;
 
 	pid_t const _pid;
 
@@ -402,26 +422,30 @@ struct Libc::Forked_child : Child_policy, Child_ready
 	Io_signal_handler<Libc::Forked_child> _exit_handler {
 		_env.ep(), *this, &Forked_child::_handle_exit };
 
-	void _handle_exit() { Libc::resume_all(); }
+	void _handle_exit()
+	{
+		_signal.charge(SIGCHLD);
+		_resume.resume_all();
+	}
 
-	Libc::Child_config _child_config;
+	Child_config _child_config;
 
 	Parent_services    &_parent_services;
 	Local_rom_services &_local_rom_services;
 	Local_clone_service _local_clone_service;
 	Local_rom_service   _config_rom_service;
 
-	struct Wait_fork_ready : Libc::Kernel_routine
+	struct Wait_fork_ready : Kernel_routine
 	{
-		Libc::Forked_child const &child;
+		Forked_child const &child;
 
-		Wait_fork_ready(Libc::Forked_child const &child) : child(child) { }
+		Wait_fork_ready(Forked_child const &child) : child(child) { }
 
 		void execute_in_kernel() override
 		{
 			/* keep executing this kernel routine until child is running */
 			if (!child.running())
-				register_kernel_routine(*this);
+				_kernel_routine_scheduler_ptr->register_kernel_routine(*this);
 		}
 	} wait_fork_ready { *this };
 
@@ -456,18 +480,27 @@ struct Libc::Forked_child : Child_policy, Child_ready
 	{
 		session.ref_account(_env.pd_session_cap());
 
-		_env.pd().transfer_quota(cap, Ram_quota{2*1024*1024});
+		_env.pd().transfer_quota(cap, Ram_quota{2500*1000});
 		_env.pd().transfer_quota(cap, Cap_quota{100});
 	}
 
 	Route resolve_session_request(Service::Name const &name,
 	                              Session_label const &label) override
 	{
+		Session_label rewritten_label = label;
+
 		Service *service_ptr = nullptr;
 		if (_state == State::STARTING_UP && name == Clone_session::service_name())
 			service_ptr = &_local_clone_service.service;
 
 		if (name == Rom_session::service_name()) {
+
+			/*
+			 * Strip off the originating child name to allow the application of
+			 * routing rules based on the leading path elements, regardless
+			 * of which child in the process hierarchy requests a ROM.
+			 */
+			rewritten_label = label.last_element();
 
 			try { service_ptr = &_local_rom_services.matching_service(name, label); }
 			catch (...) { }
@@ -481,7 +514,7 @@ struct Libc::Forked_child : Child_policy, Child_ready
 
 		if (service_ptr)
 			return Route { .service = *service_ptr,
-			               .label   = label,
+			               .label   = rewritten_label,
 			               .diag    = Session::Diag() };
 
 		throw Service_denied();
@@ -513,16 +546,18 @@ struct Libc::Forked_child : Child_policy, Child_ready
 	Forked_child(Env                   &env,
 	             Entrypoint            &fork_ep,
 	             Allocator             &alloc,
+	             Resume                &resume,
+	             Signal                &signal,
 	             pid_t                  pid,
 	             Config_accessor const &config_accessor,
 	             Parent_services       &parent_services,
 	             Local_rom_services    &local_rom_services)
 	:
-		_env(env), _pid(pid),
+		_env(env), _resume(resume), _signal(signal), _pid(pid),
 		_child_config(env, config_accessor, pid),
 		_parent_services(parent_services),
 		_local_rom_services(local_rom_services),
-		_local_clone_service(env, fork_ep, *this),
+		_local_clone_service(env, fork_ep, *this, resume),
 		_config_rom_service(fork_ep, "config", _child_config.ds_cap()),
 		_child(env.rm(), fork_ep.rpc_ep(), *this)
 	{ }
@@ -545,8 +580,10 @@ static void fork_kernel_routine()
 		abort();
 	}
 
-	Env       &env   = *_env_ptr;
-	Allocator &alloc = *_alloc_ptr;
+	Env          &env    = *_env_ptr;
+	Allocator    &alloc  = *_alloc_ptr;
+	Resume       &resume = *_resume_ptr;
+	Libc::Signal &signal = *_signal_ptr;
 
 	pid_t const child_pid = ++_pid_cnt;
 
@@ -555,25 +592,25 @@ static void fork_kernel_routine()
 
 	static Libc::Parent_services parent_services(env, alloc);
 
-	static Libc::Local_rom_services local_rom_services(env, fork_ep, alloc);
+	static Local_rom_services local_rom_services(env, fork_ep, alloc);
 
 	static Forked_children forked_children { };
 	_forked_children_ptr = &forked_children;
 
-	Registered<Libc::Forked_child> &child = *new (alloc)
-		Registered<Libc::Forked_child>(forked_children, env, fork_ep, alloc,
-		                               child_pid, *_config_accessor_ptr,
-		                               parent_services, local_rom_services);
+	Registered<Forked_child> &child = *new (alloc)
+		Registered<Forked_child>(forked_children, env, fork_ep, alloc, resume,
+		                         signal, child_pid, *_config_accessor_ptr,
+		                         parent_services, local_rom_services);
 
 	fork_result = child_pid;
 
-	register_kernel_routine(child.wait_fork_ready);
+	_kernel_routine_scheduler_ptr->register_kernel_routine(child.wait_fork_ready);
 }
 
 
-/************
- ** getpid **
- ************/
+/**********
+ ** fork **
+ **********/
 
 /*
  * We provide weak symbols to allow 'libc_noux' to override them.
@@ -589,21 +626,25 @@ extern "C" pid_t __sys_fork(void)
 	_user_stack_base_ptr = (void *)mystack.base;
 	_user_stack_size     = mystack.top - mystack.base;
 
-	struct Fork_kernel_routine : Libc::Kernel_routine
+	struct Fork_kernel_routine : Kernel_routine
 	{
 		void execute_in_kernel() override { fork_kernel_routine(); }
 
 	} kernel_routine { };
 
-	Libc::register_kernel_routine(kernel_routine);
+	struct Missing_call_of_init_fork : Exception { };
+	if (!_kernel_routine_scheduler_ptr || !_suspend_ptr)
+		throw Missing_call_of_init_fork();
 
-	struct Suspend_functor_impl : Libc::Suspend_functor
+	_kernel_routine_scheduler_ptr->register_kernel_routine(kernel_routine);
+
+	struct Suspend_functor_impl : Suspend_functor
 	{
 		bool suspend() override { return false; }
 
 	} suspend_functor { };
 
-	Libc::suspend(suspend_functor, 0);
+	_suspend_ptr->suspend(suspend_functor, 0);
 
 	return fork_result;
 }
@@ -673,13 +714,16 @@ extern "C" pid_t __sys_wait4(pid_t pid, int *status, int options, rusage *rusage
 	pid_t result    = -1;
 	int   exit_code = 0;  /* code and status */
 
-	using namespace Genode;
 	using namespace Libc;
 
 	if (!_forked_children_ptr) {
 		errno = ECHILD;
 		return -1;
 	}
+
+	struct Missing_call_of_init_fork : Exception { };
+	if (!_suspend_ptr)
+		throw Missing_call_of_init_fork();
 
 	Wait4_suspend_functor suspend_functor { pid, *_forked_children_ptr };
 
@@ -694,7 +738,7 @@ extern "C" pid_t __sys_wait4(pid_t pid, int *status, int options, rusage *rusage
 		if (result >= 0 || (options & WNOHANG))
 			break;
 
-		Libc::suspend(suspend_functor, 0);
+		_suspend_ptr->suspend(suspend_functor, 0);
 	}
 
 	/*

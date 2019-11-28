@@ -49,6 +49,46 @@ namespace Vfs {
 	using Genode::Interface;
 	using Genode::String;
 
+	struct Timestamp
+	{
+		static constexpr Genode::int64_t INVALID = 0x7fffffffffffffffLL;
+		Genode::int64_t value;
+	};
+
+	enum class Node_type {
+		DIRECTORY,
+		SYMLINK,
+		CONTINUOUS_FILE,
+		TRANSACTIONAL_FILE
+	};
+
+	struct Node_rwx
+	{
+		bool readable;
+		bool writeable;
+		bool executable;
+
+		static Node_rwx ro()  { return { .readable   = true,
+		                                 .writeable  = false,
+		                                 .executable = false }; }
+
+		static Node_rwx wo()  { return { .readable   = false,
+		                                 .writeable  = true,
+		                                 .executable = false }; }
+
+		static Node_rwx rw()  { return { .readable   = true,
+		                                 .writeable  = true,
+		                                 .executable = false }; }
+
+		static Node_rwx rx()  { return { .readable   = true,
+		                                 .writeable  = false,
+		                                 .executable = true }; }
+
+		static Node_rwx rwx() { return { .readable   = true,
+		                                 .writeable  = false,
+		                                 .executable = true }; }
+	};
+
 	typedef Genode::Path<MAX_PATH_LEN> Absolute_path;
 }
 

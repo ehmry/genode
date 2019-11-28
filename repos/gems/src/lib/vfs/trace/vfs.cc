@@ -15,8 +15,7 @@
 #include <vfs/dir_file_system.h>
 #include <vfs/single_file_system.h>
 
-
-#include <gems/vfs.h>
+#include <os/vfs.h>
 #include <util/xml_generator.h>
 
 #include <trace_session/connection.h>
@@ -155,8 +154,8 @@ class Vfs_trace::Trace_buffer_file_system : public Single_file_system
 		                         Trace::Connection &trace,
 		                         Trace::Policy_id policy,
 		                         Trace::Subject_id id)
-		: Single_file_system(NODE_TYPE_CHAR_DEVICE,
-		                     type_name(), Xml_node(_config().string())),
+		: Single_file_system(Node_type::TRANSACTIONAL_FILE, type_name(),
+		                     Node_rwx::rw(), Xml_node(_config().string())),
 		  _env(env), _trace(trace), _policy(policy), _id(id)
 		{ }
 

@@ -119,6 +119,8 @@ class Vfs_ram::Node : private Genode::Avl_node<Node>, private Genode::Lock
 			return ++inode_count;
 		}
 
+		Vfs::Timestamp _modification_time { Vfs::Timestamp::INVALID };
+
 	public:
 
 		using Lock::lock;
@@ -127,7 +129,10 @@ class Vfs_ram::Node : private Genode::Avl_node<Node>, private Genode::Lock
 		unsigned inode;
 
 		Node(char const *node_name)
-		: inode(_unique_inode()) { name(node_name); }
+		: inode(_unique_inode())
+		{
+			name(node_name);
+		}
 
 		virtual ~Node() { }
 
@@ -155,6 +160,21 @@ class Vfs_ram::Node : private Genode::Avl_node<Node>, private Genode::Lock
 
 		void unlink() { inode = 0; }
 		bool unlinked() const { return inode == 0; }
+
+		bool update_modification_timestamp(Vfs::Timestamp time)
+		{
+			_modification_time = time;
+			return true;
+		}
+
+		Vfs::Timestamp modification_time() const { return _modification_time; }
+
+		Vfs::Node_rwx rwx() const
+		{
+			return { .readable   = true,
+			         .writeable  = true,
+			         .executable = true };
+		}
 
 		virtual size_t read(char*, size_t, file_size)
 		{
@@ -437,39 +457,43 @@ class Vfs_ram::Directory : public Vfs_ram::Node
 
 			file_offset index = seek_offset / sizeof(Dirent);
 
-			Dirent *dirent = (Dirent*)dst;
-			*dirent = Dirent();
+			Dirent &dirent = *(Dirent*)dst;
+
+			using Dirent_type = Vfs::Directory_service::Dirent_type;
+
 			out_count = sizeof(Dirent);
 
-			Node *node = _entries.first();
-			if (node) node = node->index(index);
-			if (!node) {
-				dirent->type = Directory_service::DIRENT_TYPE_END;
+			Node *node_ptr = _entries.first();
+			if (node_ptr) node_ptr = node_ptr->index(index);
+			if (!node_ptr) {
+				dirent.type = Dirent_type::END;
 				return Vfs::File_io_service::READ_OK;
 			}
 
-			dirent->fileno = node->inode;
-			strncpy(dirent->name, node->name(), sizeof(dirent->name));
+			Node &node = *node_ptr;
 
-			File *file = dynamic_cast<File *>(node);
-			if (file) {
-				dirent->type = Directory_service::DIRENT_TYPE_FILE;
-				return Vfs::File_io_service::READ_OK;
-			}
+			auto dirent_type = [&] ()
+			{
+				if (dynamic_cast<File      *>(node_ptr)) return Dirent_type::CONTINUOUS_FILE;
+				if (dynamic_cast<Directory *>(node_ptr)) return Dirent_type::DIRECTORY;
+				if (dynamic_cast<Symlink   *>(node_ptr)) return Dirent_type::SYMLINK;
 
-			Directory *dir = dynamic_cast<Directory *>(node);
-			if (dir) {
-				dirent->type = Directory_service::DIRENT_TYPE_DIRECTORY;
-				return Vfs::File_io_service::READ_OK;
-			}
+				return Dirent_type::END;
+			};
 
-			Symlink *symlink = dynamic_cast<Symlink *>(node);
-			if (symlink) {
-				dirent->type = Directory_service::DIRENT_TYPE_SYMLINK;
-				return Vfs::File_io_service::READ_OK;
-			}
+			Dirent_type const type = dirent_type();
 
-			return Vfs::File_io_service::READ_ERR_INVALID;
+			if (type == Dirent_type::END)
+				return Vfs::File_io_service::READ_ERR_INVALID;
+
+			dirent = {
+				.fileno = node.inode,
+				.type   = type,
+				.rwx    = node.rwx(),
+				.name   = { node.name() }
+			};
+
+			return Vfs::File_io_service::READ_OK;
 		}
 };
 
@@ -767,34 +791,31 @@ class Vfs::Ram_file_system : public Vfs::File_system
 		{
 			using namespace Vfs_ram;
 
-			Node *node = lookup(path);
-			if (!node) return STAT_ERR_NO_ENTRY;
-			Node::Guard guard(node);
+			Node *node_ptr = lookup(path);
+			if (!node_ptr) return STAT_ERR_NO_ENTRY;
 
-			stat.size  = node->length();
-			stat.inode  = node->inode;
-			stat.device = (Genode::addr_t)this;
+			Node::Guard guard(node_ptr);
 
-			File *file = dynamic_cast<File *>(node);
-			if (file) {
-				stat.mode = STAT_MODE_FILE | 0777;
-				return STAT_OK;
-			}
+			Node &node = *node_ptr;
 
-			Directory *dir = dynamic_cast<Directory *>(node);
-			if (dir) {
-				stat.mode = STAT_MODE_DIRECTORY | 0777;
-				return STAT_OK;
-			}
+			auto node_type = [&] ()
+			{
+				if (dynamic_cast<Directory *>(node_ptr)) return Node_type::DIRECTORY;
+				if (dynamic_cast<Symlink   *>(node_ptr)) return Node_type::SYMLINK;
 
-			Symlink *symlink = dynamic_cast<Symlink *>(node);
-			if (symlink) {
-				stat.mode = STAT_MODE_SYMLINK | 0777;
-				return STAT_OK;
-			}
+				return Node_type::CONTINUOUS_FILE;
+			};
 
-			/* this should never happen */
-			return STAT_ERR_NO_ENTRY;
+			stat = {
+				.size              = node.length(),
+				.type              = node_type(),
+				.rwx               = node.rwx(),
+				.inode             = node.inode,
+				.device            = (Genode::addr_t)this,
+				.modification_time = node.modification_time()
+			};
+
+			return STAT_OK;
 		}
 
 		Rename_result rename(char const *from, char const *to) override
@@ -1002,6 +1023,19 @@ class Vfs::Ram_file_system : public Vfs::File_system
 				handle->node.open(*handle);
 			}
 			return SYNC_OK;
+		}
+
+		bool update_modification_timestamp(Vfs_handle *vfs_handle, Vfs::Timestamp time) override
+		{
+			if ((vfs_handle->status_flags() & OPEN_MODE_ACCMODE) ==  OPEN_MODE_RDONLY)
+				return false;
+
+			Vfs_ram::Io_handle *handle =
+				static_cast<Vfs_ram::Io_handle *>(vfs_handle);
+			handle->modifying = true;
+
+			Vfs_ram::Node::Guard guard(&handle->node);
+			return handle->node.update_modification_timestamp(time);
 		}
 
 		/***************************

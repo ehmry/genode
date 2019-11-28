@@ -22,7 +22,7 @@
 #include <base/attached_ram_dataspace.h>
 #include <input/event.h>
 #include <os/reporter.h>
-#include <gems/vfs.h>
+#include <os/vfs.h>
 #include <gems/vfs_font.h>
 #include <gems/cached_font.h>
 
@@ -89,6 +89,8 @@ struct Terminal::Main : Character_consumer
 	Point _pointer { }; /* pointer positon in pixels */
 
 	bool _shift_pressed = false;
+
+	unsigned _ctrl_pressed = 0; /* number of control keys pressed */
 
 	bool _selecting = false;
 
@@ -320,10 +322,25 @@ void Terminal::Main::_handle_input()
 			}
 		}
 
+		if (event.key_press(Input::KEY_LEFTCTRL)
+		 || event.key_press(Input::KEY_RIGHTCTRL))
+			++_ctrl_pressed;
+
+		if (event.key_release(Input::KEY_LEFTCTRL)
+		 || event.key_release(Input::KEY_RIGHTCTRL))
+			--_ctrl_pressed;
+
 		if (event.key_press(Input::BTN_MIDDLE))
 			_paste_clipboard_content();
 
 		event.handle_press([&] (Input::Keycode, Codepoint codepoint) {
+
+			/* control-key combinations */
+			if (_ctrl_pressed
+			 && codepoint.value >= 'a' && codepoint.value <= 'z') {
+				_read_buffer.add(Codepoint { codepoint.value - 'a' + 1 } );
+				return;
+			}
 
 			/* function-key unicodes */
 			enum {

@@ -26,17 +26,17 @@ extern "C" {
 #include <stdlib.h>
 }
 
-/* libc-internal includes */
-#include "libc_init.h"
+/* Genode-internal includes */
 #include <base/internal/unmanaged_singleton.h>
-#include <clone_session.h>
+
+/* libc-internal includes */
+#include <internal/init.h>
+#include <internal/clone_session.h>
 
 
 namespace Libc {
 	class Slab_alloc;
 	class Malloc;
-
-	using namespace Genode;
 }
 
 
@@ -224,7 +224,10 @@ class Libc::Malloc
 };
 
 
-static Libc::Malloc *mallocator;
+using namespace Libc;
+
+
+static Malloc *mallocator;
 
 
 extern "C" void *malloc(size_t size)
@@ -261,16 +264,16 @@ extern "C" void *realloc(void *ptr, size_t size)
 }
 
 
-static Genode::Constructible<Libc::Malloc> &constructible_malloc()
+static Genode::Constructible<Malloc> &constructible_malloc()
 {
-	return *unmanaged_singleton<Genode::Constructible<Libc::Malloc> >();
+	return *unmanaged_singleton<Genode::Constructible<Malloc> >();
 }
 
 
 void Libc::init_malloc(Genode::Allocator &heap)
 {
 
-	Genode::Constructible<Libc::Malloc> &_malloc = constructible_malloc();
+	Constructible<Malloc> &_malloc = constructible_malloc();
 
 	_malloc.construct(heap);
 
@@ -288,7 +291,7 @@ void Libc::init_malloc_cloned(Clone_connection &clone_connection)
 
 void Libc::reinit_malloc(Genode::Allocator &heap)
 {
-	Libc::Malloc &malloc = *constructible_malloc();
+	Malloc &malloc = *constructible_malloc();
 
-	Genode::construct_at<Libc::Malloc>(&malloc, heap);
+	construct_at<Malloc>(&malloc, heap);
 }

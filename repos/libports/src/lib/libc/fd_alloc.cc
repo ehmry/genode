@@ -17,6 +17,9 @@
 #include <base/env.h>
 #include <base/log.h>
 
+/* Genode-internal includes */
+#include <base/internal/unmanaged_singleton.h>
+
 /* libc plugin interface */
 #include <libc-plugin/fd_alloc.h>
 
@@ -25,11 +28,9 @@
 #include <unistd.h>
 
 /* libc-internal includes */
-#include <libc_init.h>
-#include <base/internal/unmanaged_singleton.h>
+#include <internal/init.h>
 
 using namespace Libc;
-using namespace Genode;
 
 
 static Allocator *_alloc_ptr;
@@ -147,7 +148,7 @@ void File_descriptor::path(char const *newpath)
 	}
 
 	if (newpath) {
-		Genode::size_t const path_size = ::strlen(newpath) + 1;
+		size_t const path_size = ::strlen(newpath) + 1;
 		char *buf = (char*)_alloc_ptr->alloc(path_size);
 		if (!buf) {
 			error("could not allocate path buffer for libc_fd ", libc_fd);

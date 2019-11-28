@@ -10,6 +10,7 @@ import_from_depot [depot_user]/src/[base_src] \
                   [depot_user]/src/bash \
                   [depot_user]/src/coreutils \
                   [depot_user]/src/vfs \
+                  [depot_user]/src/vfs_pipe \
                   [depot_user]/src/fs_rom
 
 # write default vimrc file
@@ -83,11 +84,12 @@ install_config {
 				<dir name="tmp"> <ram/> </dir>
 				<dir name="dev">
 					<zero/> <null/> <terminal/>
+					<dir name="pipe"> <pipe/> </dir>
 					<inline name="rtc">2018-01-01 00:01</inline>
 				</dir>
 			</vfs>
 
-			<policy label_prefix="vfs_rom" root="/bin"/>
+			<policy label_prefix="vfs_rom" root="/"/>
 			<default-policy root="/" writeable="yes"/>
 		</config>
 	</start>
@@ -103,11 +105,11 @@ install_config {
 		</route>
 	</start>
 
-	<start name="bash" caps="1000">
+	<start name="/bin/bash" caps="1000">
 		<resource name="RAM" quantum="30M" />
-		<config>
+		<config ld_verbose="yes">
 			<libc stdin="/dev/terminal" stdout="/dev/terminal"
-			      stderr="/dev/terminal" rtc="/dev/rtc"/>
+			      stderr="/dev/terminal" rtc="/dev/rtc" pipe="/dev/pipe"/>
 			<vfs> <fs/> </vfs>
 			<arg value="bash"/>
 			<env key="TERM" value="screen"/>
@@ -115,9 +117,9 @@ install_config {
 		</config>
 		<route>
 			<service name="File_system"> <child name="vfs"/> </service>
-			<service name="ROM" label_last="bash"> <child name="vfs_rom"/> </service>
 			<service name="ROM" label_suffix=".lib.so"> <parent/> </service>
-			<service name="ROM" label_prefix=""> <child name="vfs_rom"/> </service>
+			<service name="ROM" label_last="/bin/bash"> <child name="vfs_rom"/> </service>
+			<service name="ROM" label_prefix="/bin"> <child name="vfs_rom"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>
 		</route>
 	</start>

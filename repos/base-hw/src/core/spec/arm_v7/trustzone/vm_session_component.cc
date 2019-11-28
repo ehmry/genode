@@ -11,24 +11,44 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#include <kernel/core_interface.h>
+/* Genode includes */
+#include <util/construct_at.h>
+
+/* core includes */
 #include <vm_session_component.h>
-#include <core_env.h>
+#include <platform.h>
 
 using namespace Genode;
 
-
-void Vm_session_component::_exception_handler(Signal_context_capability handler, Vcpu_id)
+static Board::Vm_page_table_array & dummy_array()
 {
-	if (!create(_ds_addr, Capability_space::capid(handler), nullptr))
-	{
-		warning("Cannot instantiate vm kernel object twice,"
-		        "or invalid signal context?");
-	}
+	static Board::Vm_page_table_array a;
+	return a;
 }
 
 
-Vm_session_component::Vm_session_component(Rpc_entrypoint  &ds_ep,
+void Vm_session_component::_attach(addr_t, addr_t, size_t) { }
+
+
+void Vm_session_component::_attach_vm_memory(Dataspace_component &,
+                                             addr_t const,
+                                             Attach_attr const) { }
+
+
+void Vm_session_component::attach_pic(addr_t) { }
+
+
+void Vm_session_component::_detach_vm_memory(addr_t, size_t) { }
+
+
+void * Vm_session_component::_alloc_table()
+{
+	static Board::Vm_page_table table;
+	return (void*) &table;
+}
+
+
+Vm_session_component::Vm_session_component(Rpc_entrypoint  &ep,
                                            Resources resources,
                                            Label const &,
                                            Diag,
@@ -38,26 +58,32 @@ Vm_session_component::Vm_session_component(Rpc_entrypoint  &ds_ep,
 :
 	Ram_quota_guard(resources.ram_quota),
 	Cap_quota_guard(resources.cap_quota),
-	_ds_ep(&ds_ep),
+	_ep(ep),
 	_constrained_md_ram_alloc(ram_alloc, _ram_quota_guard(), _cap_quota_guard()),
-	_region_map(region_map)
-{
-	_ds_cap = _constrained_md_ram_alloc.alloc(_ds_size(), Genode::Cache_attribute::UNCACHED);
-
-	try {
-		_ds_addr = region_map.attach(_ds_cap);
-	} catch (...) {
-		_constrained_md_ram_alloc.free(_ds_cap);
-		throw;
-	}
-}
+	_sliced_heap(_constrained_md_ram_alloc, region_map),
+	_region_map(region_map),
+  _table(*construct_at<Board::Vm_page_table>(_alloc_table())),
+  _table_array(dummy_array()) { }
 
 
 Vm_session_component::~Vm_session_component()
 {
+	/* detach all regions */
+	while (true) {
+		addr_t out_addr = 0;
+
+		if (!_map.any_block_addr(&out_addr))
+			break;
+
+		detach(out_addr);
+	}
+
 	/* free region in allocator */
-	if (_ds_cap.valid()) {
-		_region_map.detach(_ds_addr);
-		_constrained_md_ram_alloc.free(_ds_cap);
+	for (unsigned i = 0; i < _id_alloc; i++) {
+		Vcpu & vcpu = _vcpus[i];
+		if (vcpu.ds_cap.valid()) {
+			_region_map.detach(vcpu.ds_addr);
+			_constrained_md_ram_alloc.free(vcpu.ds_cap);
+		}
 	}
 }

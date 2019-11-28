@@ -16,6 +16,7 @@
 #ifndef _INCLUDE__FILE_SYSTEM_SESSION__FILE_SYSTEM_SESSION_H_
 #define _INCLUDE__FILE_SYSTEM_SESSION__FILE_SYSTEM_SESSION_H_
 
+#include <util/string.h>
 #include <base/exception.h>
 #include <os/packet_stream.h>
 #include <packet_stream_tx/packet_stream_tx.h>
@@ -66,10 +67,44 @@ namespace File_system {
 	typedef Symlink::Id   Symlink_handle;
 	typedef Watch::Id     Watch_handle;
 
+	enum class Node_type {
+		DIRECTORY,
+		SYMLINK,
+		CONTINUOUS_FILE,
+		TRANSACTIONAL_FILE
+	};
+
+	struct Node_rwx
+	{
+		bool readable;
+		bool writeable;
+		bool executable;
+	};
+
 	using Genode::size_t;
 
 	typedef Genode::uint64_t seek_off_t;
 	typedef Genode::uint64_t file_size_t;
+
+	struct Timestamp
+	{
+		/*
+		 * The INVALID value is used whenever the underlying file system
+		 * session does not support modification timestamps. The value is
+		 * chosen such that it is unlikely to occur, instead of simply '0',
+		 * which would correspond to plausible time (see comment below).
+		 * This allows for handling this case explicitly. In any case, an
+		 * invalid timestamp should not be used for doing any calculations.
+		 */
+		static constexpr Genode::int64_t INVALID = 0x7fffffffffffffffLL;
+
+		/*
+		 * The 'value' member contains the modification timestamp in seconds.
+		 * Value '0' is defined as 1970-01-01T00:00:00Z, where a positive value
+		 * covers all seconds after this date and a negative one all before.
+		 */
+		Genode::int64_t value;
+	};
 
 	typedef Genode::Out_of_ram  Out_of_ram;
 	typedef Genode::Out_of_caps Out_of_caps;
@@ -81,7 +116,7 @@ namespace File_system {
 	 */
 	enum Mode { STAT_ONLY = 0, READ_ONLY = 1, WRITE_ONLY = 2, READ_WRITE = 3 };
 
-	enum { MAX_NAME_LEN = 256, MAX_PATH_LEN = 1024 };
+	enum { MAX_NAME_LEN = 128, MAX_PATH_LEN = 1024 };
 
 	/**
 	 * File offset constant for reading or writing to the end of a file
@@ -127,6 +162,7 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 		enum Opcode {
 			READ,
 			WRITE,
+			WRITE_TIMESTAMP,
 			CONTENT_CHANGED,
 			READ_READY,
 
@@ -143,9 +179,16 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 
 		Node_handle _handle { 0 };   /* node handle */
 		Opcode      _op;             /* requested operation */
-		seek_off_t  _position;       /* file seek offset in bytes */
-		size_t      _length;         /* transaction length in bytes */
 		bool        _success;        /* indicates success of operation */
+		union
+		{
+			struct
+			{
+				seek_off_t  _position;       /* file seek offset in bytes */
+				size_t      _length;         /* transaction length in bytes */
+			};
+			Timestamp _modification_time;    /* seconds since the Unix epoch */
+		};
 
 	public:
 
@@ -156,7 +199,7 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 		                  Genode::size_t buf_size   = 0)
 		:
 			Genode::Packet_descriptor(buf_offset, buf_size),
-			_op(READ), _position(0), _length(0), _success(false) { }
+			_op(READ), _success(false), _position(0), _length(0) { }
 
 		/**
 		 * Constructor
@@ -172,8 +215,8 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 		                  seek_off_t position = SEEK_TAIL)
 		:
 			Genode::Packet_descriptor(p.offset(), p.size()),
-			_handle(handle), _op(op),
-			_position(position), _length(length), _success(false)
+			_handle(handle), _op(op), _success(false),
+			_position(position), _length(length)
 		{ }
 
 		/**
@@ -185,15 +228,32 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 		Packet_descriptor(Node_handle handle, Opcode op)
 		:
 			Genode::Packet_descriptor(0, 0),
-			_handle(handle), _op(op),
-			_position(0), _length(0), _success(true)
+			_handle(handle), _op(op), _success(true),
+			_position(0), _length(0)
+		{ }
+
+		/**
+		 * Constructor
+		 */
+		Packet_descriptor(Packet_descriptor p, Node_handle handle, Opcode op, Timestamp const &mtime)
+		:
+			Genode::Packet_descriptor(p.offset(), p.size()),
+			_handle(handle), _op(op), _success(false),
+			_modification_time(mtime)
 		{ }
 
 		Node_handle handle()    const { return _handle;   }
 		Opcode      operation() const { return _op;       }
-		seek_off_t  position()  const { return _position; }
-		size_t      length()    const { return _length;   }
+		seek_off_t  position()  const { return _op != Opcode::WRITE_TIMESTAMP ? _position : 0; }
+		size_t      length()    const { return _op != Opcode::WRITE_TIMESTAMP ? _length : 0;   }
 		bool        succeeded() const { return _success;  }
+
+		template <typename FN>
+		void with_timestamp(FN const &fn) const
+		{
+			if (_op == Opcode::WRITE_TIMESTAMP)
+				fn(_modification_time);
+		}
 
 		/*
 		 * Accessors called at the server side
@@ -205,30 +265,21 @@ class File_system::Packet_descriptor : public Genode::Packet_descriptor
 
 struct File_system::Status
 {
-	enum {
-		MODE_SYMLINK   = 0020000,
-		MODE_FILE      = 0100000,
-		MODE_DIRECTORY = 0040000,
-	};
-
-	/*
-	 * XXX  add access time
-	 * XXX  add executable bit
-	 */
-
 	file_size_t   size;
-	unsigned      mode;
+	Node_type     type;
+	Node_rwx      rwx;
 	unsigned long inode;
+	Timestamp     modification_time;
 
 	/**
 	 * Return true if node is a directory
 	 */
-	bool directory() const { return mode & MODE_DIRECTORY; }
+	bool directory() const { return type == Node_type::DIRECTORY; }
 
 	/**
 	 * Return true if node is a symbolic link
 	 */
-	bool symlink() const { return mode & MODE_SYMLINK; }
+	bool symlink() const { return type == Node_type::SYMLINK; }
 };
 
 
@@ -240,11 +291,27 @@ struct File_system::Control { /* to manipulate the executable bit */ };
  */
 struct File_system::Directory_entry
 {
-	enum Type { TYPE_FILE, TYPE_DIRECTORY, TYPE_SYMLINK };
+	struct Name
+	{
+		char buf[MAX_NAME_LEN] { };
+
+		Name() { };
+		Name(char const *name) { Genode::strncpy(buf, name, sizeof(buf)); }
+	};
 
 	unsigned long inode;
-	Type          type;
-	char          name[MAX_NAME_LEN];
+	Node_type     type;
+	Node_rwx      rwx;
+	Name          name;
+
+	/**
+	 * Sanitize object received from a file-system server as plain bytes
+	 */
+	void sanitize()
+	{
+		/* enforce null termination */
+		name.buf[MAX_NAME_LEN - 1] = 0;
+	}
 };
 
 

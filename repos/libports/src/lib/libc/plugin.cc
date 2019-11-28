@@ -20,15 +20,28 @@
 #include <libc-plugin/plugin.h>
 
 /* local includes */
-#include "task.h"
+#include <internal/init.h>
+#include <internal/resume.h>
 
-using namespace Genode;
 using namespace Libc;
+
+
+static Resume *_resume_ptr;
+
+
+void Libc::init_plugin(Resume &resume)
+{
+	_resume_ptr = &resume;
+}
 
 
 void Plugin::resume_all()
 {
-	Libc::resume_all();
+	struct Missing_call_of_init_plugin : Exception { };
+	if (!_resume_ptr)
+		throw Missing_call_of_init_plugin();
+
+	_resume_ptr->resume_all();
 }
 
 
@@ -142,7 +155,7 @@ bool Plugin::supports_mmap()
 #define DUMMY(ret_type, ret_val, name, args) \
 ret_type Plugin::name args \
 { \
-	Genode::error(__func__, ": " #name " not implemented"); \
+	error(__func__, ": " #name " not implemented"); \
 	return ret_val; \
 }
 

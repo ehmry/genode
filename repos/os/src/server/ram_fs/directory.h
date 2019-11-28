@@ -181,7 +181,8 @@ class Ram_fs::Directory : public Node
 			return static_cast<Directory *>(lookup(path, true));
 		}
 
-		size_t read(char *dst, size_t len, seek_off_t seek_offset) override
+		size_t read(char *dst, size_t len, seek_off_t seek_offset,
+		            Session_writeable writeable) override
 		{
 			using File_system::Directory_entry;
 
@@ -203,15 +204,25 @@ class Ram_fs::Directory : public Node
 			if (!node)
 				return 0;
 
-			Directory_entry *e = (Directory_entry *)(dst);
+			auto type = [&] ()
+			{
+				using Node_type = File_system::Node_type;
 
-			e->inode = node->inode();
+				if (dynamic_cast<Directory *>(node)) return Node_type::DIRECTORY;
+				if (dynamic_cast<Symlink   *>(node)) return Node_type::SYMLINK;
+				return Node_type::CONTINUOUS_FILE;
+			};
 
-			if (dynamic_cast<File      *>(node)) e->type = Directory_entry::TYPE_FILE;
-			if (dynamic_cast<Directory *>(node)) e->type = Directory_entry::TYPE_DIRECTORY;
-			if (dynamic_cast<Symlink   *>(node)) e->type = Directory_entry::TYPE_SYMLINK;
+			Directory_entry &e = *(Directory_entry *)(dst);
 
-			strncpy(e->name, node->name(), sizeof(e->name));
+			e = {
+				.inode = node->inode(),
+				.type  = type(),
+				.rwx   = { .readable   = true,
+				           .writeable  = writeable == Session_writeable::WRITEABLE,
+				           .executable = true },
+				.name  = { node->name() }
+			};
 
 			return sizeof(Directory_entry);
 		}
@@ -222,13 +233,17 @@ class Ram_fs::Directory : public Node
 			return 0;
 		}
 
-		Status status() override
+		Status status(Session_writeable writeable) override
 		{
-			Status s;
-			s.inode = inode();
-			s.size = _num_entries * sizeof(File_system::Directory_entry);
-			s.mode = File_system::Status::MODE_DIRECTORY;
-			return s;
+			return {
+				.size  = _num_entries * sizeof(File_system::Directory_entry),
+				.type  = File_system::Node_type::DIRECTORY,
+				.rwx   = { .readable   = true,
+				           .writeable  = (writeable == Session_writeable::WRITEABLE),
+				           .executable = true },
+				.inode = inode(),
+				.modification_time = modification_time()
+			};
 		}
 };
 

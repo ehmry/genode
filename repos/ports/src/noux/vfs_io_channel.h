@@ -14,9 +14,13 @@
 #ifndef _NOUX__VFS_IO_CHANNEL_H_
 #define _NOUX__VFS_IO_CHANNEL_H_
 
+/* Genode includes */
+#include <timer_session/connection.h>
+
 /* Noux includes */
 #include <io_channel.h>
 #include <vfs/dir_file_system.h>
+#include <time_info.h>
 
 namespace Noux {
 	class Vfs_io_waiter;
@@ -69,10 +73,31 @@ struct Noux::Vfs_io_channel : Io_channel
 
 	bool const _dir = _fh.ds().directory(_leaf_path.base());
 
+	Time_info   const &_time_info;
+	Timer::Connection &_timer;
+
 	void _sync()
 	{
+		Milliseconds const ms =
+			_timer.curr_time().trunc_to_plain_ms();
+		uint64_t sec   = _time_info.initial_time();
+		         sec  += (ms.value / 1000);
+
+		Vfs::Timestamp ts { .value = (long long)sec };
+
 		Registered_no_delete<Vfs_io_waiter>
 			vfs_io_waiter(_vfs_io_waiter_registry);
+
+		if ((_fh.status_flags() & Sysio::OPEN_MODE_ACCMODE) != Sysio::OPEN_MODE_RDONLY) {
+			for (;;) {
+				if (_fh.fs().update_modification_timestamp(&_fh, ts)) {
+					break;
+				} else {
+					Genode::error("_sync: update_modification_timestamp failed");
+					vfs_io_waiter.wait_for_io();
+				}
+			}
+		}
 
 		while (!_fh.fs().queue_sync(&_fh))
 			vfs_io_waiter.wait_for_io();
@@ -89,11 +114,13 @@ struct Noux::Vfs_io_channel : Io_channel
 	Vfs_io_channel(char const *path, char const *leaf_path,
 	               Vfs::Vfs_handle *vfs_handle,
 	               Vfs_io_waiter_registry &vfs_io_waiter_registry,
-	               Entrypoint &ep)
+	               Entrypoint &ep,
+	               Time_info const &time_info,
+	               Timer::Connection &timer)
 	:
 		_read_avail_handler(ep, *this, &Vfs_io_channel::_handle_read_avail),
 		_fh(*vfs_handle), _vfs_io_waiter_registry(vfs_io_waiter_registry),
-		_path(path), _leaf_path(leaf_path)
+		_path(path), _leaf_path(leaf_path), _time_info(time_info), _timer(timer)
 	{
 		_fh.fs().register_read_ready_sigh(&_fh, _read_avail_handler);
 	}
@@ -244,7 +271,7 @@ struct Noux::Vfs_io_channel : Io_channel
 		 */
 		unsigned const index = _fh.seek() / sizeof(Sysio::Dirent);
 		if (index < 2) {
-			sysio.dirent_out.entry.type = Vfs::Directory_service::DIRENT_TYPE_DIRECTORY;
+			sysio.dirent_out.entry.type = Vfs::Directory_service::Dirent_type::DIRECTORY;
 			strncpy(sysio.dirent_out.entry.name,
 			        index ? ".." : ".",
 			        sizeof(sysio.dirent_out.entry.name));
@@ -259,12 +286,10 @@ struct Noux::Vfs_io_channel : Io_channel
 		 * Align index range to zero when calling the directory service.
 		 */
 
-		Vfs::Directory_service::Dirent dirent;
-
 		Vfs::file_size noux_dirent_seek = _fh.seek();
-		_fh.seek((index - 2) * sizeof(dirent));
+		_fh.seek((index - 2) * sizeof(Vfs::Directory_service::Dirent));
 
-		Vfs::file_size const count = sizeof(dirent);
+		Vfs::file_size const count = sizeof(Vfs::Directory_service::Dirent);
 
 		Registered_no_delete<Vfs_io_waiter>
 			vfs_io_waiter(_vfs_io_waiter_registry);
@@ -273,10 +298,10 @@ struct Noux::Vfs_io_channel : Io_channel
 			vfs_io_waiter.wait_for_io();
 
 		Vfs::File_io_service::Read_result read_result;
-		Vfs::file_size out_count = 0;
+		Vfs::file_size                    out_count = 0;
+		Vfs::Directory_service::Dirent    dirent { };
 
 		for (;;) {
-
 			read_result = _fh.fs().complete_read(&_fh, (char*)&dirent,
 			                                     count, out_count);
 
@@ -293,7 +318,7 @@ struct Noux::Vfs_io_channel : Io_channel
 
 		if ((read_result != Vfs::File_io_service::READ_OK) ||
 		    (out_count != sizeof(dirent))) {
-		    dirent = Vfs::Directory_service::Dirent();
+		    dirent = { };
 		}
 
 		_fh.seek(noux_dirent_seek);

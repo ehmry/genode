@@ -58,7 +58,8 @@
 
 
 /* libc-internal includes */
-#include <libc_mem_alloc.h>
+#include <internal/mem_alloc.h>
+#include <internal/legacy.h>
 
 
 using Genode::log;
@@ -387,15 +388,39 @@ extern "C" int getrlimit(int resource, struct rlimit *rlim)
  */
 static void _sysio_to_stat_struct(Noux::Sysio const *sysio, struct stat *buf)
 {
-	Genode::memset(buf, 0, sizeof(*buf));
-	buf->st_uid     = sysio->stat_out.st.uid;
-	buf->st_gid     = sysio->stat_out.st.gid;
-	buf->st_mode    = sysio->stat_out.st.mode;
-	buf->st_size    = sysio->stat_out.st.size;
+	unsigned const readable_bits   = S_IRUSR,
+	               writeable_bits  = S_IWUSR,
+	               executable_bits = S_IXUSR;
+
+	auto type = [] (Vfs::Node_type type)
+	{
+		switch (type) {
+		case Vfs::Node_type::DIRECTORY:          return S_IFDIR;
+		case Vfs::Node_type::CONTINUOUS_FILE:    return S_IFREG;
+		case Vfs::Node_type::TRANSACTIONAL_FILE: return S_IFSOCK;
+		case Vfs::Node_type::SYMLINK:            return S_IFLNK;
+		}
+		return 0;
+	};
+
+	Vfs::Directory_service::Stat const &src = sysio->stat_out.st;
+
+	*buf = { };
+
+	buf->st_uid     = 0;
+	buf->st_gid     = 0;
+	buf->st_mode    = (src.rwx.readable   ? readable_bits   : 0)
+	                | (src.rwx.writeable  ? writeable_bits  : 0)
+	                | (src.rwx.executable ? executable_bits : 0)
+	                | type(src.type);
+	buf->st_size    = src.size;
 	buf->st_blksize = FS_BLOCK_SIZE;
-	buf->st_blocks  = (buf->st_size + FS_BLOCK_SIZE - 1) / FS_BLOCK_SIZE;
-	buf->st_ino     = sysio->stat_out.st.inode;
-	buf->st_dev     = sysio->stat_out.st.device;
+	buf->st_blocks  = (src.size + FS_BLOCK_SIZE - 1) / FS_BLOCK_SIZE;
+	buf->st_ino     = src.inode;
+	buf->st_dev     = src.device;
+
+	if (src.modification_time.value != Vfs::Timestamp::INVALID)
+		buf->st_mtime = src.modification_time.value;
 }
 
 
@@ -933,6 +958,13 @@ extern "C" int gettimeofday(struct timeval *tv, struct timezone *tz)
 
 extern "C" int utimes(const char* path, const struct timeval *times)
 {
+	char * const dst     = sysio()->utimes_in.path;
+	size_t const max_len = sizeof(sysio()->utimes_in.path);
+	Genode::strncpy(dst, path, max_len);
+
+	sysio()->utimes_in.sec  = times ? times->tv_sec  : 0;
+	sysio()->utimes_in.usec = times ? times->tv_usec : 0;
+
 	if (!noux_syscall(Noux::Session::SYSCALL_UTIMES)) {
 		errno = EINVAL;
 		return -1;
@@ -1210,8 +1242,10 @@ namespace {
 		Libc::Plugin_context *context = noux_context(sysio()->open_out.fd);
 		Libc::File_descriptor *fd =
 		    Libc::file_descriptor_allocator()->alloc(this, context, sysio()->open_out.fd);
-		if ((flags & O_TRUNC) && (ftruncate(fd, 0) == -1))
+		if ((flags & O_TRUNC) && (ftruncate(fd, 0) == -1)) {
+			Plugin::close(fd);
 			return 0;
+		}
 		return fd;
 	}
 
@@ -1258,7 +1292,7 @@ namespace {
 		if (!buf) { errno = EFAULT; return -1; }
 
 		/* remember original len for the return value */
-		int const orig_count = count;
+		size_t const orig_count = count;
 
 		char *src = (char *)buf;
 		while (count > 0) {
@@ -1283,12 +1317,23 @@ namespace {
 						errno = 0;
 					break;
 				}
+
+				/* try again */
+				bool const retry = (errno == EINTR
+				                 || errno == EAGAIN
+				                 || errno == EWOULDBLOCK);
+				if (errno && retry)
+					continue;
+
+				/* leave writing loop on error */
+				if (errno)
+					break;
 			}
 
 			count -= sysio()->write_out.count;
 			src   += sysio()->write_out.count;
 		}
-		return orig_count;
+		return orig_count - count;
 	}
 
 
@@ -1321,6 +1366,14 @@ namespace {
 						errno = 0;
 					break;
 				}
+
+				/* try again */
+				bool const retry = (errno == EINTR
+				                 || errno == EAGAIN
+				                 || errno == EWOULDBLOCK);
+				if (errno && retry)
+					continue;
+
 				return -1;
 			}
 
@@ -1682,9 +1735,6 @@ namespace {
 
 		sysio()->dirent_in.fd = noux_fd(fd->context);
 
-		struct dirent *dirent = (struct dirent *)buf;
-		Genode::memset(dirent, 0, sizeof(struct dirent));
-
 		if (!noux_syscall(Noux::Session::SYSCALL_DIRENT)) {
 			switch (sysio()->error.general) {
 
@@ -1697,23 +1747,35 @@ namespace {
 			}
 		}
 
-		switch (sysio()->dirent_out.entry.type) {
-		case Vfs::Directory_service::DIRENT_TYPE_DIRECTORY: dirent->d_type = DT_DIR;  break;
-		case Vfs::Directory_service::DIRENT_TYPE_FILE:      dirent->d_type = DT_REG;  break;
-		case Vfs::Directory_service::DIRENT_TYPE_SYMLINK:   dirent->d_type = DT_LNK;  break;
-		case Vfs::Directory_service::DIRENT_TYPE_FIFO:      dirent->d_type = DT_FIFO; break;
-		case Vfs::Directory_service::DIRENT_TYPE_CHARDEV:   dirent->d_type = DT_CHR; break;
-		case Vfs::Directory_service::DIRENT_TYPE_BLOCKDEV:  dirent->d_type = DT_BLK; break;
-		case Vfs::Directory_service::DIRENT_TYPE_END:       return 0;
-		}
+		using Dirent_type = Vfs::Directory_service::Dirent_type;
 
-		dirent->d_fileno = sysio()->dirent_out.entry.fileno;
-		dirent->d_reclen = sizeof(struct dirent);
+		if (sysio()->dirent_out.entry.type == Dirent_type::END)
+			return 0;
 
-		Genode::strncpy(dirent->d_name, sysio()->dirent_out.entry.name,
-		                sizeof(dirent->d_name));
+		auto d_type = [] (Dirent_type const &type)
+		{
+			switch (sysio()->dirent_out.entry.type) {
+			case Dirent_type::DIRECTORY:          return DT_DIR;
+			case Dirent_type::CONTINUOUS_FILE:    return DT_REG;
+			case Dirent_type::TRANSACTIONAL_FILE: return DT_REG;
+			case Dirent_type::SYMLINK:            return DT_LNK;
+			case Dirent_type::END:                return 0;
+			}
+			return 0;
+		};
 
-		dirent->d_namlen = Genode::strlen(dirent->d_name);
+		struct dirent &dirent = *(struct dirent *)buf;
+
+		dirent = { };
+
+		dirent.d_type   = d_type(sysio()->dirent_out.entry.type);
+		dirent.d_fileno = sysio()->dirent_out.entry.fileno;
+		dirent.d_reclen = sizeof(struct dirent);
+
+		Genode::strncpy(dirent.d_name, sysio()->dirent_out.entry.name,
+		                sizeof(dirent.d_name));
+
+		dirent.d_namlen = Genode::strlen(dirent.d_name);
 
 		*basep += sizeof(struct dirent);
 		return sizeof(struct dirent);

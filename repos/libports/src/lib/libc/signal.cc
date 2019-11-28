@@ -21,8 +21,56 @@ extern "C" {
 #include <sys/wait.h>
 }
 
-/* Genode includes */
-#include <base/log.h>
+/* libc-internal includes */
+#include <internal/types.h>
+#include <internal/init.h>
+#include <internal/signal.h>
+#include <internal/errno.h>
+
+using namespace Libc;
+
+
+static Libc::Signal *_signal_ptr;
+
+
+void Libc::init_signal(Signal &signal)
+{
+	_signal_ptr = &signal;
+}
+
+
+void Libc::Signal::_execute_signal_handler(unsigned n)
+{
+	if (signal_action[n].sa_flags & SA_SIGINFO) {
+		signal_action[n].sa_sigaction(n, 0, 0);
+		return;
+	}
+
+	if (signal_action[n].sa_handler == SIG_DFL) {
+		switch (n) {
+			case SIGCHLD:
+			case SIGWINCH:
+				/* ignore */
+				break;
+			default:
+				/*
+				 * Trigger the termination of the process.
+				 *
+				 * We cannot call 'exit' immediately as the exiting code (e.g.,
+				 * 'atexit' handlers) may potentially issue I/O operations such
+				 * as FD sync and close. Hence, we just flag the intention to
+				 * exit and issue the actual exit call at the end of
+				 * 'Signal::execute_signal_handlers'
+				 */
+				_exit      = true;
+				_exit_code = (n << 8) | EXIT_FAILURE;
+		}
+	} else if (signal_action[n].sa_handler == SIG_IGN) {
+		/* do nothing */
+	} else {
+		signal_action[n].sa_handler(n);
+	}
+}
 
 
 extern "C" __attribute__((weak))
@@ -63,6 +111,49 @@ extern "C" int __i386_libc_sigprocmask(int how, const sigset_t *set, sigset_t *o
 }
 
 
+extern "C" int sigaction(int, const struct sigaction *, struct sigaction *) __attribute__((weak));
+
+
+extern "C" int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+{
+	if ((signum < 1) || (signum > NSIG)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (oldact)
+		*oldact = _signal_ptr->signal_action[signum];
+
+	if (act)
+		_signal_ptr->signal_action[signum] = *act;
+
+	return 0;
+}
+
+
+extern "C" int       _sigaction(int, const struct sigaction *, struct sigaction *) __attribute__((weak, alias("sigaction")));
+extern "C" int  __sys_sigaction(int, const struct sigaction *, struct sigaction *) __attribute__((weak, alias("sigaction")));
+extern "C" int __libc_sigaction(int, const struct sigaction *, struct sigaction *) __attribute__((weak, alias("sigaction")));
+
+
+extern "C" int kill(pid_t pid, int signum)
+{
+	if (_signal_ptr->local_pid(pid)) {
+		_signal_ptr->charge(signum);
+		_signal_ptr->execute_signal_handlers();
+		return 0;
+	} else {
+		warning("submitting signals to remote processes via 'kill' not supported");
+		return Libc::Errno(EPERM);
+	}
+}
+
+
+extern "C" int       _kill(pid_t, int) __attribute__((weak, alias("kill")));
+extern "C" int  __sys_kill(pid_t, int) __attribute__((weak, alias("kill")));
+extern "C" int __libc_kill(pid_t, int) __attribute__((weak, alias("kill")));
+
+
 extern "C" pid_t wait(int *istat) {
 	return wait4(WAIT_ANY, istat, 0, NULL); }
 
@@ -78,7 +169,7 @@ extern "C" pid_t _waitpid(pid_t pid, int *istat, int options) {
 extern "C" __attribute__((weak))
 pid_t wait6(idtype_t, id_t, int*, int, struct __wrusage*, siginfo_t*)
 {
-	Genode::warning(__func__, " not implemented");
+	warning(__func__, " not implemented");
 	errno = ENOSYS;
 	return -1;
 }

@@ -381,31 +381,31 @@ struct Vfs::Lxip_vfs_dir_handle final : Vfs::Lxip_vfs_handle
 /**
  * Queues of open handles to poll
  */
-static Vfs::Lxip_vfs_file_handle::Fifo _io_progress_waiters;
-static Vfs::Lxip_vfs_file_handle::Fifo  _read_ready_waiters;
+static Vfs::Lxip_vfs_file_handle::Fifo *_io_progress_waiters_ptr;
+static Vfs::Lxip_vfs_file_handle::Fifo *_read_ready_waiters_ptr;
 
 static void poll_all()
 {
-	_io_progress_waiters.for_each(
+	_io_progress_waiters_ptr->for_each(
 			[&] (Vfs::Lxip_vfs_file_handle::Fifo_element &elem) {
 		Vfs::Lxip_vfs_file_handle &handle = elem.object();
 		if (handle.file) {
 			if (handle.file->poll()) {
 				/* do not notify again until some I/O queues */
-				_io_progress_waiters.remove(elem);
+				_io_progress_waiters_ptr->remove(elem);
 
 				handle.io_progress_response();
 			}
 		}
 	});
 
-	_read_ready_waiters.for_each(
+	_read_ready_waiters_ptr->for_each(
 			[&] (Vfs::Lxip_vfs_file_handle::Fifo_element &elem) {
 		Vfs::Lxip_vfs_file_handle &handle = elem.object();
 		if (handle.file) {
 			if (handle.file->poll()) {
 				/* do not notify again until notify_read_ready */
-				_read_ready_waiters.remove(elem);
+				_read_ready_waiters_ptr->remove(elem);
 
 				handle.read_ready_response();
 			}
@@ -513,7 +513,7 @@ class Vfs::Lxip_data_file final : public Vfs::Lxip_file
 
 			Lxip::ssize_t ret = _sock.ops->recvmsg(&_sock, &msg, len, MSG_DONTWAIT);
 			if (ret == -EAGAIN) {
-				handle.io_enqueue(_io_progress_waiters);
+				handle.io_enqueue(*_io_progress_waiters_ptr);
 				throw Would_block();
 			}
 			return ret;
@@ -695,6 +695,7 @@ class Vfs::Lxip_connect_file final : public Vfs::Lxip_file
 			switch (_write_err) {
 			case Lxip::Io_result::LINUX_EINPROGRESS:
 				_connecting = true;
+				_write_err = 0;
 				return len;
 
 			case Lxip::Io_result::LINUX_EALREADY:
@@ -708,6 +709,7 @@ class Vfs::Lxip_connect_file final : public Vfs::Lxip_file
 				 */
 				if (_is_connected || !_connecting) return -1;
 				_is_connected = true;
+				_write_err = 0;
 				break;
 
 			default:
@@ -843,10 +845,10 @@ class Vfs::Lxip_remote_file final : public Vfs::Lxip_file
 
 					int const res = _sock.ops->recvmsg(&_sock, &msg, 0, MSG_DONTWAIT|MSG_PEEK);
 					if (res == -EAGAIN) {
-						handle.io_enqueue(_io_progress_waiters);
+						handle.io_enqueue(*_io_progress_waiters_ptr);
 						throw Would_block();
 					}
-					if (res < 0)        return -1;
+					if (res < 0) return -1;
 				}
 				break;
 			case Lxip::Protocol_dir::TYPE_STREAM:
@@ -924,7 +926,7 @@ class Vfs::Lxip_accept_file final : public Vfs::Lxip_file
 				return Genode::strlen(dst);
 			}
 
-			handle.io_enqueue(_io_progress_waiters);
+			handle.io_enqueue(*_io_progress_waiters_ptr);
 			throw Would_block();
 		}
 };
@@ -1107,11 +1109,7 @@ class Vfs::Lxip_socket_dir final : public Lxip::Socket_dir
 
 			Vfs::file_size index = seek_offset / sizeof(Dirent);
 
-			Dirent *out = (Dirent*)dst;
-
-			out->fileno  = index+1;
-			out->type    = Directory_service::DIRENT_TYPE_END;
-			out->name[0] = '\0';
+			Dirent &out = *(Dirent*)dst;
 
 			Vfs::Node *node = nullptr;
 			for (Vfs::File *n : _files) {
@@ -1123,11 +1121,21 @@ class Vfs::Lxip_socket_dir final : public Lxip::Socket_dir
 					--index;
 				}
 			}
-			if (!node) return -1;
+			if (!node) {
+				out = {
+					.fileno = index + 1,
+					.type   = Directory_service::Dirent_type::END,
+					.rwx    = { },
+					.name   = { } };
 
-			out->type = Directory_service::DIRENT_TYPE_FILE;
+				return -1;
+			}
 
-			strncpy(out->name, node->name(), sizeof(out->name));
+			out = {
+				.fileno = index + 1,
+				.type   = Directory_service::Dirent_type::TRANSACTIONAL_FILE,
+				.rwx    = Node_rwx::rw(),
+				.name   = { node->name() } };
 
 			return sizeof(Dirent);
 		}
@@ -1435,11 +1443,7 @@ class Lxip::Protocol_dir_impl : public Protocol_dir
 
 			Vfs::file_size index = seek_offset / sizeof(Dirent);
 
-			Dirent *out = (Dirent*)dst;
-
-			out->fileno  = index+1;
-			out->type    = Vfs::Directory_service::DIRENT_TYPE_END;
-			out->name[0] = '\0';
+			Dirent &out = *(Dirent*)dst;
 
 			Vfs::Node *node = nullptr;
 			for (Vfs::Node *n : _nodes) {
@@ -1451,15 +1455,32 @@ class Lxip::Protocol_dir_impl : public Protocol_dir
 					--index;
 				}
 			}
-			if (!node) return -1;
+			if (!node) {
+				out = {
+					.fileno = index + 1,
+					.type   = Vfs::Directory_service::Dirent_type::END,
+					.rwx    = { },
+					.name   = { } };
 
-			if (dynamic_cast<Vfs::Directory*>(node))
-				out->type = Vfs::Directory_service::DIRENT_TYPE_DIRECTORY;
+				return -1;
+			}
 
-			if (dynamic_cast<Vfs::File*>(node))
-				out->type = Vfs::Directory_service::DIRENT_TYPE_FILE;
+			typedef Vfs::Directory_service::Dirent_type Dirent_type;
 
-			Genode::strncpy(out->name, node->name(), sizeof(out->name));
+			Dirent_type const type =
+				dynamic_cast<Vfs::Directory*>(node) ? Dirent_type::DIRECTORY :
+				dynamic_cast<Vfs::File     *>(node) ? Dirent_type::TRANSACTIONAL_FILE
+				                                    : Dirent_type::END;
+
+			Vfs::Node_rwx const rwx = (type == Dirent_type::DIRECTORY)
+			                        ? Vfs::Node_rwx::rwx()
+			                        : Vfs::Node_rwx::rw();
+
+			out = {
+				.fileno = index + 1,
+				.type   = type,
+				.rwx    = rwx,
+				.name   = { node->name() } };
 
 			return sizeof(Dirent);
 		}
@@ -1692,44 +1713,38 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 			if (len < sizeof(Dirent))
 				return -1;
 
-			file_size index = seek_offset / sizeof(Dirent);
+			file_size const index = seek_offset / sizeof(Dirent);
 
-			Dirent *out = (Dirent*)dst;
+			struct Entry
+			{
+				void const *fileno;
+				Dirent_type type;
+				char const *name;
+			};
 
-			if (index == 0) {
-				out->fileno  = (Genode::addr_t)&_tcp_dir;
-				out->type    = Directory_service::DIRENT_TYPE_DIRECTORY;
-				Genode::strncpy(out->name, "tcp", sizeof(out->name));
-			} else if (index == 1) {
-				out->fileno  = (Genode::addr_t)&_udp_dir;
-				out->type    = Directory_service::DIRENT_TYPE_DIRECTORY;
-				Genode::strncpy(out->name, "udp", sizeof(out->name));
-			} else if (index == 2) {
-				out->fileno  = (Genode::addr_t)&_address;
-				out->type    = Directory_service::DIRENT_TYPE_FILE;
-				Genode::strncpy(out->name, "address", sizeof(out->name));
-			} else if (index == 3) {
-				out->fileno  = (Genode::addr_t)&_netmask;
-				out->type    = Directory_service::DIRENT_TYPE_FILE;
-				Genode::strncpy(out->name, "netmask", sizeof(out->name));
-			} else if (index == 4) {
-				out->fileno  = (Genode::addr_t)&_gateway;
-				out->type    = Directory_service::DIRENT_TYPE_FILE;
-				Genode::strncpy(out->name, "gateway", sizeof(out->name));
-			} else if (index == 5) {
-				out->fileno  = (Genode::addr_t)&_nameserver;
-				out->type    = Directory_service::DIRENT_TYPE_FILE;
-				Genode::strncpy(out->name, "nameserver", sizeof(out->name));
-			} else if (index == 6) {
-				out->fileno  = (Genode::addr_t)&_link_state;
-				out->type    = Directory_service::DIRENT_TYPE_FILE;
-				Genode::strncpy(out->name, "link_state", sizeof(out->name));
-			} else {
-				out->fileno  = 0;
-				out->type    = Directory_service::DIRENT_TYPE_END;
-				out->name[0] = '\0';
-			}
+			enum { NUM_ENTRIES = 8U };
+			static Entry const entries[NUM_ENTRIES] = {
+				{ &_tcp_dir,    Dirent_type::DIRECTORY,          "tcp" },
+				{ &_udp_dir,    Dirent_type::DIRECTORY,          "udp" },
+				{ &_address,    Dirent_type::TRANSACTIONAL_FILE, "address" },
+				{ &_netmask,    Dirent_type::TRANSACTIONAL_FILE, "netmask" },
+				{ &_gateway,    Dirent_type::TRANSACTIONAL_FILE, "gateway" },
+				{ &_nameserver, Dirent_type::TRANSACTIONAL_FILE, "nameserver" },
+				{ &_link_state, Dirent_type::TRANSACTIONAL_FILE, "link_state" },
+				{ nullptr,      Dirent_type::END,                "" }
+			};
 
+			Entry const &entry = entries[min(index, NUM_ENTRIES - 1U)];
+
+			Dirent &out = *(Dirent*)dst;
+
+			out = {
+				.fileno = (Genode::addr_t)entry.fileno,
+				.type   = entry.type,
+				.rwx    = entry.type == Dirent_type::DIRECTORY
+				        ? Node_rwx::rwx() : Node_rwx::rw(),
+				.name   = { entry.name }
+			};
 			return sizeof(Dirent);
 		}
 
@@ -1746,23 +1761,27 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 
 		Stat_result stat(char const *path, Stat &out) override
 		{
-			Vfs::Node *node = _lookup(path);
+			Node *node = _lookup(path);
 			if (!node) return STAT_ERR_NO_ENTRY;
 
-			Vfs::Directory *dir = dynamic_cast<Vfs::Directory*>(node);
-			if (dir) {
-				out.mode = STAT_MODE_DIRECTORY | 0777;
+			out = { };
+
+			if (dynamic_cast<Vfs::Directory*>(node)) {
+				out.type = Node_type::DIRECTORY;
+				out.rwx  = Node_rwx::rwx();
 				return STAT_OK;
 			}
 
 			if (dynamic_cast<Lxip_file*>(node)) {
-				out.mode = STAT_MODE_FILE | 0666;
+				out.type = Node_type::TRANSACTIONAL_FILE;
+				out.rwx  = Node_rwx::rw();
 				out.size = 0;
 				return STAT_OK;
 			}
 
 			if (dynamic_cast<Vfs::File*>(node)) {
-				out.mode = STAT_MODE_FILE | 0666;
+				out.type = Node_type::TRANSACTIONAL_FILE;
+				out.rwx  = Node_rwx::rw();
 				out.size = 0x1000;  /* there may be something to read */
 				return STAT_OK;
 			}
@@ -1855,8 +1874,8 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 				dynamic_cast<Vfs::Lxip_vfs_file_handle*>(handle);
 
 			if (file_handle) {
-				_io_progress_waiters.remove(file_handle->io_progress_elem);
-				_read_ready_waiters.remove(file_handle->read_ready_elem);
+				_io_progress_waiters_ptr->remove(file_handle->io_progress_elem);
+				_read_ready_waiters_ptr->remove(file_handle->read_ready_elem);
 			}
 
 			Genode::destroy(handle->alloc(), handle);
@@ -1913,7 +1932,7 @@ class Vfs::Lxip_file_system : public Vfs::File_system,
 
 			if (handle) {
 				if (!handle->read_ready_elem.enqueued())
-					_read_ready_waiters.enqueue(handle->read_ready_elem);
+					_read_ready_waiters_ptr->enqueue(handle->read_ready_elem);
 				return true;
 			}
 
@@ -1971,6 +1990,12 @@ struct Lxip_factory : Vfs::File_system_factory
 
 extern "C" Vfs::File_system_factory *vfs_file_system_factory(void)
 {
+	static Vfs::Lxip_vfs_file_handle::Fifo io_progress_waiters;
+	static Vfs::Lxip_vfs_file_handle::Fifo read_ready_waiters;
+
+	_io_progress_waiters_ptr = &io_progress_waiters;
+	_read_ready_waiters_ptr  = &read_ready_waiters;
+
 	static Lxip_factory factory;
 	return &factory;
 }

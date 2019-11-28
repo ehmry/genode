@@ -1,6 +1,7 @@
 /*
  * \brief  poll() implementation
  * \author Josef Soentgen
+ * \author Christian Helmuth
  * \author Emery Hemingway
  * \date   2012-07-12
  */
@@ -18,74 +19,95 @@
 #include <sys/poll.h>
 
 /* internal includes */
-#include "libc_errno.h"
-#include "libc_file.h"
-#include "task.h"
+#include <internal/errno.h>
+#include <internal/file.h>
+#include <internal/init.h>
+#include <internal/suspend.h>
+
+using namespace Libc;
 
 
-extern "C" __attribute__((weak))
-int poll(struct pollfd fds[], nfds_t nfds, int timeout_ms)
+/**
+ * The poll function was taken from OpenSSH portable (bsd-poll.c) and adepted
+ * to better fit within Genode's libc.
+ *
+ * Copyright (c) 2004, 2005, 2007 Darren Tucker (dtucker at zip com au).
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+extern "C" int
+__attribute__((weak))
+poll(struct pollfd fds[], nfds_t nfds, int timeout)
 {
-	using namespace Libc;
+	nfds_t i;
+	int ret, fd, maxfd = 0;
+	fd_set readfds, writefds, exceptfds;
+	struct timeval tv, *tvp = NULL;
 
-	if (!fds || nfds == 0) return Errno(EINVAL);
-
-	struct Check : Libc::Suspend_functor
-	{
-		pollfd       *_fds;
-		nfds_t const  _nfds;
-
-		int nready { 0 };
-
-		Check(struct pollfd fds[], nfds_t nfds)
-		: _fds(fds), _nfds(nfds) { }
-
-		bool suspend() override
-		{
-			bool polling = false;
-
-			for (unsigned i = 0; i < _nfds; ++i)
-			{
-				pollfd &pfd = _fds[i];
-				File_descriptor *libc_fd = libc_fd_to_fd(pfd.fd, "poll");
-				if (!libc_fd) {
-					pfd.revents |= POLLNVAL;
-					++nready;
-					continue;
-				}
-
-				if (!libc_fd->plugin || !libc_fd->plugin->supports_poll()) {
-					Genode::warning("poll not supported for file descriptor ", pfd.fd);
-					continue;
-				}
-
-				nready += libc_fd->plugin->poll(*libc_fd, pfd);
-				polling = true;
-			}
-
-			return (polling && nready == 0);
+	for (i = 0; i < nfds; i++) {
+		fd = fds[i].fd;
+		if (fd >= (int)FD_SETSIZE) {
+			return Libc::Errno(EINVAL);
 		}
-
-	} check (fds, nfds);
-
-	check.suspend();
-
-	if (timeout_ms == 0) {
-		return check.nready;
+		maxfd = MAX(maxfd, fd);
 	}
 
-	if (timeout_ms == -1) {
-		while (check.nready == 0) {
-			Libc::suspend(check, 0);
+	/* populate event bit vectors for the events we're interested in */
+
+	FD_ZERO(&readfds);
+	FD_ZERO(&writefds);
+	FD_ZERO(&exceptfds);
+
+	for (i = 0; i < nfds; i++) {
+		fd = fds[i].fd;
+		if (fd == -1)
+			continue;
+		if (fds[i].events & (POLLIN | POLLPRI | POLLRDNORM | POLLRDBAND)) {
+			FD_SET(fd, &readfds);
+			FD_SET(fd, &exceptfds);
 		}
-	} else {
-		Genode::uint64_t remaining_ms = timeout_ms;
-		while (check.nready == 0 && remaining_ms > 0) {
-			remaining_ms = Libc::suspend(check, remaining_ms);
+		if (fds[i].events & (POLLOUT | POLLWRNORM | POLLWRBAND)) {
+			FD_SET(fd, &writefds);
+			FD_SET(fd, &exceptfds);
 		}
 	}
 
-	return check.nready;
+	/* poll timeout is msec, select is timeval (sec + usec) */
+	if (timeout >= 0) {
+		tv.tv_sec = timeout / 1000;
+		tv.tv_usec = (timeout % 1000) * 1000;
+		tvp = &tv;
+	}
+	ret = select(maxfd + 1, &readfds, &writefds, &exceptfds, tvp);
+
+	/* scan through select results and set poll() flags */
+	for (i = 0; i < nfds; i++) {
+		fd = fds[i].fd;
+		fds[i].revents = 0;
+		if (fd == -1)
+			continue;
+		if ((fds[i].events & POLLIN) && FD_ISSET(fd, &readfds)) {
+			fds[i].revents |= POLLIN;
+		}
+		if ((fds[i].events & POLLOUT) && FD_ISSET(fd, &writefds)) {
+			fds[i].revents |= POLLOUT;
+		}
+		if (FD_ISSET(fd, &exceptfds)) {
+			fds[i].revents |= POLLERR;
+		}
+	}
+
+	return ret;
 }
 
 

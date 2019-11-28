@@ -82,16 +82,6 @@ class Lx_fs::File : public Node
 			return fd;
 		}
 
-		file_size_t _length() const
-		{
-			struct stat s;
-
-			if (fstat(_fd, &s) < 0)
-				return 0;
-
-			return s.st_size;
-		}
-
 	public:
 
 		File(int         dir,
@@ -118,6 +108,17 @@ class Lx_fs::File : public Node
 			close(_fd);
 		}
 
+		void update_modification_time(Timestamp const time) override
+		{
+			struct timespec ts[2] = {
+				{ .tv_sec = (time_t)0,          .tv_nsec = 0 },
+				{ .tv_sec = (time_t)time.value, .tv_nsec = 0 }
+			};
+
+			/* silently ignore errors */
+			futimens(_fd, (const timespec*)&ts);
+		}
+
 		size_t read(char *dst, size_t len, seek_off_t seek_offset) override
 		{
 			int ret = pread(_fd, dst, len, seek_offset);
@@ -142,11 +143,22 @@ class Lx_fs::File : public Node
 
 		Status status() override
 		{
-			Status s;
-			s.inode = inode();
-			s.size = _length();
-			s.mode = File_system::Status::MODE_FILE;
-			return s;
+			struct stat st { };
+
+			if (fstat(_fd, &st) < 0) {
+				st.st_size  = 0;
+				st.st_mtime = 0;
+			}
+
+			return {
+				.size  = (file_size_t)st.st_size,
+				.type  = File_system::Node_type::CONTINUOUS_FILE,
+				.rwx   = { .readable   = (st.st_mode & S_IRUSR),
+				           .writeable  = (st.st_mode & S_IWUSR),
+				           .executable = (st.st_mode & S_IXUSR) },
+				.inode = inode(),
+				.modification_time = { st.st_mtime }
+			};
 		}
 
 		void truncate(file_size_t size) override

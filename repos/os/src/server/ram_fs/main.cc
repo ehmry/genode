@@ -51,7 +51,7 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 		Genode::Allocator                &_alloc;
 		Directory                        &_root;
 		Id_space<File_system::Node>       _open_node_registry { };
-		bool                              _writable;
+		Session_writeable           const _writeable;
 
 		Signal_handler<Session_component> _process_packet_handler;
 
@@ -81,10 +81,10 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 					if (!node.valid())
 						break; 
 					res_length = node->read((char *)tx_sink()->packet_content(packet),
-					                        length, packet.position());
+					                        length, packet.position(), _writeable);
 
 					/* read data or EOF is a success */
-					succeeded = res_length || (packet.position() >= node->status().size);
+					succeeded = res_length || (packet.position() >= node->status(_writeable).size);
 				}
 				break;
 
@@ -92,7 +92,11 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 				if (packet.length() <= packet.size()) {
 					Locked_ptr<Node> node { open_node.node() };
 					if (!node.valid())
-						break; 
+						break;
+
+					if (_writeable == Session_writeable::READ_ONLY)
+						break;
+
 					res_length = node->write((char const *)tx_sink()->packet_content(packet),
 					                         length, packet.position());
 
@@ -107,6 +111,19 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 				}
 				open_node.mark_as_written();
 				break;
+
+			case Packet_descriptor::WRITE_TIMESTAMP: {
+				Locked_ptr<Node> node { open_node.node() };
+				if (!node.valid())
+					break;
+
+				if (_writeable == Session_writeable::WRITEABLE)
+					packet.with_timestamp([&] (File_system::Timestamp const time) {
+						node->update_modification_time(time);
+						succeeded = true;
+					});
+				break;
+			}
 
 			case Packet_descriptor::CONTENT_CHANGED:
 				Genode::error("CONTENT_CHANGED packets from clients have no effect");
@@ -196,14 +213,14 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 		Session_component(size_t tx_buf_size, Genode::Entrypoint &ep,
 		                  Genode::Ram_allocator &ram, Genode::Region_map &rm,
 		                  Genode::Allocator &alloc,
-		                  Directory &root, bool writable)
+		                  Directory &root, Session_writeable writeable)
 		:
 			Session_rpc_object(ram.alloc(tx_buf_size), rm, ep.rpc_ep()),
 			_ep(ep),
 			_ram(ram),
 			_alloc(alloc),
 			_root(root),
-			_writable(writable),
+			_writeable(writeable),
 			_process_packet_handler(_ep, *this, &Session_component::_process_packets)
 		{
 			/*
@@ -219,6 +236,9 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 		 */
 		~Session_component()
 		{
+			while (_open_node_registry.apply_any<Open_node>([&] (Open_node &node) {
+				destroy(_alloc, &node); })) { }
+
 			Dataspace_capability ds = tx_sink()->dataspace();
 			_ram.free(static_cap_cast<Ram_dataspace>(ds));
 		}
@@ -241,13 +261,13 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 				if (!dir.valid())
 					throw Unavailable();
 
-				if (!_writable)
+				if (_writeable == Session_writeable::READ_ONLY)
 					if (mode != STAT_ONLY && mode != READ_ONLY)
 						throw Permission_denied();
 
 				if (create) {
 
-					if (!_writable)
+					if (_writeable == Session_writeable::READ_ONLY)
 						throw Permission_denied();
 
 					if (dir->has_sub_node_unsynchronized(name.string()))
@@ -293,7 +313,7 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 
 				if (create) {
 
-					if (!_writable)
+					if (_writeable == Session_writeable::READ_ONLY)
 						throw Permission_denied();
 
 					if (dir->has_sub_node_unsynchronized(name.string()))
@@ -336,7 +356,7 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 
 			if (create) {
 
-				if (!_writable)
+				if (_writeable == Session_writeable::READ_ONLY)
 					throw Permission_denied();
 
 				if (!path.valid_string())
@@ -412,8 +432,8 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 			auto status_fn = [&] (Open_node &open_node) {
 				Locked_ptr<Node> node { open_node.node() };
 				if (!node.valid())
-					throw Unavailable();	
-				return node->status();
+					throw Unavailable();
+				return node->status(_writeable);
 			};
 
 			try {
@@ -430,7 +450,7 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 			if (!valid_name(name.string()))
 				throw Invalid_name();
 
-			if (!_writable)
+			if (_writeable == Session_writeable::READ_ONLY)
 				throw Permission_denied();
 
 			auto unlink_fn = [&] (Open_node &open_node) {
@@ -456,7 +476,7 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 
 		void truncate(File_handle file_handle, file_size_t size) override
 		{
-			if (!_writable)
+			if (_writeable == Session_writeable::READ_ONLY)
 				throw Permission_denied();
 
 			auto truncate_fn = [&] (Open_node &open_node) {
@@ -477,7 +497,7 @@ class Ram_fs::Session_component : public File_system::Session_rpc_object
 		void move(Dir_handle from_dir_handle, Name const &from_name,
 		          Dir_handle to_dir_handle,   Name const &to_name) override
 		{
-			if (!_writable)
+			if (_writeable == Session_writeable::READ_ONLY)
 				throw Permission_denied();
 
 			if (!valid_name(from_name.string()))
@@ -630,7 +650,9 @@ class Ram_fs::Root : public Root_component<Session_component>
 			}
 			return new (md_alloc())
 				Session_component(tx_buf_size, _ep, _ram, _rm, _alloc,
-				                  *session_root_dir, writeable);
+				                  *session_root_dir,
+				                  writeable ? Session_writeable::WRITEABLE
+				                            : Session_writeable::READ_ONLY);
 		}
 
 	public:
