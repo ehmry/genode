@@ -17,5 +17,7 @@
         });
 
       defaultPackage = forAllSystems (system: self.packages."${system}".os);
+
+      hydraJobs = self.packages;
     };
 }
