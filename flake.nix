@@ -5,19 +5,16 @@
 
   inputs.nixpkgs.uri = "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode";
 
-  outputs = { self, nixpkgs }:
-    let
-      systems = [ "x86_64-genode" ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
-    in {
-      packages = forAllSystems (system:
+  outputs = { self, nixpkgs }: {
+    packages = nixpkgs.lib.forAllCrossSystems
+      ({ system, localSystem, crossSystem }:
         import ./default.nix {
-          inherit system self;
+          inherit localSystem crossSystem self;
           nixpkgs = builtins.getAttr system nixpkgs.legacyPackages;
         });
 
-      defaultPackage = forAllSystems (system: self.packages."${system}".os);
+    defaultPackage.x86_64-linux = self.packages.x86_64-linux-x86_64-genode.os;
 
-      hydraJobs = self.packages;
-    };
+    hydraJobs = self.packages;
+  };
 }

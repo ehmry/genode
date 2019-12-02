@@ -1,15 +1,15 @@
+{ localSystem ? "x86_64-linux", crossSystem ? "x86_64-genode", self ? { }, ...
+}@args:
+
 let
-  nixpkgsGit = builtins.fetchGit {
+  pinnedNixpkgs = import (builtins.fetchGit {
     url = "https://gitea.c3d2.de/ehmry/nixpkgs.git";
     ref = "genode";
-  };
-  pinnedNixpkgs = import nixpkgsGit {
-    localSystem = "x86_64-linux";
-    crossSystem = "x86_64-genode";
-  };
+  });
 
-in { system ? "x86_64-genode", self ? { }, nixpkgs ? pinnedNixpkgs }:
-let
+  nixpkgs =
+    args.nixpkgs or (pinnedNixpkgs { inherit localSystem crossSystem; });
+
   inherit (nixpkgs) stdenv buildPackages fetchgit llvmPackages;
 
   src = self.outPath or ./.;
@@ -25,15 +25,23 @@ let
   buildRepo = { repo, repoInputs }:
     let
       tupArch = with stdenv.targetPlatform;
+
         if isAarch32 then
           "arm"
-        else if isAarch64 then
+        else
+
+        if isAarch64 then
           "arm64"
-        else if isx86_32 then
+        else
+
+        if isx86_32 then
           "i386"
-        else if isx86_64 then
+        else
+
+        if isx86_64 then
           "x86_64"
         else
+
           abort "unhandled targetPlatform";
 
       toTupConfig = attrs:
