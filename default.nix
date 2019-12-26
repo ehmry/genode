@@ -10,17 +10,30 @@ let
   nixpkgs =
     args.nixpkgs or (pinnedNixpkgs { inherit localSystem crossSystem; });
 
-  inherit (nixpkgs) stdenv buildPackages fetchgit llvmPackages;
+  inherit (nixpkgs) stdenv buildPackages llvmPackages;
 
-  src = self.outPath or ./.;
+  src = self.outPath or (builtins.fetchGit ./.);
   version = self.lastModified or "unstable";
 
   inherit (stdenv) lib targetPlatform;
   specs = with targetPlatform;
-    [ ] ++ lib.optional is32bit "32bit" ++ lib.optional is64bit "64bit"
-    ++ lib.optional isAarch32 "arm" ++ lib.optional isAarch64 "arm_64"
-    ++ lib.optional isRiscV "riscv" ++ lib.optional isx86 "x86"
-    ++ lib.optional isx86_32 "x86_32" ++ lib.optional isx86_64 "x86_64";
+    [ ]
+
+    ++ lib.optional is32bit "32bit"
+
+    ++ lib.optional is64bit "64bit"
+
+    ++ lib.optional isAarch32 "arm"
+
+    ++ lib.optional isAarch64 "arm_64"
+
+    ++ lib.optional isRiscV "riscv"
+
+    ++ lib.optional isx86 "x86"
+
+    ++ lib.optional isx86_32 "x86_32"
+
+    ++ lib.optional isx86_64 "x86_64";
 
   buildRepo = { repo, repoInputs }:
     let
@@ -85,7 +98,6 @@ let
         for R in repos/*; do
           [ "$R" != "repos/$repo" ] && find $R -name Tupfile -delete
         done
-        find repos/gems -name Tupfile -delete
 
         # Scan repository and generate script
         tup init
