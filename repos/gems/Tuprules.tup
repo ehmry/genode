@@ -1,1 +1,7 @@
 REP_DIR = $(TUP_CWD)
+
+LIBS += genode-os
+
+ifndef NIX_OUTPUTS_DEV
+include ../os/Tuprules.tup
+endif

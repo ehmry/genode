@@ -1,5 +1,16 @@
-ifdef NIX_OUTPUTS_DEV
 include_rules
-SED_FLAGS += -e "s|@includedir@|@(NIX_OUTPUTS_DEV)/include/os|"
-: *.pc.in |> !sed_pkgconfig_file |>
+
+ifdef NIX_OUTPUTS_DEV
+SED_FLAGS += -e "s|@includedir@|@(NIX_OUTPUTS_DEV)/include|"
+SED_FLAGS += -e "s|@libdir@|@(NIX_OUTPUTS_DEV)/lib|"
+SED_FLAGS += -e "s|@includes@|-I\${includedir}|"
+
+else
+
+SED_FLAGS += -e "s|@includedir@||"
+SED_FLAGS += -e "s|@includes@||"
+SED_FLAGS += -e "s|@libdir@|$(DEV_DIR)/lib|"
+
 endif
+
+: foreach *.pc.in |> !sed_pkgconfig_file |>

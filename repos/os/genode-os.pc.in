@@ -1,8 +1,10 @@
 includedir=@includedir@
+libdir=@libdir@
 
 Name: os
 Description: Genode os repository
 URL: https://genode.org/
 Version: @VERSION@
 Requires: genode-base
-Cflags: -I${includedir}
+Cflags: @includes@
+Libs: -L${libdir}

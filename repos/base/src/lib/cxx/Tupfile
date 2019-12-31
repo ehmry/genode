@@ -1,32 +1,9 @@
-ifndef LIBCXX
-error LIBCXX not configured
-endif
-
-ifndef LIBCXXABI
-error LIBCXXABI not configured
-endif
-
-ifndef LIBUNWIND_BAREMETAL
-error LIBUNWIND_BAREMETAL not configured
-endif
-
-ifndef LIBUNWIND
-error LIBUNWIND not configured
-endif
-
 include_rules
 
 COMMON_FLAGS = -ffunction-sections -fno-strict-aliasing
 
 CFLAGS += $(COMMON_FLAGS)
 CXXFLAGS += $(COMMON_FLAGS)
-
-CPPFLAGS += -I@(LIBCXX)/include/c++/v1
-CPPFLAGS += -I@(LIBCXXABI)/include
-
-LLVM_LIBS += @(LIBCXXABI)/lib/libc++abi.a
-
-: foreach *.cc |> !cxx |> {obj}
 
 #
 # Prevent symbols of the gcc support libs from being discarded during 'ld -r'
@@ -75,18 +52,48 @@ LOCAL_SYMBOLS = \
 #
 # Symbols we wrap (see unwind.c)
 #
-EH_SYMBOLS = \
-	_Unwind_Complete \
-	_Unwind_DeleteException \
+EH_SYMBOLS += _Unwind_Complete
+EH_SYMBOLS += _Unwind_DeleteException
+EH_SYMBOLS += _Unwind_Resume
 
 #
 # Additional functions for ARM
 #
-EH_SYMBOLS += \
-	__aeabi_unwind_cpp_pr0 \
-	__aeabi_unwind_cpp_pr1 \
+EH_SYMBOLS += __aeabi_unwind_cpp_pr0
+EH_SYMBOLS += __aeabi_unwind_cpp_pr1
+
+ifdef IS_LLVM
+
+ifndef LIBCXX
+error LIBCXX not configured
+endif
+
+ifndef LIBCXXABI
+error LIBCXXABI not configured
+endif
+
+ifndef LIBUNWIND_BAREMETAL
+error LIBUNWIND_BAREMETAL not configured
+endif
+
+ifndef LIBUNWIND
+error LIBUNWIND not configured
+endif
+
+CPPFLAGS += -I@(LIBCXX)/include/c++/v1
+CPPFLAGS += -I@(LIBCXXABI)/include
+
+LLVM_LIBS += @(LIBCXXABI)/lib/libc++abi.a
+
+endif
+
+: foreach *.cc |> !cxx |> {obj}
 
 REDEF_SYMBOLS = `echo $(EH_SYMBOLS) | awk -v RS=' ' '{ print "--redefine-sym "$1"=_cxx_"$1 }'`
+
+: foreach *.c |> !cc |>
+
+ifdef IS_LLVM
 
 : {obj} |> \
 	$(LD) $(LD_MARCH) $(KEEP_SYMBOLS) -r %f $(LLVM_LIBS) @(LIBUNWIND)/lib/libunwind.a -o %o |> supc++.tmp
@@ -94,14 +101,27 @@ REDEF_SYMBOLS = `echo $(EH_SYMBOLS) | awk -v RS=' ' '{ print "--redefine-sym "$1
 : {obj} |> \
 	$(LD) $(LD_MARCH) $(KEEP_SYMBOLS) -r %f $(LLVM_LIBS) @(LIBUNWIND_BAREMETAL)/lib/libunwind.a -o %o |> supc++-baremetal.tmp
 
-: foreach *.c |> !cc |> {obj}
+: supc++.tmp |> @(OBJCOPY) $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++.o
+: supc++-baremetal.tmp |> @(OBJCOPY) $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++-baremetal.o
 
-export OBJCOPY
-: supc++.tmp |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++.o
-: supc++-baremetal.tmp |> $OBJCOPY $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++-baremetal.o
-
-#
 : supc++.o |> !ar |> cxx.a {bin}
 : supc++-baremetal.o |> !ar |> cxx-baremetal.a {bin}
 : foreach {bin} |> !collect_static |>
 : |> !emit_lib_pkg_config |>
+
+endif
+
+ifdef IS_GCC
+
+LIBCXX_GCC += `$(CXX) $(CC_MARCH) -print-file-name=libsupc++.a`
+LIBCXX_GCC += `$(CXX) $(CC_MARCH) -print-file-name=libgcc_eh.a`
+
+: {obj} |> $(LD) $(LD_MARCH) $(KEEP_SYMBOLS) -r %f $(LIBCXX_GCC) -o %o |> supc++.tmp
+
+: supc++.tmp |> @(OBJCOPY) $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++.o
+
+: supc++.o unwind.o |> !ar |> | $(BASE_DIR)/<cxx> {bin}
+: foreach {bin} |> !collect_static |>
+: |> !emit_lib_pkg_config |>
+
+endif

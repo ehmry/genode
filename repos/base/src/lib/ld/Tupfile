@@ -1,3 +1,21 @@
 include_rules
-: $(REP_DIR)/lib/symbols/ld |> !abi_stub |>
+
+SED_EXPR += -e "s/^\(\w\+\) D \(\w\+\)\$/.data; .global \1; .type \1,%object; .size \1,\2; \1: .skip 1/"
+SED_EXPR += -e "s/^\(\w\+\) V/.data; .weak \1; .type \1,%object; \1: .skip 1/"
+SED_EXPR += -e "s/^\(\w\+\) T/.text; .global \1; .type \1,%function; \1:/"
+SED_EXPR += -e "s/^\(\w\+\) R \(\w\+\)\$/.section .rodata; .global \1; .type \1,%object; .size \1,\2; \1:/"
+SED_EXPR += -e "s/^\(\w\+\) W/.text; .weak \1; .type \1,%function; \1:/"
+SED_EXPR += -e "s/^\(\w\+\) B \(\w\+\)\$/.bss; .global \1; .type \1,%object; .size \1,\2; \1:/"
+SED_EXPR += -e "s/^\(\w\+\) U/.text; .global \1; movq \1@GOTPCREL(%rip), %rax/"
+
+: |> sed $(SED_EXPR) < $(REP_DIR)/lib/symbols/%d > %o |> %d.symbols.s {asm}
+: foreach {asm} |> !cc |> %d.symbols.o {obj}
+
+LDFLAGS += -shared --eh-frame-hdr
+LDFLAGS += -z max-page-size=0x1000
+LDFLAGS += -T$(BASE_DIR)/src/lib/ldso/linker.ld
+LDFLAGS += -T$(BASE_DIR)/src/ld/genode_rel.ld
+
+: {obj} |> !ld |> $(DEV_LIB_DIR)/%d.lib.so $(DEV_DIR)/<lib>
+
 : foreach *.pc.in |> !sed_pkgconfig_file |>

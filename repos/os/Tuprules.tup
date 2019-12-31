@@ -17,3 +17,5 @@ endif
 CPPFLAGS += -I$(REP_DIR)/include
 
 CXXFLAGS += -std=gnu++17
+
+LIBS += genode-base

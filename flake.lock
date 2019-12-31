@@ -2,9 +2,9 @@
     "inputs": {
         "nixpkgs": {
             "inputs": {},
-            "narHash": "sha256-/9hMb9pgV8awDYYchUueplyKF6bz23b7z5gqQ999nro=",
+            "narHash": "sha256-EqxCk6ORqq4fkewWttpvks0VycBec9X9spAZ+Pq/CEI=",
             "originalUrl": "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode",
-            "url": "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode&rev=d63ee96d86672a9cb23d83d50ee02687eded2818"
+            "url": "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode&rev=cf50f3b8bdc28832249afab6bca68acad832e011"
         }
     },
     "version": 3

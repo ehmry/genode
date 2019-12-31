@@ -30,8 +30,6 @@ GENERIC_SRC_CC += \
 	$(GENERIC_DIR)/thread_myself.cc \
 	$(GENERIC_DIR)/trace.cc \
 
-#CXXFLAGS += -mllvm -opt-bisect-limit=1
-
 : foreach $(GENERIC_SRC_CC) |> !cxx |> {obj}
 : foreach *.cc |> !cxx |> {obj}
-: {obj} |> !ar |> | $(REP_DIR)/<base-common>
+: {obj} |> !ar |> base-linux-common.lib.a | $(REP_DIR)/<base-common>

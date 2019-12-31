@@ -1,21 +1,33 @@
-{ localSystem ? "x86_64-linux", crossSystem ? "x86_64-genode", self ? { }, ...
-}@args:
-
 let
   pinnedNixpkgs = import (builtins.fetchGit {
     url = "https://gitea.c3d2.de/ehmry/nixpkgs.git";
     ref = "genode";
   });
+in { localSystem ? "x86_64-linux", crossSystem ? "x86_64-genode"
+, nixpkgs ? pinnedNixpkgs, self ? { } }:
 
-  nixpkgs =
-    args.nixpkgs or (pinnedNixpkgs { inherit localSystem crossSystem; });
+let
+  nixpkgs' = if builtins.isAttrs nixpkgs then
+    nixpkgs
+  else
+    nixpkgs { inherit localSystem crossSystem; };
 
-  inherit (nixpkgs) stdenv buildPackages llvmPackages;
+  inherit (nixpkgs') buildPackages llvmPackages;
+
+  sourceForgeToolchain = nixpkgs'.buildPackages.callPackage ./toolchain.nix { };
+
+  stdenvLlvm = let inherit (nixpkgs') stdenv;
+  in assert stdenv.cc.isClang; stdenv;
+
+  stdenvGcc = let
+    env =
+      nixpkgs'.stdenvAdapters.overrideCC nixpkgs'.stdenv sourceForgeToolchain;
+  in assert env.cc.isGNU; env;
 
   src = self.outPath or (builtins.fetchGit ./.);
   version = self.lastModified or "unstable";
 
-  inherit (stdenv) lib targetPlatform;
+  inherit (stdenvLlvm) lib targetPlatform;
   specs = with targetPlatform;
     [ ]
 
@@ -35,9 +47,9 @@ let
 
     ++ lib.optional isx86_64 "x86_64";
 
-  buildRepo = { repo, repoInputs }:
+  toTupConfig = env: attrs:
     let
-      tupArch = with stdenv.targetPlatform;
+      tupArch = with env.targetPlatform;
 
         if isAarch32 then
           "arm"
@@ -57,17 +69,95 @@ let
 
           abort "unhandled targetPlatform";
 
-      toTupConfig = attrs:
-        with builtins;
-        let op = config: name: "${config}CONFIG_${name}=${getAttr name attrs} ";
-        in foldl' op "" (attrNames attrs);
+      attrs' = with env; { TUP_ARCH = tupArch; } // attrs;
 
-    in stdenv.mkDerivation {
-      name = "genode-${repo}-${version}";
-      outputs = [ "out" "dev" ];
+    in with builtins;
+    env.mkDerivation {
+      name = "tup.config";
+      nativeBuildInputs = with nixpkgs'.buildPackages; [
+        binutils
+        pkgconfig
+        which
+      ];
+      text = let
+        op = config: name: ''
+          ${config}CONFIG_${name}=${getAttr name attrs}
+        '';
+      in foldl' op "" (attrNames attrs);
+      passAsFile = [ "text" ];
+      preferLocalBuild = true;
+      buildCommand = let
+        subst = let
+          vars = [ "AR" "NM" ];
+          f = other: var:
+            other + ''
+              echo CONFIG_${var}=`which ''$${var}` >> $out
+            '';
+        in foldl' f "" vars;
+        utils = let
+          vars = [ "pkg-config" "objcopy" ];
+          f = other: var:
+            other + ''
+              echo CONFIG_${var}=`which ${var}` >> $out
+            '';
+        in foldl' f "" vars;
+      in ''
+        cp $textPath $out
+        ${subst}
+        ${utils}
+      '';
+    };
+
+  tupConfigGcc = let
+    f = env:
+      let prefix = bin: env.cc.targetPrefix + bin;
+      in {
+        CC = prefix "gcc";
+        CXX = prefix "g++";
+        LD = prefix "ld";
+        OBJCOPY = prefix "objcopy";
+        RANLIB = prefix "ranlib";
+        READELF = prefix "readelf";
+        STRIP = prefix "strip";
+        PKGCONFIG = "${nixpkgs'.buildPackages.pkgconfig}/bin/pkg-config";
+
+        IS_GCC = "";
+        LINUX_HEADERS = buildPackages.glibc.dev;
+        VERSION = version;
+      };
+  in toTupConfig stdenvGcc (f stdenvGcc);
+
+  tupConfigLlvm = let
+    f = env:
+      let prefix = bin: "${env.cc}/bin/${env.cc.targetPrefix}${bin}";
+      in {
+        CC = prefix "cc";
+        CXX = prefix "c++";
+        LD = prefix "ld";
+        OBJCOPY = prefix "objcopy";
+        OBJDUMP = prefix "objdump";
+        RANLIB = prefix "ranlib";
+        READELF = prefix "readelf";
+        STRIP = prefix "strip";
+        PKGCONFIG = "${nixpkgs'.buildPackages.pkgconfig}/bin/pkg-config";
+
+        IS_LLVM = "";
+        LIBCXXABI = llvmPackages.libcxxabi;
+        LIBCXX = llvmPackages.libcxx;
+        LIBUNWIND_BAREMETAL =
+          llvmPackages.libunwind.override { isBaremetal = true; };
+        LIBUNWIND = llvmPackages.libunwind;
+        LINUX_HEADERS = buildPackages.glibc.dev;
+        VERSION = version;
+      };
+  in toTupConfig stdenvLlvm (f stdenvLlvm);
+
+  buildRepo = { env, repo, repoInputs }:
+    let
+
+    in env.mkDerivation {
+      pname = "genode-" + repo;
       inherit src repo specs version;
-
-      setupHook = ./setup-hooks.sh;
 
       nativeBuildInputs = repoInputs;
       # This is wrong, why does pkg-config not collect buildInputs?
@@ -76,23 +166,19 @@ let
 
       depsBuildBuild = with buildPackages; [ llvm pkgconfig tup ];
 
-      tupConfig = toTupConfig {
-        LIBCXX = llvmPackages.libcxx;
-        LIBCXXABI = llvmPackages.libcxxabi;
-        LIBUNWIND = llvmPackages.libunwind;
-        LIBUNWIND_BAREMETAL =
-          llvmPackages.libunwind.override { isBaremetal = true; };
-        LINUX_HEADERS = buildPackages.glibc.dev;
-        OLEVEL = "-O2";
-        TUP_ARCH = tupArch;
-        VERSION = version;
-      };
+      tupConfig = if env.cc.isGNU then
+        tupConfigGcc
+      else if env.cc.isClang then
+        tupConfigLlvm
+      else
+        throw "no Tup config for this stdenv";
 
       configurePhase = ''
         # Configure Tup
-        echo $tupConfig | tr ' CONFIG_' '\nCONFIG_' > tup.config
+        set -v
+        install -m666 $tupConfig tup.config
         echo CONFIG_NIX_OUTPUTS_OUT=$out >> tup.config
-        echo CONFIG_NIX_OUTPUTS_DEV=$dev >> tup.config
+        echo CONFIG_NIX_OUTPUTS_DEV=$out >> tup.config
 
         # Disable other repos
         for R in repos/*; do
@@ -104,13 +190,13 @@ let
         tup generate buildPhase.sh
 
         # Redirect artifacts to Nix store
-        mkdir -p $out/lib $dev/include
+        mkdir -p $out/lib $out/include
         ln -s $out out
-        ln -s $dev dev
+        ln -s $out dev
       '';
 
       buildPhase = ''
-        test -d repos/$repo/src/ld && cp -rv repos/$repo/src/ld $dev/
+        test -d repos/$repo/src/ld && cp -rv repos/$repo/src/ld $out/
         pushd .
         set -v
         source buildPhase.sh
@@ -124,22 +210,22 @@ let
           for DIR in repos/$repo/include; do
             for SPEC in $specs; do
               if [ -d $DIR/spec/$SPEC ]; then
-                cp -r $DIR/spec/$SPEC/* $dev/include
+                cp -r $DIR/spec/$SPEC/* $out/include
                 rm -r $DIR/spec/$SPEC
               fi
             done
             rm -rf $DIR/spec
-            cp -r $DIR $dev/
+            cp -r $DIR $out/
           done
         fi
 
-        touch $dev/.genode
-        for pc in $dev/lib/pkgconfig/*.pc; do
-          sed -e "s|^Libs: |Libs: -L$dev/lib |" -i $pc
+        touch $out/.genode
+        for pc in $out/lib/pkgconfig/*.pc; do
+          sed -e "s|^Libs: |Libs: -L$out/lib |" -i $pc
         done
       '';
 
-      meta = with stdenv.lib; {
+      meta = with env.lib; {
         description =
           "The Genode operation system framework (${repo} repository).";
         homepage = "https://genode.org/";
@@ -147,41 +233,44 @@ let
         maintainers = [ maintainers.ehmry ];
       };
 
-      shellHook = ''
-        export PROMPT_DIRTRIM=2
-        export PS1="\[\033[1;30m\]Genode-dev [\[\033[1;37m\]\w\[\033[1;30m\]] $\[\033[0m\] "
-        export PS2="\[\033[1;30m\]>\[\033[0m\] "
-        if [ -e "configs/.gitignore" ]; then
-          local CFG=configs/${targetPlatform.config}.config
-          echo $tupConfig | tr ' CONFIG_' '\nCONFIG_' > $CFG
-          tup variant $CFG
-        fi
-      '';
     };
 
+  buildRepo' = { ... }@args: buildRepo ({ env = stdenvGcc; } // args);
+
+  #builtins.throw "create the tup config file in the stdenv environment, replacing CC/CXX with environmental variables"
+
 in rec {
-  base = buildRepo {
-    repo = "base";
-    repoInputs = [ ];
+  packages = rec {
+    base = buildRepo' {
+      repo = "base";
+      repoInputs = [ ];
+    };
+
+    base-linux = buildRepo' {
+      repo = "base-linux";
+      repoInputs = [ base ];
+    };
+
+    base-nova = buildRepo' {
+      repo = "base-nova";
+      repoInputs = [ base ];
+    };
+
+    os = buildRepo' {
+      repo = "os";
+      repoInputs = [ base ];
+    };
+
+    gems = buildRepo' {
+      repo = "gems";
+      repoInputs = [ base os ];
+    };
+
+    inherit stdenvGcc stdenvLlvm tupConfigGcc tupConfigLlvm;
+
   };
 
-  base-linux = buildRepo {
-    repo = "base-linux";
-    repoInputs = [ base ];
-  };
+  defaultPackage = packages.base-linux;
+  devShell = packages.base;
 
-  base-nova = buildRepo {
-    repo = "base-nova";
-    repoInputs = [ base ];
-  };
-
-  os = buildRepo {
-    repo = "os";
-    repoInputs = [ base ];
-  };
-
-  gems = buildRepo {
-    repo = "gems";
-    repoInputs = [ os ];
-  };
 }

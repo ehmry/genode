@@ -3,17 +3,16 @@
 
   description = "Genode system flake";
 
-  inputs.nixpkgs.uri = "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode";
+  inputs.nixpkgs.uri =
+    "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode";
 
   outputs = { self, nixpkgs }:
     let
-      mkOutput = { system, localSystem, crossSystem }: rec {
-        packages = import ./default.nix {
+      mkOutput = { system, localSystem, crossSystem }:
+        import ./default.nix {
           inherit localSystem crossSystem self;
           nixpkgs = builtins.getAttr system nixpkgs.legacyPackages;
         };
-        defaultPackage = packages.base-linux;
-      };
 
       localSystems = [ "x86_64-linux" ];
       crossSystems = [ "x86_64-genode" ];

@@ -6,6 +6,10 @@ ifeq (@(TUP_ARCH),x86_64)
 	CPPFLAGS += -I$(TUP_CWD)/include/spec/64bit
 endif
 
+ifdef IS_GCC
+CXXFLAGS += -Wno-attributes
+endif
+
 CPPFLAGS += -I$(TUP_CWD)/include
 
 include &(BASE_DIR)/Tuprules.tup

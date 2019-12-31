@@ -1,0 +1,40 @@
+TOOLCHAIN_CONFIGURED=$(TOOLCHAIN_CONFIGURED)X
+
+ifeq (@(TUP_ARCH),i386)
+CC_MARCH = -march=i686 -m32
+LD_MARCH = -melf_i386
+AS_MARCH = -march=i686 --32
+endif
+
+ifeq (@(TUP_ARCH),x86_64)
+CC_MARCH = -m64 -mcmodel=large
+LD_MARCH = -melf_x86_64
+endif
+
+ifeq (@(TUP_ARCH),arm_v8)
+CC_MARCH = -march=armv8-a
+endif
+
+ifdef CXXFLAGS
+CXXFLAGS = @(CXXFLAGS)
+endif
+
+CXXFLAGS += -Wno-undefined-bool-conversion -Wno-unknown-attributes -Wsystem-headers -Werror -Wno-uninitialized -Wno-mismatched-tags
+
+LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
+
+!ir = | $(DEV_DIR)/<pkg-config> |> clang $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(CPPFLAGS) -S -emit-llvm %f |> %B.ll
+
+!asm = |> ^ CC %b^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) -D__ASSEMBLY__ $(CPPFLAGS) -c %f -o %o |> %B.o
+
+!cc = | $(DEV_DIR)/<pkg-config> |> ^o CC %f^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS) $(LIBS_CFLAGS)` -c -fPIC %f -o %o |> %B.o
+
+!cxx = | $(DEV_DIR)/<pkg-config> |> ^o CXX %b^ @(CC_WRAPPER) $(CXX) $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS)` -c -fPIC %f -o %o |> %B.o
+
+!ld = | $(DEV_DIR)/<lib> $(DEV_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LDFLAGS) `$(PKG_CONFIG) --libs $(LIBS)` --whole-archive --start-group %f --no-whole-archive --end-group -o %o |>
+
+!incbin = |> ^ incbin %f^ \
+	export SYM=_binary_`echo %f | sed 's/\./_/g'`; \
+	echo ".global ${SYM}_start, ${SYM}_end; .data; .align 4; ${SYM}_start:; .incbin \"%f\"; ${SYM}_end:" \
+		| llvm-mc -filetype=obj - > %o \
+|> binary_%b.o

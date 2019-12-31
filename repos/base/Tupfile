@@ -3,12 +3,23 @@ include_rules
 ifdef NIX_OUTPUTS_DEV
 SED_FLAGS += -e "s|@includedir@|@(NIX_OUTPUTS_DEV)/include|"
 SED_FLAGS += -e "s|@lddir@|@(NIX_OUTPUTS_DEV)/ld|"
-else
-SED_FLAGS += -e "s|@includedir@|`nix-store --add $(REP_DIR)/include`|"
-SED_FLAGS += -e "s|@lddir@|`nix-store --add $(REP_DIR)/src/ld`|"
+
+ifeq (@(TUP_ARCH),i386)
+SED_FLAGS += -e "s|@includes@|-I\${includedir}/spec/x86_32 -I\${includedir}/spec/x86 -I\${includedir}/spec/32bit -I\${includedir}|"
 endif
 
-SED_FLAGS += -e "s|@toolchainincludedir@|`$(CC) $(CC_MARCH) -print-file-name=include`|"
+ifeq (@(TUP_ARCH),x86_64)
+SED_FLAGS += -e "s|@includes@|-I\${includedir}/spec/x86_64 -I\${includedir}/spec/x86 -I\${includedir}/spec/64bit -I\${includedir}|"
+endif
+
+else
+
+SED_FLAGS += -e "s|@includes@||"
+SED_FLAGS += -e "s|@includedir@|`nix-store --add $(REP_DIR)/include`|"
+SED_FLAGS += -e "s|@lddir@|`nix-store --add $(REP_DIR)/src/ld`|"
+
+endif
+
 SED_FLAGS += -e "s|@libgcc@||"
 
 SED_FLAGS += -e "s|@cc@|$(CC)|"

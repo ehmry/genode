@@ -1,4 +1,5 @@
 Name: VFS
 Description: Genode Virtual File-System library
 Version: @VERSION@
+Requires: genode-os
 Libs: -l:vfs.lib.so

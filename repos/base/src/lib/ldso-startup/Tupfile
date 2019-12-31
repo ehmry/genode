@@ -2,6 +2,6 @@ LIBS += base
 include_rules
 
 : foreach startup.cc |> !cxx |> %B.o {obj}
-: {obj} |  |> !ar |> {bin}
+: {obj} |> !ar |> | $(BASE_DIR)/<ldso-startup> {bin}
 : foreach {bin} |> !collect_static |>
 : |> !emit_lib_pkg_config |>

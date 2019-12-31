@@ -1,30 +1,10 @@
 REP_DIR = $(TUP_CWD)
 
-ifeq (@(TUP_ARCH),i386)
-CPPFLAGS += -I$(BASE_DIR)/include/spec/x86_32
-CPPFLAGS += -I$(BASE_DIR)/include/spec/x86
-CPPFLAGS += -I$(BASE_DIR)/include/spec/32bit
-endif
-
-ifeq (@(TUP_ARCH),x86_64)
-CPPFLAGS += -I$(BASE_DIR)/include/spec/x86_64
-CPPFLAGS += -I$(BASE_DIR)/include/spec/x86
-CPPFLAGS += -I$(BASE_DIR)/include/spec/64bit
-endif
-
-ifeq (@(TUP_ARCH),arm64)
-CPPFLAGS += -I$(BASE_DIR)/include/spec/arm_64
-CPPFLAGS += -I$(BASE_DIR)/include/spec/64bit
-endif
-
-CPPFLAGS += -I$(BASE_DIR)/include
-
 # Override base macros to bypass pkg-config
 
 CXXFLAGS += \
 	-ffunction-sections \
 	-fno-strict-aliasing \
-	-nostdinc \
 	-Wall \
 	-std=gnu++17 \
 
@@ -44,5 +24,4 @@ GCC_INCLUDE = -I`$(CC) -print-file-name=include`
 	-c %f -o %o \
 |> %B.o
 
-!ld = |> ^ MERGE %o^ $(LD) \
-	$(LDFLAGS) --whole-archive --start-group %f --end-group --no-whole-archive -o %o |>
+!ld = |> ^ MERGE %o^ $(LD) -o %o $(LDFLAGS) %f |>

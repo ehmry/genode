@@ -41,7 +41,7 @@ LDFLAGS += -Ttext=0x01000000
 LDFLAGS += -T$(BASE_DIR)/src/ld/genode.ld
 LDFLAGS += -T$(REP_DIR)/src/ld/stack_area.ld
 
-LDFLAGS += -L$(DEV_LIB_DIR)  `$(PKG_CONFIG) --libs cxx-baremetal`
+PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs cxx`
 
 : {obj} | \
 	$(DEV_DIR)/<lib> \
@@ -49,7 +49,7 @@ LDFLAGS += -L$(DEV_LIB_DIR)  `$(PKG_CONFIG) --libs cxx-baremetal`
 	$(REP_DIR)/<base-common> \
 	$(REP_DIR)/<startup> \
 	$(REP_DIR)/<syscall> \
-|> !ld %<base-common> %<startup> %<syscall> \
+|> $(LD) -o %o $(LD_MARCH) $(LDFLAGS) --start-group %f %<base-common> %<startup> %<syscall> $(PKG_LIBS) -end-group $(LIBGCC) \
 |> core-linux $(REP_DIR)/<core> {bin}
 
 : {bin} |> !collect_bin |>

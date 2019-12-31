@@ -1,44 +1,50 @@
 .gitignore
 
+AR = @(AR)
+AS = @(AS)
+CC = @(CC)
+CXX = @(CXX)
+LD= @(LD)
+OBJCOPY = @(OBJCOPY)
+STRIP = @(STRIP)
+
 OUT_DIR=$(TUP_CWD)/out
 DEV_DIR = $(TUP_CWD)/dev
 DEV_LIB_DIR = $(DEV_DIR)/lib
 
+ifdef IS_GCC
+include tup-genode/gcc.tup
+endif
+
+ifdef IS_LLVM
+include tup-genode/llvm.tup
+endif
+
+ifeq ($(TOOLCHAIN_CONFIGURED),)
+error no toolchain configuration is active
+endif
+
+ifneq ($(TOOLCHAIN_CONFIGURED),X)
+error "multiple toolchain configurations are active "
+endif
 
 ifeq (@(TUP_ARCH),i386)
 X86 = y
-CC_MARCH = -march=i686 -m32
-LD_MARCH = -melf_i386
-AS_MARCH = -march=i686 --32
 endif
 
 ifeq (@(TUP_ARCH),x86_64)
 X86 = y
-TOOL_CHAIN_PREFIX=genode-x86-
-CC_MARCH = -m64 -mcmodel=large
-LD_MARCH = -melf_x86_64
-endif
-
-ifeq (@(TUP_ARCH),arm_v8)
-CC_MARCH = -march=armv8-a
 endif
 
 GENODE_DIR = $(TUP_CWD)
 
 !prg = | $(DEV_DIR)/<lib> $(DEV_DIR)/<pkg-config> \
-|> ^o LD %o^ \
-	$(LD) $(LD_MARCH) $(LDFLAGS) \
-	-L$(DEV_LIB_DIR) \
-	`$(PKG_CONFIG) --libs $(LIBS) genode-prg` \
-	%f \
-	$(LIBGCC) \
-	-o %o \
-|> %d
+|> ^o LD %o^ $(LD) -o %o $(LD_MARCH) $(LDFLAGS) -L$(DEV_LIB_DIR) %f `$(PKG_CONFIG) --libs $(LIBS) genode-prg` $(LIBGCC) |> %d
 
 !lib = | $(DEV_DIR)/<lib> $(DEV_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LD_MARCH) %f $(LDFLAGS) `$(PKG_CONFIG) --libs genode-lib $(LIBS)` -L$(DEV_LIB_DIR) -o %o |> %d.lib.so
 
 !collect_bin = |> ^ COLLECT %b^ \
-	$STRIP -o %o %f \
+	$(STRIP) -o %o %f \
 |> $(OUT_DIR)/bin/%b $(OUT_DIR)/<bin>
 
 !collect_shared = |> ^ COLLECT %b^ \
@@ -50,26 +56,14 @@ GENODE_DIR = $(TUP_CWD)
 |> $(DEV_LIB_DIR)/%b \
 	$(DEV_DIR)/<lib> \
 
-export CC
-export CXX
-export LD
-
-CC = $CC
-CXX = $CXX
-LD= $LD
-OBJCOPY = $OBJCOPY
-
-ifdef CXXFLAGS
-CXXFLAGS = @(CXXFLAGS)
-endif
-
-CXXFLAGS += -Wno-undefined-bool-conversion -Wno-unknown-attributes -Wsystem-headers -Werror -Wno-uninitialized -Wno-mismatched-tags
-
-LIBGCC = `$(CC) $(CC_MARCH) -print-libgcc-file-name`
-
-export PKG_CONFIG_PATH
 PKG_CONFIG_DIR = $(DEV_DIR)/lib/pkgconfig
-PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR):$PKG_CONFIG_PATH pkg-config
+
+ifdef NIX_OUTPUTS_DEV
+export PKG_CONFIG_PATH
+PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR):$PKG_CONFIG_PATH @(PKGCONFIG)
+else
+PKG_CONFIG = PKG_CONFIG_PATH=$(PKG_CONFIG_DIR) @(PKGCONFIG)
+endif
 
 CFLAGS += -g
 CXXFLAGS += -g
@@ -80,29 +74,11 @@ else
 OLEVEL = -O2
 endif
 
-!ir = | $(DEV_DIR)/<pkg-config> |> clang $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) `$(PKG_CONFIG) --cflags $(LIBS)` $(CPPFLAGS) -S -emit-llvm %f |> %B.ll
-
-!asm = |> ^ CC %b^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) -D__ASSEMBLY__ $(CPPFLAGS) -c %f -o %o |> %B.o
-
-!cc = | $(DEV_DIR)/<pkg-config> |> ^o CC %f^ @(CC_WRAPPER) $(CC) $(OLEVEL) $(CFLAGS) $(CFLAGS_%e) $(CFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS) $(LIBS_CFLAGS)` -c -fPIC %f -o %o |> %B.o
-
-!cxx = | $(DEV_DIR)/<pkg-config> |> ^o CXX %b^ @(CC_WRAPPER) $(CXX) $(OLEVEL) $(CXXFLAGS) $(CXXFLAGS_%e) $(CXXFLAGS_%f) $(CPPFLAGS) `$(PKG_CONFIG) --cflags $(LIBS)` -c -fPIC %f -o %o |> %B.o
-
-!ld = | $(DEV_DIR)/<lib> $(DEV_DIR)/<pkg-config> |> ^o LD %o^ $(LD) $(LDFLAGS) `$(PKG_CONFIG) --libs $(LIBS)` --whole-archive --start-group %f --no-whole-archive --end-group -o %o |>
-
-export STRIP
-!strip = |> $STRIP -o %o %f |>
+!strip = |> $(STRIP) -o %o %f |>
 
 !ln = |> ln -s %f %o |>
 
-!incbin = |> ^ incbin %f^ \
-	export SYM=_binary_`echo %f | sed 's/\./_/g'`; \
-	echo ".global ${SYM}_start, ${SYM}_end; .data; .align 4; ${SYM}_start:; .incbin \"%f\"; ${SYM}_end:" \
-		| llvm-mc -filetype=obj - > %o \
-|> binary_%b.o
-
-export AR
-!ar = |> $AR -rcs %o %f |> %d.a
+!ar = |> $(AR) -rcs %o %f |> %d.a
 
 GIT_VERSION = `git describe || echo @(VERSION)`
 
@@ -110,12 +86,12 @@ SED_PKGCONFIG_FLAGS += -e "s|@VERSION@|$(GIT_VERSION)|"
 
 !sed_pkgconfig_file = |> ^o SED %B^ \
 	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) < %f > %o; \
-	pkg-config --validate %o; \
+	$(PKG_CONFIG) --validate %o; \
 |> $(PKG_CONFIG_DIR)/%B $(DEV_DIR)/<pkg-config>
 
 !sed_pkgconfig_flags = |> ^o SED %d.pc^ \
 	sed $(SED_PKGCONFIG_FLAGS) $(SED_FLAGS) > %o; \
-	pkg-config --validate %o; \
+	$(PKG_CONFIG) --validate %o; \
 |> $(PKG_CONFIG_DIR)/%d.pc $(DEV_DIR)/<pkg-config>
 
 !emit_lib_pkg_config = |> ^ emit %d.a pkg-config^ \
@@ -123,5 +99,5 @@ SED_PKGCONFIG_FLAGS += -e "s|@VERSION@|$(GIT_VERSION)|"
 	echo Description: Genode %d library >> %o; \
 	echo Version: $(GIT_VERSION) >> %o; \
 	echo Libs: -l:%d.a >> %o; \
-	pkg-config --validate %o; \
+	$(PKG_CONFIG) --validate %o; \
 |> $(PKG_CONFIG_DIR)/%d.pc $(DEV_DIR)/<pkg-config>

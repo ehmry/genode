@@ -1,5 +1,7 @@
 include_rules
 
+LIBS += ldso-startup
+
 : $(REP_DIR)/lib/symbols/vfs |> !abi_stub |>
 
 : vfs.pc.in |> !sed_pkgconfig_file |>

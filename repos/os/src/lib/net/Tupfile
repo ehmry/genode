@@ -1,5 +1,7 @@
 include_rules
 
+LIBS += genode-base
+
 : foreach *.cc |> !cxx |> {obj}
 : {obj} |> !ar |> {bin}
 : {bin} |> !collect_static |>

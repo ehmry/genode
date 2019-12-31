@@ -9,4 +9,4 @@ Name: base
 Description: Genode base repository
 URL: https://genode.org/
 Version: @VERSION@
-Cflags: -I${includedir} -I@toolchainincludedir@
+Cflags: @includes@
