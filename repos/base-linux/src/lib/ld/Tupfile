@@ -34,22 +34,15 @@ LDFLAGS += --entry=_start_initial_stack
 
 BASE_LIBS += $(REP_DIR)/src/lib/base/base-linux.lib.a
 
+PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs alarm cxx ldso-startup timeout`
+
 : $(BASE_LIBS) {obj} | \
 	symbol.map \
 	$(DEV_DIR)/<lib> \
 	$(DEV_DIR)/<pkg-config> \
-	$(BASE_DIR)/<alarm> \
 	$(REP_DIR)/<base-common> \
-	$(BASE_DIR)/<cxx> \
-	$(BASE_DIR)/<ldso-startup> \
 	$(REP_DIR)/<startup> \
 	$(REP_DIR)/<syscall> \
-	$(BASE_DIR)/<timeout> \
-|> \
-	$(LD) -o %o $(LD_MARCH) $(LDFLAGS) --whole-archive --start-group \
-	%<alarm> %<base-common> %<cxx> %<ldso-startup> %<startup> %<syscall> %<timeout> \
-	%f --end-group --no-whole-archive  $(LIBGCC); \
-	printf "\x02" | dd of=%o bs=1 seek=16 count=1 conv=notrunc; \
-|> ld-linux.lib.so $(REP_DIR)/<ld> {bin}
+|> $(LD) -o %o $(LD_MARCH) $(LDFLAGS) --whole-archive --start-group %<base-common> %<startup> %<syscall> %f $(PKG_LIBS) --end-group --no-whole-archive  $(LIBGCC); printf "\x02" | dd of=%o bs=1 seek=16 count=1 conv=notrunc; |> ld-linux.lib.so $(REP_DIR)/<ld> {bin}
 
 : {bin} |> !collect_bin |>
