@@ -1,4 +1,4 @@
 include_rules
 : foreach *.cc |> !cxx |> %B.o {obj}
-: {obj} |  |> !prg |> test-%d {bin}
+: {obj} |  |> !prg |> test-block-%d {bin}
 : {bin} |> !collect_bin |>
