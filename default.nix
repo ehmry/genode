@@ -272,5 +272,6 @@ in rec {
 
   defaultPackage = packages.base-linux;
   devShell = packages.base;
+  checks = packages;
 
 }
