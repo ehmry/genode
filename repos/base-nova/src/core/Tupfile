@@ -45,14 +45,15 @@ CXXFLAGS_$(GEN_CORE_DIR)/version.cc += -DGENODE_VERSION=\"`git describe`\"
 
 : foreach $(SRC_CC) |> !cxx |> {obj}
 
+PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs cxx`
+
 : {obj} | \
 	$(DEV_DIR)/<lib> \
 	$(DEV_DIR)/<pkg-config> \
 	$(BASE_DIR)/<base-libs> \
 	$(REP_DIR)/<base-common> \
-	$(BASE_DIR)/<cxx> \
 	$(REP_DIR)/<startup> \
 |> $(LD) $(LDFLAGS) -u _start -r \
-	--whole-archive --start-group %f %<base-libs> %<base-common> %<cxx> %<startup> --no-whole-archive --end-group -o %o \
+	--whole-archive --start-group %f %<base-libs> %<base-common> %<startup> $(PKG_LIBS) --no-whole-archive --end-group -o %o \
 |> core.o $(REP_DIR)/<core> {core}
 : {core} |> cp %f %o |> $(OUT_DIR)/lib/core-nova.o

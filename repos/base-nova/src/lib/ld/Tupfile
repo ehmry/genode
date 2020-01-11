@@ -1,13 +1,6 @@
 include_rules
 
-LDSO_DIR = $(BASE_DIR)/src/lib/ldso
-
-ifeq (@(TUP_ARCH),x86_64)
-LDSO_SPEC_DIR = $(LDSO_DIR)/spec/x86_64
-endif
-
-CPPFLAGS += -I$(LDSO_SPEC_DIR)
-CPPFLAGS += -I$(LDSO_DIR)/include
+include $(BASE_DIR)/src/lib/ldso/Tuprules.tup
 
 : foreach $(LDSO_DIR)/*.cc |> !cxx |> {obj}
 : foreach $(LDSO_SPEC_DIR)/*.s |> !asm |> {obj}
@@ -23,7 +16,7 @@ LDFLAGS += -shared --eh-frame-hdr
 
 LDFLAGS += -Bsymbolic-functions --version-script=symbol.map
 
-ifeq (@(TUP_ARCH),x86_32)
+ifeq (@(TUP_ARCH),i386)
 LDFLAGS += -T$(LDSO_DIR)/linux-32.ld
 else
 LDFLAGS += -T$(LDSO_DIR)/linker.ld
@@ -33,25 +26,16 @@ endif
 LDFLAGS += -z max-page-size=0x1000
 LDFLAGS += -T$(BASE_DIR)/src/ld/genode_rel.ld
 
-BASE_LIBS += $(REP_DIR)/src/lib/base/base-nova.lib.a
-
-LDFLAGS += -L$(DEV_LIB_DIR) `$(PKG_CONFIG) --static --libs $(BASE_PKGS)`
+LDFLAGS += -L$(DEV_DIR)/lib
 
 : {obj} | \
 	$(DEV_DIR)/<lib> \
 	$(DEV_DIR)/<pkg-config> \
 	$(REP_DIR)/<base-common> \
+	$(REP_DIR)/<base-nova> \
 	$(REP_DIR)/<startup> \
 	symbol.map \
-|> \
-	$(LD) -o %o \
-	$(LD_MARCH) $(LDFLAGS) \
-	--whole-archive --start-group \
-	%<base-common> \
-	%<startup> \
-	%f \
-	--end-group --no-whole-archive \
-	$(LIBGCC) \
+|> $(LD) -o %o $(LD_MARCH) $(LDFLAGS) --whole-archive --start-group -l:alarm.a %<base-common> %<base-nova> -l:cxx.a %<startup> -l:timeout.a %f --end-group --no-whole-archive $(LIBGCC) \
 |> ld-nova.lib.so $(REP_DIR)/<ld> {bin}
 
 : {bin} |> !collect_bin |>

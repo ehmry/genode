@@ -33,5 +33,6 @@ GENERIC_SRC_CC += \
 	$(GENERIC_DIR)/trace.cc \
 	$(GENERIC_DIR)/vm_session.cc \
 
-: foreach $(GENERIC_SRC_CC) |> !cxx |> %B.base.o $(REP_DIR)/<base-common> {obj}
-: foreach *.cc |> !cxx |> %B.nova.o $(REP_DIR)/<base-common> {obj}
+: foreach $(GENERIC_SRC_CC) |> !cxx |> %B.o {obj}
+: foreach *.cc |> !cxx |> {obj}
+: {obj} |> !ar |> base-nova-common.lib.a | $(REP_DIR)/<base-common>

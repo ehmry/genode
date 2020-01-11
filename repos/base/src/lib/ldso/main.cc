@@ -19,6 +19,7 @@
 #include <util/string.h>
 #include <base/thread.h>
 #include <base/heap.h>
+#include <base/sleep.h>
 
 /* base-internal includes */
 #include <base/internal/unmanaged_singleton.h>
@@ -774,4 +775,12 @@ void Component::construct(Genode::Env &env)
 
 	/* start binary */
 	binary_ptr->call_entry_point(env);
+}
+
+
+extern "C" int main(int, char **, char **)
+{
+	Genode::error("LD: dummy \"main\" procedure invoked!");
+	Genode::sleep_forever();
+	return ~0;
 }

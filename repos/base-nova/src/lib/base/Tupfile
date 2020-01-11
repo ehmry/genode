@@ -16,4 +16,4 @@ SRC_CC += \
 
 : foreach $(SRC_CC) |> !cxx |> {base-obj}
 
-: {base-obj} |> !ar |> base-nova.lib.a
+: {base-obj} |> !ar |> base-nova.lib.a | $(REP_DIR)/<base-nova>

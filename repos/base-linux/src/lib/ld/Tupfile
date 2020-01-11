@@ -1,17 +1,6 @@
 include_rules
 
-ifeq (@(TUP_ARCH),x86_64)
-	CPPFLAGS += -I$(BASE_DIR)/src/lib/ldso/spec/x86_64
-endif
-
-LDSO_DIR = $(BASE_DIR)/src/lib/ldso
-
-ifeq (@(TUP_ARCH),x86_64)
-LDSO_SPEC_DIR = $(LDSO_DIR)/spec/x86_64
-endif
-
-CPPFLAGS += -I$(LDSO_SPEC_DIR)
-CPPFLAGS = -I$(LDSO_DIR)/include $(CPPFLAGS)
+include $(BASE_DIR)/src/lib/ldso/Tuprules.tup
 
 : foreach $(LDSO_DIR)/*.cc |> !cxx |> {obj}
 : foreach $(LDSO_SPEC_DIR)/*.s |> !asm |> {obj}
