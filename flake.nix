@@ -3,15 +3,19 @@
 
   description = "Genode system flake";
 
-  inputs.nixpkgs.uri =
-    "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode";
+  inputs = {
+    nixpkgs.uri = "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode";
+    dhall-haskell.uri =
+      "git+https://github.com/dhall-lang/dhall-haskell?ref=flake";
+  };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, dhall-haskell }:
     let
       mkOutput = { system, localSystem, crossSystem }:
         import ./default.nix {
           inherit localSystem crossSystem self;
           nixpkgs = builtins.getAttr system nixpkgs.legacyPackages;
+          inherit dhall-haskell;
         };
 
       localSystems = [ "x86_64-linux" ];

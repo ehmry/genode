@@ -4,7 +4,7 @@ let
     ref = "genode";
   });
 in { localSystem ? "x86_64-linux", crossSystem ? "x86_64-genode"
-, nixpkgs ? pinnedNixpkgs, self ? { } }:
+, nixpkgs ? pinnedNixpkgs, self ? { }, dhall-haskell ? null }:
 
 let
   nixpkgs' = if builtins.isAttrs nixpkgs then
@@ -271,10 +271,26 @@ in rec {
 
     inherit stdenvGcc stdenvLlvm tupConfigGcc tupConfigLlvm;
 
+    nova-iso = import ./apps/nova-iso {
+      stdenv = stdenvLlvm;
+      inherit nixpkgs NOVA base-nova;
+      dhallApps = dhall-haskell.apps.${localSystem};
+    };
   };
 
+  apps = {
+    core-linux = {
+      type = "app";
+      program = "${packages.base-linux}/bin/core-linux";
+    };
+    nova-iso = {
+      type = "app";
+      program = "${packages.nova-iso}/bin/nova-iso";
+    };
+  };
+
+  defaultApp = apps.core-linux;
   defaultPackage = packages.base-linux;
   devShell = packages.base;
   checks = packages;
-
 }
