@@ -24,9 +24,6 @@ let
       nixpkgs'.stdenvAdapters.overrideCC nixpkgs'.stdenv sourceForgeToolchain;
   in assert env.cc.isGNU; env;
 
-  src = self.outPath or (builtins.fetchGit ./.);
-  version = self.lastModified or "unstable";
-
   inherit (stdenvLlvm) lib targetPlatform;
   specs = with targetPlatform;
     [ ]
@@ -123,7 +120,6 @@ let
 
         IS_GCC = "";
         LINUX_HEADERS = buildPackages.glibc.dev;
-        VERSION = version;
       };
   in toTupConfig stdenvGcc (f stdenvGcc);
 
@@ -148,16 +144,17 @@ let
           llvmPackages.libunwind.override { isBaremetal = true; };
         LIBUNWIND = llvmPackages.libunwind;
         LINUX_HEADERS = buildPackages.glibc.dev;
-        VERSION = version;
       };
   in toTupConfig stdenvLlvm (f stdenvLlvm);
 
-  buildRepo = { env, repo, repoInputs }:
+  buildRepo = { env, repo, repoInputs, filter }:
     let
 
     in env.mkDerivation {
-      pname = "genode-" + repo;
-      inherit src repo specs version;
+      name = "genode-" + repo;
+      inherit repo specs;
+
+      src = builtins.filterSource filter ./.;
 
       nativeBuildInputs = repoInputs;
       # This is wrong, why does pkg-config not collect buildInputs?
@@ -233,6 +230,8 @@ let
         maintainers = [ maintainers.ehmry ];
       };
 
+    } // {
+      version = self.lastModified;
     };
 
   buildRepo' = { ... }@args: buildRepo ({ env = stdenvGcc; } // args);
@@ -240,33 +239,88 @@ let
   #builtins.throw "create the tup config file in the stdenv environment, replacing CC/CXX with environmental variables"
 
 in rec {
-  packages = rec {
+  packages = let
+
+    hasPrefix = pre:
+      with builtins;
+      let
+        pre' = "${toString ./.}/${pre}";
+        preLen = stringLength pre';
+      in path:
+      let pathLen = stringLength path;
+      in substring 0 preLen path == substring 0 pathLen pre';
+
+    hasSuffix = suf:
+      with builtins;
+      let sufLen = stringLength suf;
+      in path:
+      let pathLen = stringLength path;
+      in substring (pathLen - sufLen) pathLen path == suf;
+
+    filterBaseRepo = name:
+      with builtins;
+      let
+        match = [
+          (hasPrefix "Tup")
+          (hasPrefix "repos/Tup")
+          (hasPrefix "repos/base/")
+          (hasPrefix "repos/base-${name}")
+        ];
+        skip = [
+          (hasSuffix "/run")
+          (hasSuffix "/recipes")
+          (hasSuffix ".gitignore")
+        ];
+      in path: type: let f = f': f' path; in any f match && !any f skip;
+
+    filterRepo = repo:
+      with builtins;
+      let
+        reposDir = toString ./repos;
+        skip = [
+          (hasSuffix "/run")
+          (hasSuffix "/recipes")
+          (hasSuffix ".gitignore")
+        ];
+        match = [
+          (hasPrefix "Tup")
+          (hasPrefix "repos/Tup")
+          (hasPrefix "repos/${repo}")
+          (hasPrefix "repos/base/src/ld")
+        ];
+      in path: type: let f = f': f' path; in any f match && !any f skip;
+  in rec {
 
     NOVA = nixpkgs.callPackage ./NOVA { };
 
     base = buildRepo' {
       repo = "base";
       repoInputs = [ ];
+      filter = filterBaseRepo "-";
     };
 
     base-linux = buildRepo' {
       repo = "base-linux";
       repoInputs = [ base ];
+      filter = filterBaseRepo "linux";
     };
 
     base-nova = buildRepo' {
       repo = "base-nova";
       repoInputs = [ base ];
+      filter = filterBaseRepo "nova";
     };
 
     os = buildRepo' {
       repo = "os";
       repoInputs = [ base ];
+      filter = filterRepo "os";
     };
 
     gems = buildRepo' {
       repo = "gems";
       repoInputs = [ base os ];
+      filter = filterRepo "gems";
     };
 
     inherit stdenvGcc stdenvLlvm tupConfigGcc tupConfigLlvm;

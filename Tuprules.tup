@@ -13,11 +13,11 @@ DEV_DIR = $(TUP_CWD)/dev
 DEV_LIB_DIR = $(DEV_DIR)/lib
 
 ifdef IS_GCC
-include tup-genode/gcc.tup
+include Tuprules.gcc
 endif
 
 ifdef IS_LLVM
-include tup-genode/llvm.tup
+include Tuprules.llvm
 endif
 
 ifeq ($(TOOLCHAIN_CONFIGURED),)

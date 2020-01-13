@@ -26,7 +26,7 @@ endif
 LDFLAGS += -z max-page-size=0x1000
 LDFLAGS += -T$(BASE_DIR)/src/ld/genode_rel.ld
 
-LDFLAGS += -L$(DEV_DIR)/lib
+PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs alarm cxx ldso-startup timeout`
 
 : {obj} | \
 	$(DEV_DIR)/<lib> \
@@ -35,7 +35,7 @@ LDFLAGS += -L$(DEV_DIR)/lib
 	$(REP_DIR)/<base-nova> \
 	$(REP_DIR)/<startup> \
 	symbol.map \
-|> $(LD) -o %o $(LD_MARCH) $(LDFLAGS) --whole-archive --start-group -l:alarm.a %<base-common> %<base-nova> -l:cxx.a %<startup> -l:timeout.a %f --end-group --no-whole-archive $(LIBGCC) \
+|> $(LD) -o %o $(LD_MARCH) $(LDFLAGS) --whole-archive --start-group $(PKG_LIBS) %<base-common> %<base-nova> %<startup> %f --end-group --no-whole-archive $(LIBGCC) \
 |> ld-nova.lib.so $(REP_DIR)/<ld> {bin}
 
 : {bin} |> !collect_bin |>
