@@ -4,7 +4,7 @@
   description = "Genode system flake";
 
   inputs = {
-    nixpkgs.uri = "git+https://gitea.c3d2.de/ehmry/nixpkgs.git?ref=genode";
+    nixpkgs.uri = "github:ehmry/nixpkgs";
     dhall-haskell.uri =
       "git+https://github.com/dhall-lang/dhall-haskell?ref=flake";
   };
