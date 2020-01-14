@@ -35,8 +35,6 @@ nixpkgs.writeScriptBin "nova-iso" (with nixpkgs.buildPackages;
 
     pushd "$TMPDIR"
 
-    strip boot/image.elf
-
     # build ISO image
     cp ${NOVA}/hypervisor* boot/hypervisor
     cp ${./isolinux.cfg} boot/syslinux/isolinux.cfg
@@ -50,7 +48,7 @@ nixpkgs.writeScriptBin "nova-iso" (with nixpkgs.buildPackages;
 
     ISO_FILE="''${DIRSTACK[1]}/nova.iso"
 
-    mkisofs -o "$ISO_FILE" \
+    ${cdrkit}/bin/mkisofs -o "$ISO_FILE" \
     	-b syslinux/isolinux.bin -c syslinux/boot.cat \
     	-no-emul-boot -boot-load-size 4 -boot-info-table \
     	-iso-level 2 \
