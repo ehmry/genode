@@ -241,6 +241,9 @@ let
 
 in rec {
   packages = rec {
+
+    NOVA = nixpkgs.callPackage ./NOVA { };
+
     base = buildRepo' {
       repo = "base";
       repoInputs = [ ];
