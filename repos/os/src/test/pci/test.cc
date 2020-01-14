@@ -92,4 +92,5 @@ void Component::construct(Genode::Env &env)
 	pci.release_device(prev_device_cap);
 
 	log("--- Platform test finished ---");
+	env.parent().exit(0);
 }

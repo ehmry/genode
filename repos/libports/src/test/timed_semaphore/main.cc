@@ -77,6 +77,7 @@ struct Main
 		test.construct(env, false, 1, "without timeouts"); test.destruct();
 		test.construct(env, true,  2, "with timeouts");    test.destruct();
 		log("--- Timed semaphore test finished ---");
+		env.parent().exit(0);
 	}
 };
 

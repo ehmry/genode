@@ -72,6 +72,7 @@ struct Main
 			src.release_packet(pkt);
 		}
 		log("--- ROM Block test finished ---");
+		env.parent().exit(0);
 	}
 };
 

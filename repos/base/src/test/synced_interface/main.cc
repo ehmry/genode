@@ -41,12 +41,13 @@ struct Main
 	Adder                                adder { };
 	Synced_interface<Adder, Pseudo_lock> synced_adder { lock, &adder };
 
-	Main(Env &)
+	Main(Env &env)
 	{
 		log("--- Synced interface test ---");
 		int const res = synced_adder()->add(13, 14);
 		log("result is ", res);
 		log("--- Synced interface test finished ---");
+		env.parent().exit(0);
 	}
 };
 

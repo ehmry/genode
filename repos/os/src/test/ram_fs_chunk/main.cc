@@ -119,6 +119,7 @@ struct Main
 		}
 		log("allocator: sum=", alloc.sum);
 		log("--- RAM filesystem chunk test finished ---");
+		env.parent().exit(0);
 	}
 
 	void write(Chunk_level_0 &chunk, char const *str, off_t seek_offset)

@@ -693,6 +693,7 @@ struct Main
 	{
 		test_8.destruct();
 		log("--- Signalling test finished ---");
+		env.parent().exit(0);
 	}
 
 	Main(Env &env) : env(env)

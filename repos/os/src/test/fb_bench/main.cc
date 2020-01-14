@@ -143,6 +143,7 @@ struct Main
 		test_3.construct(env, 3); test_3.destruct();
 		test_4.construct(env, 4); test_4.destruct();
 		log("--- Framebuffer benchmark finished ---");
+		env.parent().exit(0);
 	}
 };
 

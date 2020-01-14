@@ -83,7 +83,7 @@ struct Main
 	void call_const_method(Compound const &compound) {
 		compound.member->reference.const_method(); }
 
-	Main(Env &)
+	Main(Env &env)
 	{
 		log("--- Reconstructible utility test ---");
 		{
@@ -132,6 +132,7 @@ struct Main
 			log("got exception, as expected"); }
 
 		log("--- Reconstructible utility test finished ---");
+		env.parent().exit(0);
 	}
 };
 
