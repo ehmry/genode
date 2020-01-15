@@ -336,6 +336,12 @@ in rec {
 
     inherit stdenvGcc stdenvLlvm tupConfigGcc tupConfigLlvm;
 
+    nova-image = import ./apps/nova-image {
+      stdenv = stdenvLlvm;
+      inherit nixpkgs NOVA base-nova;
+      dhallApps = dhall-haskell.apps.${localSystem};
+    };
+
     nova-iso = import ./apps/nova-iso {
       stdenv = stdenvLlvm;
       inherit nixpkgs NOVA base-nova;
@@ -347,6 +353,10 @@ in rec {
     core-linux = {
       type = "app";
       program = "${packages.base-linux}/bin/core-linux";
+    };
+    nova-image = {
+      type = "app";
+      program = "${packages.nova-image}/bin/nova-image";
     };
     nova-iso = {
       type = "app";
