@@ -230,8 +230,6 @@ let
         maintainers = [ maintainers.ehmry ];
       };
 
-    } // {
-      version = self.lastModified;
     };
 
   buildRepo' = { ... }@args: buildRepo ({ env = stdenvGcc; } // args);
