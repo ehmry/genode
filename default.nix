@@ -270,6 +270,7 @@ in rec {
           (hasSuffix "/run")
           (hasSuffix "/recipes")
           (hasSuffix ".gitignore")
+          (path: hasPrefix "repos/base/" path && hasSuffix "Tupfile" path)
         ];
       in path: type: let f = f': f' path; in any f match && !any f skip;
 
@@ -296,7 +297,19 @@ in rec {
     base = buildRepo' {
       repo = "base";
       repoInputs = [ ];
-      filter = filterBaseRepo "-";
+      filter = with builtins;
+        let
+          match = [
+            (hasPrefix "Tup")
+            (hasPrefix "repos/Tup")
+            (hasPrefix "repos/base/")
+          ];
+          skip = [
+            (hasSuffix "/run")
+            (hasSuffix "/recipes")
+            (hasSuffix ".gitignore")
+          ];
+        in path: type: let f = f': f' path; in any f match && !any f skip;
     };
 
     base-linux = buildRepo' {
