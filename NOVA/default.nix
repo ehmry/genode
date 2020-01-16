@@ -17,19 +17,20 @@ else
 
   buildPackages.stdenv.mkDerivation rec {
     # Borrow the build host compiler,
-    name = "NOVA";
+    pname = "NOVA";
+    version = "r10";
     inherit ARCH;
 
     src = fetchFromGitHub {
       owner = "alex-ab";
       repo = "NOVA";
-      rev = "0ebcb4fc5a25d1df4451a89cbc87d88e099acbd3";
-      sha256 = "0rkp59496032kq8a3l5fs771m5f7s5yywkxjk7j9qhmsidgk40wd";
+      rev = "68c2fb1671e75d811a4787e35b0d0c6cc85815c0";
+      sha256 = "06zxz8hvzqgp8vrh6kv65j0z1m3xfm2ac8ppkv6ql0rivm1rv07s";
     };
 
     enableParallelBuilding = true;
 
-    makeFlags = [ "--directory=build" ];
+    makeFlags = [ "--directory build" ];
 
     preInstall = "export INS_DIR=$out";
 
