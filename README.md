@@ -1,16 +1,29 @@
+**FORK AHEAD**
 
-                      =================================
-                      Genode Operating System Framework
-                      =================================
+This a fork of the Genode OS reference implementation with a replacement
+build system that is humane and interoperable.
 
+Changes against [Genode Labs](https://genode-labs.com/) master may be
+reviewed with the following commands:
+
+```sh
+git remote add genodelabs https://github.com/genodelabs/genode.git
+git fetch genodelabs
+git diff genodelabs/master
+```
+
+---
+
+# Genode Operating System Framework
 
 This is the source tree of the reference implementation of the Genode OS
 architecture. For a general overview about the architecture, please refer to
 the project's official website:
 
-:Official project website for the Genode OS Framework:
+### Official project website for the Genode OS Framework
 
-  [https://genode.org/documentation/general-overview]
+  https://genode.org/documentation/general-overview
+
 
 The current implementation can be compiled for 8 different kernels: Linux,
 L4ka::Pistachio, L4/Fiasco, OKL4, NOVA, Fiasco.OC, seL4, and a custom
@@ -33,15 +46,14 @@ the kernel that fits best with the requirements at hand for the particular
 usage scenario.
 
 
-Documentation
-#############
+## Documentation
 
 The primary documentation is the book "Genode Foundations", which is available
 on the front page of Genode website:
 
-:Download the book "Genode Foundations":
+### Download the book "Genode Foundations"
 
-  [https://genode.org]
+  https://genode.org
 
 The book describes Genode in a holistic and comprehensive way. It equips you
 with a thorough understanding of the architecture, assists developers with the
@@ -53,79 +65,75 @@ The project has a quarterly release cycle. Each version is accompanied with
 detailed release documentation, which is available at the documentation
 section of the project website:
 
-:Release documentation:
+### Release documentation
 
-  [https://genode.org/documentation/release-notes/]
+  https://genode.org/documentation/release-notes/
 
 
-Directory overview
-##################
+## Directory overview
 
 The source tree is composed of the following subdirectories:
 
-:'doc':
+### 'doc'
 
   This directory contains general documentation. Please consider the following
   document for a quick guide to get started with the framework:
 
-  ! doc/getting_started.txt
+  [doc/getting_started.txt](doc/getting_started.txt)
 
   If you are curious about the ready-to-use components that come with the
   framework, please review the components overview:
 
-  ! doc/components.txt
+  [doc/components.txt](doc/components.txt)
 
-:'repos':
+### 'repos':
 
   This directory contains the so-called source-code repositories of Genode.
   Please refer to the README file in the 'repos' directory to learn more
   about the roles of the individual repositories.
 
-:'tool':
+### 'tool'
 
   Source-code management tools and scripts. Please refer to the README file
   contained in the directory.
 
-:'depot' and 'public':
+### 'depot' and 'public'
 
   Local depot and public archive of Genode packages. Please refer to
 
-  ! doc/depot.txt
+  [doc/depot.txt](doc/depot.txt)
 
   for more details.
 
 
-Additional community-maintained components
-##########################################
+## Additional community-maintained components
 
 The components found within the main source tree are complemented by a growing
 library of additional software, which can be seamlessly integrated into Genode
 system scenarios.
 
-:Genode-world repository:
+### Genode-world repository
 
-  [https://github.com/genodelabs/genode-world]
+  https://github.com/genodelabs/genode-world
 
 
-Contact
-#######
+## Contact
 
 The best way to get in touch with Genode developers and users is the project's
 mailing list. Please feel welcome to join in!
 
-:Genode Mailing Lists:
+### Genode Mailing Lists
 
-  [https://genode.org/community/mailing-lists]
+  https://genode.org/community/mailing-lists
 
 
-Commercial support
-##################
+## Commercial support
 
 The driving force behind the Genode OS Framework is the German company Genode
 Labs. The company offers commercial licensing, trainings, support, and
 contracted development work:
 
-:Genode Labs website:
+### Genode Labs website
 
-  [https://www.genode-labs.com]
+  https://www.genode-labs.com
 
