@@ -36,6 +36,6 @@ PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs alarm cxx ldso-startup timeout
 	$(REP_DIR)/<startup> \
 	symbol.map \
 |> $(LD) -o %o $(LD_MARCH) $(LDFLAGS) --whole-archive --start-group $(PKG_LIBS) %<base-common> %<base-nova> %<startup> %f --end-group --no-whole-archive $(LIBGCC) \
-|> ld-nova.lib.so $(REP_DIR)/<ld> {bin}
+|> ld-nova.lib.so $(REP_DIR)/<ld> {lib}
 
-: {bin} |> !collect_bin |>
+: foreach {lib} |> !collect_shared |>
