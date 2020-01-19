@@ -1,0 +1,56 @@
+{
+    "inputs": {
+        "genodepkgs": {
+            "inputs": {
+                "dhall-haskell": {
+                    "inputs": {
+                        "nixpkgs": {
+                            "inputs": {},
+                            "narHash": "sha256-wJg4DA700SoQbEz61448sR6BgxRa1R92K3vvCV1g+HY=",
+                            "originalUrl": "git+https://github.com/nixos/nixpkgs.git?ref=18.09-beta&rev=1d4de0d552ae9aa66a5b8dee5fb0650a4372d148",
+                            "url": "git+https://github.com/nixos/nixpkgs.git?ref=18.09-beta&rev=1d4de0d552ae9aa66a5b8dee5fb0650a4372d148"
+                        },
+                        "nixpkgsStaticLinux": {
+                            "inputs": {},
+                            "narHash": "sha256-famU3pJZ4vkElV9qc71HmyRVSvcrAhfMZ0UJKpmmKP8=",
+                            "originalUrl": "git+https://github.com/nh2/nixpkgs.git?ref=static-haskell-nix-stack-dhall-working",
+                            "url": "git+https://github.com/nh2/nixpkgs.git?ref=static-haskell-nix-stack-dhall-working&rev=925aac04f4ca58aceb83beef18cb7dae0715421b"
+                        }
+                    },
+                    "narHash": "sha256-KJl9ZLcMcEsLSPcwcWoc0Ac74/6HKC9LkVMeLwhyhlg=",
+                    "originalUrl": "git+https://github.com/dhall-lang/dhall-haskell?ref=flake",
+                    "url": "git+https://github.com/dhall-lang/dhall-haskell?ref=flake&rev=aea28adf3d10ff1982aa4ddd176d1476251b932f"
+                },
+                "genode-depot": {
+                    "inputs": {
+                        "nixpkgs": {
+                            "inputs": {},
+                            "narHash": "sha256-NB+H7zK3BB//zM127FqgbG4iAfY+nS/IOyO+uGWA5Ho=",
+                            "originalUrl": "nixpkgs",
+                            "url": "github:edolstra/nixpkgs/7845bf5f4b3013df1cf036e9c9c3a55a30331db9"
+                        }
+                    },
+                    "narHash": "sha256-72QPBUP9EaIPGneWDLYIb6Wo5XR/lmijobDlaX8iKHA=",
+                    "originalUrl": "git+https://gitea.c3d2.de/ehmry/genode-depot.git",
+                    "url": "git+https://gitea.c3d2.de/ehmry/genode-depot.git?ref=master&rev=4e85cc4dd28d868d28815be4c925b1bb64d19939"
+                },
+                "nixpkgs": {
+                    "inputs": {},
+                    "narHash": "sha256-EqxCk6ORqq4fkewWttpvks0VycBec9X9spAZ+Pq/CEI=",
+                    "originalUrl": "github:ehmry/nixpkgs",
+                    "url": "github:ehmry/nixpkgs/cf50f3b8bdc28832249afab6bca68acad832e011"
+                }
+            },
+            "narHash": "sha256-uVUZZTXUDZqOtoSee0YpJ8WIgIOaP9yv3lN127sr3h8=",
+            "originalUrl": "git+https://git.sr.ht/~ehmry/genodepkgs?ref=staging",
+            "url": "git+https://git.sr.ht/~ehmry/genodepkgs?ref=staging&rev=45df037912a53c035909a932802bad5e56921f78"
+        },
+        "nixpkgs": {
+            "inputs": {},
+            "narHash": "sha256-NB+H7zK3BB//zM127FqgbG4iAfY+nS/IOyO+uGWA5Ho=",
+            "originalUrl": "nixpkgs",
+            "url": "github:edolstra/nixpkgs/7845bf5f4b3013df1cf036e9c9c3a55a30331db9"
+        }
+    },
+    "version": 3
+}
