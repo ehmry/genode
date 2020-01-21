@@ -30,7 +30,11 @@ namespace Genode {
 			 */
 			Log_session_component *_create_session(const char *args) override
 			{
-				return new (md_alloc()) Log_session_component(label_from_args(args));
+				Session_label const label = label_from_args(args);
+				if (label == "init -> platform")
+					return new (md_alloc()) Platform_log_session_component();
+
+				return new (md_alloc()) Labeled_log_session_component(label);
 			}
 
 		public:
