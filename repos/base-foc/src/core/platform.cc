@@ -582,7 +582,7 @@ Platform::Platform() :
  ** Generic platform interface **
  ********************************/
 
-void Platform::wait_for_exit(int const &)
+void Platform::wait_for_exit()
 {
 	/*
 	 * On Fiasco, Core never exits. So let us sleep forever.

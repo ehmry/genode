@@ -274,7 +274,7 @@ class Genode::Platform : public Platform_generic
 
 		Cap_sel asid_pool() const { return _asid_pool_sel; }
 
-		void wait_for_exit(int const &) override;
+		void wait_for_exit() override;
 
 		/**
 		 * Determine size of a core local mapping required for a

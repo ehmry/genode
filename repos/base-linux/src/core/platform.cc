@@ -113,7 +113,7 @@ Platform::Platform()
 }
 
 
-void Platform::wait_for_exit(int const &exit_value)
+void Platform::wait_for_exit()
 {
 	for (;;) {
 
@@ -145,10 +145,8 @@ void Platform::wait_for_exit(int const &exit_value)
 			Platform_thread::submit_exception(pid);
 		}
 	}
-	lx_exit_group(exit_value);
+	lx_exit_group(0);
 }
-
-void Platform::child_exit() { sigint_handler(0); }
 
 
 /*****************************

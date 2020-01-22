@@ -119,8 +119,6 @@ class Core_child : public Child_policy
 
 		Child _child;
 
-		int &_exit_value;
-
 	public:
 
 		/**
@@ -130,16 +128,14 @@ class Core_child : public Child_policy
 		           Pd_session  &core_pd,  Capability<Pd_session>  core_pd_cap,
 		           Cpu_session &core_cpu, Capability<Cpu_session> core_cpu_cap,
 		           Cap_quota cap_quota, Ram_quota ram_quota,
-		           Rpc_entrypoint &ep,
-		           int &exit_value)
+		           Rpc_entrypoint &ep)
 		:
 			_services(services),
 			_core_pd_cap (core_pd_cap),  _core_pd (core_pd),
 			_core_cpu_cap(core_cpu_cap), _core_cpu(core_cpu),
 			_cap_quota(Child::effective_quota(cap_quota)),
 			_ram_quota(Child::effective_quota(ram_quota)),
-			_child(local_rm, ep, *this),
-			_exit_value(exit_value)
+			_child(local_rm, ep, *this)
 		{ }
 
 
@@ -176,13 +172,6 @@ class Core_child : public Child_policy
 		{
 			session.ref_account(_core_cpu_cap);
 			_core_cpu.transfer_quota(cap, Cpu_session::quota_lim_upscale(100, 100));
-		}
-
-		void exit(int exit_value) override
-		{
-			_exit_value = exit_value;
-			Child_policy::exit(exit_value);
-			platform().child_exit();
 		}
 
 		Pd_session           &ref_pd()           override { return _core_pd; }
@@ -232,8 +221,6 @@ namespace Genode {
 
 int main()
 {
-	static int exit_value { 0 };
-
 	/**
 	 * Disable tracing within core because it is currently not fully implemented.
 	 */
@@ -322,10 +309,10 @@ int main()
 
 	static Reconstructible<Core_child>
 		init(services, local_rm, core_pd, core_pd_cap, core_cpu, core_cpu_cap,
-		     init_cap_quota, init_ram_quota, ep, exit_value);
+		     init_cap_quota, init_ram_quota, ep);
 
-	platform().wait_for_exit(exit_value);
+	platform().wait_for_exit();
 
 	init.destruct();
-	return exit_value;
+	return 0;
 }

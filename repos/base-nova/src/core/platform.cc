@@ -990,5 +990,5 @@ bool Mapped_mem_allocator::_unmap_local(addr_t virt_addr, addr_t, unsigned size)
  ** Generic platform interface **
  ********************************/
 
-void Platform::wait_for_exit(int const &) { sleep_forever(); }
+void Platform::wait_for_exit() { sleep_forever(); }
 

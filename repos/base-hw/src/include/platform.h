@@ -128,7 +128,7 @@ class Genode::Platform : public Genode::Platform_generic
 		size_t           vm_size()  const override { return Hw::Mm::user().size; }
 		Rom_fs          &rom_fs()         override { return _rom_fs; }
 
-		void wait_for_exit(int const &) override {
+		void wait_for_exit() override {
 			while (1) { Kernel::stop_thread(); } };
 
 		bool supports_direct_unmap() const override { return true; }

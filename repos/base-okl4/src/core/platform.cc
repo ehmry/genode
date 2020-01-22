@@ -215,7 +215,7 @@ Platform::Platform()
  ** Generic platform interface **
  ********************************/
 
-void Platform::wait_for_exit(int const &)
+void Platform::wait_for_exit()
 {
 	/*
 	 * On OKL4, core never exits. So let us sleep forever.

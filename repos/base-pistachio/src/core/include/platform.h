@@ -153,7 +153,7 @@ namespace Genode {
 			Rom_fs          &rom_fs()         override { return _rom_fs; }
 			size_t           max_caps() const override { return Capability_space::max_caps(); }
 
-			void wait_for_exit(int const &) override;
+			void wait_for_exit() override;
 
 			Affinity::Space affinity_space() const override
 			{

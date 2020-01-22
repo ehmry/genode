@@ -82,7 +82,7 @@ namespace Genode {
 			size_t           vm_size()  const override { return _vm_size;  }
 			Rom_fs          &rom_fs()         override { return _rom_fs; }
 			size_t           max_caps() const override { return _max_caps; }
-			void             wait_for_exit(int const &) override;
+			void             wait_for_exit()  override;
 
 			bool supports_direct_unmap() const override { return true; }
 

@@ -661,7 +661,7 @@ void Platform::reset_sel(unsigned sel)
 }
 
 
-void Platform::wait_for_exit(int const &)
+void Platform::wait_for_exit()
 {
 	sleep_forever();
 }

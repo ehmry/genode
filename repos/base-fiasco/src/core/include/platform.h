@@ -167,7 +167,7 @@ namespace Genode {
 
 			size_t max_caps() const override { return Capability_space::max_caps(); }
 
-			void wait_for_exit(int const &) override;
+			void wait_for_exit() override;
 	};
 }
 
