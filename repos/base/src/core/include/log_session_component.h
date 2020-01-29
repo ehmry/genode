@@ -24,10 +24,32 @@ namespace Genode {
 
 	class Log_session_component : public Rpc_object<Log_session>
 	{
-		protected:
+		private:
 
-			template <typename PROC>
-			size_t split_lines(String const &string_buf, PROC proc)
+			Session_label const _label;
+
+			static Session_label _expand_label(Session_label const &label)
+			{
+				if (label == "init -> unlabeled")
+					return "";
+				else
+					return Session_label("[", label, "] ");
+			}
+
+		public:
+
+			/**
+			 * Constructor
+			 */
+			Log_session_component(Session_label const &label)
+			: _label(_expand_label(label)) { }
+
+
+			/*****************
+			 ** Log session **
+			 *****************/
+
+			size_t write(String const &string_buf) override
 			{
 				if (!(string_buf.valid_string())) {
 					error("corrupted string");
@@ -38,63 +60,21 @@ namespace Genode {
 				size_t len = strlen(string);
 
 				unsigned from_i = 0;
+
 				for (unsigned i = 0; i < len; i++) {
 					if (string[i] == '\n') {
-						proc(Cstring(string + from_i, i - from_i));
+						log(_label, Cstring(string + from_i, i - from_i));
 						from_i = i + 1;
 					}
 				}
 
 				/* if last character of string was not a line break, add one */
 				if (from_i < len)
-					proc(Cstring(string + from_i));
+					log(_label, Cstring(string + from_i));
 
 				return len;
 			}
 	};
-
-	class Labeled_log_session_component final : public Log_session_component
-	{
-		private:
-
-			Session_label const _label;
-
-		public:
-
-			/**
-			 * Constructor
-			 */
-			Labeled_log_session_component(Session_label const &label) : _label(label) { }
-
-
-			/*****************
-			 ** Log session **
-			 *****************/
-
-			size_t write(String const &string_buf) override
-			{
-				return split_lines(string_buf, [&] (Cstring const &line) {
-					log("[", _label, "] ", line); });
-			}
-	};
-
-	class Platform_log_session_component final : public Log_session_component
-	{
-		public:
-
-
-			/*****************
-			 ** Log session **
-			 *****************/
-
-			size_t write(String const &string_buf) override
-			{
-				return split_lines(string_buf, [&] (Cstring const &line) {
-					log(line);
-				});
-			}
-	};
-
 }
 
 #endif /* _CORE__INCLUDE__LOG_SESSION_COMPONENT_H_ */
