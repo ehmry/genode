@@ -28,6 +28,11 @@ LDFLAGS += -T$(BASE_DIR)/src/ld/genode_rel.ld
 
 PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs alarm cxx ldso-startup timeout`
 
+OUTPUT = ld-nova.lib.so
+ifdef NIX_OUTPUTS_DEV
+OUTPUT = ld.lib.so
+endif
+
 : {obj} | \
 	$(DEV_DIR)/<lib> \
 	$(DEV_DIR)/<pkg-config> \
@@ -36,6 +41,6 @@ PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs alarm cxx ldso-startup timeout
 	$(REP_DIR)/<startup> \
 	symbol.map \
 |> $(LD) -o %o $(LD_MARCH) $(LDFLAGS) --whole-archive --start-group $(PKG_LIBS) %<base-common> %<base-nova> %<startup> %f --end-group --no-whole-archive $(LIBGCC) \
-|> ld-nova.lib.so $(REP_DIR)/<ld> {lib}
+|> $(OUTPUT) $(REP_DIR)/<ld> {lib}
 
 : foreach {lib} |> !collect_shared |>

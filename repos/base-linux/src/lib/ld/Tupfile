@@ -25,6 +25,11 @@ BASE_LIBS += $(REP_DIR)/src/lib/base/base-linux.lib.a
 
 PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs alarm cxx ldso-startup timeout`
 
+OUTPUT = ld-linux.lib.so
+ifdef NIX_OUTPUTS_DEV
+OUTPUT = ld.lib.so
+endif
+
 : $(BASE_LIBS) {obj} | \
 	symbol.map \
 	$(DEV_DIR)/<lib> \
@@ -32,6 +37,6 @@ PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs alarm cxx ldso-startup timeout
 	$(REP_DIR)/<base-common> \
 	$(REP_DIR)/<startup> \
 	$(REP_DIR)/<syscall> \
-|> $(LD) -o %o $(LD_MARCH) $(LDFLAGS) --whole-archive --start-group %<base-common> %<startup> %<syscall> %f $(PKG_LIBS) --end-group --no-whole-archive  $(LIBGCC); printf "\x02" | dd of=%o bs=1 seek=16 count=1 conv=notrunc; |> ld-linux.lib.so $(REP_DIR)/<ld> {bin}
+|> $(LD) -o %o $(LD_MARCH) $(LDFLAGS) --whole-archive --start-group %<base-common> %<startup> %<syscall> %f $(PKG_LIBS) --end-group --no-whole-archive  $(LIBGCC); printf "\x02" | dd of=%o bs=1 seek=16 count=1 conv=notrunc; |> $(OUTPUT) $(REP_DIR)/<ld> {bin}
 
 : {bin} |> !collect_bin |>
