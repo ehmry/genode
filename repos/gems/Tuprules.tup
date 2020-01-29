@@ -1,5 +1,7 @@
 REP_DIR = $(TUP_CWD)
 
+CPPFLAGS += -I$(REP_DIR)/include
+
 LIBS += genode-os
 
 ifndef NIX_OUTPUTS_DEV

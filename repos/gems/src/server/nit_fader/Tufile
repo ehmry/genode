@@ -1,0 +1,5 @@
+include_rules
+LIBS += blit
+: foreach *.cc |> !cxx |> {obj}
+: {obj} |> !prg |> {bin}
+: {bin} |> !collect_bin |>

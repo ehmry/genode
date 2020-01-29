@@ -1,0 +1,8 @@
+include_rules
+CPPFLAGS += -I. -I$(REP_DIR)/../demo/include
+SRC_BIN += $(REP_DIR)/../demo/src/app/scout/data/droidsansb10.tff
+SRC_BIN += closer.rgba maximize.rgba minimize.rgba windowed.rgba
+: foreach *.cc |> !cxx |> {obj}
+: foreach $(SRC_BIN) |> !incbin |> {obj}
+: {obj} |> !prg |> {bin}
+: {bin} |> !collect_bin |>

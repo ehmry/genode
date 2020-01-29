@@ -1,0 +1,5 @@
+include_rules
+CPPFLAGS += -I.
+: foreach *.cc |> !cxx |> {obj}
+: {obj} |> !prg |> {bin}
+: {bin} |> !collect_bin |>

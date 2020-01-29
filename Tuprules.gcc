@@ -40,8 +40,7 @@ LIBGCC = `$(CXX) $(CC_MARCH) -print-libgcc-file-name`
 !ld = | $(DEV_DIR)/<lib> $(DEV_DIR)/<pkg-config> |> ^o LD %o^ $(LD) -o %o $(LDFLAGS) `$(PKG_CONFIG) --libs $(LIBS)` %f |>
 
 !incbin = |> ^ incbin %f^ \
-	export SYM=_binary_`echo %f | sed 's/\./_/g'`; \
+	export SYM=_binary_`echo %b | sed 's/\./_/g'`; \
 	echo ".global ${SYM}_start, ${SYM}_end; .data; .align 4; ${SYM}_start:; .incbin \"%f\"; ${SYM}_end:" \
-		| llvm-mc -filetype=obj - > %o \
+		| as $(AS_MARCH) -o %o - \
 |> binary_%b.o
-

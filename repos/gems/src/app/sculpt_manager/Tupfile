@@ -1,0 +1,5 @@
+include_rules
+CPPFLAGS += -I. -I../depot_deploy
+: foreach *.cc view/*.cc |> !cxx |> {obj}
+: {obj} |> !prg |> {bin}
+: {bin} |> !collect_bin |>
