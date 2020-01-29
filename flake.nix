@@ -3,7 +3,7 @@
 
   edition = 201909;
 
-  inputs.genodepkgs.uri = "git+https://git.sr.ht/~ehmry/genodepkgs?ref=staging";
+  inputs.genodepkgs.uri = "git+https://git.sr.ht/~ehmry/genodepkgs";
 
   outputs = { self, nixpkgs, genodepkgs }: {
 

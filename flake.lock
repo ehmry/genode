@@ -30,9 +30,9 @@
                             "url": "github:edolstra/nixpkgs/7845bf5f4b3013df1cf036e9c9c3a55a30331db9"
                         }
                     },
-                    "narHash": "sha256-72QPBUP9EaIPGneWDLYIb6Wo5XR/lmijobDlaX8iKHA=",
+                    "narHash": "sha256-7eL2MfGgeEaIwJXPc4LQ7pBa4JeGicm9th7onjKgzsE=",
                     "originalUrl": "git+https://gitea.c3d2.de/ehmry/genode-depot.git",
-                    "url": "git+https://gitea.c3d2.de/ehmry/genode-depot.git?ref=master&rev=4e85cc4dd28d868d28815be4c925b1bb64d19939"
+                    "url": "git+https://gitea.c3d2.de/ehmry/genode-depot.git?ref=master&rev=8c2aafed45b4075e37f1cd93de0ebf93f38c83c3"
                 },
                 "nixpkgs": {
                     "inputs": {},
@@ -41,9 +41,9 @@
                     "url": "github:ehmry/nixpkgs/cf50f3b8bdc28832249afab6bca68acad832e011"
                 }
             },
-            "narHash": "sha256-uVUZZTXUDZqOtoSee0YpJ8WIgIOaP9yv3lN127sr3h8=",
-            "originalUrl": "git+https://git.sr.ht/~ehmry/genodepkgs?ref=staging",
-            "url": "git+https://git.sr.ht/~ehmry/genodepkgs?ref=staging&rev=45df037912a53c035909a932802bad5e56921f78"
+            "narHash": "sha256-78eloDNkEjWAckNLbfNait0zb6QBG4QxltX6FyV1vAk=",
+            "originalUrl": "git+https://git.sr.ht/~ehmry/genodepkgs",
+            "url": "git+https://git.sr.ht/~ehmry/genodepkgs?ref=master&rev=dad28cc17b17542ada59ba2005fbf1af5d5f8209"
         },
         "nixpkgs": {
             "inputs": {},

@@ -42,5 +42,5 @@ LIBGCC = `$(CXX) $(CC_MARCH) -print-libgcc-file-name`
 !incbin = |> ^ incbin %f^ \
 	export SYM=_binary_`echo %b | sed 's/\./_/g'`; \
 	echo ".global ${SYM}_start, ${SYM}_end; .data; .align 4; ${SYM}_start:; .incbin \"%f\"; ${SYM}_end:" \
-		| as $(AS_MARCH) -o %o - \
+		| x86_64-unknown-genode-as $(AS_MARCH) -o %o - \
 |> binary_%b.o
