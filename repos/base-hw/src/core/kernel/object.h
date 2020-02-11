@@ -32,7 +32,7 @@ namespace Kernel
 	/**
 	 * Base class of all Kernel objects
 	 */
-	class Object;
+	struct Object;
 
 	/**
 	 * An object identity helps to distinguish different capability owners

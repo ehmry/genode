@@ -24,8 +24,8 @@
 
 namespace Genode {
 
-	class Signal_context_component;
-	class Signal_source_component;
+	struct Signal_context_component;
+	struct Signal_source_component;
 
 	typedef Object_pool<Signal_context_component> Signal_context_pool;
 	typedef Object_pool<Signal_source_component>  Signal_source_pool;
@@ -50,7 +50,7 @@ struct Genode::Signal_source_component : private Kernel_object<Kernel::Signal_re
                                          public Signal_source_pool::Entry
 {
 	friend class Object_pool<Signal_source_component>;
-	friend class Signal_context_component;
+	friend struct Signal_context_component;
 
 	using Signal_source_pool::Entry::cap;
 

@@ -34,7 +34,7 @@
 namespace Genode {
 
 	class Pager_object;
-	class Thread_state;
+	struct Thread_state;
 	class Rm_client;
 	class Platform_thread;
 	class Platform_pd;

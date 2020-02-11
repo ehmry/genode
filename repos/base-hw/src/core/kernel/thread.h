@@ -29,7 +29,7 @@ namespace Kernel
 {
 	struct Thread_fault;
 	class Thread;
-	class Core_thread;
+	struct Core_thread;
 }
 
 

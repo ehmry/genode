@@ -13,8 +13,8 @@
  */
 
 /* core includes */
-#include "../../kernel/cpu.h"
-#include "../../kernel/kernel.h"
+#include "../../../kernel/cpu.h"
+#include "../../../kernel/kernel.h"
 
 void Kernel::Cpu::_arch_init()
 {

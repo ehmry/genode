@@ -14,8 +14,8 @@
  */
 
 /* core includes */
-#include "../../kernel/cpu.h"
-#include "../../kernel/thread.h"
+#include "../../../kernel/cpu.h"
+#include "../../../kernel/thread.h"
 
 using namespace Kernel;
 

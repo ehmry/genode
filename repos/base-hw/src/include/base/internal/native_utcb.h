@@ -28,8 +28,8 @@
 #include <kernel/interface.h>
 
 namespace Genode {
-	
-	struct Native_utcb;
+
+	class Native_utcb;
 
 	/**
 	 * The main thread's UTCB, used during bootstrap of the main thread before it

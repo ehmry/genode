@@ -23,7 +23,7 @@
 #include <base/capability.h>
 
 /* only needed for base-hw */
-namespace Kernel { struct Signal_receiver; }
+namespace Kernel { class Signal_receiver; }
 
 namespace Genode {
 
@@ -97,7 +97,7 @@ class Genode::Signal
 		 */
 		Signal(Data data);
 
-		friend struct Kernel::Signal_receiver;
+		friend class Kernel::Signal_receiver;
 		friend class Signal_receiver;
 		friend class Signal_context;
 

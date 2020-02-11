@@ -37,7 +37,7 @@
 #include <board.h>
 
 namespace Genode {
-	class Address_space;
+	struct Address_space;
 	class Platform;
 };
 

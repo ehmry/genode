@@ -29,14 +29,16 @@ namespace Genode {
 }
 
 
-struct Genode::Native_cpu_component
+class Genode::Native_cpu_component
 {
-	Native_cpu_component(Cpu_session_component &, char const *) { }
+	public:
 
-	Capability<Cpu_session::Native_cpu> cap()
-	{
-		return Capability<Cpu_session::Native_cpu>();
-	}
+		Native_cpu_component(Cpu_session_component &, char const *) { }
+
+		Capability<Cpu_session::Native_cpu> cap()
+		{
+			return Capability<Cpu_session::Native_cpu>();
+		}
 };
 
 #endif /* _CORE__INCLUDE__NATIVE_CPU_COMPONENT_H_ */

@@ -51,7 +51,7 @@ class Kernel::Ipc_node : private Ipc_node_queue::Element
 
 	private:
 
-		friend class Core_thread;
+		friend struct Core_thread;
 		friend class Genode::Fifo<Ipc_node>;
 
 		State                 _state    = INACTIVE;

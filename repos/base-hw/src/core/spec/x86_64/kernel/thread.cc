@@ -14,9 +14,9 @@
  */
 
 /* core includes */
-#include "../../kernel/cpu.h"
-#include "../../kernel/thread.h"
-#include "../../kernel/pd.h"
+#include "../../../kernel/cpu.h"
+#include "../../../kernel/thread.h"
+#include "../../../kernel/pd.h"
 
 void Kernel::Thread::Tlb_invalidation::execute()
 {

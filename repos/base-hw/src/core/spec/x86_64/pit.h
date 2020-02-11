@@ -23,7 +23,7 @@
 #include <port_io.h>
 #include <board.h>
 
-namespace Board { class Timer; }
+namespace Board { struct Timer; }
 
 /**
  * LAPIC-based timer driver for core

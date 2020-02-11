@@ -50,7 +50,7 @@ namespace Genode
 class Kernel::Irq : Genode::Avl_node<Irq>
 {
 	friend class Genode::Avl_tree<Irq>;
-	friend class Genode::Avl_node<Irq>;
+	friend struct Genode::Avl_node<Irq>;
 
 	public:
 

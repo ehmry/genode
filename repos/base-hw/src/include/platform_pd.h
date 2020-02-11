@@ -50,7 +50,7 @@ namespace Genode
 	/**
 	 * Platform specific part of Core's protection domain
 	 */
-	class Core_platform_pd;
+	struct Core_platform_pd;
 
 	using Hw::Page_flags;
 }
