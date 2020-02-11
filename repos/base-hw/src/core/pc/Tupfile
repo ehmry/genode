@@ -1,0 +1,37 @@
+ifeq (@(TUP_ARCH),x86_64)
+include_rules
+
+GEN_CORE_DIR = $(BASE_DIR)/src/core
+
+# add C++ sources
+SRC_CC += $(REP_DIR)/src/lib/hw/spec/64bit/memory_map.cc
+SRC_CC += ../kernel/cpu_mp.cc
+SRC_CC += ../kernel/lock.cc
+SRC_CC += ../kernel/vm_thread_off.cc
+SRC_CC += $(GEN_CORE_DIR)/spec/x86/io_port_session_component.cc
+SRC_CC += $(GEN_CORE_DIR)/spec/x86/io_port_session_support.cc
+SRC_CC += $(GEN_CORE_DIR)/spec/x86/platform_services.cc
+SRC_CC += ../spec/x86_64/bios_data_area.cc
+SRC_CC += ../spec/x86_64/cpu.cc
+SRC_CC += ../spec/x86_64/pic.cc
+SRC_CC += ../spec/x86_64/pit.cc
+SRC_CC += ../spec/x86_64/platform_support.cc
+SRC_CC += ../spec/x86_64/platform_support_common.cc
+
+: foreach $(SRC_S) |> !asm |> {obj}
+: foreach $(SRC_CC) |> !cxx |> {obj}
+
+: foreach $(SRC_CC_KERNEL) |> !cxx |> ../kernel/%B.o {obj}
+
+: {obj} | \
+	$(DEV_DIR)/<lib> \
+	$(DEV_DIR)/<pkg-config> \
+	$(BASE_DIR)/<base-libs> \
+	$(REP_DIR)/<base-common> \
+	$(REP_DIR)/<core-obj> \
+|> $(LD) $(LDFLAGS) -u _start -r \
+	--whole-archive --start-group %f %<core-obj> %<base-libs> %<base-common> $(PKG_LIBS) --no-whole-archive --end-group -o %o \
+|> core.a $(REP_DIR)/<core> {core}
+: {core} |> cp %f %o |> $(OUT_DIR)/lib/core-hw-pc.a
+
+endif

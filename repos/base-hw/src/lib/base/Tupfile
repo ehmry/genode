@@ -1,0 +1,22 @@
+include_rules
+
+BASE_LIB_DIR = $(BASE_DIR)/src/lib/base
+
+SRC_CC += $(BASE_LIB_DIR)/default_log.cc
+SRC_CC += $(BASE_LIB_DIR)/env_reinit.cc
+SRC_CC += $(BASE_LIB_DIR)/heartbeat.cc
+SRC_CC += $(BASE_LIB_DIR)/main_thread_cap.cc
+SRC_CC += $(BASE_LIB_DIR)/rpc_cap_alloc.cc
+SRC_CC += $(BASE_LIB_DIR)/stack_area.cc
+SRC_CC += $(BASE_LIB_DIR)/stack_area_addr.cc
+SRC_CC += cache.cc
+SRC_CC += capability.cc
+SRC_CC += env_deprecated.cc
+SRC_CC += native_utcb.cc
+SRC_CC += raw_write_string.cc
+SRC_CC += signal_receiver.cc
+SRC_CC += thread_start.cc
+
+: foreach $(SRC_CC) |> !cxx |> {base-obj}
+
+: {base-obj} |> !ar |> base-hw.lib.a | $(REP_DIR)/<base-hw>

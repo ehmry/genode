@@ -1,0 +1,43 @@
+include_rules
+
+BASE_COMMON_DIR = $(BASE_DIR)/src/lib/base-common
+
+SRC_CC += $(BASE_COMMON_DIR)/allocator_avl.cc
+SRC_CC += $(BASE_COMMON_DIR)/avl_tree.cc
+SRC_CC += $(BASE_COMMON_DIR)/child.cc
+SRC_CC += $(BASE_COMMON_DIR)/child_process.cc
+SRC_CC += $(BASE_COMMON_DIR)/component.cc
+SRC_CC += $(BASE_COMMON_DIR)/console.cc
+SRC_CC += $(BASE_COMMON_DIR)/elf_binary.cc
+SRC_CC += $(BASE_COMMON_DIR)/entrypoint.cc
+SRC_CC += $(BASE_COMMON_DIR)/env_session_id_space.cc
+SRC_CC += $(BASE_COMMON_DIR)/heap.cc
+SRC_CC += $(BASE_COMMON_DIR)/lock.cc
+SRC_CC += $(BASE_COMMON_DIR)/log.cc
+SRC_CC += $(BASE_COMMON_DIR)/output.cc
+SRC_CC += $(BASE_COMMON_DIR)/raw_output.cc
+SRC_CC += $(BASE_COMMON_DIR)/region_map_client.cc
+SRC_CC += $(BASE_COMMON_DIR)/registry.cc
+SRC_CC += $(BASE_COMMON_DIR)/rm_session_client.cc
+SRC_CC += $(BASE_COMMON_DIR)/root_proxy.cc
+SRC_CC += $(BASE_COMMON_DIR)/rpc_dispatch_loop.cc
+SRC_CC += $(BASE_COMMON_DIR)/rpc_entrypoint.cc
+SRC_CC += $(BASE_COMMON_DIR)/session_state.cc
+SRC_CC += $(BASE_COMMON_DIR)/signal_common.cc
+SRC_CC += $(BASE_COMMON_DIR)/slab.cc
+SRC_CC += $(BASE_COMMON_DIR)/sleep.cc
+SRC_CC += $(BASE_COMMON_DIR)/sliced_heap.cc
+SRC_CC += $(BASE_COMMON_DIR)/stack_allocator.cc
+SRC_CC += $(BASE_COMMON_DIR)/stack_protector.cc
+SRC_CC += $(BASE_COMMON_DIR)/thread.cc
+SRC_CC += $(BASE_COMMON_DIR)/thread_myself.cc
+SRC_CC += $(BASE_COMMON_DIR)/trace.cc
+SRC_CC += $(BASE_COMMON_DIR)/vm_session.cc
+
+SRC_CC += ipc.cc
+SRC_CC += signal_transmitter.cc
+SRC_CC += thread_bootstrap.cc
+
+: foreach $(SRC_CC) |> !cxx |> {obj}
+
+: {obj} |> !ar |> base-hw-common.lib.a | $(REP_DIR)/<base-hw-common>

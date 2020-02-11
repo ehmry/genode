@@ -1,0 +1,6 @@
+ifeq (@(TUP_ARCH),x86_64)
+include_rules
+
+: foreach *.cc |> !cxx |> | $(REP_DIR)/<core-obj>
+
+endif

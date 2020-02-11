@@ -1,0 +1,8 @@
+ifeq (@(TUP_ARCH),x86_64)
+	CPPFLAGS += -I$(TUP_CWD)/include/spec/x86_64
+endif
+
+CPPFLAGS += -I$(TUP_CWD)/include
+
+include &(BASE_DIR)/Tuprules.tup
+REP_DIR = $(TUP_CWD)

@@ -1,0 +1,2 @@
+CPPFLAGS += -I$(TUP_CWD)/include
+CPPFLAGS += -I$(BASE_DIR)/src/include

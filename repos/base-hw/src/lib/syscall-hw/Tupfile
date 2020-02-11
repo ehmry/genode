@@ -1,0 +1,21 @@
+include_rules
+
+ifeq (@(TUP_ARCH),arm)
+SRC_CC += ../base-common/arm/kernel/*.cc
+endif
+
+ifeq (@(TUP_ARCH),aarch64)
+SRC_CC += ../base-common/arm_64/kernel/*.cc
+endif
+
+ifeq (@(TUP_ARCH),riscv)
+SRC_CC += ../base-common/riscv/kernel/*.cc
+endif
+
+ifeq (@(TUP_ARCH),x86_64)
+SRC_CC += ../base-common/x86_64/kernel/*.cc
+endif
+
+: foreach $(SRC_CC) |> !cxx |> {obj}
+
+: {obj} |> !ar |> syscall-hw.lib.a | $(REP_DIR)/<syscall-hw>
