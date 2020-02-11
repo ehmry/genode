@@ -18,8 +18,13 @@ endif
 		-e "s/^\(\w\+\) W/.text; .weak \1; .type \1,%%function; \1:/" \
 		-e "s/^\(\w\+\) B \(\w\+\)\$/.bss; .global \1; .type \1,%%object; .size \1,\2; \1:/" \
 		-e "s/^\(\w\+\) U/.text; .global \1; $(ASM_SYM_DEPENDENCY)/" \
-		%f \
-	| $(CC) $(CC_MARCH) -x assembler -c - -Wl,-shared -Wl,-T&(LD_SCRIPT_SO) -o %o \
+		%f > stub.s; \
+	$(CC) $(CC_MARCH) -x assembler -c stub.s; \
+	$(LD) -o %o \
+		-shared \
+		-T &(LD_SCRIPT_SO) \
+		stub.o; \
+	rm -v stub.o stub.s; \
 |> $(DEV_LIB_DIR)/%B.lib.so $(DEV_DIR)/<lib>
 
 BASE_DIR = $(GENODE_DIR)/repos/base

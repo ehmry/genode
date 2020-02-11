@@ -104,8 +104,8 @@ ifdef IS_LLVM
 : supc++.tmp |> @(OBJCOPY) $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++.o
 : supc++-baremetal.tmp |> @(OBJCOPY) $(LOCAL_SYMBOLS) $(REDEF_SYMBOLS) %f %o |> supc++-baremetal.o
 
-: supc++.o |> !ar |> cxx.a {bin}
-: supc++-baremetal.o |> !ar |> cxx-baremetal.a {bin}
+: supc++.o unwind.o |> !ar |> cxx.a {bin}
+: supc++-baremetal.o unwind.o |> !ar |> cxx-baremetal.a {bin}
 : foreach {bin} |> !collect_static |>
 : |> !emit_lib_pkg_config |>
 

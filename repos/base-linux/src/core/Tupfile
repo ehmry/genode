@@ -41,7 +41,11 @@ LDFLAGS += -Ttext=0x01000000
 LDFLAGS += -T$(BASE_DIR)/src/ld/genode.ld
 LDFLAGS += -T$(REP_DIR)/src/ld/stack_area.ld
 
+ifdef IS_LLVM
+PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs cxx-baremetal`
+else
 PKG_LIBS = -L$(DEV_DIR)/lib `$(PKG_CONFIG) --libs cxx`
+endif
 
 : {obj} | \
 	$(DEV_DIR)/<lib> \

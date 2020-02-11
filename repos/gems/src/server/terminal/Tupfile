@@ -1,5 +1,0 @@
-include_rules
-LIBS += vfs
-: foreach *.cc |> !cxx |> {obj}
-: {obj} |> !prg |> {bin}
-: {bin} |> !collect_bin |>
