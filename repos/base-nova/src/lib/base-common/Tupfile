@@ -1,8 +1,10 @@
 include_rules
 
 GENERIC_DIR = $(BASE_DIR)/src/lib/base-common
+include $(GENERIC_DIR)/Tupfile.inc
 
 GENERIC_SRC_CC += \
+	$(GENERIC_DIR)/ansi_c.cc \
 	$(GENERIC_DIR)/allocator_avl.cc \
 	$(GENERIC_DIR)/avl_tree.cc \
 	$(GENERIC_DIR)/child.cc \
@@ -34,5 +36,6 @@ GENERIC_SRC_CC += \
 	$(GENERIC_DIR)/vm_session.cc \
 
 : foreach $(GENERIC_SRC_CC) |> !cxx |> %B.o {obj}
+: foreach $(SRC_S) |> !asm |> {obj}
 : foreach *.cc |> !cxx |> {obj}
 : {obj} |> !ar |> base-nova-common.lib.a | $(REP_DIR)/<base-common>

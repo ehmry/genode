@@ -649,9 +649,14 @@ dl_unwind_find_exidx T
 genode_argc D 4
 genode_argv D 8
 genode_envp B 8
+longjmp W
 lx_environ B 8
+memcmp W
 memcpy W
 memmove W
 memset W
+setjmp W
 stdout_reconnect T
+strcmp W
+strlen W
 wait_for_continue T

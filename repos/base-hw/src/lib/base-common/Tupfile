@@ -1,7 +1,9 @@
 include_rules
 
 BASE_COMMON_DIR = $(BASE_DIR)/src/lib/base-common
+include $(BASE_COMMON_DIR)/Tupfile.inc
 
+SRC_CC += $(BASE_COMMON_DIR)/ansi_c.cc
 SRC_CC += $(BASE_COMMON_DIR)/allocator_avl.cc
 SRC_CC += $(BASE_COMMON_DIR)/avl_tree.cc
 SRC_CC += $(BASE_COMMON_DIR)/child.cc
@@ -39,5 +41,6 @@ SRC_CC += signal_transmitter.cc
 SRC_CC += thread_bootstrap.cc
 
 : foreach $(SRC_CC) |> !cxx |> {obj}
+: foreach $(SRC_S) |> !asm |> {obj}
 
 : {obj} |> !ar |> base-hw-common.lib.a | $(REP_DIR)/<base-hw-common>
