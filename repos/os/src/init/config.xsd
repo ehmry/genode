@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
- <xs:include schemaLocation="base_types.xsd"/>
+ <xs:include schemaLocation="../../../base/xsd/base_types.xsd"/>
 
  <xs:complexType name="template_service">
   <xs:choice minOccurs="1" maxOccurs="3">
@@ -160,6 +160,12 @@
         </xs:complexType>
        </xs:element> <!-- "resource" -->
 
+       <xs:element name="exit">
+        <xs:complexType>
+         <xs:attribute name="propagate" type="Boolean" />
+        </xs:complexType>
+       </xs:element> <!-- "exit" -->
+
        <xs:element name="configfile">
         <xs:complexType>
          <xs:attribute name="name" type="xs:string" />
@@ -168,7 +174,7 @@
 
        <xs:element name="provides">
         <xs:complexType>
-         <xs:choice maxOccurs="unbounded">
+         <xs:choice maxOccurs="unbounded" minOccurs="0">
           <xs:element name="service">
            <xs:complexType>
             <xs:attribute name="name" type="xs:string" />
