@@ -1,4 +1,0 @@
-include_rules
-: foreach *.cc |> !cxx |> %B.o {obj}
-: {obj} |  |> !prg |> test-dynamic_config_%d {bin}
-: {bin} |> !collect_bin |>
