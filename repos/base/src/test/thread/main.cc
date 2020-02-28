@@ -13,11 +13,13 @@
  */
 
 /* Genode includes */
-#include <base/log.h>
-#include <base/thread.h>
+#include <base/attached_rom_dataspace.h>
 #include <base/component.h>
 #include <base/heap.h>
-#include <base/attached_rom_dataspace.h>
+#include <base/log.h>
+#include <base/rpc_server.h>
+#include <base/rpc_client.h>
+#include <base/thread.h>
 #include <util/reconstructible.h>
 #include <cpu_session/connection.h>
 #include <cpu_thread/client.h>
@@ -681,6 +683,54 @@ static void test_successive_create_destroy_threads(Env &env)
 	}
 }
 
+/**
+ * Test destruction of entrypoint with yet not dissolved components
+ */
+namespace Test {
+	struct Session;
+	struct Server;
+	struct Component;
+}
+
+struct Test::Session : Genode::Session
+{
+	static const char *service_name() { return "EP_TEST"; }
+
+	GENODE_RPC(Rpc_test_untyped, void, test_untyped, unsigned);
+	GENODE_RPC_INTERFACE(Rpc_test_untyped);
+};
+
+struct Test::Component : Genode::Rpc_object<Test::Session, Test::Component>
+{
+	void test_untyped(unsigned) { }
+};
+
+static void test_entrypoint_destruction(Genode::Env &env)
+{
+	Test::Component c;
+
+	{
+		Entrypoint ep(env, 8192 /* STACK*/, "test_ep", Affinity::Location());
+		ep.manage(c);
+	}
+}
+
+/******************************************************
+ ** Test destruction of inter-dependent CPU sessions **
+ ******************************************************/
+
+static void test_destroy_dependent_cpu_sessions(Env &env)
+{
+	log("destroy dependent CPU sessions in wrong order");
+
+	Cpu_connection grandchild { env };
+	Cpu_connection child      { env };
+
+	grandchild.ref_account(child.rpc_cap());
+
+	/* when leaving the scope, 'child' is destructed before 'grandchild' */
+}
+
 
 void Component::construct(Env &env)
 {
@@ -689,6 +739,9 @@ void Component::construct(Env &env)
 	Attached_rom_dataspace config(env, "config");
 
 	try {
+
+		test_destroy_dependent_cpu_sessions(env);
+
 		test_stack_alloc(env);
 		test_stack_alignment(env);
 		test_main_thread();
@@ -702,6 +755,7 @@ void Component::construct(Env &env)
 
 		test_create_as_many_threads(env);
 		test_successive_create_destroy_threads(env);
+		test_entrypoint_destruction(env);
 	} catch (int error) {
 		Genode::error("error ", error);
 		throw;

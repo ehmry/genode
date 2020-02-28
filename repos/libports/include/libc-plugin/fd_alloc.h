@@ -20,6 +20,7 @@
 #include <os/path.h>
 #include <base/allocator.h>
 #include <base/id_space.h>
+#include <util/bit_allocator.h>
 #include <util/xml_generator.h>
 
 /* libc includes */
@@ -57,9 +58,6 @@ namespace Libc {
 		bool cloexec  = 0;  /* for 'fcntl' */
 		bool modified = false;
 
-		File_descriptor(Id_space &id_space, Plugin &plugin, Plugin_context &context)
-		: _elem(*this, id_space), plugin(&plugin), context(&context) { }
-
 		File_descriptor(Id_space &id_space, Plugin &plugin, Plugin_context &context,
 		                Id_space::Id id)
 		: _elem(*this, id_space, id), plugin(&plugin), context(&context) { }
@@ -79,6 +77,8 @@ namespace Libc {
 			typedef File_descriptor::Id_space Id_space;
 
 			Id_space _id_space;
+
+			Genode::Bit_allocator<MAX_NUM_FDS> _id_allocator;
 
 		public:
 
@@ -103,6 +103,20 @@ namespace Libc {
 			void preserve(int libc_fd);
 
 			File_descriptor *find_by_libc_fd(int libc_fd);
+
+			/**
+			 * Return any file descriptor with close-on-execve flag set
+			 *
+			 * \return pointer to file descriptor, or
+			 *         nullptr is no such file descriptor exists
+			 */
+			File_descriptor *any_cloexec_libc_fd();
+
+			/**
+			 * Return file-descriptor ID of any open file, or -1 if no file is
+			 * open
+			 */
+			int any_open_fd();
 
 			void generate_info(Genode::Xml_generator &);
 	};

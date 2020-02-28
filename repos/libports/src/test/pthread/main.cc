@@ -6,7 +6,7 @@
  */
 
 /*
- * Copyright (C) 2012-2019 Genode Labs GmbH
+ * Copyright (C) 2012-2020 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -19,9 +19,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <errno.h>
 
 /* Genode includes */
 #include <base/log.h>
+#include <base/sleep.h>
 #include <base/thread.h>
 
 
@@ -49,10 +52,14 @@ static void *thread_func(void *arg)
 
 	sem_post(&thread_args->thread_finished_sem);
 
-	/* sleep forever */
-	sem_t sleep_sem;
-	sem_init(&sleep_sem, 0, 0);
-	sem_wait(&sleep_sem);
+	/*
+	 * sleep forever
+	 *
+	 * The thread is going to be cancelled, but cancellation points are
+	 * not implemented yet in most blocking libc functions, so
+	 * Genode::sleep_forever() is called here for now.
+	 */
+	Genode::sleep_forever();
 
 	return 0;
 }
@@ -115,10 +122,29 @@ static inline void compare_semaphore_values(int reported_value, int expected_val
 }
 
 
+static timespec add_timespec(timespec const &a, timespec const &b)
+{
+	enum { NSEC_PER_SEC = 1'000'000'000ull };
+
+	long sec  = a.tv_sec + b.tv_sec;
+	long nsec = a.tv_nsec + b.tv_nsec;
+	while (nsec >= NSEC_PER_SEC) {
+		nsec -= NSEC_PER_SEC;
+		sec++;
+	}
+	return timespec { sec, nsec };
+}
+
+static timespec add_timespec_ms(timespec const &a, long msec)
+{
+	return add_timespec(a, timespec { 0, msec*1'000'000 });
+}
+
 struct Test_mutex_data
 {
 	sem_t           main_thread_ready_sem;
 	sem_t           test_thread_ready_sem;
+	pthread_mutex_t normal_mutex;
 	pthread_mutex_t recursive_mutex;
 	pthread_mutex_t errorcheck_mutex;
 
@@ -126,6 +152,8 @@ struct Test_mutex_data
 	{
 		sem_init(&main_thread_ready_sem, 0, 0);
 		sem_init(&test_thread_ready_sem, 0, 0);
+
+		pthread_mutex_init(&normal_mutex, nullptr);
 
 		pthread_mutexattr_t recursive_mutex_attr;
 		pthread_mutexattr_init(&recursive_mutex_attr);
@@ -144,6 +172,7 @@ struct Test_mutex_data
 	{
 		pthread_mutex_destroy(&errorcheck_mutex);
 		pthread_mutex_destroy(&recursive_mutex);
+		pthread_mutex_destroy(&normal_mutex);
 	}
 };
 
@@ -271,6 +300,54 @@ static void *thread_mutex_func(void *arg)
 	/* wake up main thread */
 	sem_post(&test_mutex_data->test_thread_ready_sem);
 
+	/* wait for main thread */
+	sem_wait(&test_mutex_data->main_thread_ready_sem);
+
+	/************************************
+	 ** test normal mutex with timeout **
+	 ************************************/
+
+	timespec abstimeout { 0, 0 };
+
+	/* lock normal mutex */
+
+	if (pthread_mutex_lock(&test_mutex_data->normal_mutex) != 0) {
+		printf("Error: could not lock normal mutex\n");
+		exit(-1);
+	}
+
+	/* wake up main thread */
+	sem_post(&test_mutex_data->test_thread_ready_sem);
+
+	/* wait for main thread */
+	sem_wait(&test_mutex_data->main_thread_ready_sem);
+
+	/* unlock normal mutex */
+
+	if (pthread_mutex_unlock(&test_mutex_data->normal_mutex) != 0) {
+		printf("Error: could not unlock normal mutex\n");
+		exit(-1);
+	}
+
+	/* wake up main thread */
+	sem_post(&test_mutex_data->test_thread_ready_sem);
+
+	/* wait for main thread */
+	sem_wait(&test_mutex_data->main_thread_ready_sem);
+
+	/* try to lock locked mutex with timeout */
+
+	clock_gettime(CLOCK_REALTIME, &abstimeout);
+	abstimeout = add_timespec_ms(abstimeout, 500);
+
+	if (pthread_mutex_timedlock(&test_mutex_data->normal_mutex, &abstimeout) != ETIMEDOUT) {
+		printf("Error: locking of normal mutex did not time out in test thread\n");
+		exit(-1);
+	}
+
+	/* wake up main thread */
+	sem_post(&test_mutex_data->test_thread_ready_sem);
+
 	return nullptr;
 }
 
@@ -335,6 +412,47 @@ static void test_mutex()
 		printf("Error: could not unlock errorcheck mutex from main thread\n");
 		exit(-1);
 	}
+
+	/************************************
+	 ** test normal mutex with timeout **
+	 ************************************/
+
+	timespec abstimeout { 0, 0 };
+
+	/* wake up test thread */
+	sem_post(&test_mutex_data.main_thread_ready_sem);
+
+	/* wait for test thread - normal mutex should still be locked */
+	sem_wait(&test_mutex_data.test_thread_ready_sem);
+
+	/* try to lock locked mutex with timeout */
+
+	clock_gettime(CLOCK_REALTIME, &abstimeout);
+	abstimeout = add_timespec_ms(abstimeout, 500);
+
+	if (pthread_mutex_timedlock(&test_mutex_data.normal_mutex, &abstimeout) != ETIMEDOUT) {
+		printf("Error: locking of normal mutex did not time out in main thread\n");
+		exit(-1);
+	}
+
+	/* wake up test thread */
+	sem_post(&test_mutex_data.main_thread_ready_sem);
+
+	/* wait for test thread - normal mutex should still be locked */
+	sem_wait(&test_mutex_data.test_thread_ready_sem);
+
+	/* lock normal mutex */
+
+	if (pthread_mutex_lock(&test_mutex_data.normal_mutex) != 0) {
+		printf("Error: could not lock normal mutex\n");
+		exit(-1);
+	}
+
+	/* wake up test thread */
+	sem_post(&test_mutex_data.main_thread_ready_sem);
+
+	/* wait for test thread - normal mutex should still be locked */
+	sem_wait(&test_mutex_data.test_thread_ready_sem);
 
 	pthread_join(t, NULL);
 }
@@ -450,14 +568,14 @@ struct Test_mutex_stress
 	Test_mutex_stress()
 	{
 		printf("main thread: start %s stress test\n", mutex.type_string());
+		pthread_mutex_lock(mutex.mutex());
 		for (Thread &t : threads) t.start();
+		pthread_mutex_unlock(mutex.mutex());
 		for (Thread &t : threads) t.join();
 		printf("main thread: finished %s stress test\n", mutex.type_string());
 	}
 };
 
-
-extern "C" void wait_for_continue();
 
 static void test_mutex_stress()
 {
@@ -542,6 +660,267 @@ static void test_lock_and_sleep()
 }
 
 
+struct Cond
+{
+	pthread_cond_t _cond;
+
+	Cond() { pthread_cond_init(&_cond, nullptr); }
+
+	~Cond() { pthread_cond_destroy(&_cond); }
+
+	pthread_cond_t * cond() { return &_cond; }
+};
+
+
+struct Test_cond
+{
+	Mutex<PTHREAD_MUTEX_NORMAL> _mutex;
+	Cond                        _cond;
+
+	enum class State {
+		PING, PONG, SHUTDOWN, END
+	} _shared_state { State::PING };
+
+	static void *signaller_fn(void *arg)
+	{
+		((Test_cond *)arg)->signaller();
+		return nullptr;
+	}
+
+	void signaller()
+	{
+		Genode::log("signaller: started");
+
+		unsigned num_events = 0;
+		bool test_done = false;
+		while (!test_done) {
+			pthread_mutex_lock(_mutex.mutex());
+
+			switch (_shared_state) {
+			case State::PING:
+				_shared_state = State::PONG;
+				++num_events;
+				pthread_cond_signal(_cond.cond());
+				break;
+			case State::PONG:
+				_shared_state = State::PING;
+				++num_events;
+				pthread_cond_signal(_cond.cond());
+				break;
+			case State::SHUTDOWN:
+				Genode::log("signaller: shutting down");
+				_shared_state = State::END;
+				++num_events;
+				pthread_cond_broadcast(_cond.cond());
+				test_done = true;
+				break;
+			case State::END:
+				break;
+			}
+
+			pthread_mutex_unlock(_mutex.mutex());
+
+			usleep(1000);
+		}
+
+		Genode::log("signaller: finished after ", num_events, " state changes");
+	}
+
+	static void *waiter_fn(void *arg)
+	{
+		((Test_cond *)arg)->waiter();
+		return nullptr;
+	}
+
+	void waiter(bool main_thread = false)
+	{
+		char const * const note =  main_thread ? "(main thread)" : "";
+
+		Genode::log("waiter", note, ": started");
+
+		unsigned pings = 0, pongs = 0;
+		unsigned long iterations = 0;
+		bool test_done = false;
+		while (!test_done) {
+			pthread_mutex_lock(_mutex.mutex());
+
+			auto handle_state = [&] {
+				unsigned const num_events = pings + pongs;
+				if (num_events == 2000) {
+					Genode::log("waiter", note, ": request shutdown");
+					_shared_state = State::SHUTDOWN;
+				} else if (num_events % 2 == 0) {
+					pthread_cond_wait(_cond.cond(), _mutex.mutex());
+				}
+			};
+
+			switch (_shared_state) {
+			case State::PING:
+				++pings;
+				handle_state();
+				break;
+			case State::PONG:
+				++pongs;
+				handle_state();
+				break;
+			case State::SHUTDOWN:
+				pthread_cond_wait(_cond.cond(), _mutex.mutex());
+				break;
+			case State::END:
+				test_done = true;
+				break;
+			}
+
+			pthread_mutex_unlock(_mutex.mutex());
+
+			usleep(3000);
+			++iterations;
+		}
+
+		Genode::log("waiter", note, ": finished (pings=", pings, ", pongs=",
+		            pongs, ", iterations=", iterations, ")");
+	}
+
+	Test_cond()
+	{
+		printf("main thread: test without timeouts\n");
+
+		pthread_t signaller_id;
+		if (pthread_create(&signaller_id, 0, signaller_fn, this) != 0) {
+			printf("error: pthread_create() failed\n");
+			exit(-1);
+		}
+		pthread_t waiter1_id;
+		if (pthread_create(&waiter1_id, 0, waiter_fn, this) != 0) {
+			printf("error: pthread_create() failed\n");
+			exit(-1);
+		}
+		pthread_t waiter2_id;
+		if (pthread_create(&waiter2_id, 0, waiter_fn, this) != 0) {
+			printf("error: pthread_create() failed\n");
+			exit(-1);
+		}
+
+		waiter(true);
+		pthread_join(signaller_id, nullptr);
+		pthread_join(waiter1_id, nullptr);
+		pthread_join(waiter2_id, nullptr);
+	}
+};
+
+
+struct Test_cond_timed
+{
+	Mutex<PTHREAD_MUTEX_NORMAL> _mutex;
+	Cond                        _cond;
+
+	enum class State { RUN, END } _shared_state { State::RUN };
+
+	enum { ROUNDS = 10 };
+
+	static void *signaller_fn(void *arg)
+	{
+		((Test_cond_timed *)arg)->signaller();
+		return nullptr;
+	}
+
+	void signaller()
+	{
+		printf("signaller: started\n");
+
+		bool loop = true;
+		for (unsigned i = 1; loop; ++i) {
+			usleep(249*1000);
+			pthread_mutex_lock(_mutex.mutex());
+
+			if (i == ROUNDS) {
+				_shared_state = State::END;
+				loop          = false;
+			}
+			pthread_cond_broadcast(_cond.cond());
+
+			pthread_mutex_unlock(_mutex.mutex());
+		}
+
+		printf("signaller: finished\n");
+	}
+
+	static void *waiter_fn(void *arg)
+	{
+		((Test_cond_timed *)arg)->waiter();
+		return nullptr;
+	}
+
+	void waiter(bool main_thread = false)
+	{
+		char const * const note = main_thread ? "(main thread)" : "";
+
+		printf("waiter%s: started\n", note);
+
+		for (bool loop = true; loop; ) {
+			pthread_mutex_lock(_mutex.mutex());
+
+			timespec ts { 0, 0 };
+			clock_gettime(CLOCK_REALTIME, &ts);
+
+			int ret;
+			do {
+				if (_shared_state == State::END) {
+					loop = false;
+					break;
+				}
+
+				ts = add_timespec_ms(ts, 250);
+
+				ret = pthread_cond_timedwait(_cond.cond(), _mutex.mutex(), &ts);
+
+				if (ret)
+					printf("waiter%s: pthread_cond_timedwait: %s\n", note, strerror(ret));
+			} while (ret != 0);
+
+			pthread_mutex_unlock(_mutex.mutex());
+		}
+
+		printf("waiter%s: finished\n", note);
+	}
+
+	Test_cond_timed()
+	{
+		printf("main thread: test with timeouts\n");
+
+		pthread_t signaller_id;
+		if (pthread_create(&signaller_id, 0, signaller_fn, this) != 0) {
+			printf("error: pthread_create() failed\n");
+			exit(-1);
+		}
+		pthread_t waiter1_id;
+		if (pthread_create(&waiter1_id, 0, waiter_fn, this) != 0) {
+			printf("error: pthread_create() failed\n");
+			exit(-1);
+		}
+		pthread_t waiter2_id;
+		if (pthread_create(&waiter2_id, 0, waiter_fn, this) != 0) {
+			printf("error: pthread_create() failed\n");
+			exit(-1);
+		}
+
+		waiter(true);
+		pthread_join(signaller_id, nullptr);
+		pthread_join(waiter1_id, nullptr);
+		pthread_join(waiter2_id, nullptr);
+	}
+};
+
+
+static void test_cond()
+{
+	printf("main thread: test condition variables\n");
+
+	{ Test_cond       test; }
+	{ Test_cond_timed test; }
+}
+
+
 static void test_interplay()
 {
 	enum { NUM_THREADS = 2 };
@@ -620,6 +999,88 @@ static void test_interplay()
 }
 
 
+/*
+ * Test cleanup handlers
+ */
+
+static bool cleanup1_executed = false;
+static bool cleanup2_executed = false;
+static bool cleanup3_executed = false;
+static bool cleanup4_executed = false;
+
+static void cleanup1(void *) { cleanup1_executed = true; }
+static void cleanup2(void *) { cleanup2_executed = true; }
+
+static void cleanup3(void *arg)
+{
+	if (arg != (void*)1) {
+		printf("Error: cleanup3(): incorrect argument\n");
+		exit(-1);
+	}
+
+	cleanup3_executed = true;
+}
+
+static void cleanup4(void *) { cleanup4_executed = true; }
+
+static void *thread_cleanup_func(void *)
+{
+	pthread_cleanup_push(cleanup1, nullptr);
+	pthread_cleanup_push(cleanup2, nullptr);
+	pthread_cleanup_push(cleanup3, (void*)1);
+	pthread_cleanup_push(cleanup4, nullptr);
+
+	/* pop 'cleanup4()', don't execute */
+	pthread_cleanup_pop(0);
+
+	if (cleanup4_executed) {
+		printf("Error: cleanup4() executed\n");
+		exit(-1);
+	}
+
+	/* pop and execute 'cleanup3()' */
+	pthread_cleanup_pop(1);
+
+	if (!cleanup3_executed) {
+		printf("Error: cleanup3() not executed\n");
+		exit(-1);
+	}
+
+	pthread_exit(nullptr);
+
+	/*
+	 * 'cleanup1()' and 'cleanup2()' are executed by 'pthread_exit()', but
+	 * because 'pthread_cleanup_push()' contains opening braces, there must be
+	 * corresponding calls to 'pthread_cleanup_pop()' in the same function,
+	 * even if they are not executed there.
+	 */
+	pthread_cleanup_pop(0);
+	pthread_cleanup_pop(0);
+}
+
+static void test_cleanup()
+{
+	printf("main thread: test cleanup handlers\n");
+
+	pthread_t  t;
+	void      *retval;
+
+	if (pthread_create(&t, 0, thread_cleanup_func, nullptr) != 0) {
+		printf("error: pthread_create() failed\n");
+		exit(-1);
+	}
+
+	pthread_join(t, &retval);
+
+	if (!cleanup1_executed || !cleanup2_executed) {
+		printf("Error: cleanup1() or cleanup2() not executed\n");
+		exit(-1);
+	}
+
+	printf("main thread: cleanup handler testing done\n");
+}
+
+
 int main(int argc, char **argv)
 {
 	printf("--- pthread test ---\n");
@@ -635,6 +1096,8 @@ int main(int argc, char **argv)
 	test_mutex();
 	test_mutex_stress();
 	test_lock_and_sleep();
+	test_cond();
+	test_cleanup();
 
 	printf("--- returning from main ---\n");
 	return 0;

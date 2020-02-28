@@ -17,7 +17,7 @@
 
 #include <board.h>
 #include <platform.h>
-#include "kernel/log.h"
+#include <kernel/log.h>
 
 
 void Kernel::log(char const c)

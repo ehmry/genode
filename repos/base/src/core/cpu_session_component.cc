@@ -34,6 +34,10 @@ Thread_capability Cpu_session_component::create_thread(Capability<Pd_session> pd
 {
 	Trace::Thread_name thread_name(name.string());
 
+	if (!_md_alloc.withdraw(_utcb_quota_size())) {
+		throw Out_of_ram();
+	}
+
 	Cpu_thread_component *thread = 0;
 
 	if (weight.value == 0) {
@@ -46,7 +50,6 @@ Thread_capability Cpu_session_component::create_thread(Capability<Pd_session> pd
 	}
 
 	Lock::Guard thread_list_lock_guard(_thread_list_lock);
-	_incr_weight(weight.value);
 
 	/*
 	 * Create thread associated with its protection domain
@@ -66,9 +69,19 @@ Thread_capability Cpu_session_component::create_thread(Capability<Pd_session> pd
 				_priority, utcb);
 	};
 
-	try { _thread_ep.apply(pd_cap, create_thread_lambda); }
-	catch (Allocator::Out_of_memory)                    { throw Out_of_ram(); }
-	catch (Native_capability::Reference_count_overflow) { throw Thread_creation_failed(); }
+	try {
+		_incr_weight(weight.value);
+		_thread_ep.apply(pd_cap, create_thread_lambda);
+	} catch (Allocator::Out_of_memory) {
+		_decr_weight(weight.value);
+		throw Out_of_ram();
+	} catch (Native_capability::Reference_count_overflow) {
+		_decr_weight(weight.value);
+		throw Thread_creation_failed();
+	} catch (...) {
+		_decr_weight(weight.value);
+		throw;
+	}
 
 	thread->session_exception_sigh(_exception_sigh);
 
@@ -112,6 +125,8 @@ void Cpu_session_component::_unsynchronized_kill_thread(Thread_capability thread
 		Lock::Guard lock_guard(_thread_alloc_lock);
 		destroy(&_thread_alloc, thread);
 	}
+
+	_md_alloc.upgrade(_utcb_quota_size());
 }
 
 
@@ -283,21 +298,22 @@ Cpu_session_component::~Cpu_session_component()
 
 void Cpu_session_component::_deinit_ref_account()
 {
-	/* without a ref-account, nothing has do be done */
-	if (!_ref) { return; }
+	/* rewire child ref accounts to this sessions's ref account */
+	{
+		Lock::Guard lock_guard(_ref_members_lock);
+		for (Cpu_session_component * s; (s = _ref_members.first()); ) {
+			_unsync_remove_ref_member(*s);
+			if (_ref)
+				_ref->_insert_ref_member(s);
+		}
+	}
 
-	/* give back our remaining quota to our ref account */
-	_transfer_quota(*_ref, _quota);
+	if (_ref) {
+		/* give back our remaining quota to our ref account */
+		_transfer_quota(*_ref, _quota);
 
-	/* remove ref-account relation between us and our ref-account */
-	Cpu_session_component * const orig_ref = _ref;
-	_ref->_remove_ref_member(*this);
-
-	/* redirect ref-account relation of ref members to our prior ref account */
-	Lock::Guard lock_guard(_ref_members_lock);
-	for (Cpu_session_component * s; (s = _ref_members.first()); ) {
-		_unsync_remove_ref_member(*s);
-		orig_ref->_insert_ref_member(s);
+		/* remove ref-account relation between us and our ref-account */
+		_ref->_remove_ref_member(*this);
 	}
 }
 
@@ -361,8 +377,12 @@ void Cpu_session_component::_update_each_thread_quota()
 }
 
 
-size_t Cpu_session_component::_weight_to_quota(size_t const weight) const {
-	return (weight * _quota) / _weight; }
+size_t Cpu_session_component::_weight_to_quota(size_t const weight) const
+{
+	if (_weight == 0) return 0;
+
+	return (weight * _quota) / _weight;
+}
 
 
 /****************************

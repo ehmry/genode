@@ -15,9 +15,9 @@
 #include <cpu/atomic.h>
 #include <cpu/memory_barrier.h>
 
-#include "cpu.h"
-#include "lock.h"
-#include "kernel.h"
+#include <kernel/cpu.h>
+#include <kernel/lock.h>
+#include <kernel/kernel.h>
 
 Kernel::Lock & Kernel::data_lock()
 {

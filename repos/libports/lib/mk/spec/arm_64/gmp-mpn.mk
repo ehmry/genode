@@ -6,10 +6,10 @@ FILTER_OUT += udiv_w_sdiv.c
 
 # add ARM-specific assembly files and filter out the generic C files if needed
 
-SRC_ASM += copyd.asm copyi.asm
+SRC_ASM += copyd.asm copyi.asm invert_limb.asm
 
 FILTER_OUT += popham.c
-FILTER_OUT += logops_n.c sec_div.c sec_pi1_div.c copyi.c copyd.c
+FILTER_OUT += pre_divrem_1.c logops_n.c sec_div.c sec_pi1_div.c copyi.c copyd.c
 
 SRC_C += $(notdir $(wildcard $(REP_DIR)/src/lib/gmp/mpn/spec/64bit/*.c))
 SRC_C += $(filter-out $(FILTER_OUT),$(notdir $(wildcard $(GMP_MPN_DIR)/generic/*.c)))
@@ -19,7 +19,6 @@ include $(REP_DIR)/lib/mk/gmp.inc
 PWD := $(shell pwd)
 
 SRC_O += $(SRC_ASM:.asm=.o) hamdist.o popcount.o
-
 #
 # Create execution environment for the m4-ccas tool, which is used by the gmp
 # library to assemble asm files to object files. Make sure to execute this rule

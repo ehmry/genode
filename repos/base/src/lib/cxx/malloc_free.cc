@@ -101,7 +101,11 @@ extern "C" int posix_memalign(void **dest, size_t /*align*/, size_t size)
 
 extern "C" void *calloc(size_t nmemb, size_t size)
 {
-	void *addr = malloc(nmemb*size);
+	void * const addr = malloc(nmemb*size);
+
+	if (addr == nullptr)
+		return nullptr;
+
 	Genode::memset(addr, 0, nmemb*size);
 	return addr;
 }

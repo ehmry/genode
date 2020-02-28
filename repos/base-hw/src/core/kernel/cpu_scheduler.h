@@ -17,8 +17,8 @@
 /* core includes */
 #include <util.h>
 #include <util/misc_math.h>
-#include "configuration.h"
-#include "double_list.h"
+#include <kernel/configuration.h>
+#include <kernel/double_list.h>
 
 namespace Kernel
 {
@@ -26,16 +26,6 @@ namespace Kernel
 	 * Priority of an unconsumed CPU claim versus other unconsumed CPU claims
 	 */
 	class Cpu_priority;
-
-	/**
-	 * Scheduling context that has quota and priority (low-latency)
-	 */
-	class Cpu_claim : public Double_list_item { };
-
-	/**
-	 * Scheduling context that has no quota or priority (best effort)
-	 */
-	class Cpu_fill  : public Double_list_item { };
 
 	/**
 	 * Scheduling context that is both claim and fill
@@ -70,7 +60,7 @@ class Kernel::Cpu_priority
 		 * Standard operators
 		 */
 
-		Cpu_priority & operator =(signed const v)
+		Cpu_priority &operator =(signed const v)
 		{
 			_value = Genode::min(v, MAX);
 			return *this;
@@ -79,17 +69,19 @@ class Kernel::Cpu_priority
 		operator signed() const { return _value; }
 };
 
-class Kernel::Cpu_share : public Cpu_claim, public Cpu_fill
+class Kernel::Cpu_share
 {
 	friend class Cpu_scheduler;
 
 	private:
 
-		signed const _prio;
-		unsigned     _quota;
-		unsigned     _claim;
-		unsigned     _fill  = 0;
-		bool         _ready = false;
+		Double_list_item<Cpu_share> _fill_item  { *this };
+		Double_list_item<Cpu_share> _claim_item { *this };
+		signed const                _prio;
+		unsigned                    _quota;
+		unsigned                    _claim;
+		unsigned                    _fill       { 0 };
+		bool                        _ready      { false };
 
 	public:
 
@@ -114,60 +106,53 @@ class Kernel::Cpu_scheduler
 {
 	private:
 
-		typedef Cpu_share                Share;
-		typedef Cpu_fill                 Fill;
-		typedef Cpu_claim                Claim;
-		typedef Double_list_typed<Claim> Claim_list;
-		typedef Double_list_typed<Fill>  Fill_list;
-		typedef Cpu_priority             Prio;
+		typedef Cpu_share    Share;
+		typedef Cpu_priority Prio;
 
-		Claim_list     _rcl[Prio::MAX + 1]; /* ready claims */
-		Claim_list     _ucl[Prio::MAX + 1]; /* unready claims */
-		Fill_list      _fills { };          /* ready fills */
-		Share * const  _idle;
-		Share *        _head = nullptr;
-		unsigned       _head_quota  = 0;
-		bool           _head_claims = false;
-		bool           _head_yields = false;
-		unsigned const _quota;
-		unsigned       _residual;
-		unsigned const _fill;
-		bool           _need_to_schedule { true };
-		time_t         _last_time { 0 };
+		Double_list<Cpu_share>  _rcl[Prio::MAX + 1]; /* ready claims */
+		Double_list<Cpu_share>  _ucl[Prio::MAX + 1]; /* unready claims */
+		Double_list<Cpu_share>  _fills { };          /* ready fills */
+		Share                  &_idle;
+		Share                  *_head = nullptr;
+		unsigned                _head_quota  = 0;
+		bool                    _head_claims = false;
+		bool                    _head_yields = false;
+		unsigned const          _quota;
+		unsigned                _residual;
+		unsigned const          _fill;
+		bool                    _need_to_schedule { true };
+		time_t                  _last_time { 0 };
 
 		template <typename F> void _for_each_prio(F f) {
 			for (signed p = Prio::MAX; p > Prio::MIN - 1; p--) { f(p); } }
 
-		template <typename T>
-		static Share * _share(T * const t) { return static_cast<Share *>(t); }
-
-		static void _reset(Claim * const c);
+		static void _reset(Cpu_share &share);
 
 		void     _reset_claims(unsigned const p);
 		void     _next_round();
 		void     _consumed(unsigned const q);
-		void     _set_head(Share * const s, unsigned const q, bool const c);
+		void     _set_head(Share &s, unsigned const q, bool const c);
 		void     _next_fill();
 		void     _head_claimed(unsigned const r);
 		void     _head_filled(unsigned const r);
 		bool     _claim_for_head();
 		bool     _fill_for_head();
-		unsigned _trim_consumption(unsigned & q);
+		unsigned _trim_consumption(unsigned &q);
 
 		/**
 		 * Fill 's' becomes a claim due to a quota donation
 		 */
-		void _quota_introduction(Share * const s);
+		void _quota_introduction(Share &s);
 
 		/**
 		 * Claim 's' looses its state as claim due to quota revokation
 		 */
-		void _quota_revokation(Share * const s);
+		void _quota_revokation(Share &s);
 
 		/**
 		 * The quota of claim 's' changes to 'q'
 		 */
-		void _quota_adaption(Share * const s, unsigned const q);
+		void _quota_adaption(Share &s, unsigned const q);
 
 	public:
 
@@ -179,7 +164,7 @@ class Kernel::Cpu_scheduler
 		 * \param q  total amount of time quota that can be claimed by shares
 		 * \param f  time-slice length of the fill round-robin
 		 */
-		Cpu_scheduler(Share * const i, unsigned const q, unsigned const f);
+		Cpu_scheduler(Share &i, unsigned const q, unsigned const f);
 
 		bool need_to_schedule() { return _need_to_schedule; }
 		void timeout()          { _need_to_schedule = true; }
@@ -192,17 +177,17 @@ class Kernel::Cpu_scheduler
 		/**
 		 * Set 's1' ready and return wether this outdates current head
 		 */
-		bool ready_check(Share * const s1);
+		void ready_check(Share &s1);
 
 		/**
 		 * Set share 's' ready
 		 */
-		void ready(Share * const s);
+		void ready(Share &s);
 
 		/**
 		 * Set share 's' unready
 		 */
-		void unready(Share * const s);
+		void unready(Share &s);
 
 		/**
 		 * Current head looses its current claim/fill for this round
@@ -212,23 +197,23 @@ class Kernel::Cpu_scheduler
 		/**
 		 * Remove share 's' from scheduler
 		 */
-		void remove(Share * const s);
+		void remove(Share &s);
 
 		/**
 		 * Insert share 's' into scheduler
 		 */
-		void insert(Share * const s);
+		void insert(Share &s);
 
 		/**
 		 * Set quota of share 's' to 'q'
 		 */
-		void quota(Share * const s, unsigned const q);
+		void quota(Share &s, unsigned const q);
 
 		/*
 		 * Accessors
 		 */
 
-		Share * head() const { return _head; }
+		Share &head() const;
 		unsigned head_quota() const {
 			return Genode::min(_head_quota, _residual); }
 		unsigned quota() const { return _quota; }

@@ -307,8 +307,7 @@ proc run_genode_until {{wait_for_re forever} {timeout_value 0} {running_spawn_id
 
 			# kill the spawned load process if there is one
 			if {[load_spawn_id] != -1} {
-				set pid [exp_pid -i [load_spawn_id]]
-				exec kill -9 $pid
+				kill_spawned [load_spawn_id]
 			}
 
 			incr retry -1;
@@ -326,6 +325,17 @@ proc run_genode_until {{wait_for_re forever} {timeout_value 0} {running_spawn_id
 
 	puts stderr "Boot process failed 3 times in series. I give up!";
 	exit -1;
+}
+
+
+##
+# "Safely" kill spawned process
+#
+proc kill_spawned {spawn_id} {
+	set pid [exp_pid -i $spawn_id]
+	close -i $spawn_id
+	exec kill -9 $pid
+	wait -i $spawn_id
 }
 
 
@@ -985,6 +995,37 @@ proc build_core_image { modules } {
 
 	# Save config part of the image.elf for easy inspection
 	exec cp -f [run_dir]/genode/config [run_dir].config
+}
+
+proc build_initrd { modules } {
+
+    copy_genode_binaries_to_run_dir $modules
+
+    set modules [glob -nocomplain -tails -directory [run_dir]/genode/ *]
+    set excluded_modules [kernel_files]
+
+    foreach file [glob -nocomplain [run_dir]/genode/*.config] {
+		check_xml_syntax $file }
+
+    exec cp -f [run_dir]/genode/config [run_dir].config
+
+    set here [pwd]
+    cd [run_dir]
+    puts "generating initrd"
+    exec cp genode/initramfs init
+    exec mkdir tmp
+    exec mkdir dev
+    set files "init\ntmp\ndev\ngenode\n"
+    append files [exec find genode -type f,l -printf "genode/%f\n"]
+    exec -ignorestderr echo $files | [installed_command cpio] -o -L -H newc > initrd
+
+    #workaround because cpio fails to compress broken links sometimes
+    exec touch dev/platform_info
+    cd genode
+    exec ln -s ../dev/platform_info platform_info
+    cd ..
+    exec -ignorestderr echo "genode/platform_info" | [installed_command cpio] -o -A -H newc -O initrd
+    cd ${here}
 }
 
 source [genode_dir]/tool/run/depot.inc

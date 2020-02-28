@@ -17,6 +17,7 @@
 #define _LIBC__INTERNAL__PTHREAD_H_
 
 /* Genode includes */
+#include <libc/allocator.h>
 #include <libc/component.h>
 #include <util/reconstructible.h>
 
@@ -25,11 +26,15 @@
 
 /* libc-internal includes */
 #include <internal/types.h>
+#include <internal/monitor.h>
+#include <internal/timer.h>
 
 namespace Libc {
 
 	struct Pthread;
 	struct Pthread_registry;
+	struct Pthread_blockade;
+	struct Pthread_job;
 }
 
 
@@ -178,7 +183,26 @@ struct Libc::Pthread : Noncopyable, Thread::Tls::Base
 		void   *_stack_addr = nullptr;
 		size_t  _stack_size = 0;
 
+		/* cleanup handlers */
+
+		class Cleanup_handler : public List<Cleanup_handler>::Element
+		{
+			private:
+				void (*_routine)(void*);
+				void *_arg;
+
+			public:
+				Cleanup_handler(void (*routine)(void*), void *arg)
+				: _routine(routine), _arg(arg) { }
+
+				void execute() { _routine(_arg); }
+		};
+
+		List<Cleanup_handler> _cleanup_handlers;
+
 	public:
+
+		int thread_local_errno = 0;
 
 		/**
 		 * Constructor for threads created via 'pthread_create'
@@ -227,12 +251,43 @@ struct Libc::Pthread : Noncopyable, Thread::Tls::Base
 
 		void exit(void *retval)
 		{
+			while (cleanup_pop(1)) { }
 			_retval = retval;
 			cancel();
 		}
 
 		void   *stack_addr() const { return _stack_addr; }
 		size_t  stack_size() const { return _stack_size; }
+
+		/*
+		 * Push a cleanup handler to the cancellation cleanup stack.
+		 */
+		void cleanup_push(void (*routine)(void*), void *arg)
+		{
+			Libc::Allocator alloc { };
+			_cleanup_handlers.insert(new (alloc) Cleanup_handler(routine, arg));
+		}
+
+		/*
+		 * Pop and optionally execute the top-most cleanup handler.
+		 * Returns true if a handler was found.
+		 */
+		bool cleanup_pop(int execute)
+		{
+			Cleanup_handler *cleanup_handler = _cleanup_handlers.first();
+
+			if (!cleanup_handler) return false;
+
+			_cleanup_handlers.remove(cleanup_handler);
+
+			if (execute)
+				cleanup_handler->execute();
+
+			Libc::Allocator alloc { };
+			destroy(alloc, cleanup_handler);
+
+			return true;
+		}
 };
 
 
@@ -242,6 +297,57 @@ struct pthread : Libc::Pthread
 };
 
 
-namespace Libc { void init_pthread_support(Env &env); }
+class Libc::Pthread_blockade : public Blockade, public Timeout_handler
+{
+	private:
+
+		Lock                   _blockade { Lock::LOCKED };
+		Constructible<Timeout> _timeout;
+
+	public:
+
+		Pthread_blockade(Timer_accessor &timer_accessor, uint64_t timeout_ms)
+		{
+			if (timeout_ms) {
+				_timeout.construct(timer_accessor, *this);
+				_timeout->start(timeout_ms);
+			}
+		}
+
+		void block() override { _blockade.lock(); }
+
+		void wakeup() override
+		{
+			_woken_up = true;
+			_blockade.unlock();
+		}
+
+		/**
+		 * Timeout_handler interface
+		 */
+		void handle_timeout() override
+		{
+			_expired = true;
+			_blockade.unlock();
+		}
+};
+
+
+struct Libc::Pthread_job : Monitor::Job
+{
+	private:
+
+		Pthread_blockade _blockade;
+
+	public:
+
+		Pthread_job(Monitor::Function &fn,
+		            Timer_accessor &timer_accessor, uint64_t timeout_ms)
+		:
+			Job(fn, _blockade),
+			_blockade(timer_accessor, timeout_ms)
+		{ }
+};
+
 
 #endif /* _LIBC__INTERNAL__PTHREAD_H_ */

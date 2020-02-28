@@ -12,8 +12,8 @@
  */
 
 /* core includes */
-#include "thread.h"
-#include "vm.h"
+#include <kernel/thread.h>
+#include <kernel/vm.h>
 
 void Kernel::Thread::_call_new_vm()
 {

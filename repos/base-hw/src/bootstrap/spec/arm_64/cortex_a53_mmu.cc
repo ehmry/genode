@@ -16,7 +16,7 @@
 
 using Board::Cpu;
 
-extern "C" void * _crt0_enable_fpu;
+extern "C" void * _crt0_start_secondary;
 
 static inline void prepare_non_secure_world()
 {
@@ -144,6 +144,9 @@ unsigned Bootstrap::Platform::enable_mmu()
 	Cpu::Ttbr::access_t ttbr =
 		Cpu::Ttbr::Baddr::masked((Genode::addr_t)core_pd->table_base);
 
+	/* primary cpu wakes up all others */
+	if (primary && NR_OF_CPUS > 1) Cpu::wake_up_all_cpus(&_crt0_start_secondary);
+
 	while (Cpu::current_privilege_level() > Cpu::Current_el::EL1) {
 		if (Cpu::current_privilege_level() == Cpu::Current_el::EL3) {
 			prepare_non_secure_world();
@@ -153,11 +156,11 @@ unsigned Bootstrap::Platform::enable_mmu()
 		}
 	}
 
-	/* primary cpu wakes up all others */
-	if (primary && NR_OF_CPUS > 1) Cpu::wake_up_all_cpus(&_crt0_enable_fpu);
-
 	/* enable performance counter for user-land */
 	Cpu::Pmuserenr_el0::write(0b1111);
+	Cpu::Pmcr_el0::access_t pmcr = Cpu::Pmcr_el0::read();
+	Cpu::Pmcr_el0::write(pmcr | 1);
+	Cpu::Pmcntenset_el0::write(1 << 31);
 
 	/* enable user-level access of physical/virtual counter */
 	Cpu::Cntkctl_el1::write(0b11);
@@ -198,5 +201,5 @@ unsigned Bootstrap::Platform::enable_mmu()
 	Cpu::Sctlr::Uct::set(sctlr, 1);
 	Cpu::Sctlr_el1::write(sctlr);
 
-	return 0;
+	return (Cpu::Mpidr::read() & 0xff);
 }

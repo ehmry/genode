@@ -13,9 +13,9 @@
  */
 
 /* core includes */
-#include "cpu.h"
-#include "lock.h"
-#include "kernel.h"
+#include <kernel/cpu.h>
+#include <kernel/lock.h>
+#include <kernel/kernel.h>
 
 
 extern "C" void kernel()

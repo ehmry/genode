@@ -19,74 +19,16 @@
 #include <base/internal/native_utcb.h>
 
 /* core includes */
-#include <platform_pd.h>
-#include "ipc_node.h"
-#include "pd.h"
-#include "kernel.h"
-#include "thread.h"
+#include <kernel/ipc_node.h>
+#include <kernel/kernel.h>
+#include <kernel/thread.h>
 
 using namespace Kernel;
 
 
-static inline void free_obj_id_ref(Pd &pd, void *ptr)
-{
-	pd.platform_pd().capability_slab().free(ptr, sizeof(Object_identity_reference));
-}
-
-
-void Ipc_node::copy_msg(Ipc_node &sender)
-{
-	using namespace Genode;
-	using Reference = Object_identity_reference;
-
-	/* copy payload and set destination capability id */
-	*_utcb = *sender._utcb;
-	_utcb->destination(sender._capid);
-
-	/* translate capabilities */
-	for (unsigned i = 0; i < _rcv_caps; i++) {
-
-		capid_t id = sender._utcb->cap_get(i);
-
-		/* if there is no capability to send, just free the pre-allocation */
-		if (i >= sender._utcb->cap_cnt()) {
-			free_obj_id_ref(pd(), _obj_id_ref_ptr[i]);
-			continue;
-		}
-
-		/* lookup the capability id within the caller's cap space */
-		Reference *oir = (id == cap_id_invalid())
-			? nullptr : sender.pd().cap_tree().find(id);
-
-		/* if the caller's capability is invalid, free the pre-allocation */
-		if (!oir) {
-			_utcb->cap_add(cap_id_invalid());
-			free_obj_id_ref(pd(), _obj_id_ref_ptr[i]);
-			continue;
-		}
-
-		/* lookup the capability id within the callee's cap space */
-		Reference *dst_oir = oir->find(pd());
-
-		/* if it is not found, and the target is not core, create a reference */
-		if (!dst_oir && (&pd() != &core_pd())) {
-			dst_oir = oir->factory(_obj_id_ref_ptr[i], pd());
-			if (!dst_oir)
-				free_obj_id_ref(pd(), _obj_id_ref_ptr[i]);
-		} else /* otherwise free the pre-allocation */
-			free_obj_id_ref(pd(), _obj_id_ref_ptr[i]);
-
-		if (dst_oir) dst_oir->add_to_utcb();
-
-		/* add the translated capability id to the target buffer */
-		_utcb->cap_add(dst_oir ? dst_oir->capid() : cap_id_invalid());
-	}
-}
-
-
 void Ipc_node::_receive_request(Ipc_node &caller)
 {
-	copy_msg(caller);
+	_thread.ipc_copy_msg(caller._thread);
 	_caller = &caller;
 	_state  = INACTIVE;
 }
@@ -94,9 +36,9 @@ void Ipc_node::_receive_request(Ipc_node &caller)
 
 void Ipc_node::_receive_reply(Ipc_node &callee)
 {
-	copy_msg(callee);
+	_thread.ipc_copy_msg(callee._thread);
 	_state = INACTIVE;
-	_send_request_succeeded();
+	_thread.ipc_send_request_succeeded();
 }
 
 
@@ -105,19 +47,21 @@ void Ipc_node::_announce_request(Ipc_node &node)
 	/* directly receive request if we've awaited it */
 	if (_state == AWAIT_REQUEST) {
 		_receive_request(node);
-		_await_request_succeeded();
+		_thread.ipc_await_request_succeeded();
 		return;
 	}
 
 	/* cannot receive yet, so queue request */
-	_request_queue.enqueue(node);
+	_request_queue.enqueue(node._request_queue_item);
 }
 
 
 void Ipc_node::_cancel_request_queue()
 {
-	_request_queue.dequeue_all([] (Ipc_node &node) {
-		node._outbuf_request_cancelled(); });
+	_request_queue.dequeue_all([] (Queue_item &item) {
+		Ipc_node &node { item.object() };
+		node._outbuf_request_cancelled();
+	});
 }
 
 
@@ -142,7 +86,7 @@ void Ipc_node::_cancel_inbuf_request()
 void Ipc_node::_announced_request_cancelled(Ipc_node &node)
 {
 	if (_caller == &node) _caller = nullptr;
-	else _request_queue.remove(node);
+	else _request_queue.remove(node._request_queue_item);
 }
 
 
@@ -152,40 +96,24 @@ void Ipc_node::_outbuf_request_cancelled()
 
 	_callee = nullptr;
 	_state  = INACTIVE;
-	_send_request_failed();
+	_thread.ipc_send_request_failed();
 }
 
 
 bool Ipc_node::_helps_outbuf_dst() { return (_state == AWAIT_REPLY) && _help; }
 
 
-void Ipc_node::_init(Genode::Native_utcb &utcb, Ipc_node &starter)
+bool Ipc_node::can_send_request()
 {
-	_utcb = &utcb;
-	_rcv_caps = starter._utcb->cap_cnt();
-	Genode::Allocator &slab = pd().platform_pd().capability_slab();
-	for (unsigned i = 0; i < _rcv_caps; i++)
-		_obj_id_ref_ptr[i] = slab.alloc(sizeof(Object_identity_reference));
-	copy_msg(starter);
+	return _state == INACTIVE;
 }
 
 
-void Ipc_node::send_request(Ipc_node &callee, capid_t capid, bool help,
-                            unsigned rcv_caps)
+void Ipc_node::send_request(Ipc_node &callee, bool help)
 {
-	if (_state != INACTIVE) {
-		Genode::raw("IPC send request: bad state");
-		return;
-	}
-	Genode::Allocator &slab = pd().platform_pd().capability_slab();
-	for (unsigned i = 0; i < rcv_caps; i++)
-		_obj_id_ref_ptr[i] = slab.alloc(sizeof(Object_identity_reference));
-
 	_state    = AWAIT_REPLY;
 	_callee   = &callee;
-	_capid    = capid;
 	_help     = false;
-	_rcv_caps = rcv_caps;
 
 	/* announce request */
 	_callee->_announce_request(*this);
@@ -194,32 +122,22 @@ void Ipc_node::send_request(Ipc_node &callee, capid_t capid, bool help,
 }
 
 
-Ipc_node * Ipc_node::helping_sink() {
-	return _helps_outbuf_dst() ? _callee->helping_sink() : this; }
+Thread &Ipc_node::helping_sink() {
+	return _helps_outbuf_dst() ? _callee->helping_sink() : _thread; }
 
 
-bool Ipc_node::await_request(unsigned rcv_caps)
+bool Ipc_node::can_await_request()
 {
-	if (_state != INACTIVE) {
-		Genode::raw("IPC await request: bad state");
-		return true;
-	}
-	Genode::Allocator &slab = pd().platform_pd().capability_slab();
-	for (unsigned i = 0; i < rcv_caps; i++)
-		_obj_id_ref_ptr[i] = slab.alloc(sizeof(Object_identity_reference));
+	return _state == INACTIVE;
+}
 
-	_rcv_caps = rcv_caps;
 
-	/* if no request announced then wait */
-	bool announced = false;
+void Ipc_node::await_request()
+{
 	_state = AWAIT_REQUEST;
-
-	/* if anybody already announced a request receive it */
-	_request_queue.dequeue([&] (Ipc_node &ipc) {
-		_receive_request(ipc);
-		announced = true;
+	_request_queue.dequeue([&] (Queue_item &item) {
+		_receive_request(item.object());
 	});
-	return announced;
 }
 
 
@@ -239,16 +157,22 @@ void Ipc_node::cancel_waiting()
 	case AWAIT_REPLY:
 		_cancel_outbuf_request();
 		_state = INACTIVE;
-		_send_request_failed();
+		_thread.ipc_send_request_failed();
 		break;
 	case AWAIT_REQUEST:
 		_state = INACTIVE;
-		_await_request_failed();
+		_thread.ipc_await_request_failed();
 		break;
 		return;
 	default: return;
 	}
 }
+
+
+Ipc_node::Ipc_node(Thread &thread)
+:
+	_thread(thread)
+{ }
 
 
 Ipc_node::~Ipc_node()

@@ -111,10 +111,11 @@ struct Menu_view::Main
 
 	} _vfs_env;
 
-	Directory _root_dir  { _vfs_env };
-	Directory _fonts_dir { _root_dir, "fonts" };
+	Directory _root_dir   { _vfs_env };
+	Directory _fonts_dir  { _root_dir, "fonts" };
+	Directory _styles_dir { _root_dir, "styles" };
 
-	Style_database _styles { _env.ram(), _env.rm(), _heap, _fonts_dir };
+	Style_database _styles { _env.ram(), _env.rm(), _heap, _fonts_dir, _styles_dir };
 
 	Animator _animator { };
 
@@ -126,7 +127,7 @@ struct Menu_view::Main
 
 	Attached_dataspace _input_ds { _env.rm(), _nitpicker.input()->dataspace() };
 
-	Widget::Unique_id _last_reported_hovered { };
+	Widget::Hovered _last_reported_hovered { };
 
 	void _handle_config();
 
@@ -208,7 +209,7 @@ void Menu_view::Main::_update_hover_report()
 		return;
 	}
 
-	Widget::Unique_id const new_hovered = _root_widget.hovered(_hovered_position);
+	Widget::Hovered const new_hovered = _root_widget.hovered(_hovered_position);
 
 	if (_last_reported_hovered != new_hovered) {
 

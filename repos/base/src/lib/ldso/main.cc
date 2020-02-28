@@ -19,6 +19,7 @@
 #include <util/string.h>
 #include <base/thread.h>
 #include <base/heap.h>
+#include <base/platform.h>
 #include <base/sleep.h>
 
 /* base-internal includes */
@@ -193,6 +194,11 @@ class Linker::Elf_object : public Object, private Fifo<Elf_object>::Element
 
 			Link_map::add(&_map);
 		};
+
+		void link_map_make_first()
+		{
+			Link_map::make_first(&_map);
+		}
 
 		void force_keep() { _keep = KEEP; }
 
@@ -637,6 +643,9 @@ Elf::Sym const *Linker::lookup_symbol(char const *name, Dependency const &dep,
  */
 extern "C" void init_rtld()
 {
+	/* init cxa guard mechanism before any local static variables are used */
+	init_cxx_guard();
+
 	/*
 	 * Allocate on stack, since the linker has not been relocated yet, the vtable
 	 * type relocation might produce a wrong vtable pointer (at least on ARM), do
@@ -671,7 +680,7 @@ void Genode::init_ldso_phdr(Env &env)
 	 * however, is copied from the parent process. So the pointed-to objects
 	 * must reside on the same addresses in the parent and child.
 	 */
-	static char initial_block[4*1024];
+	static char initial_block[8*1024];
 	heap().construct(&env.ram(), &env.rm(), Heap::UNLIMITED,
 	                 initial_block, sizeof(initial_block));
 
@@ -729,6 +738,9 @@ void *Dynamic_linker::_respawn(Env &env, char const *binary, char const *entry_n
 	/* load new binary */
 	construct_at<Binary>(binary_ptr, env, *heap(), config, name.string());
 
+	/* move to front of link map */
+	binary_ptr->link_map_make_first();
+
 	try {
 		return (void *)binary_ptr->lookup_symbol(entry_name);
 	}
@@ -772,6 +784,8 @@ void Component::construct(Genode::Env &env)
 	Link_map::dump();
 
 	binary_ready_hook_for_gdb();
+
+	binary_ready_hook_for_platform();
 
 	/* start binary */
 	binary_ptr->call_entry_point(env);

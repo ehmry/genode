@@ -16,7 +16,7 @@
 
 /* base-hw includes */
 #include <kernel/types.h>
-#include "irq.h"
+#include <kernel/irq.h>
 
 /* Genode includes */
 #include <util/list.h>
@@ -91,7 +91,10 @@ class Kernel::Timer
 
 		Timer(Cpu & cpu);
 
-		void schedule_timeout();
+		/**
+		 * Return duration from last call of this function
+		 */
+		time_t schedule_timeout();
 
 		void process_timeouts();
 

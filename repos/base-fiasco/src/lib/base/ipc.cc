@@ -201,16 +201,14 @@ void Genode::ipc_reply(Native_capability caller, Rpc_exception_code exc,
 	            snd_header.protocol_word,
 	            snd_header.num_caps,
 	            L4_IPC_SEND_TIMEOUT_0, &result);
-
-	if (L4_IPC_IS_ERROR(result))
-		error("ipc_send error ", Hex(L4_IPC_ERROR(result)), ", ignored");
 }
 
 
-Genode::Rpc_request Genode::ipc_reply_wait(Reply_capability const &last_caller,
-                                           Rpc_exception_code      exc,
-                                           Msgbuf_base            &reply_msg,
-                                           Msgbuf_base            &request_msg)
+Genode::Rpc_request Genode::ipc_reply_wait(Reply_capability const         &last_caller,
+                                           Rpc_exception_code              exc,
+                                           Msgbuf_base                    &reply_msg,
+                                           Msgbuf_base                    &request_msg,
+                                           Rpc_entrypoint::Native_context &)
 {
 	using namespace Fiasco;
 
@@ -277,9 +275,10 @@ Genode::Rpc_request Genode::ipc_reply_wait(Reply_capability const &last_caller,
 }
 
 
-Ipc_server::Ipc_server()
+Ipc_server::Ipc_server(Rpc_entrypoint::Native_context& native_context)
 :
-	Native_capability(Capability_space::import(Fiasco::l4_myself(), Rpc_obj_key()))
+	Native_capability(Capability_space::import(Fiasco::l4_myself(), Rpc_obj_key())),
+	_native_context(native_context)
 { }
 
 

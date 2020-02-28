@@ -36,6 +36,30 @@ extern int session_auth_password_cb(ssh_session, char const *, char const *, voi
 extern int session_auth_pubkey_cb(ssh_session, char const *, struct ssh_key_struct *, char, void *);
 extern ssh_channel session_channel_open_request_cb(ssh_session, void *);
 
+/**
+ * forward declaration of the write available callback.
+ */
+static int write_avail_cb(socket_t fd, int revents, void *userdata);
+
+
+Ssh::Terminal_session::Terminal_session(Genode::Registry<Terminal_session> &reg,
+                                        Ssh::Terminal &conn,
+                                        ssh_event event_loop)
+:
+	Element(reg, *this), conn(conn), _event_loop(event_loop)
+{
+	if (pipe(_fds) ||
+		ssh_event_add_fd(_event_loop,
+		                 _fds[0],
+		                 POLLIN,
+		                 write_avail_cb,
+		                 this) != SSH_OK ) {
+		Genode::error("Failed to create wakeup pipe");
+		throw -1;
+	}
+	conn.write_avail_fd = _fds[1];
+}
+
 
 Ssh::Server::Server(Genode::Env &env,
                     Genode::Xml_node const &config,
@@ -521,10 +545,23 @@ bool Ssh::Server::auth_pubkey(ssh_session s, char const *u,
 	}
 	Session &session = *p;
 
+	/*
+	 * In this first state the given pubkey is solely probed.
+	 * Ideally we would check here if the given pubkey is in fact to the
+	 * configured one, i.e., reading a 'authorized_keys' like file and
+	 * check its entries.
+	 *
+	 * For now we simple accept all keys and reject them in the later
+	 * state.
+	 */
 	if (signature_state == SSH_PUBLICKEY_STATE_NONE) {
-		return SSH_AUTH_PARTIAL;
+		return true;
 	}
 
+	/*
+	 * In this second state we check the provided pubkey and if it
+	 * matches allow authentication to proceed.
+	 */
 	if (signature_state == SSH_PUBLICKEY_STATE_VALID) {
 		Genode::Lock::Guard g(_logins.lock());
 		Login const *l = _logins.lookup(u);
@@ -534,13 +571,13 @@ bool Ssh::Server::auth_pubkey(ssh_session s, char const *u,
 				session.auth_sucessful = true;
 				session.adopt(l->user);
 				_log_login(l->user, session, true);
-				return SSH_AUTH_SUCCESS;
+				return true;
 			}
 		}
 	}
 
 	_log_failed(u, session, true);
-	return SSH_AUTH_DENIED;
+	return false;
 }
 
 

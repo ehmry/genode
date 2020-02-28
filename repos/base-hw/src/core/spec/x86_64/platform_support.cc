@@ -13,7 +13,7 @@
 
 #include <bios_data_area.h>
 #include <platform.h>
-#include "../../kernel/cpu.h"
+#include <kernel/cpu.h>
 #include <map_local.h>
 
 using namespace Genode;

@@ -154,8 +154,8 @@ LX_MUTEX_INIT_DECLARE(phy_fixup_lock);
 
 #include <lx_emul/bitops.h>
 #include <lx_emul/atomic.h>
-#include <lx_emul/work.h>
 #include <lx_emul/spinlock.h>
+#include <lx_emul/work.h>
 #include <lx_emul/errno.h>
 #include <lx_emul/string.h>
 #include <lx_emul/module.h>
@@ -1932,8 +1932,6 @@ void dev_add_offload(struct packet_offload *po);
 void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp);
 
 struct pm_qos_request {};
-
-#define dma_wmb() __asm__ __volatile__ ("dmb oshst" : : : "memory")
 
 #include <lx_emul/extern_c_end.h>
 

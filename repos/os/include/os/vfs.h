@@ -50,13 +50,14 @@ struct Genode::Directory : Noncopyable, Interface
 
 				Entry() { }
 
+				using Dirent_type = Vfs::Directory_service::Dirent_type;
+
 			public:
 
 				void print(Output &out) const
 				{
 					using Genode::print;
 					using Vfs::Directory_service;
-					using Dirent_type = Directory_service::Dirent_type;
 
 					print(out, _dirent.name.buf, " (");
 					switch (_dirent.type) {
@@ -74,6 +75,10 @@ struct Genode::Directory : Noncopyable, Interface
 				Name name() const { return Name(Cstring(_dirent.name.buf)); }
 
 				Vfs::Directory_service::Dirent_type type() const { return _dirent.type; }
+
+				bool dir() const { return _dirent.type == Dirent_type::DIRECTORY; }
+
+				Vfs::Node_rwx rwx() const { return _dirent.rwx; }
 		};
 
 		enum { MAX_PATH_LEN = 256 };
@@ -84,6 +89,10 @@ struct Genode::Directory : Noncopyable, Interface
 		{
 			char const *p = y.string();
 			while (*p == '/') ++p;
+
+			if (x == "/")
+				return Path("/", p);
+
 			return Path(x, "/", p);
 		}
 
@@ -498,8 +507,15 @@ class Genode::File_content
 		template <typename FN>
 		void xml(FN const &fn) const
 		{
-			try { fn(Xml_node(_buffer.ptr, _buffer.size)); }
-			catch (Xml_node::Invalid_syntax) { fn(Xml_node("<empty/>")); }
+			try {
+				if (_buffer.size) {
+					fn(Xml_node(_buffer.ptr, _buffer.size));
+					return;
+				}
+			}
+			catch (Xml_node::Invalid_syntax) { }
+
+			fn(Xml_node("<empty/>"));
 		}
 
 		/**
@@ -510,6 +526,9 @@ class Genode::File_content
 		template <typename STRING, typename FN>
 		void for_each_line(FN const &fn) const
 		{
+			if (_buffer.size == 0)
+				return;
+
 			char const *src           = _buffer.ptr;
 			char const *curr_line     = src;
 			size_t      curr_line_len = 0;
@@ -538,9 +557,15 @@ class Genode::File_content
 
 		/**
 		 * Call functor 'fn' with the data pointer and size in bytes
+		 *
+		 * If the buffer has a size of zero, 'fn' is not called.
 		 */
 		template <typename FN>
-		void bytes(FN const &fn) const { fn((char const *)_buffer.ptr, _buffer.size); }
+		void bytes(FN const &fn) const
+		{
+			if (_buffer.size)
+				fn((char const *)_buffer.ptr, _buffer.size);
+		}
 };
 
 

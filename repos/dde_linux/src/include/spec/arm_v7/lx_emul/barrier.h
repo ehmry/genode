@@ -19,6 +19,9 @@
 #define rmb() mb()
 #define wmb() asm volatile ("dsb st": : :"memory")
 
+#define dma_wmb() asm volatile ("dmb oshst": : : "memory")
+#define dma_rmb() asm volatile ("dmb osh": : : "memory")
+
 /*
  * This is the "safe" implementation as needed for a configuration
  * with bufferable DMA memory and SMP enabled.

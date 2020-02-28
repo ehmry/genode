@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (C) 2016-2019 Genode Labs GmbH
+ * Copyright (C) 2016-2020 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -17,6 +17,27 @@
 #include <internal/kernel.h>
 
 Libc::Kernel * Libc::Kernel::_kernel_ptr;
+
+
+/**
+ * Blockade for main context
+ */
+
+inline void Libc::Main_blockade::block()
+{
+	Check check { _woken_up };
+
+	do {
+		_timeout_ms = Kernel::kernel().suspend(check, _timeout_ms);
+		_expired    = _timeout_valid && !_timeout_ms;
+	} while (!woken_up() && !expired());
+}
+
+inline void Libc::Main_blockade::wakeup()
+{
+	_woken_up = true;
+	Kernel::kernel().resume_main();
+}
 
 
 /**
@@ -118,6 +139,8 @@ void Libc::Kernel::_init_file_descriptors()
 			_vfs.close(fd);
 			return;
 		}
+
+		fd->cloexec = node.attribute_value("cloexec", false);
 
 		/*
 		 * We need to manually register the path. Normally this is done
@@ -357,11 +380,25 @@ void Libc::execute_in_application_context(Application_code &app_code)
 }
 
 
+static void close_file_descriptors_on_exit()
+{
+	for (;;) {
+		int const fd = Libc::file_descriptor_allocator()->any_open_fd();
+		if (fd == -1)
+			break;
+		close(fd);
+	}
+}
+
+
 Libc::Kernel::Kernel(Genode::Env &env, Genode::Allocator &heap)
 :
 	_env(env), _heap(heap)
 {
-	init_pthread_support(env, *this, *this);
+	atexit(close_file_descriptors_on_exit);
+
+	init_semaphore_support(_timer_accessor);
+	init_pthread_support(*this, *this, _timer_accessor);
 
 	_env.ep().register_io_progress_handler(*this);
 
@@ -373,8 +410,10 @@ Libc::Kernel::Kernel(Genode::Env &env, Genode::Allocator &heap)
 		init_malloc(*_malloc_heap);
 	}
 
-	init_fork(_env, _libc_env, _heap, *_malloc_heap, _pid, *this, *this, _signal, *this);
-	init_execve(_env, _heap, _user_stack, *this);
+	init_fork(_env, _libc_env, _heap, *_malloc_heap, _pid, *this, *this, _signal,
+	          *this, _binary_name);
+	init_execve(_env, _heap, _user_stack, *this, _binary_name,
+	            *file_descriptor_allocator());
 	init_plugin(*this);
 	init_sleep(*this);
 	init_vfs_plugin(*this);

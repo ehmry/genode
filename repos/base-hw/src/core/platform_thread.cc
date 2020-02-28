@@ -17,15 +17,15 @@
 #include <platform_pd.h>
 #include <core_env.h>
 #include <rm_session_component.h>
-#include "map_local.h"
+#include <map_local.h>
 
 /* base-internal includes */
 #include <base/internal/native_utcb.h>
 #include <base/internal/capability_space.h>
 
 /* kernel includes */
-#include "kernel/pd.h"
-#include "kernel/kernel.h"
+#include <kernel/pd.h>
+#include <kernel/kernel.h>
 
 using namespace Genode;
 

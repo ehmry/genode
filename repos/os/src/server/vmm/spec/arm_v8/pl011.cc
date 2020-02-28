@@ -64,7 +64,7 @@ void Pl011::_read()
 {
 	if (!_terminal.avail()) return;
 
-	while (_terminal.avail()) {
+	while (_terminal.avail() && _rx_buf.avail_capacity()) {
 		unsigned char c = 0;
 		_terminal.read(&c, 1);
 		_rx_buf.add(c);
@@ -83,7 +83,7 @@ Pl011::Pl011(const char * const       name,
              Mmio_bus               & bus,
              Genode::Env            & env)
 : Mmio_device(name, addr, size),
-  _terminal(env),
+  _terminal(env, "earlycon"),
   _handler(cpu, env.ep(), *this, &Pl011::_read),
   _irq(cpu.gic().irq(irq))
 {

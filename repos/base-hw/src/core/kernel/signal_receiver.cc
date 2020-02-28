@@ -12,7 +12,8 @@
  */
 
 /* core includes */
-#include "signal_receiver.h"
+#include <kernel/signal_receiver.h>
+#include <kernel/thread.h>
 
 using namespace Kernel;
 
@@ -24,11 +25,13 @@ using namespace Kernel;
 void Signal_handler::cancel_waiting()
 {
 	if (_receiver) {
-		_receiver->_handler_cancelled(this);
+		_receiver->_handler_cancelled(*this);
 		_receiver = 0;
 	}
 }
 
+
+Signal_handler::Signal_handler(Thread &thread) : _thread { thread } { }
 
 Signal_handler::~Signal_handler() { cancel_waiting(); }
 
@@ -43,7 +46,10 @@ void Signal_context_killer::cancel_waiting()
 }
 
 
-Signal_context_killer::Signal_context_killer() : _context(nullptr) { }
+Signal_context_killer::Signal_context_killer(Thread &thread)
+:
+	_thread { thread }
+{ }
 
 
 Signal_context_killer::~Signal_context_killer() { cancel_waiting(); }
@@ -55,7 +61,7 @@ Signal_context_killer::~Signal_context_killer() { cancel_waiting(); }
 
 void Signal_context::_deliverable()
 {
-	if (_submits) { _receiver._add_deliverable(this); }
+	if (_submits) { _receiver._add_deliverable(*this); }
 }
 
 
@@ -69,12 +75,18 @@ void Signal_context::_delivered()
 void Signal_context::_killer_cancelled() { _killer = 0; }
 
 
-int Signal_context::submit(unsigned const n)
+bool Signal_context::can_submit(unsigned const n) const
 {
-	if (_killed || _submits >= (unsigned)~0 - n) { return -1; }
+	if (_killed || _submits >= (unsigned)~0 - n) { return false; }
+	return true;
+}
+
+
+void Signal_context::submit(unsigned const n)
+{
+	if (_killed || _submits >= (unsigned)~0 - n) { return; }
 	_submits += n;
 	if (_ack) { _deliverable(); }
-	return 0;
 }
 
 
@@ -88,37 +100,46 @@ void Signal_context::ack()
 	}
 	if (_killer) {
 		_killer->_context = 0;
-		_killer->_signal_context_kill_done();
+		_killer->_thread.signal_context_kill_done();
 		_killer = 0;
 	}
 }
 
 
-int Signal_context::kill(Signal_context_killer * const k)
+bool Signal_context::can_kill() const
 {
 	/* check if in a kill operation or already killed */
 	if (_killed) {
-		if (_ack) { return 0; }
-		return -1;
+		if (_ack) { return true; }
+		return false;
+	}
+	return true;
+}
+
+
+void Signal_context::kill(Signal_context_killer &k)
+{
+	/* check if in a kill operation or already killed */
+	if (_killed) {
+		return;
 	}
 	/* kill directly if there is no unacknowledged delivery */
 	if (_ack) {
 		_killed = 1;
-		return 0;
+		return;
 	}
 	/* wait for delivery acknowledgement */
-	_killer = k;
+	_killer = &k;
 	_killed = 1;
 	_killer->_context = this;
-	_killer->_signal_context_kill_pending();
-	return 0;
+	_killer->_thread.signal_context_kill_pending();
 }
 
 
 Signal_context::~Signal_context()
 {
-	if (_killer) { _killer->_signal_context_kill_failed(); }
-	_receiver._context_destructed(this);
+	if (_killer) { _killer->_thread.signal_context_kill_failed(); }
+	_receiver._context_destructed(*this);
 }
 
 
@@ -126,7 +147,7 @@ Signal_context::Signal_context(Signal_receiver & r, addr_t const imprint)
 : _receiver(r),
   _imprint(imprint)
 {
-	r._add_context(this);
+	r._add_context(*this);
 }
 
 
@@ -134,10 +155,10 @@ Signal_context::Signal_context(Signal_receiver & r, addr_t const imprint)
  ** Signal_receiver **
  *********************/
 
-void Signal_receiver::_add_deliverable(Signal_context * const c)
+void Signal_receiver::_add_deliverable(Signal_context &c)
 {
-	if (!c->_deliver_fe.enqueued()) {
-		_deliver.enqueue(c->_deliver_fe);
+	if (!c._deliver_fe.enqueued()) {
+		_deliver.enqueue(c._deliver_fe);
 	}
 	_listen();
 }
@@ -164,7 +185,7 @@ void Signal_receiver::_listen()
 			_handlers.dequeue([&] (Signal_handler::Fifo_element &elem) {
 				auto const handler = &elem.object();
 				handler->_receiver = nullptr;
-				handler->_receive_signal(&data, sizeof(data));
+				handler->_thread.signal_receive_signal(&data, sizeof(data));
 			});
 			context->_delivered();
 		});
@@ -172,30 +193,36 @@ void Signal_receiver::_listen()
 }
 
 
-void Signal_receiver::_context_destructed(Signal_context * const c)
+void Signal_receiver::_context_destructed(Signal_context &c)
 {
-	_contexts.remove(c->_contexts_fe);
-	if (!c->_deliver_fe.enqueued()) { return; }
-	_deliver.remove(c->_deliver_fe);
+	_contexts.remove(c._contexts_fe);
+	if (!c._deliver_fe.enqueued()) { return; }
+	_deliver.remove(c._deliver_fe);
 }
 
 
-void Signal_receiver::_handler_cancelled(Signal_handler * const h) {
-	_handlers.remove(h->_handlers_fe); }
+void Signal_receiver::_handler_cancelled(Signal_handler &h) {
+	_handlers.remove(h._handlers_fe); }
 
 
-void Signal_receiver::_add_context(Signal_context * const c) {
-	_contexts.enqueue(c->_contexts_fe); }
+void Signal_receiver::_add_context(Signal_context &c) {
+	_contexts.enqueue(c._contexts_fe); }
 
 
-int Signal_receiver::add_handler(Signal_handler * const h)
+bool Signal_receiver::can_add_handler(Signal_handler const &h) const
 {
-	if (h->_receiver) { return -1; }
-	_handlers.enqueue(h->_handlers_fe);
-	h->_receiver = this;
-	h->_await_signal(this);
+	if (h._receiver) { return false; }
+	return true;
+}
+
+
+void Signal_receiver::add_handler(Signal_handler &h)
+{
+	if (h._receiver) { return; }
+	_handlers.enqueue(h._handlers_fe);
+	h._receiver = this;
+	h._thread.signal_wait_for_signal();
 	_listen();
-	return 0;
 }
 
 

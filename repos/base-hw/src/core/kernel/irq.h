@@ -23,7 +23,7 @@
 #include <base/internal/unmanaged_singleton.h>
 
 /* core includes */
-#include "signal_receiver.h"
+#include <kernel/signal_receiver.h>
 
 namespace Kernel
 {
@@ -50,7 +50,7 @@ namespace Genode
 class Kernel::Irq : Genode::Avl_node<Irq>
 {
 	friend class Genode::Avl_tree<Irq>;
-	friend struct Genode::Avl_node<Irq>;
+	friend class Genode::Avl_node<Irq>;
 
 	public:
 
@@ -119,10 +119,11 @@ class Kernel::Irq : Genode::Avl_node<Irq>
 };
 
 
-class Kernel::User_irq : public Kernel::Irq, public Kernel::Object
+class Kernel::User_irq : public Kernel::Irq
 {
 	private:
 
+		Kernel::Object  _kernel_object { *this };
 		Signal_context &_context;
 
 		/**
@@ -150,7 +151,9 @@ class Kernel::User_irq : public Kernel::Irq, public Kernel::Object
 		 */
 		void occurred() override
 		{
-			_context.submit(1);
+			if (_context.can_submit(1)) {
+				_context.submit(1);
+			}
 			disable();
 		}
 
@@ -186,6 +189,8 @@ class Kernel::User_irq : public Kernel::Irq, public Kernel::Object
 		 */
 		static void syscall_destroy(Genode::Kernel_object<User_irq> &irq) {
 			call(call_id_delete_irq(), (Call_arg) &irq); }
+
+		Object &kernel_object() { return _kernel_object; }
 };
 
 #endif /* _CORE__KERNEL__IRQ_H_ */

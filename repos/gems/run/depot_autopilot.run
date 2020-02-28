@@ -112,8 +112,7 @@ proc autopilot_run_genode_until {{wait_for_re forever} {timeout_value 0} {runnin
 
 			# kill the spawned load process if there is one
 			if {[load_spawn_id] != -1} {
-				set pid [exp_pid -i [load_spawn_id]]
-				exec kill -9 $pid
+				kill_spawned [load_spawn_id]
 			}
 
 			incr retry -1;
@@ -359,7 +358,7 @@ proc prepare_to_run_genode { } {
 		</start>
 
 		<start name="depot_autopilot" priority="-1">
-			<resource name="RAM" quantum="2M"/>
+			<resource name="RAM" quantum="8M"/>
 			<provides> <service name="LOG"/> </provides>
 			<config repeat="} $test_repeat {" arch="} [depot_spec] {" children_label_prefix="dynamic -> ">
 				<static>
@@ -720,7 +719,6 @@ set default_test_pkgs {
 	test-tcp_bulk_lwip
 	test-tcp_bulk_lxip
 	test-terminal_crosslink
-	test-timed_semaphore
 	test-timer
 	test-tls
 	test-trace
@@ -768,8 +766,8 @@ set skip_test(test-rm_nested)       [expr [have_spec linux]]
 set skip_test(test-slab)            [expr ![interactive] && [have_include "power_on/qemu"]]
 set skip_test(test-solo5)           [expr ![have_spec x86_64]]
 set skip_test(test-spark_exception) [expr [have_spec arm]]
-set skip_test(test-tcp_bulk_lwip)   [expr ![have_spec x86]]
-set skip_test(test-tcp_bulk_lxip)   [expr ![have_spec x86]]
+set skip_test(test-tcp_bulk_lwip)   [expr ![have_spec x86] && ![have_include "power_on/qemu"]]
+set skip_test(test-tcp_bulk_lxip)   [expr ![have_spec x86] && ![have_include "power_on/qemu"]]
 set skip_test(test-rust)            [expr [have_spec arm_v8a]]
 
 #
@@ -830,7 +828,7 @@ while {1} {
 		if {$run_genode_failed} {
 
 			# shut-down running system
-			exec kill -9 [exp_pid -i $serial_id]
+			kill_spawned $serial_id
 			run_power_off
 
 			# remember result of last test
@@ -902,7 +900,7 @@ while {1} {
 		{
 			# shut-down running system
 			puts "Re-booting to meet maximum number of tests per boot for this platform"
-			exec kill -9 [exp_pid -i $serial_id]
+			kill_spawned $serial_id
 			run_power_off
 
 			# prepare system re-boot

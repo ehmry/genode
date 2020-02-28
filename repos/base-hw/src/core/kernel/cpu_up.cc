@@ -11,7 +11,7 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
-#include "cpu.h"
+#include <kernel/cpu.h>
 
 void Kernel::Cpu::Ipi::occurred() { }
 

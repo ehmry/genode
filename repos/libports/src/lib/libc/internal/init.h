@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2016-2017 Genode Labs GmbH
+ * Copyright (C) 2016-2020 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -30,12 +30,15 @@ namespace Libc {
 
 	struct Resume;
 	struct Suspend;
+	struct Monitor;
 	struct Select;
 	struct Current_time;
 	struct Clone_connection;
 	struct Kernel_routine_scheduler;
 	struct Watch;
 	struct Signal;
+	struct File_descriptor_allocator;
+	struct Timer_accessor;
 
 	/**
 	 * Support for shared libraries
@@ -103,10 +106,10 @@ namespace Libc {
 	void init_socket_fs(Suspend &);
 
 	/**
-	 * Allow thread.cc to access the 'Genode::Env' (needed for the
-	 * implementation of condition variables with timeout)
+	 * Pthread/semaphore support
 	 */
-	void init_pthread_support(Genode::Env &env, Suspend &, Resume &);
+	void init_pthread_support(Suspend &, Resume &, Timer_accessor &);
+	void init_semaphore_support(Timer_accessor &);
 
 	struct Config_accessor : Interface
 	{
@@ -118,7 +121,8 @@ namespace Libc {
 	 */
 	void init_fork(Genode::Env &, Config_accessor const &,
 	               Genode::Allocator &heap, Heap &malloc_heap, int pid,
-	               Suspend &, Resume &, Signal &, Kernel_routine_scheduler &);
+	               Suspend &, Resume &, Signal &, Kernel_routine_scheduler &,
+	               Binary_name const &);
 
 	struct Reset_malloc_heap : Interface
 	{
@@ -129,7 +133,8 @@ namespace Libc {
 	 * Execve mechanism
 	 */
 	void init_execve(Genode::Env &, Genode::Allocator &, void *user_stack,
-	                 Reset_malloc_heap &);
+	                 Reset_malloc_heap &, Binary_name &,
+	                 File_descriptor_allocator &);
 
 	/**
 	 * Signal handling

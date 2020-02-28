@@ -12,9 +12,9 @@
  */
 
 /* core includes */
-#include "kernel.h"
-#include "cpu.h"
-#include "irq.h"
+#include <kernel/kernel.h>
+#include <kernel/cpu.h>
+#include <kernel/irq.h>
 
 
 void Kernel::Irq::disable() const {

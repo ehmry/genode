@@ -23,6 +23,8 @@
 
 namespace Kernel
 {
+	class Thread;
+
 	/**
 	 * Ability to receive signals from signal receivers
 	 */
@@ -59,36 +61,15 @@ class Kernel::Signal_handler
 
 		typedef Genode::Fifo_element<Signal_handler> Fifo_element;
 
-		Fifo_element      _handlers_fe { *this   };
-		Signal_receiver * _receiver    { nullptr };
-
-		/**
-		 * Let the handler block for signal receipt
-		 *
-		 * \param receiver  the signal pool that the thread blocks for
-		 */
-		virtual void _await_signal(Signal_receiver * const receiver) = 0;
-
-		/**
-		 * Signal delivery backend
-		 *
-		 * \param base  signal-data base
-		 * \param size  signal-data size
-		 */
-		virtual void _receive_signal(void * const base, size_t const size) = 0;
-
-	protected:
-
-		/***************
-		 ** Accessors **
-		 ***************/
-
-		Signal_receiver * receiver() const { return _receiver; }
+		Thread          &_thread;
+		Fifo_element     _handlers_fe { *this   };
+		Signal_receiver *_receiver    { nullptr };
 
 	public:
 
-		Signal_handler() { }
-		virtual ~Signal_handler();
+		Signal_handler(Thread &thread);
+
+		~Signal_handler();
 
 		/**
 		 * Stop waiting for a signal receiver
@@ -108,35 +89,14 @@ class Kernel::Signal_context_killer
 		Signal_context_killer(Signal_context_killer const &);
 		Signal_context_killer &operator = (Signal_context_killer const &);
 
-		Signal_context * _context;
-
-		/**
-		 * Notice that the kill operation is pending
-		 */
-		virtual void _signal_context_kill_pending() = 0;
-
-		/**
-		 * Notice that pending kill operation is done
-		 */
-		virtual void _signal_context_kill_done() = 0;
-
-		/**
-		 * Notice that pending kill operation failed
-		 */
-		virtual void _signal_context_kill_failed() = 0;
-
-	protected:
-
-		/***************
-		 ** Accessors **
-		 ***************/
-
-		Signal_context * context() const { return _context; }
+		Thread         &_thread;
+		Signal_context *_context { nullptr };
 
 	public:
 
-		Signal_context_killer();
-		virtual ~Signal_context_killer();
+		Signal_context_killer(Thread &thread);
+
+		~Signal_context_killer();
 
 		/**
 		 * Stop waiting for a signal context
@@ -144,7 +104,7 @@ class Kernel::Signal_context_killer
 		void cancel_waiting();
 };
 
-class Kernel::Signal_context : public Kernel::Object
+class Kernel::Signal_context
 {
 	friend class Signal_receiver;
 	friend class Signal_context_killer;
@@ -159,14 +119,15 @@ class Kernel::Signal_context : public Kernel::Object
 
 		typedef Genode::Fifo_element<Signal_context> Fifo_element;
 
-		Fifo_element            _deliver_fe  { *this   };
-		Fifo_element            _contexts_fe { *this   };
+		Kernel::Object          _kernel_object { *this };
+		Fifo_element            _deliver_fe    { *this };
+		Fifo_element            _contexts_fe   { *this };
 		Signal_receiver &       _receiver;
 		addr_t const            _imprint;
-		Signal_context_killer * _killer      { nullptr };
-		unsigned                _submits     { 0       };
-		bool                    _ack         { true    };
-		bool                    _killed      { false   };
+		Signal_context_killer * _killer        { nullptr };
+		unsigned                _submits       { 0       };
+		bool                    _ack           { true    };
+		bool                    _killed        { false   };
 
 		/**
 		 * Tell receiver about the submits of the context if any
@@ -208,7 +169,8 @@ class Kernel::Signal_context : public Kernel::Object
 		 * \retval  0 succeeded
 		 * \retval -1 failed
 		 */
-		int submit(unsigned const n);
+		bool can_submit(unsigned const n) const;
+		void submit(unsigned const n);
 
 		/**
 		 * Acknowledge delivery of signal
@@ -223,7 +185,8 @@ class Kernel::Signal_context : public Kernel::Object
 		 * \retval  0 succeeded
 		 * \retval -1 failed
 		 */
-		int kill(Signal_context_killer * const k);
+		bool can_kill() const;
+		void kill(Signal_context_killer &k);
 
 		/**
 		 * Create a signal context and assign it to a signal receiver
@@ -249,9 +212,11 @@ class Kernel::Signal_context : public Kernel::Object
 		 */
 		static void syscall_destroy(Genode::Kernel_object<Signal_context> &c) {
 			call(call_id_delete_signal_context(), (Call_arg)&c); }
+
+		Object &kernel_object() { return _kernel_object; }
 };
 
-class Kernel::Signal_receiver : public Kernel::Object
+class Kernel::Signal_receiver
 {
 	friend class Signal_context;
 	friend class Signal_handler;
@@ -262,14 +227,15 @@ class Kernel::Signal_receiver : public Kernel::Object
 
 		template <typename T> class Fifo : public Genode::Fifo<T> { };
 
-		Fifo<Signal_handler::Fifo_element> _handlers { };
-		Fifo<Signal_context::Fifo_element> _deliver  { };
-		Fifo<Signal_context::Fifo_element> _contexts { };
+		Kernel::Object                     _kernel_object { *this };
+		Fifo<Signal_handler::Fifo_element> _handlers      { };
+		Fifo<Signal_context::Fifo_element> _deliver       { };
+		Fifo<Signal_context::Fifo_element> _contexts      { };
 
 		/**
 		 * Recognize that context 'c' has submits to deliver
 		 */
-		void _add_deliverable(Signal_context * const c);
+		void _add_deliverable(Signal_context &c);
 
 		/**
 		 * Deliver as much submits as possible
@@ -281,17 +247,17 @@ class Kernel::Signal_receiver : public Kernel::Object
 		 *
 		 * \param c  destructed context
 		 */
-		void _context_destructed(Signal_context * const c);
+		void _context_destructed(Signal_context &c);
 
 		/**
 		 * Notice that handler 'h' has cancelled waiting
 		 */
-		void _handler_cancelled(Signal_handler * const h);
+		void _handler_cancelled(Signal_handler &h);
 
 		/**
 		 * Assign context 'c' to the receiver
 		 */
-		void _add_context(Signal_context * const c);
+		void _add_context(Signal_context &c);
 
 	public:
 
@@ -303,7 +269,8 @@ class Kernel::Signal_receiver : public Kernel::Object
 		 * \retval  0 succeeded
 		 * \retval -1 failed
 		 */
-		int add_handler(Signal_handler * const h);
+		bool can_add_handler(Signal_handler const &h) const;
+		void add_handler(Signal_handler &h);
 
 		/**
 		 * Syscall to create a signal receiver
@@ -322,6 +289,8 @@ class Kernel::Signal_receiver : public Kernel::Object
 		 */
 		static void syscall_destroy(Genode::Kernel_object<Signal_receiver> &r) {
 			call(call_id_delete_signal_receiver(), (Call_arg)&r); }
+
+		Object &kernel_object() { return _kernel_object; }
 };
 
 #endif /* _CORE__KERNEL__SIGNAL_RECEIVER_H_ */

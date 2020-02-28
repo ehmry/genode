@@ -7,7 +7,7 @@ include $(call select_from_repositories,lib/import/import-syscall-linux.mk)
 # Manually supply all library search paths of the host compiler to our tool
 # chain.
 #
-HOST_LIB_SEARCH_DIRS = $(shell cc $(CC_MARCH) -print-search-dirs | grep libraries |\
+HOST_LIB_SEARCH_DIRS = $(shell $(CUSTOM_HOST_CC) $(CC_MARCH) -print-search-dirs | grep libraries |\
                                sed "s/.*=//"   | sed "s/:/ /g" |\
                                sed "s/\/ / /g" | sed "s/\/\$$//")
 #
@@ -68,11 +68,11 @@ endif
 LD_TEXT_ADDR     ?=
 LD_SCRIPT_STATIC ?=
 
-EXT_OBJECTS += $(shell cc $(CC_MARCH) -print-file-name=crt1.o)
-EXT_OBJECTS += $(shell cc $(CC_MARCH) -print-file-name=crti.o)
+EXT_OBJECTS += $(shell $(CUSTOM_HOST_CC) $(CC_MARCH) -print-file-name=crt1.o)
+EXT_OBJECTS += $(shell $(CUSTOM_HOST_CC) $(CC_MARCH) -print-file-name=crti.o)
 EXT_OBJECTS += $(shell $(CUSTOM_CC) $(CC_MARCH) -print-file-name=crtbegin.o)
 EXT_OBJECTS += $(shell $(CUSTOM_CC) $(CC_MARCH) -print-file-name=crtend.o)
-EXT_OBJECTS += $(shell cc $(CC_MARCH) -print-file-name=crtn.o)
+EXT_OBJECTS += $(shell $(CUSTOM_HOST_CC) $(CC_MARCH) -print-file-name=crtn.o)
 
 LX_LIBS_OPT += -lgcc -lgcc_s -lsupc++ -lc -lpthread
 
@@ -105,7 +105,7 @@ endif
 LD_LIBGCC = $(LX_LIBS_OPT)
 
 # use the host c++ for linking to find shared libraries in DT_RPATH library paths
-LD_CMD = c++
+LD_CMD = $(CUSTOM_HOST_CXX)
 
 # disable format-string security checks, which prevent non-literal format strings
 CC_OPT += -Wno-format-security
@@ -114,8 +114,8 @@ CC_OPT += -Wno-format-security
 # Disable position-independent executables (which are enabled by default on
 # Ubuntu 16.10 or newer)
 #
-CXX_LINK_OPT_NO_PIE := $(shell \
-	(echo "int main(){}" | $(LD_CMD) -no-pie -x c++ - -o /dev/null >& /dev/null \
+CXX_LINK_OPT_NO_PIE = $(shell \
+	(echo "int main(){}" | $(CUSTOM_HOST_CXX) -no-pie -x c++ - -o /dev/null >& /dev/null \
 	&& echo "-no-pie") || true)
 CXX_LINK_OPT += $(CXX_LINK_OPT_NO_PIE)
 

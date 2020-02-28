@@ -19,7 +19,7 @@
 #include <drivers/timer/util.h>
 
 /* core includes */
-#include "../../kernel/timer.h"
+#include <kernel/timer.h>
 #include <platform.h>
 
 using namespace Genode;

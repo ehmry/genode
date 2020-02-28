@@ -23,17 +23,92 @@
 
 /* core includes */
 #include <hw/assert.h>
-#include "cpu.h"
-#include "kernel.h"
-#include "thread.h"
-#include "irq.h"
-#include "log.h"
+#include <kernel/cpu.h>
+#include <kernel/kernel.h>
+#include <kernel/thread.h>
+#include <kernel/irq.h>
+#include <kernel/log.h>
 #include <map_local.h>
 #include <platform_pd.h>
 
 extern "C" void _core_start(void);
 
 using namespace Kernel;
+
+
+void Thread::_ipc_alloc_recv_caps(unsigned cap_count)
+{
+	Genode::Allocator &slab = pd().platform_pd().capability_slab();
+	for (unsigned i = 0; i < cap_count; i++) {
+		if (_obj_id_ref_ptr[i] == nullptr)
+			_obj_id_ref_ptr[i] = slab.alloc(sizeof(Object_identity_reference));
+	}
+	_ipc_rcv_caps = cap_count;
+}
+
+
+void Thread::_ipc_free_recv_caps()
+{
+	for (unsigned i = 0; i < _ipc_rcv_caps; i++) {
+		if (_obj_id_ref_ptr[i]) {
+			Genode::Allocator &slab = pd().platform_pd().capability_slab();
+			slab.free(_obj_id_ref_ptr[i], sizeof(Object_identity_reference));
+		}
+	}
+	_ipc_rcv_caps = 0;
+}
+
+
+void Thread::_ipc_init(Genode::Native_utcb &utcb, Thread &starter)
+{
+	_utcb = &utcb;
+	_ipc_alloc_recv_caps(starter._utcb->cap_cnt());
+	ipc_copy_msg(starter);
+}
+
+
+void Thread::ipc_copy_msg(Thread &sender)
+{
+	using namespace Genode;
+	using Reference = Object_identity_reference;
+
+	/* copy payload and set destination capability id */
+	*_utcb = *sender._utcb;
+	_utcb->destination(sender._ipc_capid);
+
+	/* translate capabilities */
+	for (unsigned i = 0; i < _ipc_rcv_caps; i++) {
+
+		capid_t id = sender._utcb->cap_get(i);
+
+		/* if there is no capability to send, nothing to do */
+		if (i >= sender._utcb->cap_cnt()) { continue; }
+
+		/* lookup the capability id within the caller's cap space */
+		Reference *oir = (id == cap_id_invalid())
+			? nullptr : sender.pd().cap_tree().find(id);
+
+		/* if the caller's capability is invalid, continue */
+		if (!oir) {
+			_utcb->cap_add(cap_id_invalid());
+			continue;
+		}
+
+		/* lookup the capability id within the callee's cap space */
+		Reference *dst_oir = oir->find(pd());
+
+		/* if it is not found, and the target is not core, create a reference */
+		if (!dst_oir && (&pd() != &core_pd())) {
+			dst_oir = oir->factory(_obj_id_ref_ptr[i], pd());
+			if (dst_oir) _obj_id_ref_ptr[i] = nullptr;
+		}
+
+		if (dst_oir) dst_oir->add_to_utcb();
+
+		/* add the translated capability id to the target buffer */
+		_utcb->cap_add(dst_oir ? dst_oir->capid() : cap_id_invalid());
+	}
+}
 
 
 Thread::Tlb_invalidation::Tlb_invalidation(Thread & caller, Pd & pd,
@@ -76,14 +151,14 @@ void Thread_fault::print(Genode::Output &out) const
 }
 
 
-void Thread::_signal_context_kill_pending()
+void Thread::signal_context_kill_pending()
 {
 	assert(_state == ACTIVE);
 	_become_inactive(AWAITS_SIGNAL_CONTEXT_KILL);
 }
 
 
-void Thread::_signal_context_kill_done()
+void Thread::signal_context_kill_done()
 {
 	assert(_state == AWAITS_SIGNAL_CONTEXT_KILL);
 	user_arg_0(0);
@@ -91,7 +166,7 @@ void Thread::_signal_context_kill_done()
 }
 
 
-void Thread::_signal_context_kill_failed()
+void Thread::signal_context_kill_failed()
 {
 	assert(_state == AWAITS_SIGNAL_CONTEXT_KILL);
 	user_arg_0(-1);
@@ -99,14 +174,13 @@ void Thread::_signal_context_kill_failed()
 }
 
 
-void Thread::_await_signal(Signal_receiver * const receiver)
+void Thread::signal_wait_for_signal()
 {
 	_become_inactive(AWAITS_SIGNAL);
-	_signal_receiver = receiver;
 }
 
 
-void Thread::_receive_signal(void * const base, size_t const size)
+void Thread::signal_receive_signal(void * const base, size_t const size)
 {
 	assert(_state == AWAITS_SIGNAL);
 	Genode::memcpy(utcb()->data(), base, size);
@@ -114,7 +188,7 @@ void Thread::_receive_signal(void * const base, size_t const size)
 }
 
 
-void Thread::_send_request_succeeded()
+void Thread::ipc_send_request_succeeded()
 {
 	assert(_state == AWAITS_IPC);
 	user_arg_0(0);
@@ -123,7 +197,7 @@ void Thread::_send_request_succeeded()
 }
 
 
-void Thread::_send_request_failed()
+void Thread::ipc_send_request_failed()
 {
 	assert(_state == AWAITS_IPC);
 	user_arg_0(-1);
@@ -132,7 +206,7 @@ void Thread::_send_request_failed()
 }
 
 
-void Thread::_await_request_succeeded()
+void Thread::ipc_await_request_succeeded()
 {
 	assert(_state == AWAITS_IPC);
 	user_arg_0(0);
@@ -140,7 +214,7 @@ void Thread::_await_request_succeeded()
 }
 
 
-void Thread::_await_request_failed()
+void Thread::ipc_await_request_failed()
 {
 	assert(_state == AWAITS_IPC);
 	user_arg_0(-1);
@@ -151,15 +225,15 @@ void Thread::_await_request_failed()
 void Thread::_deactivate_used_shares()
 {
 	Cpu_job::_deactivate_own_share();
-	Ipc_node::for_each_helper([&] (Ipc_node &h) {
-		static_cast<Thread &>(h)._deactivate_used_shares(); });
+	_ipc_node.for_each_helper([&] (Thread &thread) {
+		thread._deactivate_used_shares(); });
 }
 
 void Thread::_activate_used_shares()
 {
 	Cpu_job::_activate_own_share();
-	Ipc_node::for_each_helper([&] (Ipc_node &h) {
-		static_cast<Thread &>(h)._activate_used_shares(); });
+	_ipc_node.for_each_helper([&] (Thread &thread) {
+		thread._activate_used_shares(); });
 }
 
 void Thread::_become_active()
@@ -180,7 +254,7 @@ void Thread::_die() { _become_inactive(DEAD); }
 
 
 Cpu_job * Thread::helping_sink() {
-	return static_cast<Thread *>(Ipc_node::helping_sink()); }
+	return &_ipc_node.helping_sink(); }
 
 
 size_t Thread::_core_to_kernel_quota(size_t const quota) const
@@ -212,7 +286,7 @@ void Thread::_call_start_thread()
 
 	/* join protection domain */
 	thread._pd = (Pd *) user_arg_3();
-	thread.Ipc_node::_init(*(Native_utcb *)user_arg_4(), *this);
+	thread._ipc_init(*(Native_utcb *)user_arg_4(), *this);
 	thread._become_active();
 }
 
@@ -285,15 +359,15 @@ void Thread::_cancel_blocking()
 		_become_active();
 		return;
 	case AWAITS_IPC:
-		Ipc_node::cancel_waiting();
+		_ipc_node.cancel_waiting();
 		return;
 	case AWAITS_SIGNAL:
-		Signal_handler::cancel_waiting();
+		_signal_handler.cancel_waiting();
 		user_arg_0(-1);
 		_become_active();
 		return;
 	case AWAITS_SIGNAL_CONTEXT_KILL:
-		Signal_context_killer::cancel_waiting();
+		_signal_context_killer.cancel_waiting();
 		return;
 	case ACTIVE:
 		return;
@@ -339,11 +413,18 @@ void Thread::_call_delete_thread()
 
 void Thread::_call_await_request_msg()
 {
-	if (Ipc_node::await_request(user_arg_1())) {
+	if (_ipc_node.can_await_request()) {
+		_ipc_alloc_recv_caps(user_arg_1());
+		_ipc_node.await_request();
+		if (_ipc_node.awaits_request()) {
+			_become_inactive(AWAITS_IPC);
+		} else {
+			user_arg_0(0);
+		}
+	} else {
+		Genode::raw("IPC await request: bad state");
 		user_arg_0(0);
-		return;
 	}
-	_become_inactive(AWAITS_IPC);
 }
 
 
@@ -372,8 +453,11 @@ void Thread::timeout_triggered()
 {
 	Signal_context * const c =
 		pd().cap_tree().find<Signal_context>(_timeout_sigid);
-	if (!c || c->submit(1))
+	if (!c || !c->can_submit(1)) {
 		Genode::raw(*this, ": failed to submit timeout signal");
+		return;
+	}
+	c->submit(1);
 }
 
 
@@ -390,8 +474,14 @@ void Thread::_call_send_request_msg()
 	bool const help = Cpu_job::_helping_possible(*dst);
 	oir = oir->find(dst->pd());
 
-	Ipc_node::send_request(*dst, oir ? oir->capid() : cap_id_invalid(),
-	                       help, user_arg_2());
+	if (!_ipc_node.can_send_request()) {
+		Genode::raw("IPC send request: bad state");
+	} else {
+		_ipc_alloc_recv_caps(user_arg_2());
+		_ipc_capid    = oir ? oir->capid() : cap_id_invalid();
+		_ipc_node.send_request(dst->_ipc_node, help);
+	}
+
 	_state = AWAITS_IPC;
 	if (!help || !dst->own_share_active()) { _deactivate_used_shares(); }
 }
@@ -399,7 +489,7 @@ void Thread::_call_send_request_msg()
 
 void Thread::_call_send_reply_msg()
 {
-	Ipc_node::send_reply();
+	_ipc_node.send_reply();
 	bool const await_request_msg = user_arg_2();
 	if (await_request_msg) { _call_await_request_msg(); }
 	else { user_arg_0(0); }
@@ -434,11 +524,12 @@ void Thread::_call_await_signal()
 		return;
 	}
 	/* register handler at the receiver */
-	if (r->add_handler(this)) {
+	if (!r->can_add_handler(_signal_handler)) {
 		Genode::raw("failed to register handler at signal receiver");
 		user_arg_0(-1);
 		return;
 	}
+	r->add_handler(_signal_handler);
 	user_arg_0(0);
 }
 
@@ -455,10 +546,11 @@ void Thread::_call_pending_signal()
 	}
 
 	/* register handler at the receiver */
-	if (r->add_handler(this)) {
+	if (!r->can_add_handler(_signal_handler)) {
 		user_arg_0(-1);
 		return;
 	}
+	r->add_handler(_signal_handler);
 
 	if (_state == AWAITS_SIGNAL) {
 		_cancel_blocking();
@@ -500,11 +592,12 @@ void Thread::_call_submit_signal()
 	}
 
 	/* trigger signal context */
-	if (c->submit(user_arg_2())) {
+	if (!c->can_submit(user_arg_2())) {
 		Genode::raw("failed to submit signal context");
 		user_arg_0(-1);
 		return;
 	}
+	c->submit(user_arg_2());
 	user_arg_0(0);
 }
 
@@ -534,11 +627,12 @@ void Thread::_call_kill_signal_context()
 	}
 
 	/* kill signal context */
-	if (c->kill(this)) {
+	if (!c->can_kill()) {
 		Genode::raw("failed to kill signal context");
 		user_arg_0(-1);
 		return;
 	}
+	c->kill(_signal_context_killer);
 }
 
 
@@ -721,17 +815,23 @@ void Thread::_mmu_exception()
 
 	if (_core)
 		Genode::raw(*this, " raised a fault, which should never happen ",
-	                  _fault);
+		            _fault);
 
-	if (_pager) _pager->submit(1);
+	if (_pager && _pager->can_submit(1)) {
+		_pager->submit(1);
+	}
 }
 
 
 Thread::Thread(unsigned const priority, unsigned const quota,
                char const * const label, bool core)
 :
-	Cpu_job(priority, quota), _state(AWAITS_START),
-	_signal_receiver(0), _label(label), _core(core), regs(core) { }
+	Kernel::Object { *this },
+	Cpu_job(priority, quota), _ipc_node(*this), _state(AWAITS_START),
+	_label(label), _core(core), regs(core) { }
+
+
+Thread::~Thread() { _ipc_free_recv_caps(); }
 
 
 void Thread::print(Genode::Output &out) const

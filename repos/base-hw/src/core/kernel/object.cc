@@ -1,6 +1,6 @@
-#include "object.h"
-#include "pd.h"
-#include "kernel.h"
+#include <kernel/object.h>
+#include <kernel/pd.h>
+#include <kernel/kernel.h>
 
 #include <util/construct_at.h>
 
@@ -11,10 +11,97 @@ using namespace Kernel;
  ** Object **
  ************/
 
+Object::Object(Thread &obj)
+:
+	_type { THREAD },
+	_obj  { (void *)&obj }
+{ }
+
+Object::Object(Irq &obj)
+:
+	_type { IRQ },
+	_obj  { (void *)&obj }
+{ }
+
+Object::Object(Signal_receiver &obj)
+:
+	_type { SIGNAL_RECEIVER },
+	_obj  { (void *)&obj }
+{ }
+
+Object::Object(Signal_context &obj)
+:
+	_type { SIGNAL_CONTEXT },
+	_obj  { (void *)&obj }
+{ }
+
+Object::Object(Pd &obj)
+:
+	_type { PD },
+	_obj  { (void *)&obj }
+{ }
+
+Object::Object(Vm &obj)
+:
+	_type { VM },
+	_obj  { (void *)&obj }
+{ }
+
 Object::~Object()
 {
-	for (Object_identity * oi = list.first(); oi; oi = list.first())
+	for (Object_identity * oi = first(); oi; oi = first())
 		oi->invalidate();
+}
+
+namespace Kernel {
+
+	template <> Pd *Object::obj<Pd>() const
+	{
+		if (_type != PD) {
+			return nullptr; }
+
+		return reinterpret_cast<Pd *>(_obj);
+	}
+
+	template <> Irq *Object::obj<Irq>() const
+	{
+		if (_type != IRQ) {
+			return nullptr; }
+
+		return reinterpret_cast<Irq *>(_obj);
+	}
+
+	template <> Signal_receiver *Object::obj<Signal_receiver>() const
+	{
+		if (_type != SIGNAL_RECEIVER) {
+			return nullptr; }
+
+		return reinterpret_cast<Signal_receiver *>(_obj);
+	}
+
+	template <> Signal_context *Object::obj<Signal_context>() const
+	{
+		if (_type != SIGNAL_CONTEXT) {
+			return nullptr; }
+
+		return reinterpret_cast<Signal_context *>(_obj);
+	}
+
+	template <> Thread *Object::obj<Thread>() const
+	{
+		if (_type != THREAD) {
+			return nullptr; }
+
+		return reinterpret_cast<Thread *>(_obj);
+	}
+
+	template <> Vm *Object::obj<Vm>() const
+	{
+		if (_type != VM) {
+			return nullptr; }
+
+		return reinterpret_cast<Vm *>(_obj);
+	}
 }
 
 
@@ -24,18 +111,18 @@ Object::~Object()
 
 void Object_identity::invalidate()
 {
-	for (Object_identity_reference * oir = list.first(); oir; oir = list.first())
+	for (Object_identity_reference * oir = first(); oir; oir = first())
 		oir->invalidate();
 
 	if (_object) {
-		_object->list.remove(this);
+		_object->remove(this);
 		_object = nullptr;
 	}
 }
 
 
 Object_identity::Object_identity(Object & object)
-: _object(&object) { _object->list.insert(this); }
+: _object(&object) { _object->insert(this); }
 
 
 Object_identity::~Object_identity() { invalidate(); }
@@ -50,7 +137,7 @@ Object_identity_reference::find(Pd &pd)
 {
 	if (!_identity) return nullptr;
 
-	for (Object_identity_reference * oir = _identity->list.first();
+	for (Object_identity_reference * oir = _identity->first();
 	     oir; oir = oir->next())
 		if (&pd == &(oir->_pd)) return oir;
 	return nullptr;
@@ -79,7 +166,7 @@ Object_identity_reference * Object_identity_reference::factory(void * dst,
 
 
 void Object_identity_reference::invalidate() {
-	if (_identity) _identity->list.remove(this);
+	if (_identity) _identity->remove(this);
 	_identity = nullptr;
 }
 
@@ -88,7 +175,7 @@ Object_identity_reference::Object_identity_reference(Object_identity *oi,
                                                      Pd              &pd)
 : _capid(pd.capid_alloc().alloc()), _identity(oi), _pd(pd), _in_utcbs(0)
 {
-	if (_identity) _identity->list.insert(this);
+	if (_identity) _identity->insert(this);
 	_pd.cap_tree().insert(this);
 }
 

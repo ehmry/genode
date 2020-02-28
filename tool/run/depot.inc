@@ -41,21 +41,21 @@ set _missing_depot_archives {}
 # Pattern to parse a version-less archive path into <user>, <type>, <name>
 #
 proc _depot_archive_path_pattern { } {
-	return {^([\w\d]+)/([\w]+)/([\w\d\-_]+)$} }
+	return {^([\w\d\-]+)/([\w]+)/([\w\d\-_]+)$} }
 
 
 #
 # Pattern to parse a versioned archive path into <user>, <type>, <name>, <version>
 #
 proc _depot_archive_versioned_path_pattern { } {
-	return {^([\w\d]+)/([\w]+)/([\w\d\-_]+)/([\w\d\-\._]+)$} }
+	return {^([\w\d\-]+)/([\w]+)/([\w\d\-_]+)/([\w\d\-\._]+)$} }
 
 
 #
 # Pattern to parse a binary archive path into <user>, <spec>, <name>.
 #
 proc _depot_bin_archive_path_pattern { } {
-	return {^([\w\d]+)/bin/([\w\d]+)/([\w\d\-_]+)$} }
+	return {^([\w\d\-]+)/bin/([\w\d]+)/([\w\d\-_]+)$} }
 
 
 #
@@ -465,6 +465,7 @@ proc drivers_interactive_pkg { } {
 	if {[have_spec pbxa9]}     { return drivers_interactive-pbxa9 }
 	if {[have_spec imx53_qsb]} { return drivers_interactive-imx53_qsb }
 	if {[have_spec rpi]}       { return drivers_interactive-rpi }
+	if {[have_spec imx8q_evk]} { return drivers_interactive-imx8q_evk }
 
 	puts stderr "drivers_interactive package undefined for this build configuration"
 	exit 1

@@ -107,7 +107,7 @@ extern "C" {
 		                               struct pbuf *p, err_t err);
 		static err_t tcp_delayed_recv_callback(void *arg, struct tcp_pcb *tpcb,
 		                                       struct pbuf *p, err_t err);
-		/* static err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len); */
+		static err_t tcp_sent_callback(void *arg, struct tcp_pcb *tpcb, u16_t len);
 		static void  tcp_err_callback(void *arg, err_t err);
 	}
 
@@ -486,9 +486,13 @@ Lwip::Read_result Lwip::Lwip_file_handle::read(char *dst, file_size count,
 Lwip::Write_result Lwip::Lwip_file_handle::write(char const *src, file_size count,
 	                                             file_size &out_count)
 {
-	return (socket)
-		? socket->write(*this, src, count, out_count)
-		: Write_result::WRITE_ERR_INVALID;
+	Write_result result = Write_result::WRITE_ERR_INVALID;
+	if (socket) {
+		result = socket->write(*this, src, count, out_count);
+		if (result == Write_result::WRITE_ERR_WOULD_BLOCK && !_io_progress_waiter.enqueued())
+			socket->io_progress_queue.enqueue(_io_progress_waiter);
+	}
+	return result;
 }
 
 bool Lwip::Lwip_file_handle::notify_read_ready()
@@ -898,6 +902,7 @@ class Lwip::Udp_socket_dir final :
 		                 char *dst, file_size count,
 		                 file_size &out_count) override
 		{
+			Genode::Lock::Guard g { Lwip::lock() };
 			Read_result result = Read_result::READ_ERR_INVALID;
 
 			switch(handle.kind) {
@@ -983,6 +988,8 @@ class Lwip::Udp_socket_dir final :
 		                   char const *src, file_size count,
 		                   file_size &out_count) override
 		{
+			Genode::Lock::Guard g { Lwip::lock() };
+
 			switch(handle.kind) {
 
 			case Lwip_file_handle::DATA: {
@@ -1139,10 +1146,7 @@ class Lwip::Tcp_socket_dir final :
 			tcp_arg(_pcb, this);
 
 			tcp_recv(_pcb, tcp_recv_callback);
-
-			/* Disabled, do not track acknowledgements */
-			/* tcp_sent(_pcb, tcp_sent_callback); */
-
+			tcp_sent(_pcb, tcp_sent_callback);
 			tcp_err(_pcb, tcp_err_callback);
 		}
 
@@ -1287,6 +1291,8 @@ class Lwip::Tcp_socket_dir final :
 		                 char *dst, file_size count,
 		                 file_size &out_count) override
 		{
+			Genode::Lock::Guard g { Lwip::lock() };
+
 			switch(handle.kind) {
 
 			case Lwip_file_handle::DATA:
@@ -1371,7 +1377,11 @@ class Lwip::Tcp_socket_dir final :
 
 					handle.kind = Lwip_file_handle::LOCATION;
 					/* read the location of the new socket directory */
-					return handle.read(dst, count, out_count);
+					Lwip::lock().unlock();
+					Read_result result = handle.read(dst, count, out_count);
+					Lwip::lock().lock();
+
+					return result;
 				}
 
 				return Read_result::READ_QUEUED;
@@ -1433,6 +1443,7 @@ class Lwip::Tcp_socket_dir final :
 		                   char const *src, file_size count,
 		                   file_size &out_count) override
 		{
+			Genode::Lock::Guard g { Lwip::lock() };
 			if (_pcb == NULL) {
 				/* socket is closed */
 				return Write_result::WRITE_ERR_IO;
@@ -1638,9 +1649,9 @@ err_t tcp_delayed_recv_callback(void *arg, struct tcp_pcb *pcb, struct pbuf *buf
 /**
  * This would be the ACK callback, we could defer sync completion
  * until then, but performance is expected to be unacceptable.
- *
+ */
 static
-err_t tcp_sent_callback(void *arg, struct tcp_pcb*, u16_t len)
+err_t tcp_sent_callback(void *arg, struct tcp_pcb *pcb, u16_t)
 {
 	if (!arg) {
 		tcp_abort(pcb);
@@ -1648,12 +1659,9 @@ err_t tcp_sent_callback(void *arg, struct tcp_pcb*, u16_t len)
 	}
 
 	Lwip::Tcp_socket_dir *socket_dir = static_cast<Lwip::Tcp_socket_dir *>(arg);
-	socket_dir->pending_ack -= len;
 	socket_dir->process_io();
-	socket_dir->process_write_ready();
 	return ERR_OK;
 }
-*/
 
 
 static
@@ -1958,17 +1966,8 @@ class Lwip::File_system final : public Vfs::File_system, public Lwip::Directory
 			if ((vfs_handle->status_flags() & OPEN_MODE_ACCMODE) == OPEN_MODE_RDONLY)
 				return Write_result::WRITE_ERR_INVALID;
 			if (Lwip_handle *handle = dynamic_cast<Lwip_handle*>(vfs_handle)) {
-				while (true) {
-					res = handle->write(src, count, out_count);
-					if (res != WRITE_ERR_WOULD_BLOCK || out_count) break;
-
-					/*
-					 * XXX: block for signals until the write completes
-					 * or fails, this is not how it should be done, but
-					 * it's how lxip does it
-					 */
-					_ep.wait_and_dispatch_one_io_signal();
-				}
+				res = handle->write(src, count, out_count);
+				if (res == WRITE_ERR_WOULD_BLOCK) throw Insufficient_buffer();
 			}
 			return res;
 		}

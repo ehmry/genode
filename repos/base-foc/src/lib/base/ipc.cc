@@ -238,6 +238,11 @@ static l4_msgtag_t copy_msgbuf_to_utcb(Msgbuf_base &snd_msg,
 		/* setup flexpage for valid capability to delegate */
 		if (caps[i].valid) {
 			unsigned const idx = num_msg_words + 2*num_cap_sel;
+
+			/* check bounds of 'l4_msg_regs_t::mr' */
+			if (idx + 1 >= L4_UTCB_GENERIC_DATA_SIZE)
+				break;
+
 			l4_utcb_mr()->mr[idx]     = L4_ITEM_MAP/* | L4_ITEM_CONT*/;
 			l4_utcb_mr()->mr[idx + 1] = l4_obj_fpage(caps[i].sel,
 			                                         0, L4_FPAGE_RWX).raw;
@@ -311,10 +316,11 @@ void Genode::ipc_reply(Native_capability, Rpc_exception_code exc,
 }
 
 
-Genode::Rpc_request Genode::ipc_reply_wait(Reply_capability const &,
-                                           Rpc_exception_code      exc,
-                                           Msgbuf_base            &reply_msg,
-                                           Msgbuf_base            &request_msg)
+Genode::Rpc_request Genode::ipc_reply_wait(Reply_capability const         &,
+                                           Rpc_exception_code              exc,
+                                           Msgbuf_base                    &reply_msg,
+                                           Msgbuf_base                    &request_msg,
+                                           Rpc_entrypoint::Native_context &)
 {
 	Receive_window &rcv_window = Thread::myself()->native_thread().rcv_window;
 
@@ -365,9 +371,10 @@ Genode::Rpc_request Genode::ipc_reply_wait(Reply_capability const &,
 }
 
 
-Ipc_server::Ipc_server()
+Ipc_server::Ipc_server(Rpc_entrypoint::Native_context& native_context)
 :
-	Native_capability((Cap_index*)Fiasco::l4_utcb_tcr()->user[Fiasco::UTCB_TCR_BADGE])
+	Native_capability((Cap_index*)Fiasco::l4_utcb_tcr()->user[Fiasco::UTCB_TCR_BADGE]),
+	_native_context(native_context)
 {
 	Thread::myself()->native_thread().rcv_window.init();
 }

@@ -19,10 +19,10 @@
 
 /* core includes */
 #include <board.h>
-#include "cpu_context.h"
-#include "irq.h"
-#include "inter_processor_work.h"
-#include "thread.h"
+#include <kernel/cpu_context.h>
+#include <kernel/irq.h>
+#include <kernel/inter_processor_work.h>
+#include <kernel/thread.h>
 
 namespace Kernel
 {
@@ -69,7 +69,6 @@ namespace Kernel
  *   publicly provide via a 'typedef Genode::Cpu::Arch_regs Arch_regs'.
  *   Then, the 'Genode::Cpu' could be inherited privately.
  */
-#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
 
 class Kernel::Cpu : public Genode::Cpu, private Irq::Pool, private Timeout
@@ -170,7 +169,7 @@ class Kernel::Cpu : public Genode::Cpu, private Irq::Pool, private Timeout
 		 * Returns the currently active job
 		 */
 		Job & scheduled_job() const {
-			return *static_cast<Job *>(_scheduler.head())->helping_sink(); }
+			return *static_cast<Job *>(&_scheduler.head())->helping_sink(); }
 
 		unsigned id() const { return _id; }
 		Cpu_scheduler &scheduler() { return _scheduler; }
@@ -179,6 +178,11 @@ class Kernel::Cpu : public Genode::Cpu, private Irq::Pool, private Timeout
 
 		Inter_processor_work_list & work_list() {
 			return _local_work_list; }
+
+		/**
+		 * Return CPU's idle thread object
+		 */
+		Kernel::Thread &idle_thread() { return _idle; }
 };
 
 

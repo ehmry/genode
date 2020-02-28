@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright (C) 2016-2019 Genode Labs GmbH
+ * Copyright (C) 2016-2020 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU Affero General Public License version 3.
@@ -39,8 +39,53 @@
 #include <internal/kernel_timer_accessor.h>
 #include <internal/watch.h>
 #include <internal/signal.h>
+#include <internal/monitor.h>
+#include <internal/pthread.h>
 
-namespace Libc { class Kernel; }
+namespace Libc {
+	class Kernel;
+	class Main_blockade;
+	class Main_job;
+}
+
+
+class Libc::Main_blockade : public Blockade
+{
+	private:
+
+		uint64_t   _timeout_ms;
+		bool const _timeout_valid { _timeout_ms != 0 };
+
+		struct Check : Suspend_functor
+		{
+			bool const &woken_up;
+
+			Check(bool const &woken_up) : woken_up(woken_up) { }
+
+			bool suspend() override { return !woken_up; }
+		};
+
+	public:
+
+		Main_blockade(uint64_t timeout_ms) : _timeout_ms(timeout_ms) { }
+
+		void block() override;
+		void wakeup() override;
+};
+
+
+class Libc::Main_job : public Monitor::Job
+{
+	private:
+
+		Main_blockade _blockade;
+
+	public:
+
+		Main_job(Monitor::Function &fn, uint64_t timeout_ms)
+		: Job(fn, _blockade), _blockade(timeout_ms)
+		{ }
+};
 
 
 /**
@@ -58,6 +103,7 @@ struct Libc::Kernel final : Vfs::Io_response_handler,
                             Reset_malloc_heap,
                             Resume,
                             Suspend,
+                            Monitor,
                             Select,
                             Kernel_routine_scheduler,
                             Current_time,
@@ -77,7 +123,14 @@ struct Libc::Kernel final : Vfs::Io_response_handler,
 		 *
 		 * Not mirrored to forked processes. Preserved across 'execve' calls.
 		 */
-		Allocator &_heap;
+		Genode::Allocator &_heap;
+
+		/**
+		 * Name of the current binary's ROM module
+		 *
+		 * Used by fork, modified by execve.
+		 */
+		Binary_name _binary_name { "binary" };
 
 		/**
 		 * Allocator for application-owned data
@@ -211,6 +264,16 @@ struct Libc::Kernel final : Vfs::Io_response_handler,
 
 		Pthread_pool _pthreads { _timer_accessor };
 
+		Monitor::Pool _monitors { };
+
+		Reconstructible<Io_signal_handler<Kernel>> _execute_monitors {
+			_env.ep(), *this, &Kernel::_monitors_handler };
+
+		void _monitors_handler()
+		{
+			_monitors.execute_monitors();
+		}
+
 		Constructible<Clone_connection> _clone_connection { };
 
 		struct Resumer
@@ -284,7 +347,7 @@ struct Libc::Kernel final : Vfs::Io_response_handler,
 			}
 
 			if (!check.suspend() && !_kernel_routine)
-				return 0;
+				return timeout_ms;
 
 			if (timeout_ms > 0)
 				_main_timeout.timeout(timeout_ms);
@@ -325,7 +388,7 @@ struct Libc::Kernel final : Vfs::Io_response_handler,
 
 	public:
 
-		Kernel(Genode::Env &env, Allocator &heap);
+		Kernel(Genode::Env &env, Genode::Allocator &heap);
 
 		~Kernel() { error(__PRETTY_FUNCTION__, " should not be executed!"); }
 
@@ -460,6 +523,31 @@ struct Libc::Kernel final : Vfs::Io_response_handler,
 		}
 
 		/**
+		 * Monitor interface
+		 */
+		bool _monitor(Genode::Lock &mutex, Function &fn, uint64_t timeout_ms) override
+		{
+			if (_main_context()) {
+				Main_job job { fn, timeout_ms };
+
+				_monitors.monitor(mutex, job);
+				return job.completed();
+
+			} else {
+				Pthread_job job { fn, _timer_accessor, timeout_ms };
+
+				_monitors.monitor(mutex, job);
+				return job.completed();
+			}
+		}
+
+		void _charge_monitors() override
+		{
+			if (_monitors.charge_monitors())
+				Signal_transmitter(*_execute_monitors).submit();
+		}
+
+		/**
 		 * Current_time interface
 		 */
 		Duration current_time() override
@@ -524,6 +612,14 @@ struct Libc::Kernel final : Vfs::Io_response_handler,
 		 * Public alias for _main_context()
 		 */
 		bool main_context() const { return _main_context(); }
+
+		void resume_main()
+		{
+			if (_main_context())
+				_resume_main();
+			else
+				Signal_transmitter(*_resume_main_handler).submit();
+		}
 
 		/**
 		 * Execute application code while already executing in run()

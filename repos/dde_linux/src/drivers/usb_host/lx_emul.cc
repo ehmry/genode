@@ -19,7 +19,6 @@
 #include <timer_session/connection.h>
 #include <util/bit_allocator.h>
 #include <util/string.h>
-#include <os/backtrace.h>
 
 /* Local includes */
 #include "signal.h"
@@ -41,7 +40,6 @@ namespace Genode {
 
 
 unsigned long jiffies;
-void lx_backtrace() { Genode::backtrace(); }
 
 
 void pci_dev_put(struct pci_dev *pci_dev)
@@ -521,7 +519,7 @@ dma_addr_t dma_map_single_attrs(struct device *dev, void *ptr,
 	dma_addr_t phys = (dma_addr_t)Lx::Malloc::dma().phys_addr(ptr);
 
 	if (phys == ~0UL)
-		Genode::error("translation virt->phys ", ptr, "->", Genode::Hex(phys), "failed, return ip ",
+		Genode::error("translation virt->phys ", ptr, "->", Genode::Hex(phys), " failed, return ip ",
 		     __builtin_return_address(0));
 
 	lx_log(DEBUG_DMA, "virt: %p phys: %lx", ptr, phys);
@@ -1037,7 +1035,7 @@ const struct of_device_id *of_match_device(const struct of_device_id *matches,
                                            const struct device *dev)
 {
 	const char * compatible = (const char*) of_get_property(dev->of_node, "compatible", 0);
-	for (; matches && matches->compatible; matches++)
+	for (; matches && matches->compatible[0]; matches++)
 		if (Genode::strcmp(matches->compatible, compatible) == 0)
 			return matches;
 	return nullptr;
