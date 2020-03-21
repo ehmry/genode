@@ -1,0 +1,142 @@
+set dd     [installed_command dd]
+set sgdisk [installed_command sgdisk]
+
+#
+# Build
+#
+set build_components {
+	core init timer
+	app/sequence
+	server/part_block
+	server/rom_block
+	test/block/bench
+}
+
+build $build_components
+
+create_boot_directory
+
+set partition_blocks 8192
+
+# create empty block device file
+catch { exec $dd if=/dev/zero of=bin/gpt.raw bs=512 count=[expr $partition_blocks*5+2082]}
+
+# create paritions
+puts "using sgdisk to partition disk image"
+ catch { exec $sgdisk -o \
+	-n 1:2048:[expr 2048+$partition_blocks*1-1] \
+	-n 2:[expr 2048+$partition_blocks*1]:[expr 2048+$partition_blocks*2-1] \
+	-n 3:[expr 2048+$partition_blocks*2]:[expr 2048+$partition_blocks*3-1] \
+	-n 4:[expr 2048+$partition_blocks*3]:[expr 2048+$partition_blocks*4-1] \
+	-n 5:[expr 2048+$partition_blocks*4]:[expr 2048+$partition_blocks*5-1] \
+	bin/gpt.raw }
+
+#
+# Generate config
+#
+set config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="IRQ"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<default caps="100"/>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+	<start name="rom_block">
+		<resource name="RAM" quantum="32M"/>
+		<provides><service name="Block"/></provides>
+		<config file="gpt.raw" block_size="512"/>
+	</start>
+	<start name="part_block">
+		<resource name="RAM" quantum="10M" />
+		<provides><service name="Block" /></provides>
+		<route>
+			<service name="Report">
+				<child name="block_router"/> </service>
+			<any-service><child name="rom_block"/> <parent/><any-child/></any-service>
+		</route>
+		<config use_gpt="yes">
+			<policy label_suffix="test-a -> " partition="1"/>
+			<policy label_suffix="test-b -> " partition="2"/>
+			<policy label_suffix="test-c -> " partition="3"/>
+			<policy label_suffix="test-d -> " partition="4"/>
+			<policy label_suffix="test-e -> " partition="5"/>
+		</config>
+	</start>
+	<start name="test-a">
+		<binary name="test-block-bench" />
+		<resource name="RAM" quantum="5M" />
+		<route>
+			<service name="Block"><child name="part_block"/></service>
+			<any-service> <parent/> <any-child /> </any-service>
+		</route>
+	</start>
+
+	<start name="test-b">
+		<binary name="test-block-bench" />
+		<resource name="RAM" quantum="5M" />
+		<route>
+			<service name="Block"><child name="part_block"/></service>
+			<any-service> <parent/> <any-child /> </any-service>
+		</route>
+	</start>
+
+	<start name="test-c">
+		<binary name="test-block-bench" />
+		<resource name="RAM" quantum="5M" />
+		<route>
+			<service name="Block"><child name="part_block"/></service>
+			<any-service> <parent/> <any-child /> </any-service>
+		</route>
+	</start>
+
+	<start name="test-d">
+		<binary name="test-block-bench" />
+		<resource name="RAM" quantum="5M" />
+		<route>
+			<service name="Block"><child name="part_block"/></service>
+			<any-service> <parent/> <any-child /> </any-service>
+		</route>
+	</start>
+
+	<start name="test-e">
+		<binary name="test-block-bench" />
+		<resource name="RAM" quantum="5M" />
+		<route>
+			<service name="Block"><child name="part_block"/></service>
+			<any-service> <parent/> <any-child /> </any-service>
+		</route>
+	</start>
+
+</config> }
+
+install_config $config
+
+#
+# Boot modules
+#
+set boot_modules {
+	core ld.lib.so init timer
+	part_block rom_block test-block-bench sequence
+	gpt.raw
+}
+
+build_boot_image $boot_modules
+
+append qemu_args " -nographic"
+
+run_genode_until forever
+
+file delete bin/gpt.raw
