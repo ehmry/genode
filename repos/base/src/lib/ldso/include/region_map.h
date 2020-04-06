@@ -122,6 +122,16 @@ class Linker::Region_map
 				[&] () { _env.upgrade(Parent::Env::pd(), "ram_quota=8K"); });
 		}
 
+		Local_addr attach_readonly(Dataspace_capability ds, addr_t local_addr,
+		                           size_t size = 0, off_t offset = 0)
+		{
+			return retry<Genode::Out_of_ram>(
+				[&] () {
+					return _rm.attach(ds, size, offset, true, local_addr - _base, false, false);
+				},
+				[&] () { _env.upgrade(Parent::Env::pd(), "ram_quota=8K"); });
+		}
+
 		void detach(Local_addr local_addr) { _rm.detach((addr_t)local_addr - _base); }
 };
 
