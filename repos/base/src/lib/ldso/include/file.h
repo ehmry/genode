@@ -34,6 +34,9 @@ namespace Linker {
 
 	static inline bool is_rw(Elf::Phdr const &ph) {
 		return ((ph.p_flags & PF_MASK) == (PF_R | PF_W)); }
+
+	static inline bool is_ro(Elf::Phdr const &ph) {
+		return ((ph.p_flags & PF_MASK) == PF_R); }
 }
 
 
@@ -280,15 +283,21 @@ struct Linker::Elf_file : File
 			else if (is_rw(*ph))
 				load_segment_rw(*ph, i);
 
+			else if (is_ro(*ph))
+				load_segment_ro(*ph);
+
 			else {
-				error("LD: Non-RW/RX segment");
+				auto X = ph->p_flags & PF_X ? "X" : "-";
+				auto W = ph->p_flags & PF_W ? "W" : "-";
+				auto R = ph->p_flags & PF_R ? "R" : "-";
+				error("LD: unhandled ", X,W,R, " segment at file offset ", Hex(ph->p_offset));
 				throw Invalid_file();
 			}
 		}
 	}
 
 	/**
-	 * Map read-only segment
+	 * Map read-execute-only segment
 	 */
 	void load_segment_rx(Elf::Phdr const &p)
 	{
@@ -316,6 +325,17 @@ struct Linker::Elf_file : File
 			memset((void *)(dst + p.p_filesz), 0, p.p_memsz - p.p_filesz);
 
 		env.rm().detach(src);
+	}
+
+	/**
+	 * Map read-only segment
+	 */
+	void load_segment_ro(Elf::Phdr const &p)
+	{
+		Region_map::r()->attach_readonly(rom_cap,
+		                                 trunc_page(p.p_vaddr) + reloc_base,
+		                                 round_page(p.p_memsz),
+		                                 trunc_page(p.p_offset));
 	}
 
 	/**
