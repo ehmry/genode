@@ -38,9 +38,17 @@
 # under the terms of the GNU Affero General Public License version 3.
 #
 
-_Unwind_Complete T
-_Unwind_DeleteException T
+_Unwind_RaiseException T
 _Unwind_Resume T
+_Unwind_DeleteException T
+_Unwind_GetGR T
+_Unwind_SetGR T
+_Unwind_GetIP T
+_Unwind_SetIP T
+_Unwind_GetRegionStart T
+_Unwind_GetLanguageSpecificData T
+_Unwind_ForcedUnwind T
+_Unwind_Complete T
 _Z11genode_exiti T
 _Z13genode_atexitPFvvE T
 _Z16main_thread_utcbv T
