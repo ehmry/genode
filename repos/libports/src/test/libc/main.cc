@@ -135,6 +135,24 @@ int main(int argc, char **argv)
 		}
 	}
 
+	for (size_t align = sizeof(void*); align < 0x2000; align = align<<1) {
+		size_t const size = 4;
+		printf("posix_memalign: check %zu byte alignment\n", align);
+
+		enum { ROUNDS = 3 };
+		void *addr[ROUNDS];
+		for (unsigned i = 0; i < ROUNDS; ++i) {
+			int ret = posix_memalign(&addr[i], align, size);
+
+			if (!((unsigned long)addr[i] & (align-1)))
+				continue;
+
+			printf("%u. posix_memalign(…, 0x%x, %zu) returned %d - %p\n", i, align, size, ret, addr[i]);
+			++error_count;
+		}
+		for (unsigned i = 0; i < ROUNDS; ++i) free(addr[i]);
+	}
+
 	{
 		pid_t const tid = syscall(SYS_thr_self);
 		if (tid == -1) {

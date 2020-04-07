@@ -24,6 +24,7 @@
 extern "C" {
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 }
 
 /* Genode-internal includes */
@@ -88,7 +89,7 @@ class Libc::Malloc
 
 		struct Metadata
 		{
-			unsigned long long value; /* bits 63..5 size and 4..0 offset */
+			unsigned long long value; /* bits 63..16 size and 15..0 offset */
 
 			/**
 			 * Allocation metadata
@@ -97,10 +98,10 @@ class Libc::Malloc
 			 * \param offset  offset of pointer from allocation
 			 */
 			Metadata(size_t size, unsigned offset)
-			: value(((unsigned long long)size << 5) | (offset & 0x1f)) { }
+			: value(((unsigned long long)size << 16) | (offset & 0xffff)) { }
 
-			size_t   size()   const { return value >> 5; }
-			unsigned offset() const { return value & 0x1f; }
+			size_t   size()   const { return value >> 16; }
+			unsigned offset() const { return value & 0xffff; }
 		};
 
 		/**
@@ -153,11 +154,18 @@ class Libc::Malloc
 		 * Allocator interface
 		 */
 
-		void * alloc(size_t size)
+		void * alloc(size_t size, size_t align = 16)
 		{
 			Lock::Guard lock_guard(_lock);
 
-			size_t   const real_size = size + _room();
+			/* assert that alignment is a reasonable power of two */
+			if (align < sizeof(void*) || __builtin_popcount(align) > 1 || align > 4096) {
+				errno = EINVAL;
+				return nullptr;
+			}
+
+			/* alignment is just padding */
+			size_t   const real_size = Genode::max(_room(), align) + size;
 			unsigned const msb       = _slab_log2(real_size);
 
 			void *alloc_addr = nullptr;
@@ -168,11 +176,14 @@ class Libc::Malloc
 			else
 				alloc_addr = _slabs[msb - SLAB_START]->alloc();
 
-			if (!alloc_addr) return nullptr;
+			if (!alloc_addr) {
+				errno = ENOMEM;
+				return nullptr;
+			}
 
 			/* correctly align the allocation address */
 			Metadata * const aligned_addr =
-				(Metadata *)(((addr_t)alloc_addr + _room()) & ~15UL);
+				(Metadata *)((addr_t(alloc_addr) + real_size - size) & ~(align-1));
 
 			unsigned const offset = (addr_t)aligned_addr - (addr_t)alloc_addr;
 
@@ -242,6 +253,13 @@ extern "C" void *calloc(size_t nmemb, size_t size)
 	if (addr)
 		Genode::memset(addr, 0, nmemb*size);
 	return addr;
+}
+
+
+extern "C" int posix_memalign(void **ptr, size_t alignment, size_t size)
+{
+	*ptr = mallocator->alloc(size, alignment);
+	return *ptr ? 0 : -1;
 }
 
 
