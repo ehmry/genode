@@ -61,27 +61,23 @@ void Genode::init_cxx_heap(Env &env)
 }
 
 
-typedef unsigned long Block_header;
+typedef size_t Block_header;
 
 
 extern "C" void *malloc(size_t size)
 {
-	/* enforce size to be a multiple of 4 bytes */
-	size = (size + 3) & ~3;
-
 	/*
-	 * We store the size of the allocation at the very
-	 * beginning of the allocated block and return
-	 * the subsequent address. This way, we can retrieve
-	 * the size information when freeing the block.
+	 * We  pad each allocation with 16 leading bytes for
+	 * storing the size of the allocation. This way, we can
+	 * retrieve the size information when freeing the block.
 	 */
-	unsigned long real_size = size + sizeof(Block_header);
-	void *addr = 0;
-	if (!cxx_heap().alloc(real_size, &addr))
-		return 0;
+	size_t real_size = size + 16;
+	addr_t real_addr = 0;
+	if (!cxx_heap().alloc(real_size, (void**)&real_addr))
+		return nullptr;
 
-	*(Block_header *)addr = real_size;
-	return (Block_header *)addr + 1;
+	*(Block_header *)real_addr = real_size;
+	return (void*)(real_addr + 16);
 }
 
 
@@ -101,7 +97,7 @@ extern "C" void free(void *ptr)
 {
 	if (!ptr) return;
 
-	unsigned long *addr = ((unsigned long *)ptr) - 1;
+	unsigned long *addr = (unsigned long *)(addr_t(ptr) - 16);
 	cxx_heap().free(addr, *addr);
 }
 
