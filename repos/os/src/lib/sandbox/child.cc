@@ -448,6 +448,8 @@ Sandbox::Child::Route
 Sandbox::Child::resolve_session_request(Service::Name const &service_name,
                                         Session_label const &label)
 {
+	auto no_filter = [] (Service &) -> bool { return false; };
+
 	/* check for "config" ROM request */
 	if (service_name == Rom_session::service_name() &&
 	    label.last_element() == "config") {
@@ -476,9 +478,20 @@ Sandbox::Child::resolve_session_request(Service::Name const &service_name,
 	    label == _unique_name && _unique_name != _binary_name)
 		return resolve_session_request(service_name, _binary_name);
 
-	/* supply binary as dynamic linker if '<start ld="no">' */
-	if (!_use_ld && service_name == Rom_session::service_name() && label == "ld.lib.so")
-		return resolve_session_request(service_name, _binary_name);
+	/*
+	 * Check for the "ld.lib.so" ROM request
+	 */
+	if (service_name == Rom_session::service_name() && label == "ld.lib.so") {
+		if (_use_ld) {
+			/* forward request to parent */
+			return Route {
+				find_service(_parent_services, Rom_session::service_name(), no_filter),
+				Session_label("ld.lib.so"), Session::Diag { false} };
+		} else {
+			/* supply binary as dynamic linker if '<start ld="no">' */
+			return resolve_session_request(service_name, _binary_name);
+		}
+	}
 
 	/* check for "session_requests" ROM request */
 	if (service_name == Rom_session::service_name()
@@ -518,8 +531,6 @@ Sandbox::Child::resolve_session_request(Service::Name const &service_name,
 
 				Session::Diag const
 					target_diag { target.attribute_value("diag", false) };
-
-				auto no_filter = [] (Service &) -> bool { return false; };
 
 				if (target.has_type("parent")) {
 
