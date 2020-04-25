@@ -487,17 +487,25 @@ Sandbox::Child::resolve_session_request(Service::Name const &service_name,
 		               Session::Label(), Session::Diag{false} };
 
 	try {
+		/* Lookup route in <default-route>… */
 		Xml_node route_node = _default_route_accessor.default_route();
+		/* …unless <routes> is present… */
+		route_node = _routes_accessor.routes(route_node);
 		try {
+			/* …otherwise use <child><route>. */
 			route_node = _start_node->xml().sub_node("route"); }
 		catch (...) { }
+
 		Xml_node service_node = route_node.sub_node();
+
+		/* <routes> is processed with the "«child» -> " prefix */
+		bool skip_prefix = route_node.type() != "routes";
 
 		for (; ; service_node = service_node.next()) {
 
 			bool service_wildcard = service_node.has_type("any-service");
 
-			if (!service_node_matches(service_node, label, name(), service_name))
+			if (!service_node_matches(service_node, label, name(), service_name, skip_prefix))
 				continue;
 
 			Xml_node target = service_node.sub_node();
@@ -705,6 +713,7 @@ Sandbox::Child::Child(Env                      &env,
                       Report_update_trigger    &report_update_trigger,
                       Xml_node                  start_node,
                       Default_route_accessor   &default_route_accessor,
+                      Routes_accessor          &routes_accessor,
                       Default_caps_accessor    &default_caps_accessor,
                       Name_registry            &name_registry,
                       Ram_quota                 ram_limit,
@@ -722,6 +731,7 @@ Sandbox::Child::Child(Env                      &env,
 	_list_element(this),
 	_start_node(_alloc, start_node),
 	_default_route_accessor(default_route_accessor),
+	_routes_accessor(routes_accessor),
 	_default_caps_accessor(default_caps_accessor),
 	_ram_limit_accessor(ram_limit_accessor),
 	_cap_limit_accessor(cap_limit_accessor),

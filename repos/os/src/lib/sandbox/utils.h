@@ -59,7 +59,8 @@ namespace Sandbox {
 	inline bool service_node_matches(Xml_node           const  service_node,
 	                                 Session_label      const &label,
 	                                 Child_policy::Name const &child_name,
-	                                 Service::Name      const &service_name)
+	                                 Service::Name      const &service_name,
+	                                 bool               skip_child_prefix = true)
 	{
 		bool const service_matches =
 			service_node.has_type("any-service") ||
@@ -98,8 +99,9 @@ namespace Sandbox {
 		if (!route_depends_on_child_provided_label)
 			return true;
 
-		char const * const scoped_label = skip_label_prefix(
-			child_name.string(), label.string());
+		char const * const scoped_label = skip_child_prefix
+			? skip_label_prefix(child_name.string(), label.string())
+			: label.string();
 
 		if (!scoped_label)
 			return false;
