@@ -23,6 +23,7 @@
 
 struct Genode::Sandbox::Library : ::Sandbox::State_reporter::Producer,
                                   ::Sandbox::Child::Default_route_accessor,
+                                  ::Sandbox::Child::Routes_accessor,
                                   ::Sandbox::Child::Default_caps_accessor,
                                   ::Sandbox::Child::Ram_limit_accessor,
                                   ::Sandbox::Child::Cap_limit_accessor
@@ -51,6 +52,8 @@ struct Genode::Sandbox::Library : ::Sandbox::State_reporter::Producer,
 	Reconstructible<Verbose> _verbose { };
 
 	Constructible<Buffered_xml> _default_route { };
+
+	Constructible<Buffered_xml> _routes { };
 
 	Cap_quota _default_caps { 0 };
 
@@ -139,6 +142,12 @@ struct Genode::Sandbox::Library : ::Sandbox::State_reporter::Producer,
 		return _default_route.constructed() ? _default_route->xml()
 		                                    : Xml_node("<empty/>");
 	}
+
+	/**
+	 * Routes_accessor interface
+	 */
+	Xml_node routes(Xml_node _default) override {
+		return _routes.constructed() ? _routes->xml() : _default; }
 
 	/**
 	 * Default_caps_accessor interface
@@ -314,6 +323,9 @@ void Genode::Sandbox::Library::apply_config(Xml_node const &config)
 		_default_route.construct(_heap, config.sub_node("default-route")); }
 	catch (...) { }
 
+	try { _routes.construct(_heap, config.sub_node("routes")); }
+	catch (...) { }
+
 	_default_caps = Cap_quota { 0 };
 	try {
 		_default_caps = Cap_quota { config.sub_node("default")
@@ -404,7 +416,7 @@ void Genode::Sandbox::Library::apply_config(Xml_node const &config)
 				Child &child = *new (_heap)
 					Child(_env, _heap, *_verbose,
 					      Child::Id { ++_child_cnt }, _state_reporter,
-					      start_node, *this, *this, _children,
+					      start_node, *this, *this, *this, _children,
 					      Ram_quota { avail_ram.value  - used_ram.value },
 					      Cap_quota { avail_caps.value - used_caps.value },
 					       *this, *this, prio_levels, affinity_space,
