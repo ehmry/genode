@@ -52,6 +52,14 @@ class Sandbox::Child : Child_policy, Routed_service::Wakeup
 		struct Default_route_accessor : Interface { virtual Xml_node default_route() = 0; };
 		struct Default_caps_accessor  : Interface { virtual Cap_quota default_caps() = 0; };
 
+		struct Routes_accessor : Interface
+		{
+			virtual Xml_node routes(Xml_node _default)
+			{
+				return _default;
+			}
+		};
+
 		template <typename QUOTA>
 		struct Resource_limit_accessor : Interface
 		{
@@ -98,6 +106,7 @@ class Sandbox::Child : Child_policy, Routed_service::Wakeup
 		bool const _use_ld = _start_node->xml().attribute_value("ld", true);
 
 		Default_route_accessor &_default_route_accessor;
+		Routes_accessor        &_routes_accessor;
 		Default_caps_accessor  &_default_caps_accessor;
 		Ram_limit_accessor     &_ram_limit_accessor;
 		Cap_limit_accessor     &_cap_limit_accessor;
@@ -472,6 +481,7 @@ class Sandbox::Child : Child_policy, Routed_service::Wakeup
 		      Report_update_trigger    &report_update_trigger,
 		      Xml_node                  start_node,
 		      Default_route_accessor   &default_route_accessor,
+		      Routes_accessor          &route_accessor,
 		      Default_caps_accessor    &default_caps_accessor,
 		      Name_registry            &name_registry,
 		      Ram_quota                 ram_limit,
