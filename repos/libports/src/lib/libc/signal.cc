@@ -131,6 +131,9 @@ extern "C" int sigaction(int signum, const struct sigaction *act, struct sigacti
 }
 
 
+extern "C" int siginterrupt(int sig, int flag) { return 0; };
+
+
 extern "C" int       _sigaction(int, const struct sigaction *, struct sigaction *) __attribute__((weak, alias("sigaction")));
 extern "C" int  __sys_sigaction(int, const struct sigaction *, struct sigaction *) __attribute__((weak, alias("sigaction")));
 extern "C" int __libc_sigaction(int, const struct sigaction *, struct sigaction *) __attribute__((weak, alias("sigaction")));
