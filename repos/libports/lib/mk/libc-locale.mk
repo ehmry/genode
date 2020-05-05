@@ -6,7 +6,7 @@ CC_OPT += -D_Thread_local=""
 FILTER_OUT = \
 	c16rtomb.c c32rtomb_iconv.c mbrtoc16_iconv.c mbrtoc32_iconv.c \
 	setlocale.c xlocale.c setrunelocale.c \
-	ascii.c big5.c euc.co gb18030.c gb2312.c gbk.c mbsinit.c mskanji.c utf8.c \
+	ascii.c big5.c euc.co gb18030.c gb2312.c gbk.c mskanji.c utf8.c \
 
 SRC_C = $(filter-out $(FILTER_OUT),$(notdir $(wildcard $(LIBC_LOCALE_DIR)/*.c)))
 
