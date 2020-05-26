@@ -60,22 +60,17 @@ append config {
 		<config>
 			<start name="solo5-test_hello">
 				<config>
-					<solo5 cmdline="Hello_Solo5"/>
-					<rtc/> <nic/> <block/>
+					<cmdline>Hello_Solo5</cmdline>
 				</config>
 			</start>
 			<start name="solo5-test_fpu"/>
 			<start name="solo5-test_globals"/>
 			<start name="solo5-test_quiet"/>
-			<start name="solo5-test_blk">
-				<config> <block/> </config>
-			</start>}
+			<start name="solo5-test_blk"/>}
 
 if { ![get_cmd_switch --autopilot] || ![have_include "power_on/qemu"] } {
 	append config {
-			<start name="solo5-test_time">
-				<config> <rtc/> </config>
-			</start>}
+			<start name="solo5-test_time"/>}
 }
 
 append config {

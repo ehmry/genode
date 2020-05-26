@@ -67,12 +67,9 @@ append config {
 		</route>
 	</start>
 
-	<start name="solo5-test_ping_serve" caps="256">
+	<start name="solo5-test_net" caps="256">
 		<resource name="RAM" quantum="4M"/>
-		<config>
-			<solo5 cmdline="limit"/>
-			<nic/>
-		</config>
+		<config><cmdline>limit</cmdline></config>
 		<route>
 			<service name="Nic"> <child name="nic_bridge"/> </service>
 			<any-service> <parent/> <any-child/> </any-service>

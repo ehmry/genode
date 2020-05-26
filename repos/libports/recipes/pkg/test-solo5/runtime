@@ -51,16 +51,13 @@
 			<config>
 				<start name="solo5-test_hello">
 					<config>
-						<solo5 cmdline="Hello_Solo5"/>
-						<nic/> <blk/>
+						<cmdline>Hello_Solo5</cmdline>
 					</config>
 				</start>
 				<start name="solo5-test_fpu"/>
 				<start name="solo5-test_globals"/>
 				<start name="solo5-test_quiet"/>
-				<start name="solo5-test_blk">
-					<config> <block/> </config>
-				</start>
+				<start name="solo5-test_blk"/>
 			</config>
 		</start>
 	</config>

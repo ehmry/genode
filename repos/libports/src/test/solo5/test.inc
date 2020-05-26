@@ -3,7 +3,9 @@ TARGET = solo5-$(TEST_NAME)
 
 LIBS += base solo5
 
-CC_OPT += -fstack-protector-strong
+CC_OPT += -fstack-protector-strong -Dintmax_t=int64_t
+
+CC_WARN += -Wno-builtin-declaration-mismatch
 
 SRC_C += $(TEST_NAME).c
 
