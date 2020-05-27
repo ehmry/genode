@@ -218,5 +218,15 @@ int __attribute__((weak)) madvise(void *addr, size_t length, int advice)
 
 const struct res_sym __p_type_syms[] = { };
 
+#define DUMMY_EPERM(ret_type, ret_val, name, args) __attribute__((weak)) \
+ret_type name args \
+{ \
+	errno = EPERM; \
+	return ret_val; \
+}
+
+DUMMY_EPERM(int, -1,   mlock, (const void *, size_t));
+DUMMY_EPERM(int, -1, munlock, (const void *, size_t));
+
 } /* extern "C" */
 
