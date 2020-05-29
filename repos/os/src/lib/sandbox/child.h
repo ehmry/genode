@@ -119,7 +119,6 @@ class Sandbox::Child : Child_policy, Routed_service::Wakeup
 			throw Missing_name_attribute();
 		}
 
-		typedef String<64> Name;
 		Name const _unique_name { _name_from_xml(_start_node->xml()) };
 
 		static Binary_name _binary_from_xml(Xml_node start_node,

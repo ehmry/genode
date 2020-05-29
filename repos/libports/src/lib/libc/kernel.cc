@@ -364,7 +364,7 @@ void Libc::Kernel::_clone_state_from_parent()
 
 		/* clone RW segment of a shared library or the binary */
 		if (node.type() == "rw") {
-			typedef String<64> Name;
+			typedef String<128> Name;
 			Name const name = node.attribute_value("name", Name());
 
 			/*

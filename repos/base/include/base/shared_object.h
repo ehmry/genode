@@ -128,7 +128,7 @@ class Genode::Dynamic_linker
 		struct Object_info
 		{
 			/* name of shared library, or "binary" for the main program */
-			typedef String<64> Name;
+			typedef String<128> Name;
 			Name name;
 
 			Rom_dataspace_capability ds_cap;
