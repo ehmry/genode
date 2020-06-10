@@ -64,4 +64,14 @@ char *setlocale(int, const char *)
 	return (char*)"C";
 }
 
+
+locale_t newlocale(int, const char *locale, locale_t)
+{
+	Genode::warning("cannot set \"", locale, "\" locale, not implemented");
+	return NULL;
+}
+
+
+void freelocale(locale_t) { }
+
 }
