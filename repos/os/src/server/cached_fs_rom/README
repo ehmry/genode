@@ -1,0 +1,13 @@
+The 'cached_fs_rom' server is an alternative to 'fs_rom' for serving ROMs
+of fixed-content. The server will cache file content between sessions and
+clients, however the server does not cache intermediate symlinks.
+
+Configuration
+~~~~~~~~~~~~~
+
+The only configuration option is the directory policy variable.
+
+! <config>
+!   <policy label_suffix=".lib.so" directory="rom/lib" />
+!   <default-policy directory="rom/bin" />
+! </config>

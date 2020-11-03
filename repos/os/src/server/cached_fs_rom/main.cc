@@ -13,6 +13,7 @@
 
 /* Genode includes */
 #include <os/path.h>
+#include <os/session_policy.h>
 #include <file_system_session/connection.h>
 #include <file_system/util.h>
 #include <rom_session/rom_session.h>
@@ -267,8 +268,13 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 
 	Session_requests_rom session_requests { env, *this };
 
+	Attached_rom_dataspace config_rom { env, "config" };
+
 	Io_signal_handler<Main> packet_handler {
 		env.ep(), *this, &Main::handle_packets };
+
+	Signal_handler<Attached_rom_dataspace> config_handler {
+		env.ep(), config_rom, &Attached_rom_dataspace::update };
 
 	/**
 	 * Return true when a cache element is freed
@@ -444,8 +450,17 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 		 ** Find ROM in cache **
 		 ***********************/
 
+
+		Path path("/");
 		Session_label const label = label_from_args(args.string());
-		Path          const path(label.last_element().string());
+
+		try {
+			Session_policy policy(label, config_rom.xml());
+			path.append(policy.attribute_value(
+				"directory", String<Path::capacity()>("/")).string());
+		} catch (Service_denied) { }
+
+		path.append_element(label.last_element().string());
 
 		bool diag = session_diag_from_args(args.string()).enabled;
 
