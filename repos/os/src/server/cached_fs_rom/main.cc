@@ -74,7 +74,9 @@ struct Cached_fs_rom::Transfer final
 	/* Id of the originating session request */
 	Parent::Server::Id const request_id;
 
-	File_system::seek_off_t  _seek = 0;
+	File_system::seek_off_t seek = 0;
+
+	bool completed = false;
 
 	/**
 	 * Allocate space in the File_system packet buffer
@@ -92,41 +94,15 @@ struct Cached_fs_rom::Transfer final
 		return _fs.tx()->alloc_packet(chunk_size);
 	}
 
-	File_system::Node_handle _handle() const {
+	File_system::Node_handle handle() const {
 		return File_system::Node_handle{ _transfer_elem->id().value }; }
 
-	void _replace_handle(File_system::Node_handle new_handle)
+	void replace_handle(File_system::Node_handle new_handle)
 	{
-		_fs.close(_handle());
+		_fs.close(handle());
 		_transfer_elem.destruct();
 		_transfer_elem.construct(
 			*this, _transfers, Transfer_space::Id{new_handle.value});
-	}
-
-	void _resolve()
-	{
-		using namespace File_system;
-		status = _fs.status(_handle());
-
-		if (status.directory()) {
-			error("cannot serve directory as ROM, \"", final_path, "\"");
-			throw Service_denied();
-		}
-
-		Path dir_path(final_path);
-		dir_path.strip_last_element();
-		Dir_handle parent_handle = _fs.dir(dir_path.base(), false);
-		Handle_guard parent_guard(_fs, parent_handle);
-
-		if (status.symlink()) {
-			Symlink_handle link_handle = _fs.symlink(
-				parent_handle, final_path.last_element(), false);
-			_replace_handle(link_handle);
-		} else {
-			File_handle file_handle = _fs.file(
-				parent_handle, final_path.last_element(), READ_ONLY, false);
-			_replace_handle(file_handle);
-		}
 	}
 
 	Transfer(Genode::Env          &env,
@@ -139,62 +115,19 @@ struct Cached_fs_rom::Transfer final
 	, first_path(path)
 	, ram_ds(env.ram(), env.rm(), 0)
 	, request_id(pid)
-	{
-		_resolve();
-	}
+	{ }
 
-	~Transfer() { _fs.close(_handle()); }
+	~Transfer() { _fs.close(handle()); }
 
 	bool matches(Path const &path) const {
 		return (first_path == path || final_path == path); }
 
-	bool completed() const {
-		return (!status.symlink() && _seek >= status.size); }
-
-	/**
-	 * Called from the packet signal handler.
-	 */
-	void process_packet(File_system::Packet_descriptor const packet)
-	{
-		if (status.symlink()) {
-			size_t const n = packet.length();
-			if (n >= Path::capacity()) {
-				error("erronous symlink read");
-				throw File_system::Lookup_failed();
-			}
-
-			char buf[Path::capacity()];
-			copy_cstring(buf, _fs.tx()->packet_content(packet), n);
-			if (*buf == '/')
-				final_path = Path(buf);
-			else
-				final_path.append_element(buf);
-
-			_replace_handle(_fs.node(final_path.string()));
-			_resolve();
-
-		} else {
-			auto const pkt_seek = packet.position();
-
-			if (pkt_seek > _seek || _seek >= status.size) {
-				error("unexpected packet seek position for ", final_path);
-				error("packet seek is ", packet.position(), ", file seek is ", _seek, ", file size is ", status.size);
-				_seek = status.size;
-			} else {
-				size_t const n = min(packet.length(), status.size - pkt_seek);
-				memcpy(ram_ds.local_addr<char>()+pkt_seek,
-				       _fs.tx()->packet_content(packet), n);
-				_seek = pkt_seek+n;
-			}
-		}
-	}
-
 	void submit_next_packet()
 	{
 		File_system::Packet_descriptor packet(
-			_raw_pkt, _handle(),
+			_raw_pkt, handle(),
 			File_system::Packet_descriptor::READ,
-			min(_raw_pkt.size(), status.size-_seek), _seek);
+			_raw_pkt.size(), seek);
 		_fs.tx()->submit_packet(packet);
 	}
 
@@ -294,10 +227,11 @@ class Cached_fs_rom::Session_component final : public  Rpc_object<Rom_session>
 	public:
 
 		Session_component(Cached_rom &cached_rom,
-		                  Session_space &space, Session_space::Id id)
+		                  Session_space &space,
+		                  Parent::Server::Id pid)
 		:
 			_cached_rom(cached_rom),
-			_sessions_elem(*this, space, id)
+			_sessions_elem(*this, space, Session_space::Id{pid.value})
 		{ }
 
 
@@ -370,10 +304,31 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 		throw Service_denied();
 	}
 
-	void process_transfer(Transfer &transfer)
+	void resolve(Transfer &transfer)
 	{
-		/* allocate a backing dataspace if the path is resolved */
-		if (!transfer.ram_ds.size() && !transfer.status.symlink()) {
+		using namespace File_system;
+		transfer.status = fs.status(transfer.handle());
+
+		if (transfer.status.directory()) {
+			error("cannot serve directory as ROM, \"", transfer.final_path, "\"");
+			throw Service_denied();
+		}
+
+		Path dir_path(transfer.final_path);
+		dir_path.strip_last_element();
+		Dir_handle parent_handle = fs.dir(dir_path.base(), false);
+		Handle_guard parent_guard(fs, parent_handle);
+
+		if (transfer.status.symlink()) {
+			Symlink_handle link_handle = fs.symlink(
+				parent_handle, transfer.final_path.last_element(), false);
+			transfer.replace_handle(link_handle);
+		} else {
+			File_handle file_handle = fs.file(
+				parent_handle, transfer.final_path.last_element(), READ_ONLY, false);
+			transfer.replace_handle(file_handle);
+
+			/* allocate a backing dataspace */
 			size_t ds_size =
 				align_addr(max(transfer.status.size, 1U), 12);
 
@@ -386,12 +341,73 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 			transfer.ram_ds.realloc(&env.ram(), ds_size);
 		}
 
-		if (transfer.completed()) {
-			new (heap) Cached_rom( env, rm, cache, transfer);
-			destroy(heap, &transfer);
-			session_requests.schedule();
+		transfer.submit_next_packet();
+	}
+
+	/**
+	 * Called from the packet signal handler.
+	 */
+	void process_packet(Transfer &transfer,
+	                    File_system::Packet_descriptor const packet)
+	{
+		if (transfer.status.symlink()) {
+			size_t const n = packet.length();
+			if (n >= Path::capacity()) {
+				error("bad symlink read at ", transfer.final_path);
+				throw File_system::Lookup_failed();
+			}
+
+			char buf[Path::capacity()];
+			copy_cstring(buf, fs.tx()->packet_content(packet), n);
+			if (*buf == '/')
+				transfer.final_path = Path(buf);
+			else
+				transfer.final_path.append_element(buf);
+
+			/* lookup the link target in the cache */
+			cache.for_each<Cached_rom&>([&] (Cached_rom &rom) {
+				if (!transfer.completed && rom.path == transfer.final_path) {
+					/*
+					 * this session can be served but future requests to
+					 * first_path must again traverse the symlinks to final_path
+					 */
+					Session_component *session = new (heap)
+						Session_component(rom, sessions, transfer.request_id);
+					env.parent().deliver_session_cap(
+						transfer.request_id, env.ep().manage(*session));
+					transfer.completed = true;
+				}
+			});
+			if (!transfer.completed) {
+				transfer.replace_handle(fs.node(transfer.final_path.string()));
+				resolve(transfer);
+			}
 		} else {
-			transfer.submit_next_packet();
+			auto const pkt_seek = packet.position();
+
+			if (pkt_seek > transfer.seek || transfer.seek >= transfer.status.size) {
+				error("unexpected packet seek position for ", transfer.final_path);
+				error("packet seek is ", packet.position(), ", file seek is ", transfer.seek, ", file size is ", transfer.status.size);
+				transfer.seek = transfer.status.size;
+			} else {
+				size_t const n = min(packet.length(), transfer.status.size - pkt_seek);
+				memcpy(transfer.ram_ds.local_addr<char>()+pkt_seek,
+				       fs.tx()->packet_content(packet), n);
+				transfer.seek = pkt_seek+n;
+			}
+
+			if (transfer.seek < transfer.status.size) {
+				transfer.submit_next_packet();
+			} else {
+				Cached_rom *rom = new (heap)
+					Cached_rom(env, rm, cache, transfer);
+				destroy(heap, &transfer);
+				Session_component *session = new (heap)
+					Session_component(*rom, sessions, transfer.request_id);
+				env.parent().deliver_session_cap(
+					transfer.request_id, env.ep().manage(*session));
+				session_requests.schedule();
+			}
 		}
 	}
 
@@ -422,8 +438,6 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 		 ** Find ROM in cache **
 		 ***********************/
 
-		Session_space::Id  const id { pid.value };
-
 		Path path("/");
 		Session_label const label = label_from_args(args.string());
 
@@ -445,7 +459,7 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 		if (rom) {
 			/* Create new RPC object */
 			Session_component *session = new (heap)
-				Session_component(*rom, sessions, id);
+				Session_component(*rom, sessions, pid);
 			if (session_diag_from_args(args.string()).enabled)
 				log("deliver ROM \"", label, "\"");
 			env.parent().deliver_session_cap(pid, env.ep().manage(*session));
@@ -456,16 +470,23 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 		/* find matching transfer */
 		bool pending = false;
 		transfers.for_each<Transfer&>([&] (Transfer &other) {
-			pending |= other.matches(path); });
+			/* symlink race? */
+			pending |= other.matches(path);
+		});
 
 		if (pending) /* wait until transfer completes */
 			return;
 
 		/* initiate new transfer or throw Service_denied */
 		try_transfer(path, [&] () {
-			Transfer *transfer = new (heap)
-				Transfer(env, fs, transfers, path, pid);
-			process_transfer(*transfer);
+			try {
+				Transfer *transfer = new (heap)
+					Transfer(env, fs, transfers, path, pid);
+				resolve(*transfer);
+			} catch (Packet_alloc_failed) {
+				/* temporary failure */
+				return;
+			}
 		});
 	}
 
@@ -501,11 +522,10 @@ struct Cached_fs_rom::Main final : Genode::Session_request_handler
 			transfers.apply<Transfer&>(
 				Transfer_space::Id{pkt.handle().value}, [&] (Transfer &transfer)
 			{
+				stray_pkt = false;
 				try {
 					try_transfer(transfer.final_path, [&] () {
-						transfer.process_packet(pkt);
-						process_transfer(transfer);
-						stray_pkt = false;
+						process_packet(transfer, pkt);
 					});
 				} catch (Service_denied) {
 					env.parent().session_response(
