@@ -58,12 +58,9 @@ namespace Sandbox {
 	 */
 	inline bool service_node_matches(Xml_node           const  service_node,
 	                                 Session_label      const &label,
-	                                 Child_policy::Name const &child_name,
-	                                 Service::Name      const &service_name,
-	                                 bool               skip_child_prefix = true)
+	                                 Service::Name      const &service_name)
 	{
 		bool const service_matches =
-			service_node.has_type("any-service") ||
 			(service_node.has_type("service") &&
 			 service_node.attribute_value("name", Service::Name()) == service_name);
 
@@ -72,7 +69,6 @@ namespace Sandbox {
 
 		typedef String<Session_label::capacity()> Label;
 
-		char const *unscoped_attr   = "unscoped_label";
 		char const *label_last_attr = "label_last";
 
 		bool const route_depends_on_child_provided_label =
@@ -81,34 +77,13 @@ namespace Sandbox {
 			service_node.has_attribute("label_suffix") ||
 			service_node.has_attribute(label_last_attr);
 
-		if (service_node.has_attribute(unscoped_attr)) {
-
-			/*
-			 * If an 'unscoped_label' attribute is provided, don't consider any
-			 * scoped label attribute.
-			 */
-			if (route_depends_on_child_provided_label)
-				warning("service node contains both scoped and unscoped label attributes");
-
-			return label == service_node.attribute_value(unscoped_attr, Label());
-		}
-
 		if (service_node.has_attribute(label_last_attr))
 			return service_node.attribute_value(label_last_attr, Label()) == label.last_element();
 
 		if (!route_depends_on_child_provided_label)
 			return true;
 
-		char const * const scoped_label = skip_child_prefix
-			? skip_label_prefix(child_name.string(), label.string())
-			: label.string();
-
-		if (!scoped_label)
-			return false;
-
-		Session_label const session_label(scoped_label);
-
-		return !Xml_node_label_score(service_node, session_label).conflict();
+		return !Xml_node_label_score(service_node, label).conflict();
 	}
 
 
@@ -130,6 +105,34 @@ namespace Sandbox {
 
 		return cnt > 1;
 	}
+
+
+	/*
+	 * Determine session label to be provided to the server
+	 *
+	 * By default, the client's identity (accompanied with the a
+	 * client-provided label) is presented as session label to the
+	 * server. However, the target node can explicitly override the
+	 * client's identity by a custom label via the 'label' attribute or
+	 * by specifying a 'prefix' and 'suffix attributes.
+	 */
+	typedef String<Session_label::capacity()> Label;
+	inline Label target_label(Xml_node           const  node,
+	                          Child_policy::Name const &child_name,
+	                          Session_label      const &label)
+	{
+		if (node.has_attribute("label"))
+			return Session_label(node.attribute_value("label", Label()).string());
+
+		Label head = node.attribute_value("prefix", Label(child_name.string()));
+		Label tail = node.attribute_value("suffix", Label(child_name == label ? "" : label));
+
+		if (head == "") return tail;
+		if (tail == "") return head;
+
+		return Label(prefixed_label(head, tail).string());
+	}
+
 
 	/**
 	 * Find service with certain values in given registry

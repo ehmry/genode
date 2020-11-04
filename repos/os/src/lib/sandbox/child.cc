@@ -11,6 +11,7 @@
  * under the terms of the GNU Affero General Public License version 3.
  */
 
+#include <os/session_policy.h>
 #include <vm_session/vm_session.h>
 
 /* local includes */
@@ -486,105 +487,65 @@ Sandbox::Child::resolve_session_request(Service::Name const &service_name,
 	 && label.last_element() == Session_requester::rom_name())
 		return Route { _session_requester.service(), Session::Label(), diag };
 
-	try {
-		/* Lookup route in <default-route>… */
-		Xml_node route_node = _default_route_accessor.default_route();
-		/* …unless <routes> is present… */
-		route_node = _routes_accessor.routes(route_node);
-		try {
-			/* …otherwise use <child><route>. */
-			route_node = _start_node->xml().sub_node("route"); }
-		catch (...) { }
+	{
+		Xml_node service_node("<deny/>");
+		Xml_node routes_node = _routes_accessor.routes(service_node);
+		Xml_node_label_score best_score;
 
-		Xml_node service_node = route_node.sub_node();
-
-		/* <routes> is processed with the "«child» -> " prefix */
-		bool skip_prefix = route_node.type() != "routes";
-
-		for (; ; service_node = service_node.next()) {
-
-			bool service_wildcard = service_node.has_type("any-service");
-
-			if (!service_node_matches(service_node, label, name(), service_name, skip_prefix))
-				continue;
-
-			Xml_node target = service_node.sub_node();
-			for (; ; target = target.next()) {
-
-				/*
-				 * Determine session label to be provided to the server
-				 *
-				 * By default, the client's identity (accompanied with the a
-				 * client-provided label) is presented as session label to the
-				 * server. However, the target node can explicitly override the
-				 * client's identity by a custom label via the 'label'
-				 * attribute.
-				 */
-				typedef String<Session_label::capacity()> Label;
-				Label const target_label =
-					target.attribute_value("label", Label(label.string()));
-
-				Session::Diag const
-					target_diag { target.attribute_value("diag", diag.enabled) };
-
-				auto no_filter = [] (Service &) -> bool { return false; };
-
-				if (target.has_type("parent")) {
-
-					try {
-						return Route { find_service(_parent_services, service_name, no_filter),
-						               target_label, target_diag };
-					} catch (Service_denied) { }
+		routes_node.for_each_sub_node([&] (Xml_node const &node) {
+			if (service_node_matches(node, label, service_name)) {
+				Xml_node_label_score score(node, label);
+				if (score.stronger(best_score)
+				 || service_node.has_type("deny")) {
+					best_score = score;
+					service_node = node;
 				}
-
-				if (target.has_type("local")) {
-
-					try {
-						return Route { find_service(_local_services, service_name, no_filter),
-						               target_label, target_diag };
-					} catch (Service_denied) { }
-				}
-
-				if (target.has_type("child")) {
-
-					typedef Name_registry::Name Name;
-					Name server_name = target.attribute_value("name", Name());
-					server_name = _name_registry.deref_alias(server_name);
-
-					auto filter_server_name = [&] (Routed_service &s) -> bool {
-						return s.child_name() != server_name; };
-
-					try {
-						return Route { find_service(_child_services, service_name, filter_server_name),
-						               target_label, target_diag };
-
-					} catch (Service_denied) { }
-				}
-
-				if (target.has_type("any-child")) {
-
-					if (is_ambiguous(_child_services, service_name)) {
-						error(name(), ": ambiguous routes to "
-						      "service \"", service_name, "\"");
-						throw Service_denied();
-					}
-					try {
-						return Route { find_service(_child_services, service_name, no_filter),
-						               target_label, target_diag };
-
-					} catch (Service_denied) { }
-				}
-
-				if (!service_wildcard) {
-					warning(name(), ": lookup for service \"", service_name, "\" failed");
-					throw Service_denied();
-				}
-
-				if (target.last())
-					break;
 			}
+		});
+
+		if (service_node.has_type("deny")) {
+			warning(name(), ": no route to service \"", service_name, "\" (label=\"", label, "\")");
+			throw Service_denied();
 		}
-	} catch (Xml_node::Nonexistent_sub_node) { }
+
+		for (Xml_node target_node = service_node.sub_node(); ;
+		     target_node = target_node.next()) {
+
+			Session_label the_label_part_of_label(skip_label_prefix(name().string(), label.string()));
+			if (the_label_part_of_label == "") the_label_part_of_label = label;
+
+			auto target_label = Sandbox::target_label(
+				target_node, name(), the_label_part_of_label);
+
+			Session::Diag const
+				target_diag { target_node.attribute_value("diag", false) };
+
+			auto no_filter = [] (Service &) -> bool { return false; };
+
+			if (target_node.has_type("parent"))
+				return Route { find_service(_parent_services, service_name, no_filter),
+				               target_label, target_diag };
+
+			if (target_node.has_type("local"))
+				return Route { find_service(_local_services, service_name, no_filter),
+				               target_label, target_diag };
+
+			if (target_node.has_type("child")) {
+
+				typedef Name_registry::Name Name;
+				Name server_name = target_node.attribute_value("name", Name());
+				server_name = _name_registry.deref_alias(server_name);
+
+				auto filter_server_name = [&] (Routed_service &s) -> bool {
+					return s.child_name() != server_name; };
+
+				return Route { find_service(_child_services, service_name, filter_server_name),
+				               target_label, target_diag };
+			}
+
+			if (target_node.last()) break;
+		}
+	}
 
 	warning(name(), ": no route to service \"", service_name, "\" (label=\"", label, "\")");
 	throw Service_denied();
@@ -712,7 +673,6 @@ Sandbox::Child::Child(Env                      &env,
                       Id                        id,
                       Report_update_trigger    &report_update_trigger,
                       Xml_node                  start_node,
-                      Default_route_accessor   &default_route_accessor,
                       Routes_accessor          &routes_accessor,
                       Default_caps_accessor    &default_caps_accessor,
                       Name_registry            &name_registry,
@@ -730,7 +690,6 @@ Sandbox::Child::Child(Env                      &env,
 	_report_update_trigger(report_update_trigger),
 	_list_element(this),
 	_start_node(_alloc, start_node),
-	_default_route_accessor(default_route_accessor),
 	_routes_accessor(routes_accessor),
 	_default_caps_accessor(default_caps_accessor),
 	_ram_limit_accessor(ram_limit_accessor),

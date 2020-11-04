@@ -22,7 +22,6 @@
 #include <heartbeat.h>
 
 struct Genode::Sandbox::Library : ::Sandbox::State_reporter::Producer,
-                                  ::Sandbox::Child::Default_route_accessor,
                                   ::Sandbox::Child::Routes_accessor,
                                   ::Sandbox::Child::Default_caps_accessor,
                                   ::Sandbox::Child::Ram_limit_accessor,
@@ -132,15 +131,6 @@ struct Genode::Sandbox::Library : ::Sandbox::State_reporter::Producer,
 
 		if (detail.children())
 			_children.report_state(xml, detail);
-	}
-
-	/**
-	 * Default_route_accessor interface
-	 */
-	Xml_node default_route() override
-	{
-		return _default_route.constructed() ? _default_route->xml()
-		                                    : Xml_node("<empty/>");
 	}
 
 	/**
@@ -462,7 +452,7 @@ void Genode::Sandbox::Library::apply_config(Xml_node const &config)
 				Child &child = *new (_heap)
 					Child(_env, _heap, *_verbose,
 					      Child::Id { ++_child_cnt }, _state_reporter,
-					      start_node, *this, *this, *this, _children,
+					      start_node, *this, *this, _children,
 					      Ram_quota { avail_ram.value  - used_ram.value },
 					      Cap_quota { avail_caps.value - used_caps.value },
 					       *this, *this, prio_levels, affinity_space,
