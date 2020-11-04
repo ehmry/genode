@@ -184,47 +184,93 @@ struct Genode::Sandbox::Library : ::Sandbox::State_reporter::Producer,
 
 void Genode::Sandbox::Library::_update_parent_services_from_config(Xml_node const &config)
 {
-	Xml_node const node = config.has_sub_node("parent-provides")
-	                    ? config.sub_node("parent-provides")
-	                    : Xml_node("<empty/>");
+	if (config.has_sub_node("routes")) {
+		if (config.has_sub_node("parent-provides"))
+			warning("ignoring <parent-provides> and parsing <routes> instead");
+	
+		Xml_node const node = config.sub_node("routes");
+	
+		/* remove services that are no longer present in config */
+		_parent_services.for_each([&] (Parent_service &service) {
 
-	/* remove services that are no longer present in config */
-	_parent_services.for_each([&] (Parent_service &service) {
+			Service::Name const name = service.name();
 
-		Service::Name const name = service.name();
+			bool obsolete = true;
+			node.for_each_sub_node("service", [&] (Xml_node service) {
+				if (obsolete && name == service.attribute_value("name", Service::Name())) {
+					obsolete = !service.has_sub_node("parent"); }});
 
-		bool obsolete = true;
+			if (obsolete)
+				service.abandon();
+		});
+	
+		/* used to prepend the list of new parent services with title */
+		bool first_log = true;
+	
+		/* register new services */
 		node.for_each_sub_node("service", [&] (Xml_node service) {
-			if (name == service.attribute_value("name", Service::Name())) {
-				obsolete = false; }});
-
-		if (obsolete)
-			service.abandon();
-	});
-
-	/* used to prepend the list of new parent services with title */
-	bool first_log = true;
-
-	/* register new services */
-	node.for_each_sub_node("service", [&] (Xml_node service) {
-
-		Service::Name const name = service.attribute_value("name", Service::Name());
-
-		bool registered = false;
-		_parent_services.for_each([&] (Parent_service const &service) {
-			if (service.name() == name)
-				registered = true; });
-
-		if (!registered) {
-			new (_heap) ::Sandbox::Parent_service(_parent_services, _env, name);
-			if (_verbose->enabled()) {
-				if (first_log)
-					log("parent provides");
-				log("  service \"", name, "\"");
-				first_log = false;
+			if (service.has_sub_node("child")) return;
+	
+			Service::Name const name = service.attribute_value("name", Service::Name());
+	
+			bool registered = false;
+			_parent_services.for_each([&] (Parent_service const &service) {
+				if (service.name() == name)
+					registered = true; });
+	
+			if (!registered) {
+				new (_heap) ::Sandbox::Parent_service(_parent_services, _env, name);
+				if (_verbose->enabled()) {
+					if (first_log)
+						log("parent provides");
+					log("  service \"", name, "\"");
+					first_log = false;
+				}
 			}
-		}
-	});
+		});
+	} else {	
+		Xml_node const node = config.has_sub_node("parent-provides")
+		                    ? config.sub_node("parent-provides")
+		                    : Xml_node("<empty/>");
+	
+		/* remove services that are no longer present in config */
+		_parent_services.for_each([&] (Parent_service &service) {
+	
+			Service::Name const name = service.name();
+	
+			bool obsolete = true;
+			node.for_each_sub_node("service", [&] (Xml_node service) {
+				if (name == service.attribute_value("name", Service::Name())) {
+					obsolete = false; }});
+	
+			if (obsolete)
+				service.abandon();
+		});
+	
+		/* used to prepend the list of new parent services with title */
+		bool first_log = true;
+	
+		/* register new services */
+		node.for_each_sub_node("service", [&] (Xml_node service) {
+	
+			Service::Name const name = service.attribute_value("name", Service::Name());
+	
+			bool registered = false;
+			_parent_services.for_each([&] (Parent_service const &service) {
+				if (service.name() == name)
+					registered = true; });
+	
+			if (!registered) {
+				new (_heap) ::Sandbox::Parent_service(_parent_services, _env, name);
+				if (_verbose->enabled()) {
+					if (first_log)
+						log("parent provides");
+					log("  service \"", name, "\"");
+					first_log = false;
+				}
+			}
+		});
+	}
 }
 
 
