@@ -379,7 +379,7 @@ class Platform::Session_component : public Genode::Rpc_object<Session>
 		/**
 		 * Check according session policy device usage
 		 */
-		bool permit_device(Bdf const bdf, unsigned class_code)
+		bool permit_device(Bdf const bdf, unsigned class_code, unsigned &class_index)
 		{
 			using namespace Genode;
 
@@ -403,6 +403,16 @@ class Platform::Session_component : public Genode::Rpc_object<Session>
 					/* if class/subclass don't match - deny */
 					if (class_sub_prog && (class_sub_prog ^ class_code) >> DONT_CHECK_PROGIF)
 						return;
+
+					/*
+					 *if policy specifies an index into devices
+					 * of this class and it doesn't match - deny
+					 */
+					unsigned long policy_index = node.attribute_value("index", ~0UL);
+					if (policy_index != ~0UL) {
+						if (class_index++ != policy_index)
+							return;
+					}
 
 					/* if this bdf is used by some policy - deny */
 					if (find_dev_in_policy(bdf))
@@ -535,9 +545,9 @@ class Platform::Session_component : public Genode::Rpc_object<Session>
 						throw Genode::Service_denied();
 					}
 
-					/* sanity check that 'class' is the only attribute */
+					/* sanity check that 'class' and 'index' are the only attributes */
 					try {
-						node.attribute(1);
+						node.attribute(node.has_attribute("index") ? 2 : 1);
 						Genode::error("'", _label, "' - attributes beside 'class' detected");
 						throw Genode::Service_denied();
 					}
@@ -663,6 +673,7 @@ class Platform::Session_component : public Genode::Rpc_object<Session>
 				 */
 				Device_config config;
 
+				unsigned class_index = 0;
 				while (true) {
 					function += 1;
 					if (!_pci_bus.find_next(bus, device, function, &config,
@@ -682,7 +693,8 @@ class Platform::Session_component : public Genode::Rpc_object<Session>
 					if (permit_device(Bdf { (unsigned)bus,
 					                        (unsigned)device,
 					                        (unsigned)function },
-					                  config.class_code()))
+					                  config.class_code(),
+					                  class_index))
 						break;
 				}
 

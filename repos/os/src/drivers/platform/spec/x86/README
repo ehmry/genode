@@ -59,11 +59,14 @@ Non PCI devices, as the PS2 controller are named by a "device" node in the polic
 
 
 The first entry ('pci' or 'dev') of the policy node that matches will grant
-access of a device or device class to the client. Subsequent entries will not
-be checked. If a 'bus', 'device', 'function' triple was specified in one of the
-policies and in another policy a fuzzy pci class alias which would include
-the device specified by the triple, the device will not appear during device
-discovery by the client with the fuzzy pci class policy.
+access of a device or device class to the client. If a 'pci' policy specifies
+'class' and 'index' attributes then the device will be selected by an index
+into the list of devices matching that class.
+
+If a 'bus', 'device', 'function' triple was specified in one of the policies
+and in another policy a fuzzy pci class alias which would include the device
+specified by the triple, the device will not appear during device discovery
+by the client with the fuzzy pci class policy.
 
 
 By default the driver will try to use MSIs if the device and the used kernel
