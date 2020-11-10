@@ -1110,7 +1110,9 @@ class Platform::Root : public Genode::Root_component<Session_component>
 
 								for (Genode::uint16_t val = 0; cap; cap = val >> 8) {
 									val = config.read(config_access, cap, Platform::Device::ACCESS_16BIT);
-									xml.attribute("cap", String<8>(Hex(val & 0xff)));
+									xml.node("cap", [&] () {
+										xml.attribute("type", String<8>(Hex(val & 0xff)));
+									});
 								}
 							} catch (...) {
 								xml.attribute("cap", "failed to read");
