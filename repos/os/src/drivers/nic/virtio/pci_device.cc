@@ -50,7 +50,10 @@ struct Virtio_pci_nic::Main
 		log("--- VirtIO PCI driver started ---");
 		env.parent().announce(env.ep().manage(root));
 	}
-	catch (...) { env.parent().exit(-1); }
+	catch (Device_not_found) {
+		error("device not found");
+		env.parent().exit(-1);
+	}
 };
 
 
