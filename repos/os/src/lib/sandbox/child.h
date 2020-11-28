@@ -596,6 +596,7 @@ class Sandbox::Child : Child_policy, Routed_service::Wakeup
 		 ****************************/
 
 		Child_policy::Name name() const override { return _unique_name; }
+		Child_policy::Binary_name binary_name() const override { return _binary_name; }
 
 		Pd_session           &ref_pd()           override { return _env.pd(); }
 		Pd_session_capability ref_pd_cap() const override { return _env.pd_session_cap(); }

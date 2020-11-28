@@ -58,7 +58,7 @@ struct Genode::Child_policy
 	/**
 	 * ROM module name of the binary to start
 	 */
-	virtual Binary_name binary_name() const { return name(); }
+	virtual Binary_name binary_name() const = 0;
 
 	/**
 	 * ROM module name of the dynamic linker
