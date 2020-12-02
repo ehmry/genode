@@ -319,10 +319,6 @@ Libc::File_descriptor *Libc::Vfs_plugin::open_from_kernel(const char *path, int 
 		case Result::OPEN_ERR_UNACCESSIBLE:
 			{
 				if (!(flags & O_CREAT)) {
-					if (flags & O_NOFOLLOW) {
-					        errno = ELOOP;
-					        return 0;
-					}
 					errno = ENOENT;
 					return 0;
 				}
@@ -336,10 +332,6 @@ Libc::File_descriptor *Libc::Vfs_plugin::open_from_kernel(const char *path, int 
 				case Result::OPEN_ERR_EXISTS:
 
 					/* file has been created by someone else in the meantime */
-					if (flags & O_NOFOLLOW) {
-					        errno = ELOOP;
-					        return 0;
-					}
 					errno = EEXIST;
 					return 0;
 
@@ -451,10 +443,6 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags)
 				case Result::OPEN_ERR_UNACCESSIBLE:
 					{
 						if (!(flags & O_CREAT)) {
-							if (flags & O_NOFOLLOW) {
-							        result_errno = ELOOP;
-							        return Fn::COMPLETE;
-							}
 							result_errno = ENOENT;
 							return Fn::COMPLETE;
 						}
@@ -468,10 +456,6 @@ Libc::File_descriptor *Libc::Vfs_plugin::open(char const *path, int flags)
 						case Result::OPEN_ERR_EXISTS:
 
 							/* file has been created by someone else in the meantime */
-							if (flags & O_NOFOLLOW) {
-								result_errno = ELOOP;
-								return Fn::COMPLETE;
-							}
 							result_errno = EEXIST;
 							return Fn::COMPLETE;
 
