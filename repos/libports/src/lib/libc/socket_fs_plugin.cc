@@ -33,6 +33,8 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <ifaddrs.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <net/if.h>
 
 /* libc-internal includes */
@@ -1128,7 +1130,53 @@ extern "C" int getifaddrs(struct ifaddrs **ifap)
 }
 
 
-extern "C" void freeifaddrs(struct ifaddrs *) { }
+extern "C" void freeifaddrs(struct ifaddrs *)
+{
+}
+
+
+static char const * static_if_name = "eth0";
+
+
+extern "C" unsigned int
+if_nametoindex(const char *ifname)
+{
+	return ::strcmp(ifname, static_if_name) ? 0 : 1;
+}
+
+
+extern "C" char *
+if_indextoname(unsigned int ifindex, char *ifname)
+{
+	if (ifindex == 1) {
+		strncpy(ifname, static_if_name, IFNAMSIZ);
+		return ifname;
+	}
+	return NULL;
+}
+
+
+extern "C" struct if_nameindex *
+if_nameindex(void)
+{
+	static struct if_nameindex if_ni_array[2] = {
+		{
+			.if_index = 1,
+			.if_name = (char *)static_if_name
+		},
+		{
+			.if_index = 0,
+			.if_name = NULL
+		}
+	};
+
+	return if_ni_array;
+}
+
+
+extern "C" void if_freenameindex(struct if_nameindex *ptr)
+{
+}
 
 
 /****************************
