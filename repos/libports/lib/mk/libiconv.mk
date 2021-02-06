@@ -12,7 +12,8 @@ CC_DEF += -DLIBDIR=\"\"
 
 SRC_C := iconv.c \
          relocatable.c \
-         localcharset.c
+         localcharset.c \
+         citrus_iconv.c
 
 SHARED_LIB = yes
 

@@ -732,7 +732,8 @@ extern "C" pid_t __sys_wait4(pid_t pid, int *status, int options, rusage *rusage
 	return result;
 }
 
-extern "C" pid_t wait4(pid_t, int *, int, rusage *) __attribute__((weak, alias("__sys_wait4")));
+extern "C" pid_t  wait4(pid_t, int *, int, rusage *) __attribute__((weak, alias("__sys_wait4")));
+extern "C" pid_t _wait4(pid_t, int *, int, rusage *) __attribute__((weak, alias("__sys_wait4")));
 
 
 void Libc::init_fork(Env &env, Config_accessor const &config_accessor,

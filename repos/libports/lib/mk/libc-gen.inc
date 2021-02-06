@@ -22,7 +22,6 @@ FILTER_OUT_C += lockf.c
 
 # interposing stubs
 FILTER_OUT_C += \
-	elf_utils.c \
 	sleep.c \
 	_spinlock_stub.c \
 	usleep.c \

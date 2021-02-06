@@ -37,6 +37,8 @@ extern "C" {
 #include <resolv.h>
 #include <spinlock.h>
 #include <ucontext.h>
+#include <dirent.h>
+#include <gdtoa.h>
 
 
 #define DUMMY(ret_type, ret_val, name, args) __attribute__((weak)) \
@@ -216,7 +218,9 @@ int __attribute__((weak)) madvise(void *addr, size_t length, int advice)
 	return -1;
 }
 
-const struct res_sym __p_type_syms[] = { };
+const struct res_sym __p_class_syms[] = { };
+const struct res_sym __p_rcode_syms[] = { };
+const struct res_sym __p_type_syms[]  = { };
 
 #define DUMMY_EPERM(ret_type, ret_val, name, args) __attribute__((weak)) \
 ret_type name args \
@@ -228,5 +232,33 @@ ret_type name args \
 DUMMY_EPERM(int, -1,   mlock, (const void *, size_t));
 DUMMY_EPERM(int, -1, munlock, (const void *, size_t));
 
-} /* extern "C" */
+DUMMY(int, -1, sysarch, (int, void *))
 
+DUMMY(int, -1, freebsd11_fstat, (struct thread *, struct freebsd11_stat_args *))
+DUMMY(int, -1, freebsd11_lstat, (struct thread *, struct freebsd11_lstat_args *))
+DUMMY(int, -1, freebsd11_readdir, (DIR *, struct freebsd11_dirent *, struct freebsd11_dirent **))
+DUMMY(int, -1, freebsd11_stat, (struct thread *, struct freebsd11_stat_args *))
+DUMMY(int, -1, freebsd11_statfs, (const char *, struct freebsd11_statfs *))
+
+DUMMY(int, -1, strunvis, (char *dst, const char *src))
+DUMMY(int, -1, strvisx, (char *, const char *, size_t, int))
+DUMMY(int, -1, unvis, (char *, int, int *, int))
+
+DUMMY(const char *, "", loc_ntoa, (const u_char *, char *))
+DUMMY(const char *, "", p_class, (int))
+DUMMY(const char *, "", p_rcode, (int))
+DUMMY(const char *, "", p_section, (int, int))
+DUMMY(const char *, "", p_type, (int))
+DUMMY(char *, NULL, p_secstodate, (u_long))
+DUMMY(int, -1, dn_count_labels, (const char *))
+DUMMY(int, -1, loc_aton, (const char *, u_char *))
+DUMMY(int, -1, sym_ston, (const struct res_sym *, const char *, int *))
+DUMMY(void, , res_pquery, (const res_state, const u_char *, int, FILE *))
+
+DUMMY(int, -1, clock_getcpuclockid2, (id_t, int, clockid_t *))
+
+DUMMY(int, -1, _citrus_iconv_open, (struct _citrus_iconv **, const char *, const char *))
+
+DUMMY(int, -1, strtodg, (const char*, char**, FPI*, int*, ULong*))
+
+} /* extern "C" */
